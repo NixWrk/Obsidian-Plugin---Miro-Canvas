@@ -5,3 +5,4 @@ coverage/
 *.tsbuildinfo
 __pycache__/
 .pytest_cache/
+tools/obsidian_oracle/.out/
