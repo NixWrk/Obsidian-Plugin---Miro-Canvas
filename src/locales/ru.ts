@@ -746,6 +746,28 @@ export const RU: Messages = {
 		copied: "Скопировано.",
 		copyFailed: "Не удалось скопировать.",
 	},
+	updates: {
+		heading: "Обновления",
+		checkName: "Проверить обновления",
+		checkDesc: (version: string) =>
+			`Установлена версия ${version}. Правила Obsidian не дают плагину обновлять самого себя: обновления ставит сам Obsidian, когда плагин есть в каталоге, а до этого — плагин BRAT.`,
+		autoName: "Проверять автоматически",
+		autoDesc: "Раз в день, при запуске Obsidian, узнавать у GitHub номер последнего выпуска. Больше ничего не отправляется. Новая версия появится в строке состояния.",
+		checkButton: "Проверить",
+		checking: "Проверка…",
+		newer: (version: string) => `Вышла версия ${version}.`,
+		openRelease: "Открыть выпуск",
+		current: (version: string) => `Установлена последняя версия (${version}).`,
+		unpublished: "Выпусков пока нет.",
+		failed: "Не удалось связаться с GitHub.",
+		indicator: (version: string) => `Miro Canvas ${version}`,
+		indicatorTooltip: "Вышла новая версия Miro Canvas: что изменилось",
+		modalTitle: (version: string) => `Miro Canvas ${version}`,
+		noNotes: "У этого выпуска нет описания.",
+		howToUpdate: "Обновить: Настройки → Сторонние плагины → «Проверить обновления», или в BRAT, если плагин установлен через него.",
+		later: "Позже",
+		mobileNotice: (version: string) => `Вышла Miro Canvas ${version}: Настройки → Miro Canvas → Обновления.`,
+	},
 	welcome: {
 		fileName: "Miro Canvas - Знакомство.canvas",
 

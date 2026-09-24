@@ -10,6 +10,7 @@
 
 import { words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
+import { readAvailableUpdate, type AvailableUpdate } from "./update-check";
 export type WheelZoomModifier = "none" | "ctrl" | "shift" | "alt";
 
 export interface MiroCanvasSettings {
@@ -60,6 +61,12 @@ export interface MiroCanvasSettings {
    * the same guide on request.
    */
   readonly importQuestionAnswered: boolean;
+  /** Ask GitHub once a day, at start, whether a newer release is out. */
+  readonly checkUpdatesAutomatically: boolean;
+  /** When GitHub was last asked, in milliseconds since 1970; 0 before the first time. */
+  readonly lastUpdateCheck: number;
+  /** A newer release the last check found, shown until it is installed. */
+  readonly availableUpdate: AvailableUpdate | undefined;
 }
 
 interface NumberBound {
@@ -110,6 +117,9 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   commentAuthor: "",
   commentAuthorColors: Object.freeze({}),
   importQuestionAnswered: false,
+  checkUpdatesAutomatically: true,
+  lastUpdateCheck: 0,
+  availableUpdate: undefined,
 });
 
 /** The longest name a comment is signed with, and the most authors given colours. */
@@ -206,6 +216,10 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     commentAuthor: typeof value.commentAuthor === "string" ? value.commentAuthor.trim().slice(0, MAX_AUTHOR_NAME) : DEFAULT_SETTINGS.commentAuthor,
     commentAuthorColors: readAuthorColors(value.commentAuthorColors),
     importQuestionAnswered: readBoolean(value, "importQuestionAnswered", DEFAULT_SETTINGS.importQuestionAnswered),
+    checkUpdatesAutomatically: readBoolean(value, "checkUpdatesAutomatically", DEFAULT_SETTINGS.checkUpdatesAutomatically),
+    lastUpdateCheck: typeof value.lastUpdateCheck === "number" && Number.isFinite(value.lastUpdateCheck) && value.lastUpdateCheck >= 0
+      ? value.lastUpdateCheck : DEFAULT_SETTINGS.lastUpdateCheck,
+    availableUpdate: readAvailableUpdate(value.availableUpdate),
   });
 }
 

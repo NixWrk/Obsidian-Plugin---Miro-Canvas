@@ -11,6 +11,7 @@ import { PluginSettingTab, Setting, type App, type Plugin } from "obsidian";
 import { authorColor } from "./comment-thread";
 import { words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
+import type { UpdateCheck } from "./update-check";
 import {
   DEFAULT_COMMENT_AUTHOR,
   SETTING_BOUNDS,
@@ -31,6 +32,10 @@ export interface SettingsTabHost {
   readonly openImportGuide: () => void;
   /** Writes (or opens, if it already exists) the welcome board; the same action the first-run question offers. */
   readonly createWelcomeBoard: () => void;
+  /** The installed version, from the plugin's manifest. */
+  readonly pluginVersion: string;
+  /** Asks GitHub for the latest release; called only on the button's press. */
+  readonly checkForUpdate: () => Promise<UpdateCheck>;
 }
 
 export class MiroCanvasSettingTab extends PluginSettingTab {
@@ -175,12 +180,45 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         .setButtonText(importLabels.openGuideButton)
         .onClick(() => this.host.openImportGuide()));
 
+    this.updates(containerEl);
+
     new Setting(containerEl)
       .setName(labels.developerDiagnosticsName)
       .setDesc(labels.developerDiagnosticsDesc)
       .addToggle((toggle) => toggle
         .setValue(this.host.settings.developerDiagnostics)
         .onChange((value) => void this.host.saveSettings({ developerDiagnostics: value })));
+  }
+
+  /** "Check for updates": the installed version, and on a press what GitHub has. */
+  private updates(containerEl: HTMLElement): void {
+    const labels = words().updates;
+    new Setting(containerEl).setName(labels.heading).setHeading();
+    new Setting(containerEl)
+      .setName(labels.autoName)
+      .setDesc(labels.autoDesc)
+      .addToggle((toggle) => toggle
+        .setValue(this.host.settings.checkUpdatesAutomatically)
+        .onChange((value) => void this.host.saveSettings({ checkUpdatesAutomatically: value })));
+    const setting = new Setting(containerEl).setName(labels.checkName).setDesc(labels.checkDesc(this.host.pluginVersion));
+    const status = setting.descEl.createDiv({ cls: "miro-canvas-update-status" });
+    setting.addButton((button) => button
+      .setButtonText(labels.checkButton)
+      .onClick(async () => {
+        button.setDisabled(true);
+        status.setText(labels.checking);
+        const result = await this.host.checkForUpdate();
+        button.setDisabled(false);
+        status.empty();
+        if (result.kind === "newer") {
+          status.appendText(`${labels.newer(result.version)} `);
+          status.createEl("a", { text: labels.openRelease, href: result.url });
+        } else {
+          status.setText(result.kind === "current" ? labels.current(result.version)
+            : result.kind === "unpublished" ? labels.unpublished
+              : labels.failed);
+        }
+      }));
   }
 
   /** Who signs the comments written here, and the colour each author's pins wear. */

@@ -775,6 +775,29 @@ export const EN = {
 		copied: "Copied to the clipboard.",
 		copyFailed: "Could not copy to the clipboard.",
 	},
+	/** The settings' "Check for updates" (update-check.ts): it downloads nothing. */
+	updates: {
+		heading: "Updates",
+		checkName: "Check for updates",
+		checkDesc: (version: string) =>
+			`Installed: ${version}. Obsidian's rules keep a plugin from updating itself: updates come through Obsidian once the plugin is in the community catalogue, and through the BRAT plugin until then.`,
+		autoName: "Check automatically",
+		autoDesc: "Once a day, when Obsidian starts, ask GitHub for the number of the latest release. Nothing else is sent. A newer release shows in the status bar.",
+		checkButton: "Check",
+		checking: "Checking…",
+		newer: (version: string) => `Version ${version} is out.`,
+		openRelease: "Open the release",
+		current: (version: string) => `${version} is the latest version.`,
+		unpublished: "No release is published yet.",
+		failed: "Could not reach GitHub.",
+		indicator: (version: string) => `Miro Canvas ${version}`,
+		indicatorTooltip: "A newer Miro Canvas is out: what changed",
+		modalTitle: (version: string) => `Miro Canvas ${version}`,
+		noNotes: "This release has no notes.",
+		howToUpdate: "Update in Settings → Community plugins → Check for updates, or in BRAT if the plugin came from there.",
+		later: "Later",
+		mobileNotice: (version: string) => `Miro Canvas ${version} is out: Settings → Miro Canvas → Updates.`,
+	},
 	/**
 	 * The optional welcome board (welcome-board.ts): its file name, its frame
 	 * titles in reading order and the few words it carries - most frames show

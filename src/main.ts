@@ -1,5 +1,5 @@
 import * as obsidian from "obsidian";
-import { Menu, Modal, Notice, Platform, Plugin, TFile, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
 import {
   inspectAdvancedCanvas,
@@ -30,6 +30,7 @@ import { setAuthorColors } from "./comment-thread";
 import { layerActions } from "./layer-order";
 import { localeFor, setLocale, words } from "./i18n";
 import { createWelcomeBoard } from "./welcome-board";
+import { automaticCheckDue, checkForUpdate, isNewerVersion, type ReleaseRequest, type UpdateCheck } from "./update-check";
 
 const NATIVE_CANVAS_VIEW_TYPE = "canvas";
 
@@ -103,6 +104,8 @@ export default class MiroCanvasPlugin extends Plugin {
   private m1Session: M1CanvasSession | null = null;
   private toolsModal: Modal | null = null;
   private importGuideModal: Modal | null = null;
+  /** The status bar's mark while a newer release is known; absent otherwise. */
+  private updateIndicator: HTMLElement | undefined;
   private initializationRetry: ReturnType<typeof setTimeout> | null = null;
   public canvasSettings: MiroCanvasSettings = DEFAULT_SETTINGS;
 
@@ -123,6 +126,8 @@ export default class MiroCanvasPlugin extends Plugin {
       accountName: () => obsidianAccountName(window.localStorage),
       openImportGuide: () => this.openImportGuide(),
       createWelcomeBoard: () => this.openWelcomeBoard(),
+      pluginVersion: this.manifest.version,
+      checkForUpdate: () => this.checkForUpdates(),
     }));
     // Advanced Canvas is optional.  Its adapter fails closed, so this probe
     // cannot prevent the native Canvas shell from loading.
@@ -344,7 +349,10 @@ export default class MiroCanvasPlugin extends Plugin {
     // Asked once, after Obsidian's own startup has settled; a plugin-only
     // person can decline it without ever seeing Miro mentioned again outside
     // the settings tab's own button.
-    this.app.workspace.onLayoutReady(() => this.maybeAskImportQuestion());
+    this.app.workspace.onLayoutReady(() => {
+      this.maybeAskImportQuestion();
+      void this.checkForUpdatesAtStart();
+    });
   }
 
   override onunload(): void {
@@ -438,6 +446,89 @@ export default class MiroCanvasPlugin extends Plugin {
     if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
       this.handleActiveLeafChange(leaf);
     }
+  }
+
+  /** A settings change that needs no rebuilt session: when updates were last checked. */
+  private async saveSettingsQuietly(patch: Partial<MiroCanvasSettings>): Promise<void> {
+    this.canvasSettings = normalizeSettings({ ...this.canvasSettings, ...patch });
+    await this.saveData(this.canvasSettings);
+  }
+
+  /** Once a day at start, unless turned off, ask GitHub whether a newer release is out. */
+  private async checkForUpdatesAtStart(): Promise<void> {
+    this.showUpdateIndicator();
+    const settings = this.canvasSettings;
+    if (!automaticCheckDue(settings.checkUpdatesAutomatically, settings.lastUpdateCheck, Date.now())) return;
+    const known = settings.availableUpdate?.version;
+    const result = await this.checkForUpdates();
+    // A phone has no status bar: a newer release found now is said once.
+    if (Platform.isMobile && result.kind === "newer" && result.version !== known) {
+      new Notice(words().updates.mobileNotice(result.version), 10_000);
+    }
+  }
+
+  /** Ask GitHub now; remember a newer release and show it in the corner. */
+  private async checkForUpdates(): Promise<UpdateCheck> {
+    const request: ReleaseRequest = async (url) => {
+      const response = await requestUrl({ url, throw: false });
+      let json: unknown;
+      try {
+        json = response.json;
+      } catch {
+        // Not JSON: the check reports that it failed.
+      }
+      return { status: response.status, json };
+    };
+    const result = await checkForUpdate(request, this.manifest.version);
+    if (this.shellDisposed) return result;
+    await this.saveSettingsQuietly({
+      lastUpdateCheck: Date.now(),
+      ...(result.kind === "newer" ? { availableUpdate: { version: result.version, url: result.url, notes: result.notes } } : {}),
+      ...(result.kind === "current" || result.kind === "unpublished" ? { availableUpdate: undefined } : {}),
+    });
+    this.showUpdateIndicator();
+    return result;
+  }
+
+  /** The mark in the status bar's corner while a newer release than this one is known. */
+  private showUpdateIndicator(): void {
+    const update = this.canvasSettings.availableUpdate;
+    if (update === undefined || !isNewerVersion(update.version, this.manifest.version)) {
+      this.updateIndicator?.remove();
+      this.updateIndicator = undefined;
+      return;
+    }
+    if (this.updateIndicator === undefined) {
+      const item = this.addStatusBarItem();
+      item.addClasses(["miro-canvas-update", "mod-clickable"]);
+      this.registerDomEvent(item, "click", () => this.openUpdateNotes());
+      this.updateIndicator = item;
+    }
+    const item = this.updateIndicator;
+    item.empty();
+    setIcon(item.createSpan({ cls: "miro-canvas-update__icon" }), "arrow-up-circle");
+    item.createSpan({ text: words().updates.indicator(update.version) });
+    item.setAttribute("aria-label", words().updates.indicatorTooltip);
+  }
+
+  /** What the newer release changed, in its own words, and where to get it. */
+  private openUpdateNotes(): void {
+    const update = this.canvasSettings.availableUpdate;
+    if (update === undefined) return;
+    const labels = words().updates;
+    const modal = new Modal(this.app);
+    modal.setTitle(labels.modalTitle(update.version));
+    const notes = modal.contentEl.createDiv({ cls: "miro-canvas-update-notes" });
+    if (update.notes === "") notes.createEl("p", { text: labels.noNotes });
+    else void MarkdownRenderer.render(this.app, update.notes, notes, "", this);
+    modal.contentEl.createEl("p", { text: labels.howToUpdate });
+    const buttons = modal.contentEl.createDiv({ cls: "modal-button-container" });
+    buttons.createEl("button", { text: labels.openRelease, cls: "mod-cta" }).addEventListener("click", () => {
+      openExternalLink(update.url);
+      modal.close();
+    });
+    buttons.createEl("button", { text: labels.later }).addEventListener("click", () => modal.close());
+    modal.open();
   }
 
   /** Obsidian's settings, open on this plugin's page. */
