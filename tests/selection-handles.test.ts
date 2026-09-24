@@ -702,10 +702,10 @@ describe("selection handle hints in Russian", () => {
   it("names its grips from the Russian word table", () => {
     setLocale("ru");
     const { root } = build();
-    expect(rotateLabel()).toBe("Повернуть\nПрилипает к каждым 45°; удерживайте Shift для шага 15°");
+    expect(rotateLabel()).toBe("Повернуть\nШаг 45°; с Shift — 15°");
     expect(byLabel(root, rotateLabel())).toBeDefined();
-    expect(byLabel(root, "Повернуть к следующему прямому углу")).toBeDefined();
-    expect(byLabel(root, "Повернуть к предыдущему прямому углу")).toBeDefined();
-    expect(byLabel(root, "Нажмите, чтобы добавить подключённый элемент сверху, или потяните, чтобы соединить")).toBeDefined();
+    expect(byLabel(root, "Повернуть по часовой стрелке до прямого угла")).toBeDefined();
+    expect(byLabel(root, "Повернуть против часовой стрелки до прямого угла")).toBeDefined();
+    expect(byLabel(root, "Щёлкните, чтобы добавить связанную карточку сверху, или потяните, чтобы провести линию")).toBeDefined();
   });
 });

@@ -96,6 +96,6 @@ describe("line kind names in Russian", () => {
     setLocale("ru");
     expect(lineLabel("arrow")).toBe("Стрелка");
     expect(lineLabel("elbow")).toBe("Угловая стрелка");
-    expect(lineLabel("line")).toBe("Линия\nУдерживайте Shift, чтобы вести её строго горизонтально, вертикально или под 45°");
+    expect(lineLabel("line")).toBe("Линия\nС Shift — строго по горизонтали, по вертикали или под 45°");
   });
 });

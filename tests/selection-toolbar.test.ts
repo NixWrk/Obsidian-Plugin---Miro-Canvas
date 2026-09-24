@@ -648,9 +648,9 @@ describe("selection toolbar in Russian", () => {
     const { root } = build();
     expect(byLabel(root, "Фигура").getAttribute("aria-expanded")).toBe("false");
     expect(byLabel(root, "Шрифт")).toBeDefined();
-    expect(byLabel(root, "Стиль текста")).toBeDefined();
+    expect(byLabel(root, "Начертание")).toBeDefined();
     expect(byLabel(root, "Выравнивание")).toBeDefined();
-    expect(byLabel(root, "Заблокировать выделение")).toBeDefined();
+    expect(byLabel(root, "Заблокировать")).toBeDefined();
     const { root: edgeRoot } = build({ ...EDGE });
     expect(byLabel(edgeRoot, "Начало линии")).toBeDefined();
     expect(byLabel(edgeRoot, "Конец линии")).toBeDefined();

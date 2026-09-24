@@ -147,7 +147,7 @@ describe("plugin settings", () => {
 
   it("reads navigation command names lazily, in the language set when they are built", () => {
     setLocale("ru");
-    expect(navigationCommands().find((command) => command.id === "m1-zoom-in")?.name).toBe("Приблизить");
+    expect(navigationCommands().find((command) => command.id === "m1-zoom-in")?.name).toBe("Увеличить масштаб");
     setLocale("en");
     expect(navigationCommands().find((command) => command.id === "m1-zoom-in")?.name).toBe("Zoom in");
   });

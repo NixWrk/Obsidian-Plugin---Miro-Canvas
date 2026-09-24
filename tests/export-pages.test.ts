@@ -76,6 +76,6 @@ describe("paper labels in Russian", () => {
     expect(paperLabels().a4).toBe("A4");
     expect(paperLabels().letter).toBe("Letter");
     expect(paperLabels()["16:9"]).toBe("Слайд 16:9");
-    expect(paperLabels().free).toBe("Свободный размер");
+    expect(paperLabels().free).toBe("Произвольный размер");
   });
 });

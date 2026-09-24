@@ -291,9 +291,9 @@ describe("quick tools in Russian", () => {
     setLocale("ru");
     const { root } = build();
     expect(root.getAttribute("aria-label")).toBe("Инструменты доски");
-    expect(byLabel(root, "Ещё инструменты")).toBeDefined();
+    expect(byLabel(root, "Другие инструменты")).toBeDefined();
     expect(byLabel(root, "Выделение\nV")).toBeDefined();
-    expect(byLabel(root, "Рамка\nF")).toBeDefined();
-    expect(byLabel(root, "Цвет новой линии")).toBeDefined();
+    expect(byLabel(root, "Фрейм\nF")).toBeDefined();
+    expect(byLabel(root, "Цвет новых линий")).toBeDefined();
   });
 });

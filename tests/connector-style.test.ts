@@ -20,8 +20,8 @@ describe("connector look in Russian", () => {
   it("names ends, routes and strokes from the Russian word table", () => {
     setLocale("ru");
     expect(capLabels().arrow).toBe("Открытая стрелка");
-    expect(capLabels().erd_many).toBe("ERD: много\nОтношение сущностей: много");
+    expect(capLabels().erd_many).toBe("ERD: много\nСвязь: много");
     expect(routeLabels().elbowed).toBe("Ломаная линия");
-    expect(strokeLabels().dashed).toBe("Штриховая линия");
+    expect(strokeLabels().dashed).toBe("Пунктирная линия");
   });
 });

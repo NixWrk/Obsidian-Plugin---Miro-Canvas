@@ -57,6 +57,6 @@ describe("shape catalogue in Russian", () => {
     setLocale("ru");
     expect(shapeCatalogLabel(shapeCatalogEntry("star")!)).toBe("Звезда");
     const rhombus = shapeCatalogEntry("rhombus")!;
-    expect(shapeCatalogLabel(rhombus)).toBe("Ромб\nРешение: вопрос, разветвляющий поток");
+    expect(shapeCatalogLabel(rhombus)).toBe("Ромб\nРешение: условие, на котором поток ветвится");
   });
 });

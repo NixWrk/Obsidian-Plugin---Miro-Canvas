@@ -61,7 +61,7 @@ describe("the plugin's language", () => {
 		expect(words().layer.front).toBe(EN.layer.front);
 		setLocale("ru");
 		expect(words().layer.front).toBe(RU.layer.front);
-		expect(words().export.capturingProgress(2, 20)).toBe("Снимаю страницы: 2 из 20");
+		expect(words().export.capturingProgress(2, 20)).toBe("Подготовка страниц: 2 из 20");
 	});
 
 	it("has every English string in Russian, of the same kind", () => {
