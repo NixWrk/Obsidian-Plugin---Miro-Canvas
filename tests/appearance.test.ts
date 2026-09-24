@@ -29,6 +29,21 @@ import {
 } from "../src/appearance";
 
 describe("appearance core", () => {
+  it("reads a board without a settings record without taking its data for settings", () => {
+    const state = normalizeAppearanceState({
+      schemaVersion: 1,
+      displayTheme: "dark",
+      localOverrides: { node: { locked: true } },
+      localComments: [],
+      connectors: {},
+      export: { format: "a4" },
+    });
+    expect(state.settings.displayTheme).toBe("dark");
+    for (const field of ["schemaVersion", "localOverrides", "localComments", "connectors", "export"]) {
+      expect(Object.prototype.hasOwnProperty.call(state.settings, field), field).toBe(false);
+    }
+  });
+
   it("normalizes display themes and resolves system without touching the model", () => {
     expect(normalizeDisplayTheme("dark")).toBe("dark");
     expect(normalizeDisplayTheme("unknown")).toBe("system");

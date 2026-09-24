@@ -1056,8 +1056,10 @@ export function buildSourceScene(document: unknown): SourceScene {
       order = [...ranked.map(([id]) => id), ...entries.filter(([id]) => !rankedIds.has(id)).map(([id]) => id)];
       if (ranked.length !== entries.length) diagnostics.push("source-order-partial: zIndex is missing for some projected items; unranked items keep deterministic source order.");
     } else {
+      // No item names its layer - every board this plugin makes, and a Miro
+      // export without z-order: the file's own order is the layer order, as
+      // on any Canvas, which is nothing to report.
       order = entries.map(([id]) => id);
-      if (entries.length > 0) diagnostics.push("source-order-limited: no explicit z-order or zIndex is available; deterministic source order is not claimed as Miro layer order.");
     }
   }
   return Object.freeze({ items, order: Object.freeze(order), diagnostics: Object.freeze(diagnostics) });

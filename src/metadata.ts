@@ -290,7 +290,17 @@ const SETTINGS_FIELDS = new Set([
   "palette",
   "recentColors",
 ]);
-const OVERRIDE_FIELDS = new Set(["typography", "colors", "locked", "showAttachmentName", "rotation", "item"]);
+/**
+ * The fields of one element's local override this version knows about, the
+ * ones `schema/v1/miro-canvas.schema.json` declares; kept in step with it by
+ * `tests/schema-fixtures.test.ts`, so the plugin never warns about a field
+ * it wrote itself.
+ */
+const OVERRIDE_FIELDS = new Set([
+  "typography", "colors", "locked", "showAttachmentName", "rotation", "item",
+  "shape", "borderStyle", "borderWidth", "connector", "connectorAnchors",
+]);
+export const KNOWN_OVERRIDE_FIELDS: ReadonlySet<string> = OVERRIDE_FIELDS;
 const TYPOGRAPHY_FIELDS = new Set([
   "fontFamily",
   "fontSize",

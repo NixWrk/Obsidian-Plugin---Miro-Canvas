@@ -1,11 +1,12 @@
 import {
+	KNOWN_METADATA_FIELDS,
 	createDefaultMiroCanvasMetadata,
 	parseMiroCanvasMetadata,
 	validateMiroCanvasMetadata,
 	type MiroCanvasMetadata,
 	type MiroCanvasMetadataParseOptions,
 } from "./metadata";
-import { nativeOmits, nativeRounds } from "./native-graph";
+import { graphDrift } from "./native-graph";
 
 /**
  * The persistence boundary is deliberately injected instead of being
@@ -345,28 +346,20 @@ function snapshotDocument(value: unknown): Snapshot {
 }
 
 /** Every written graph value survives, as native Canvas stores it; a host may only materialize extra defaults. */
-function graphIsUnchanged(observed: Record<string, unknown>, written: Record<string, unknown>): boolean {
-	for (const key of ["nodes", "edges"] as const) {
-		const actual = observed[key];
-		const wanted = written[key];
-		if (!Array.isArray(actual) || !Array.isArray(wanted) || actual.length !== wanted.length) return false;
-		for (let index = 0; index < wanted.length; index += 1) {
-			const actualItem = actual[index];
-			const wantedItem = wanted[index];
-			if (!isRecord(actualItem) || !isRecord(wantedItem)) return false;
-			for (const field of Object.keys(wantedItem)) {
-				if (!hasOwn(actualItem, field)) {
-					// Native Canvas leaves a default out: that is keeping it.
-					if (nativeOmits(key, field, wantedItem[field])) continue;
-					return false;
-				}
-				if (structurallyEqual(actualItem[field], wantedItem[field])) continue;
-				if (nativeRounds(key, field, wantedItem[field], actualItem[field])) continue;
-				return false;
-			}
-		}
-	}
-	return true;
+/**
+ * The metadata with its settings cleared of fields that belong to the
+ * metadata root.  An earlier version read a board without a settings record
+ * as if the whole metadata were its settings, and its next settings write
+ * copied every root field - overrides, comments, lines, export pages - into
+ * `settings`.  Any write now leaves those copies behind.
+ */
+function withoutCopiedRootFields(candidate: unknown): unknown {
+	if (!isRecord(candidate) || !isRecord(candidate.settings)) return candidate;
+	const copied = Object.keys(candidate.settings).filter((key) => KNOWN_METADATA_FIELDS.has(key));
+	if (copied.length === 0) return candidate;
+	const settings = { ...candidate.settings };
+	for (const key of copied) delete settings[key];
+	return { ...candidate, settings };
 }
 
 /** Unknown extension/source roots are evidence and must survive byte-for-byte. */
@@ -532,7 +525,7 @@ export class MetadataWriter {
 			let candidate: unknown;
 			try {
 				const callbackResult = mutate(baseMetadata);
-				candidate = callbackResult === undefined ? baseMetadata : callbackResult;
+				candidate = withoutCopiedRootFields(callbackResult === undefined ? baseMetadata : callbackResult);
 			} catch (error) {
 				return result(action, "rejected", [
 					{
@@ -739,7 +732,7 @@ export class MetadataWriter {
 			// that only when the metadata this writer produced survived and the
 			// graph is still the one that was written, and never accept it quietly.
 			if (structurallyEqual(observed.document.miroCanvas, after.document.miroCanvas)
-				&& graphIsUnchanged(observed.document, after.document)
+				&& graphDrift(observed.document, after.document) === undefined
 				&& nonGraphRootsAreUnchanged(observed.document, after.document)) {
 				let notice: string | undefined;
 				try {
@@ -759,10 +752,11 @@ export class MetadataWriter {
 
 		// Name the check that failed: a bare refusal gave no way to tell a
 		// host that rebuilt the graph from one that lost the metadata.
+		const drift = observed === undefined ? undefined : graphDrift(observed.document, after.document);
 		const failed = observed === undefined ? "unreadable"
 			: !sourceIsUnchanged(before, observed) ? "miroSource changed"
 				: !structurallyEqual(observed.document.miroCanvas, after.document.miroCanvas) ? "miroCanvas changed"
-					: !graphIsUnchanged(observed.document, after.document) ? "graph changed"
+					: drift !== undefined ? `graph changed: ${drift}`
 						: "root keys changed";
 		addDiagnostic(
 			diagnostics,

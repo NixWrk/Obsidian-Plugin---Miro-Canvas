@@ -1,5 +1,5 @@
 import type { MetadataDocumentStore } from "./metadata-writer";
-import { nativeOmits, nativeRounds } from "./native-graph";
+import { graphDrift } from "./native-graph";
 
 /**
  * The native Canvas root-data bridge is intentionally smaller than the general
@@ -281,65 +281,6 @@ function normalizeDocument(value: unknown): Record<string, unknown> {
 		throw new NativeShapeError("The Canvas document root must be a plain object.");
 	}
 	return clone as Record<string, unknown>;
-}
-
-const NATIVE_NODE_DEFAULTS = new Set(["color", "subpath"]);
-const NATIVE_EDGE_DEFAULTS = new Set(["color", "label", "fromEnd", "toEnd", "fromFloating", "toFloating", "styleAttributes"]);
-
-function nativeDefaultAllowed(kind: "nodes" | "edges", key: string, value: unknown): boolean {
-	if (kind === "nodes") return NATIVE_NODE_DEFAULTS.has(key) && (typeof value === "string" || value === null);
-	if (!NATIVE_EDGE_DEFAULTS.has(key)) return false;
-	if (key === "fromFloating" || key === "toFloating") return typeof value === "boolean";
-	if (key === "styleAttributes") return value !== null && typeof value === "object"
-		&& !Array.isArray(value) && Object.keys(value).length === 0;
-	return typeof value === "string" || value === null;
-}
-
-/** Compare graph values exactly, except for known optional defaults materialized by native Canvas. */
-/**
- * What the host changed in the graph while saving, named precisely.
- *
- * Reporting only "nodes" left every field of every node as a suspect, which
- * is no more actionable than saying the transaction failed.  The item and the
- * field are named so a refusal points straight at what disagreed.
- */
-function graphDrift(observed: Record<string, unknown>, written: Record<string, unknown>): string | undefined {
-	for (const key of ["nodes", "edges"] as const) {
-		const actual = observed[key];
-		const wanted = written[key];
-		if (!Array.isArray(actual) || !Array.isArray(wanted)) return `${key} missing`;
-		if (actual.length !== wanted.length) return `${key} count ${wanted.length}->${actual.length}`;
-		// Matched by id, not by position: the host reorders the array when it
-		// rebuilds - it owns the stacking order - and comparing by index read
-		// that as every node changing its id, refusing writes that were fine.
-		const byId = new Map<string, UnknownRecord>();
-		for (const item of actual) {
-			if (isObject(item) && typeof item.id === "string") byId.set(item.id, item);
-		}
-		for (let index = 0; index < wanted.length; index += 1) {
-			const wantedItem = wanted[index];
-			if (!isObject(wantedItem)) return `${key}[${index}] not an object`;
-			const id = typeof wantedItem.id === "string" ? wantedItem.id : undefined;
-			if (id === undefined) return `${key}[${index}] has no id`;
-			const actualItem = byId.get(id);
-			if (actualItem === undefined) return `${key} ${id} missing after save`;
-			for (const field of Object.keys(wantedItem)) {
-				if (!hasOwn(actualItem, field)) {
-					// Native Canvas leaves a default out: that is keeping it.
-					if (nativeOmits(key, field, wantedItem[field])) continue;
-					return `${key} ${id} lost ${field}`;
-				}
-				if (equalJson(actualItem[field], wantedItem[field])) continue;
-				if (nativeRounds(key, field, wantedItem[field], actualItem[field])) continue;
-				return `${key} ${id} changed ${field}`;
-			}
-			for (const field of Object.keys(actualItem)) {
-				if (hasOwn(wantedItem, field)) continue;
-				if (!nativeDefaultAllowed(key, field, actualItem[field])) return `${key} ${id} gained ${field}`;
-			}
-		}
-	}
-	return undefined;
 }
 
 /** Every non-graph root belongs to the source, this plugin, or another producer. */

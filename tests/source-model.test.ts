@@ -530,7 +530,7 @@ describe("source projection model", () => {
     expect(scene.diagnostics.some((item) => item.startsWith("miro-canvas-z-order-partial:"))).toBe(true);
   });
 
-  it("uses zIndex rank and diagnoses source-limited order instead of claiming fallback order", () => {
+  it("uses zIndex rank, and keeps the file's order quietly when no item names its layer", () => {
     const ranked = buildSourceScene({
       miroSource: { items: [{ id: "a", type: "text", zIndex: 5 }, { id: "b", type: "text", zIndex: -1 }, { id: "c", type: "text" }] },
     });
@@ -539,7 +539,7 @@ describe("source projection model", () => {
 
     const limited = buildSourceScene({ miroSource: { items: [{ id: "a", type: "text" }, { id: "b", type: "text" }] } });
     expect(limited.order).toEqual(["a", "b"]);
-    expect(limited.diagnostics.some((item) => item.startsWith("source-order-limited:"))).toBe(true);
+    expect(limited.diagnostics.some((item) => item.startsWith("source-order"))).toBe(false);
   });
 });
 

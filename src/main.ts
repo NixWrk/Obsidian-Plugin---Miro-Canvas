@@ -604,6 +604,9 @@ export default class MiroCanvasPlugin extends Plugin {
     if (!this.statusBarItem) {
       return;
     }
+    // The adapter's state is for whoever develops or debugs the plugin: it
+    // shows only with the developer diagnostics turned on.
+    this.statusBarItem.toggle(this.canvasSettings.developerDiagnostics);
 
     this.statusBarItem.dataset.miroCanvasState = isCanvas
       ? "canvas"

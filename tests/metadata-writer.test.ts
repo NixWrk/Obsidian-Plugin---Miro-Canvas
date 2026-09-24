@@ -55,6 +55,47 @@ function setComment(text: string) {
 }
 
 describe("MetadataWriter", () => {
+	it("clears copies of the metadata's own fields that an earlier version left in its settings", () => {
+		const store = new MemoryStore({
+			nodes: [],
+			edges: [],
+			miroCanvas: {
+				schemaVersion: 1,
+				localOverrides: { a: { locked: true } },
+				settings: { displayTheme: "dark", schemaVersion: 1, localOverrides: { a: { locked: true } }, localComments: [] },
+			},
+		});
+		const writer = new MetadataWriter(store);
+
+		const write = writer.write("minimap-visibility", (draft) => {
+			draft.settings = { ...(draft.settings as Record<string, unknown>), minimapVisible: false };
+		});
+
+		expect(write).toMatchObject({ ok: true, status: "applied" });
+		expect((store.current.miroCanvas as { settings: Record<string, unknown> }).settings).toEqual({ displayTheme: "dark", minimapVisible: false });
+		expect((store.current.miroCanvas as { localOverrides: unknown }).localOverrides).toEqual({ a: { locked: true } });
+	});
+
+	it("accepts a save that stores the items in the host's own stacking order", () => {
+		// Right after a board opens, native Canvas stacks its items in an order
+		// of its own and stores them in that order: the same graph, reordered.
+		const store = new MemoryStore({
+			nodes: [{ id: "a", type: "text", x: 0, y: 0, width: 10, height: 10 }, { id: "b", type: "text", x: 20, y: 0, width: 10, height: 10 }],
+			edges: [],
+		});
+		store.commitHook = (current) => {
+			current.nodes = [...(current.nodes as unknown[])].reverse();
+		};
+		const writer = new MetadataWriter(store);
+
+		const write = writer.write("add-comment", setComment("kept"));
+
+		expect(write).toMatchObject({ ok: true, status: "applied" });
+		expect(write.diagnostics.map((item) => item.code)).not.toContain("host-commit-verification-failed");
+		expect(store.commits).toHaveLength(1);
+		expect(store.current.miroCanvas).toMatchObject({ localComments: [{ id: "local-1", text: "kept" }] });
+	});
+
 	it("reads metadata without writing during construction or inspection", () => {
 		const store = new MemoryStore({ nodes: [], edges: [] });
 		const writer = createMetadataWriter(store);

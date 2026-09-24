@@ -409,6 +409,16 @@ function cloneUnknown(value: unknown, visiting = new Set<object>()): unknown | t
   }
 }
 
+/** Only the named fields of a record. */
+function pickOwn(source: UnknownRecord, fields: ReadonlySet<string>): UnknownRecord {
+  const result: UnknownRecord = {};
+  for (const key of fields) {
+    const value = readOwn(source, key);
+    if (value !== ABSENT) defineOwn(result, key, value);
+  }
+  return result;
+}
+
 function copyUnknownProperties(source: UnknownRecord, known: ReadonlySet<string>): UnknownRecord {
   const result: UnknownRecord = {};
   for (const key of ownKeys(source)) {
@@ -974,7 +984,10 @@ export function normalizeAppearanceState(value: unknown): AppearanceState {
     source = wrapper;
   }
   const settingsValue = readOwn(source, "settings");
-  const settings = normalizeSettings(settingsValue === ABSENT ? source : settingsValue);
+  // A board with no settings record - a new one, or an older flat one that
+  // kept its settings at the root - has only the settings' own fields read
+  // from the root: its other fields are the board's data, not its settings.
+  const settings = normalizeSettings(settingsValue === ABSENT ? pickOwn(source, SETTINGS_FIELDS) : settingsValue);
   const overrides = normalizeLocalOverrides(readOwn(source, "localOverrides"));
   return freeze({ settings, localOverrides: overrides });
 }

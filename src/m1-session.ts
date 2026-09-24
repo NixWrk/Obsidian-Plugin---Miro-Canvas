@@ -1295,6 +1295,8 @@ export class M1CanvasSession {
 	private readonly appearanceDom = new Map<HTMLElement, AppearanceDomSnapshot>();
 	/** Node shells this session has checked for an editor frame, so a card no longer being edited is still found once more to clean up. */
 	private readonly editorAppearanceDom = new Set<HTMLElement>();
+	/** Depth of native importData calls running now: the graph is being rebuilt, not edited. */
+	private rebuildingGraph = 0;
 	/** Node shells a mutation batch just added, waiting for the next frame's pass; unset once a batch is too large to reason about shell by shell. */
 	private pendingAppearanceShells: Set<HTMLElement> | undefined;
 	/** True instead of a shell list when a batch is too large to enumerate cheaply; the next pass takes the full refresh path. */
@@ -5233,8 +5235,11 @@ export class M1CanvasSession {
 		if (result.status === "applied") {
 			// The board itself shows the change, so success raises no notice; an
 			// accepted-but-altered commit is reported in the panel, so host
-			// behavior stays visible without interrupting.
+			// behavior stays visible without interrupting.  A save the host
+			// rebuilt in its own order, verified unchanged, is how every save
+			// works, not something to report.
 			for (const diagnostic of result.diagnostics) {
+				if (diagnostic.code === "host-rebuilt-document") continue;
 				this.addDiagnostic(diagnostic.message);
 			}
 		} else if (result.status === "rejected") {
@@ -7214,6 +7219,19 @@ export class M1CanvasSession {
 			}
 			return result;
 		});
+		// Native importData re-applies every item's data - undo, redo, a paste,
+		// the plugin's own reordering all rebuild the graph through it - and a
+		// locked item gets its own data back like any other.  That is not an
+		// edit of it: a change to a locked item is refused before the graph is
+		// ever written.
+		this.guardNativeMethod(canvas, "importData", (original, receiver, args) => {
+			this.rebuildingGraph += 1;
+			try {
+				return Reflect.apply(original, receiver, args);
+			} finally {
+				this.rebuildingGraph -= 1;
+			}
+		});
 		for (const key of ["removeNode", "removeEdge", "removeSelection", "deleteSelection"]) {
 			this.guardNativeMethod(canvas, key, (original, receiver, args) => {
 				this.readInteractionState();
@@ -7236,6 +7254,7 @@ export class M1CanvasSession {
 			this.guardedElements.add(element);
 			for (const [key, operation] of Object.entries(operations)) {
 				this.guardNativeMethod(element, key, (original, receiver, args) => {
+					if (this.rebuildingGraph > 0) return Reflect.apply(original, receiver, args);
 					const ids = allIds([element]);
 					if (!this.nativeEditAllowed(operation, ids)) {
 						return undefined;

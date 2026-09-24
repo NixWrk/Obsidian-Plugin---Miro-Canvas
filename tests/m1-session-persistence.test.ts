@@ -155,7 +155,7 @@ describe("M1 session document persistence", () => {
 		expect(canvas.data).toHaveProperty("miroCanvas.localOverrides.n1.rotation", 37);
 	});
 
-	it("accepts a host that also normalizes nodes, and says so instead of hiding it", () => {
+	it("accepts a host that also normalizes nodes, noting it in the result but not among the diagnostics", () => {
 		const { canvas, session } = fixture({ hostNormalizesNodes: true });
 		session.mount();
 		const result = session.writeMetadata("set-display-theme", (draft) => ({
@@ -166,7 +166,8 @@ describe("M1 session document persistence", () => {
 		expect(result?.status).toBe("applied");
 		expect(canvas.data.miroCanvas).toHaveProperty("settings.displayTheme", "dark");
 		expect(canvas.data.nodes[0]).toHaveProperty("color", "");
-		expect(session.diagnostics.some((item) => item.includes("rebuilt"))).toBe(true);
+		expect(result?.diagnostics.map((item) => item.code)).toContain("host-rebuilt-document");
+		expect(session.diagnostics.some((item) => item.includes("rebuilt"))).toBe(false);
 	});
 
 	it("applies a write when the host rebuild carries values JSON would drop", () => {

@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { KNOWN_METADATA_FIELDS, validateMiroCanvasMetadata } from "../src/metadata";
+import { KNOWN_METADATA_FIELDS, KNOWN_OVERRIDE_FIELDS, validateMiroCanvasMetadata } from "../src/metadata";
 
 const TESTS_DIR = dirname(fileURLToPath(import.meta.url));
 const SCHEMAS_V1_DIR = join(TESTS_DIR, "..", "schema", "v1");
@@ -77,5 +77,12 @@ describe("miro-canvas.schema.json declares exactly the plugin's known metadata f
     const schemaFields = new Set(Object.keys(schema.properties));
     const pluginFields = new Set(KNOWN_METADATA_FIELDS);
     expect(schemaFields).toEqual(pluginFields);
+  });
+
+  it("knows every field of a local override the schema declares", () => {
+    const schema = readJson(join(SCHEMAS_V1_DIR, "miro-canvas.schema.json")) as {
+      $defs: { localOverride: { properties: Record<string, unknown> } };
+    };
+    expect(new Set(Object.keys(schema.$defs.localOverride.properties))).toEqual(new Set(KNOWN_OVERRIDE_FIELDS));
   });
 });
