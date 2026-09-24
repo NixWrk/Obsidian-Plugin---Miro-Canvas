@@ -3542,13 +3542,19 @@
   text-decoration: underline;
 }
 
-.miro-canvas-import-guide__download {
+/* The download is a link that looks like the main button; as specific as the link rule, and later. */
+.miro-canvas-import-guide__link.miro-canvas-import-guide__download {
   background-color: var(--interactive-accent);
+  box-shadow: var(--input-shadow);
   color: var(--text-on-accent);
+  padding-left: var(--size-4-4, 16px);
+  padding-right: var(--size-4-4, 16px);
 }
 
-.miro-canvas-import-guide__download:hover {
+.miro-canvas-import-guide__link.miro-canvas-import-guide__download:hover {
   background-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+  text-decoration: none;
 }
 
 .miro-canvas-import-guide__prompt {
