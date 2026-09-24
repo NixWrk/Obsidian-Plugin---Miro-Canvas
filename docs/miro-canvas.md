@@ -719,10 +719,12 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   and styles.css): before the community catalogue through the BRAT plugin,
   which installs and updates a plugin from this repository's releases
   (described in the README); once in the catalogue through Obsidian's own
-  update check. The plugin itself gets a "Check for updates" button in its
-  settings: on a press it compares its version with the latest GitHub release
-  and shows what is new, with a link; it downloads nothing and never goes to
-  the network without the press.
+  update check. Done in the plugin 2026-09-25 (`src/update-check.ts`): once a
+  day at start, unless turned off in the settings, and on the settings'
+  "Check" button, the plugin asks GitHub for the latest release's number; a
+  newer release shows in the status bar, and a click opens its notes, a link
+  and how to update. Nothing is downloaded. Left: the first release and BRAT
+  in the README.
 
 ### Future: ecosystem migration
 

@@ -41,3 +41,25 @@ along.
 - The Russian interface reads as Russian: one term for each thing (фрейм for
   a frame, рамка for a border, порядок for layer order, маркер for
   highlight) and natural phrasing instead of word-for-word translation.
+- A line's label stays the size a card's text is at every zoom, instead of
+  growing past the cards it joins once the board is zoomed out.
+- Selecting a line or arrow offers its label's font: family, size, bold,
+  italic, underline and strike, written the same way a card's own text is.
+- A card's border style and width land where Canvas draws the border: a
+  dashed or dotted border no longer has Canvas's own border inside it, and
+  "no border" has none.
+- The first change on a freshly opened board is kept: Canvas saved the board
+  in its own stacking order, and a check comparing items by position took
+  that for a changed graph and undid the change.
+- A board no longer keeps a copy of all its data inside its settings: a board
+  without settings had its data read as settings and written back into them
+  on the first theme, review mode or minimap change. Any write clears such a
+  copy.
+- Normal work raises no diagnostics: no layer-order note on every board, no
+  "locked element" when the order of a card next to a locked one changes, no
+  note for every save Canvas rebuilds, no warning about the plugin's own
+  fields; the adapter's status in the status bar shows only with the
+  developer diagnostics on.
+- Updates: once a day at start, unless turned off, the plugin asks GitHub for
+  the latest release; a newer one shows in the status bar and opens its
+  notes. Settings -> Updates has the switch and a button to check now.

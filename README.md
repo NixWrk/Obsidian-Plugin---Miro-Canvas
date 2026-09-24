@@ -18,6 +18,7 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 - [Reference](#reference)
 - [Languages](#languages)
 - [Limits](#limits)
+- [Network use](#network-use)
 - [Installing](#installing)
 - [Development](#development)
 - [License](#license)
@@ -36,8 +37,9 @@ A board brought over from Miro keeps its look: sticky notes in Miro's own
 colours with text that fits, shapes and flowcharts, frames, code blocks, link
 previews, presentations with their slides, and comments pinned where they were.
 
-Nothing here goes to the network, and nothing is lost when the plugin is off:
-the file opens as an ordinary Canvas.
+Nothing is lost when the plugin is off: the file opens as an ordinary Canvas.
+The plugin goes to the network for one thing only - see
+[Network use](#network-use).
 
 ## Getting started
 
@@ -89,6 +91,9 @@ The guide is under Settings → Miro Canvas → **Open the import guide**.
   styled, labelled, copied and deleted the same way.
 - Ends snap to a card's outline and its key points; drag a line's body to bend
   it.
+- A label's own font - family, size, bold, italic, underline, strike - comes
+  from the same toolbar a card's text does, and stays the size a card's text
+  is however far you zoom out.
 
 ## What is on top of what
 
@@ -211,6 +216,14 @@ speaks, and English for any other.
 - Very large boards (thousands of cards) stay responsive, but dragging many
   cards at once is slower than in Miro.
 - The Advanced Canvas plugin is not needed; boards made for it open here too.
+
+## Network use
+
+Once a day, when Obsidian starts, the plugin asks GitHub's API for the number
+of this plugin's latest release, so a newer one can show in the status bar
+with its notes. Nothing else is sent, nothing is downloaded, and the plugin
+never updates itself. Turn it off under Settings → Miro Canvas → Updates;
+the **Check** button there asks on demand.
 
 ## Installing
 
