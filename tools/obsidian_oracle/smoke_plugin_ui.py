@@ -9,6 +9,11 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 REPO = Path(__file__).resolve().parents[2]
+BUNDLE_FIXTURE = (
+    "require('esbuild').buildSync({"
+    "entryPoints: [process.argv[1]], bundle: true, platform: 'browser', outfile: process.argv[2]"
+    "})"
+)
 EDGE_PATH = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
 
 
@@ -22,10 +27,12 @@ def main() -> int:
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="miro-plugin-ui-") as temporary:
         bundle = Path(temporary) / "fixture.js"
+        # Through esbuild's JavaScript API: on Linux and macOS npm replaces
+        # node_modules/esbuild/bin/esbuild with the native binary, which node
+        # cannot run as a script.
         subprocess.run([
-            "node", str(REPO / "node_modules/esbuild/bin/esbuild"),
-            str(REPO / "tools/obsidian_oracle/fixtures/m1-browser.ts"),
-            "--bundle", "--platform=browser", f"--outfile={bundle}",
+            "node", "-e", BUNDLE_FIXTURE,
+            str(REPO / "tools/obsidian_oracle/fixtures/m1-browser.ts"), str(bundle),
         ], cwd=REPO, check=True)
         with sync_playwright() as playwright:
             launch_options: dict[str, object] = {"headless": True}
