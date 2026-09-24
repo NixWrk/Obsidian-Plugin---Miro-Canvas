@@ -1946,6 +1946,24 @@
   color: var(--text-faint);
 }
 
+/* Miro keeps a line's label part of the board: the same size at every
+   zoom, exactly like a card's own text.  Native Canvas grows a label by
+   --zoom-multiplier so it still reads far away, which would otherwise make
+   a label bigger than the cards it joins once the board is zoomed out.
+   Scoped to the plugin's own root, so a board without it keeps native
+   Canvas's own label untouched.  This reaches the plugin's own labels and
+   a native edge's label while it is the one shown, both of which wear
+   .canvas-path-label. */
+.miro-canvas-root .canvas-path-label {
+  font-size: var(--font-text-size, 16px);
+  padding: var(--size-2-3);
+  max-width: 17em;
+}
+
+.miro-canvas-root .canvas-path-label.is-editing {
+  box-shadow: var(--shadow-stationary), 0 0 0 3px var(--canvas-color);
+}
+
 .miro-canvas-toolbar[data-miro-independent-only="true"] .canvas-menu,
 .miro-canvas-toolbar[data-miro-independent-only="true"] .miro-canvas-toolbar__native-snapshot { display:none !important; }
 

@@ -947,10 +947,14 @@ export class SelectionToolbar {
     refs.deleteSelection.hidden = state.independentOnly !== true;
     refs.deleteSelection.disabled=!state.editable;
     const hasNode = state.kinds.some((kind) => kind !== "edge");
+    // A card's text row belongs to nodes that show text; a link, file or
+    // embed has none of its own.  A line's label takes the same font family,
+    // size and four marks, so the font row opens for a line too - but not
+    // alignment or line height, which only a card's own text wraps enough to need.
+    const hasTextNode = state.kinds.some((kind) => kind !== "edge" && kind !== "media");
     refs.shape.host.hidden = !state.kinds.includes("shape");
-    // A connector's label keeps native editing, and a link, file or embed has
-    // no text of its own: the text row belongs to nodes that show text.
-    refs.textGroup.hidden = !state.kinds.some((kind) => kind !== "edge" && kind !== "media");
+    refs.textGroup.hidden = !(hasTextNode || hasEdge);
+    refs.align.host.hidden = !hasTextNode;
     refs.edgeGroup.hidden = !hasEdge;
     refs.editConnectorLabel.hidden = state.canEditConnectorLabel !== true;
     for (const slot of COLOR_SLOT_KEYS) {

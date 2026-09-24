@@ -13,6 +13,7 @@ import {
 	normalizeAppearanceState,
 	appearanceReducer,
 	colorToCss,
+	fontStack,
 	typographyDeclarations,
 	type AppearanceAction,
 	type AppearanceState,
@@ -406,6 +407,39 @@ export function resolveSelectionToolbarPresentation(
 			...(Object.keys(connectorStyle).length === 0 ? {} : { connector: connectorStyle }),
 		},
 	};
+}
+
+/** The CSS a label's own font paints; never alignment, line height or vertical align. */
+const LABEL_FONT_PROPERTIES = new Set(["font-family", "font-size", "font-weight", "font-style", "text-decoration"]);
+
+/**
+ * A connector label's font: an edited override in full, painted the same
+ * way a card's text is, since touching any one field snaps every field to
+ * the defaults `normalizeTypography` fills in; short of an override, only
+ * the properties the Miro source's own label style set, so an import that
+ * never named a weight still keeps Canvas's own default weight.  A local
+ * override wins outright, as it does for a card's colours and typography.
+ */
+export function labelFont(
+	override: TypographySettings | undefined,
+	css: Readonly<Record<string, string>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+	if (override !== undefined) {
+		const style: Record<string, string> = {};
+		for (const [property, value] of typographyDeclarations(override)) {
+			if (LABEL_FONT_PROPERTIES.has(property)) style[property] = value;
+		}
+		return style;
+	}
+	if (css === undefined) return undefined;
+	const style: Record<string, string> = {};
+	const family = css["font-family"];
+	if (family !== undefined) style["font-family"] = fontStack(family);
+	for (const property of ["font-size", "font-weight", "font-style", "text-decoration"]) {
+		const value = css[property];
+		if (value !== undefined) style[property] = value;
+	}
+	return Object.keys(style).length === 0 ? undefined : style;
 }
 
 function safeText(value: unknown): string {
@@ -1110,7 +1144,7 @@ export class M1CanvasSession {
 		const labels = this.connectorLabels;
 		if (labels === undefined) return;
 		const raw = this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument;
-		const geometry = this.landingGeometry().geometry;
+		const { geometry, scene } = this.landingGeometry();
 		const selected = this.selectedIds.length === 1 ? this.selectedIds[0] : undefined;
 		const placed = this.labelsPlaced;
 		if (placed !== undefined && placed.document === raw && placed.geometry === geometry && placed.selected === selected) return;
@@ -1120,6 +1154,11 @@ export class M1CanvasSession {
 			const route = geometry.edges?.[id];
 			return route?.points ?? (route?.start !== undefined && route.end !== undefined ? [route.start, route.end] : []);
 		};
+		// A label's font: an edited override in full, or, short of one, whatever
+		// the Miro source's own label style set - never Canvas's own default,
+		// which stays untouched until one of the two actually says something.
+		const font = (id: string): Readonly<Record<string, string>> | undefined =>
+			labelFont(this.appearance.localOverrides[id]?.typography, scene.items.get(id)?.css);
 		const items: ConnectorLabel[] = [];
 		const rawEdges = readRuntime(raw, "edges");
 		const byId = new Map((Array.isArray(rawEdges) ? rawEdges as readonly unknown[] : []).map((edge) => [readRuntime(edge, "id"), edge]));
@@ -1133,16 +1172,23 @@ export class M1CanvasSession {
 			if (points.length < 2) continue;
 			const labelT = readRuntime(readRuntime(readRuntime(overrides, id), "connector"), "labelT");
 			const native = readRuntime(readRuntime(edge, "labelElement"), "wrapperEl");
+			const labelFontStyle = font(id);
 			items.push({
 				id, text, points, t: typeof labelT === "number" && labelT >= 0 && labelT <= 1 ? labelT : fallback,
 				...(isElement(native) ? { native } : {}),
+				...(labelFontStyle === undefined ? {} : { font: labelFontStyle }),
 			});
 		}
 		for (const connector of boardConnectors(raw)) {
 			const text = connector.label ?? "";
 			if (text === "" && connector.id !== selected) continue;
 			const points = along(connector.id);
-			if (points.length >= 2) items.push({ id: connector.id, text, points, t: connector.labelT ?? fallback, color: connector.color });
+			if (points.length < 2) continue;
+			const labelFontStyle = font(connector.id);
+			items.push({
+				id: connector.id, text, points, t: connector.labelT ?? fallback, color: connector.color,
+				...(labelFontStyle === undefined ? {} : { font: labelFontStyle }),
+			});
 		}
 		labels.update(items);
 	}

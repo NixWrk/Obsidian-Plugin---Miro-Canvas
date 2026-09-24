@@ -25,6 +25,12 @@ export interface ConnectorLabel {
   readonly t: number;
   /** The connector's colour, which an edited label is outlined in. */
   readonly color?: string;
+  /**
+   * The label's own font: family, size and the four marks, as an edited
+   * override or the Miro source's own label style set them.  Absent
+   * properties keep whatever Canvas's own label rule paints.
+   */
+  readonly font?: Readonly<Record<string, string>>;
   /** Native Canvas's own label for the edge, hidden while this one shows. */
   readonly native?: HTMLElement;
 }
@@ -49,6 +55,10 @@ interface Entry {
 
 /** How far a label must be pulled, in window pixels, before a press becomes a drag. */
 const DRAG_THRESHOLD = 3;
+
+/** The font properties a label paints; alignment, line height and vertical
+ * align stay a card's own, since a label never wraps or stacks like one. */
+const FONT_PROPERTIES = ["font-family", "font-size", "font-weight", "font-style", "text-decoration"] as const;
 
 export class ConnectorLabels {
   public readonly element: HTMLDivElement;
@@ -77,6 +87,7 @@ export class ConnectorLabels {
       entry.item = item;
       if (item.color === undefined) entry.wrapper.style.removeProperty("--canvas-color");
       else entry.wrapper.style.setProperty("--canvas-color", item.color);
+      this.applyFont(entry, item.font);
       if (item.id === this.editing) continue;
       if (entry.label.textContent !== item.text) entry.label.textContent = item.text;
       entry.wrapper.hidden = item.text === "";
@@ -195,6 +206,15 @@ export class ConnectorLabels {
     if (entry.native !== undefined) entry.native.style.visibility = entry.nativeVisibility ?? "";
     entry.wrapper.remove();
     this.entries.delete(id);
+  }
+
+  /** Paint a label's own font, clearing any property the item no longer sets. */
+  private applyFont(entry: Entry, font: ConnectorLabel["font"]): void {
+    for (const property of FONT_PROPERTIES) {
+      const value = font?.[property];
+      if (value === undefined) entry.label.style.removeProperty(property);
+      else entry.label.style.setProperty(property, value);
+    }
   }
 
   /** Put a label at its share of a route, in board units. */

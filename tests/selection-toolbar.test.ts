@@ -312,10 +312,34 @@ describe("selection toolbar", () => {
     expect(["Line start", "Swap line ends", "Line end", "Line", "Line color"].some(visible)).toBe(false);
     update(EDGE);
     expect(["Line start", "Swap line ends", "Line end", "Line", "Line color", "Lock selection"].every(visible)).toBe(true);
-    expect(["Shape", "Font", "Text style", "Alignment", "Text color", "Fill color", "Border"].some(visible)).toBe(false);
+    // A line's label takes the font row, family, size and the four marks; the
+    // rest - shape, alignment, and the colours a card's own text, fill and
+    // border take - stay a card's.
+    expect(["Font", "Text style"].every(visible)).toBe(true);
+    expect(["Shape", "Alignment", "Text color", "Fill color", "Border"].some(visible)).toBe(false);
     update({ kinds: ["text"] });
     expect(visible("Shape")).toBe(false);
     expect(visible("Font")).toBe(true);
+  });
+
+  it("writes a selected line's font family, size and marks like a card's text", () => {
+    const { root, appearance, update } = build({ ...EDGE });
+    choice(root, "Font", "serif").dispatch("click");
+    byLabel(root, "Font size").value = "24";
+    byLabel(root, "Font size").dispatch("change");
+    byLabel(root, "Bold").dispatch("click");
+    byLabel(root, "Italic").dispatch("click");
+    expect(appearance).toEqual([
+      { type: APPEARANCE_ACTIONS.setFontFamily, fontFamily: "serif" },
+      { type: APPEARANCE_ACTIONS.setFontSize, fontSize: 24 },
+      { type: APPEARANCE_ACTIONS.setFormat, format: { bold: !TYPOGRAPHY.format.bold } },
+      { type: APPEARANCE_ACTIONS.setFormat, format: { italic: !TYPOGRAPHY.format.italic } },
+    ]);
+    // Alignment and line height stay a card's own; a board connector shares
+    // the same font row as a native edge does.
+    update({ ...EDGE, kinds: ["edge"] });
+    expect(shown(byLabel(root, "Alignment"))).toBe(false);
+    expect(shown(byLabel(root, "Font"))).toBe(true);
   });
 
   it("sets text style, alignment and font from pictures and shows the current ones", () => {
