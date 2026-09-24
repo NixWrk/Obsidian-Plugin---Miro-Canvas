@@ -677,6 +677,11 @@ function applyNodeCss(
   layer: DomElementLike | undefined,
   patches: RestorePatch[],
 ): void {
+  // Native Canvas draws a card's border on its container, inside the shell.
+  // The border's style and width go there too: on the shell they drew a
+  // second border around the native one, and a card set to no border kept
+  // the native one.
+  const container = layer === undefined ? safeCall(shell, "querySelector", [":scope > .canvas-node-container"]) : undefined;
   for (const [property, value] of Object.entries(descriptor.css)) {
     if (TYPOGRAPHY_CSS.has(property)) {
       // A family the machine lacks falls back to a face of its own kind.
@@ -688,6 +693,7 @@ function applyNodeCss(
         const seeThrough = property === "background-color" && /^#[0-9a-f]{6}(?!ff)[0-9a-f]{2}$/iu.test(value);
         if ((descriptor.kind !== "shape" || property === "opacity") && !seeThrough) setOwnedElementStyle(layer, property, value);
       }
+      else if (isElement(container) && (property === "border-style" || property === "border-width")) patchStyle(container, property, value, patches);
       else patchStyle(shell, property, value, patches);
     }
   }

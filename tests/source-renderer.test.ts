@@ -1247,3 +1247,34 @@ describe("sticky notes", () => {
     expect(f.contentEl.style.getPropertyValue("font-size")).toBe("24px");
   });
 });
+
+describe("a card's border", () => {
+  it("goes on the native container, where Canvas draws the border, not around it", () => {
+    const shell = new Element("div");
+    const container = shell.appendChild(new Element("div"));
+    container.classes.add("canvas-node-container");
+    const content = container.appendChild(new Element("div"));
+    Object.assign(shell, {
+      querySelector: (selector: string) => selector === ":scope > .canvas-node-container"
+        ? shell.children.find((child) => child.classes.has("canvas-node-container")) ?? null
+        : null,
+    });
+    const data = {
+      nodes: [
+        { id: "dashed", type: "text", x: 0, y: 0, width: 145, height: 70, text: "Dashed" },
+      ],
+      edges: [],
+      miroCanvas: { schemaVersion: 1, localOverrides: { dashed: { borderStyle: "dashed", borderWidth: 4, colors: { border: "#f24726" } } } },
+    };
+    const renderer = new SourceRenderer({
+      getDocument: () => data,
+      getNodes: () => [{ id: "dashed", nodeEl: shell, contentEl: content }],
+      getEdges: () => [],
+    }, dom);
+    renderer.refresh();
+    expect(container.style.getPropertyValue("border-style")).toBe("dashed");
+    expect(container.style.getPropertyValue("border-width")).toBe("4px");
+    expect(shell.style.getPropertyValue("border-style")).toBe("");
+    expect(shell.style.getPropertyValue("border-width")).toBe("");
+  });
+});
