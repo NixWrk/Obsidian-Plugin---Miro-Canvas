@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Types, tests and the build: the same as before every commit by hand.
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: Release files exist
+        run: test -f main.js && test -f manifest.json && test -f styles.css
+      # Obsidian decides what to update by the manifest's version; the release
+      # is found by the tag; versions.json says which Obsidian each one needs.
+      - name: Versions agree
+        run: |
+          manifest=$(node -p "require('./manifest.json').version")
+          pkg=$(node -p "require('./package.json').version")
+          echo "manifest $manifest, package $pkg"
+          test "$manifest" = "$pkg"
+          node -e "
+            const m = require('./manifest.json');
+            const v = require('./versions.json');
+            if (!v[m.version]) { console.error('versions.json does not list ' + m.version); process.exit(1); }
+          "
+      # The board format is miro2obsidian's; the copy here must be the one
+      # schema/pin.json names.
+      - name: Pinned schema is unchanged
+        run: npm run schema:check
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: npm ci
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m playwright install --with-deps chromium
+      # The plugin in a browser against a synthetic Canvas host.
+      - run: python -m tools.obsidian_oracle.smoke_plugin_ui
+      - run: python -m tools.obsidian_oracle.smoke_plugin_ui --interactions
+      - run: python -m tools.obsidian_oracle.smoke_plugin_ui --controls
+      - run: python -m pytest -q tools/obsidian_oracle/tests

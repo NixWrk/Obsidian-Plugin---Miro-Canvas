@@ -1,88 +1,241 @@
 # Miro Canvas
 
-`miro-canvas` is an offline Obsidian plugin that extends the native Canvas
-view. The `.canvas` format stays valid and useful when the plugin is disabled.
+An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 
-The M0 foundation is deliberately small: it registers no network clients, does
-not contact Miro, and does not write a Canvas file while a board is being
-opened. It adds one explicit `Initialize board metadata` command for the
-active native Canvas. Metadata features call the internal
-`MetadataWriter.write(action, mutate)` boundary; native Canvas Ctrl/Cmd+Z and
-Ctrl/Cmd+Y history actions are the intended undo/redo path, not a competing
-plugin history UI. Advanced Canvas is an optional integration target and is
-not a package or runtime dependency.
+[Русская версия](README.ru.md)
 
-The current development checkpoint also includes M1 controls for navigation,
-minimap, typography, themes, colors, locks/review mode, and attachment titles.
-Native zoom remains limited to 6.25%–200%. The command **Local shapes, comments,
-anchors and documents** opens M2 tools: six editable shapes, local comment
-threads, connector endpoints and native document navigation. Select a file node
-first to expose its document controls. Source and unknown metadata survive
-graph edits and native history. M3 adds local/source rotation, layer ordering,
-rotated anchors, and reversible source-backed decoration for Miro shapes, text,
-sticky notes, connectors, frames and media. The first M4 slice adds bounded,
-inert source-backed code-card styling while keeping native text editable.
-Proven `app_card` field collections now receive the same reversible treatment
-without copying field payloads into plugin-owned DOM.
-Preview metadata stays inert above native clickable links, while ordinary cards
-resolve source tag definitions into bounded, non-interactive chips.
-Proven `mindmap_node` trees keep native Canvas text and generated hierarchy
-edges, with reversible root/branch styling and explicit legacy limitations.
-The source/provenance inspector is available from Commands and the command
-palette; it reports bounded counts and key paths without exposing raw values.
-Automated browser checks use a synthetic host; real-Obsidian verification is
-still required.
+## Contents
+
+- [What it looks like](#what-it-looks-like)
+- [Getting started](#getting-started)
+- [Bringing boards over from Miro](#bringing-boards-over-from-miro)
+- [Drawing, lines and arrows](#drawing-lines-and-arrows)
+- [What is on top of what](#what-is-on-top-of-what)
+- [Comments](#comments)
+- [Locking and review mode](#locking-and-review-mode)
+- [Exporting to PDF and PowerPoint](#exporting-to-pdf-and-powerpoint)
+- [The file stays a Canvas](#the-file-stays-a-canvas)
+- [Reference](#reference)
+- [Languages](#languages)
+- [Limits](#limits)
+- [Installing](#installing)
+- [Development](#development)
+- [License](#license)
+
+## What it looks like
+
+You open a `.canvas` file as usual - it is still Obsidian's Canvas, with its
+own cards, links, files and history - and the board behaves the way a Miro
+board does. At the bottom there is a bar of tools: select, text, sticky note,
+shape, pen, lines and arrows, comment, frame, and more. Select something and a
+toolbar appears above it with fonts, colours, borders, shapes and line styles.
+In the corner there is a minimap and a small dock with the zoom and the board's
+settings.
+
+A board brought over from Miro keeps its look: sticky notes in Miro's own
+colours with text that fits, shapes and flowcharts, frames, code blocks, link
+previews, presentations with their slides, and comments pinned where they were.
+
+Nothing here goes to the network, and nothing is lost when the plugin is off:
+the file opens as an ordinary Canvas.
+
+## Getting started
+
+1. Install and enable the plugin (see [Installing](#installing)).
+2. Open any `.canvas` file, or create one.
+3. Pick a tool at the bottom, or press its letter: **V** select, **T** text,
+   **N** sticky note, **S** shape, **P** pen, **L** lines and arrows, **C**
+   comment, **F** frame. The rest - code block, table, web link - is under
+   **More**.
+4. Click the board to place the item; select it to style it.
+
+The first time the plugin starts it asks whether you want to import boards
+from Miro. Either answer is fine; the guide stays in the plugin's settings.
+
+## Bringing boards over from Miro
+
+Importing is done by a separate free program,
+[miro2obsidian](https://github.com/NixWrk/Miro_2_Obsidian), for Windows, macOS
+and Linux. The plugin never downloads, installs or runs it - it only shows you
+the way:
+
+1. **Get miro2obsidian** - a ready-made build from its
+   [releases](https://github.com/NixWrk/Miro_2_Obsidian/releases/latest).
+2. **Or let an AI agent do it** - Codex or Claude Code can do every step with
+   the `miro2obsidian-import` skill; the guide gives you a ready prompt with
+   this vault's path in it.
+3. **Create your own Miro app** - once, 10-20 minutes, no programming; Miro's
+   security model asks for it.
+4. **Export into this vault** in the **miro-canvas** format.
+5. **Open the board** here.
+6. **Remove the program** if you like - the boards do not need it.
+
+The guide is under Settings → Miro Canvas → **Open the import guide**.
+
+## Drawing, lines and arrows
+
+- **Pen, highlighter, smart drawing** - a stroke is its own item on the board.
+  Smart drawing turns a rough shape into a clean one, or a rough line into an
+  arrow. Hold **Shift** for straight strokes.
+- **Erasers** - a whole stroke, or the part under the pointer.
+- **Lines and arrows** - straight, angled, curved, block arrows, polylines and
+  splines. A line whose ends are both on cards is an ordinary Canvas edge; a
+  line with an end anywhere else - on the empty board, or on another line - is
+  kept by the plugin. You do not see the difference: both are selected,
+  styled, labelled, copied and deleted the same way.
+- Ends snap to a card's outline and its key points; drag a line's body to bend
+  it.
+
+## What is on top of what
+
+Cards can be brought to the front, forward, backward and to the back - from
+the **Layer** menu in the selection toolbar, from the card's right-click menu,
+or with commands you can give hotkeys. It works on a whole selection and keeps
+the cards' order among themselves; one step of undo.
+
+**Forward** and **backward** move a card past the nearest card that overlaps
+it. Frames always lie under cards, as Canvas draws them, and lines have no
+layers. As in Miro, moving or selecting a card does not bring it to the top.
+
+## Comments
+
+Pin a comment anywhere: on a card, on a point of a picture, along a line, or on
+the empty board. Threads have replies, authors with their own colours,
+resolving and locking. Comments imported from Miro stay read-only and can be
+hidden. A panel lists every comment on the board or in the selection.
+
+## Locking and review mode
+
+A locked item cannot be moved, resized, rotated, retyped, restyled, reconnected
+or deleted until it is unlocked. **Review mode** locks the whole board while
+keeping panning, selection, links, copying and comments.
+
+## Exporting to PDF and PowerPoint
+
+The board menu's **Export to PDF or PowerPoint** marks pages on the board -
+rectangles of one paper size (A4, A3, Letter, 16:9, 4:3 or free), moved by
+their tab and resized by their corner. They are kept with the board but are
+never cards, so nothing on the board changes. **A page per frame** adds a page
+around every frame. A presentation's bar has its own export, whose pages are
+its slides. Each page is photographed the way Obsidian's own **Export as
+image** does it and packed into a PDF or a PowerPoint deck; a small window
+shows the progress and can stop it.
+
+## The file stays a Canvas
+
+Everything Canvas can express stays in Canvas's own fields. What it cannot -
+fonts, colours, shapes, rotation, locks, comments, free lines, export pages -
+lives under one extra key, `miroCanvas`, which Canvas ignores. A board imported
+from Miro also carries `miroSource`, the Miro data as it was exported; the
+plugin reads it and never changes it.
+
+The format is written down as a versioned JSON Schema owned by miro2obsidian;
+this repository keeps a pinned copy in [`schema/v1`](schema/v1) and its tests
+run every example board of it. Agents can read and edit boards safely with
+miro2obsidian's `miro-canvas-format` skill.
+
+## Reference
+
+<details>
+<summary><b>Tools and their letters</b></summary>
+
+| Letter | Tool |
+| --- | --- |
+| V | Select (and lasso, when its button is shown) |
+| T | Text |
+| N | Sticky note |
+| S | Shape - basic shapes and flowcharts |
+| P | Pen, highlighter, smart drawing, erasers |
+| L | Lines and arrows |
+| C | Comment |
+| F | Frame |
+| More | Code block, table, web link |
+
+The letters work while the board has focus; editors keep their own keys.
+Escape resets the tools and the selection.
+
+</details>
+
+<details>
+<summary><b>Commands</b></summary>
+
+Every command can get a hotkey in Settings → Hotkeys; none has one by default,
+so nothing is taken from Obsidian or other plugins.
+
+- Bring to front, bring forward, send backward, send to back
+- Lock selection, unlock selection
+- Toggle review mode
+- Use system / light / dark board theme
+- Zoom in, zoom out, reset zoom, fit board, toggle minimap, pan left / right /
+  up / down
+- Toggle attachment names
+- Open Miro Canvas controls, open source and provenance inspector
+- Local shapes, comments, anchors and documents
+- Describe the selected element (for reporting a problem)
+- Reset tools and selection
+- Convert legacy line nodes to connectors, initialize board metadata
+
+</details>
+
+<details>
+<summary><b>Settings</b></summary>
+
+- **Navigation** - zoom step, zoom towards the pointer, the wheel's modifier,
+  minimum and maximum zoom.
+- **Panning** - pan step and the fast multiplier with Shift.
+- **Lines** - what ends attach to (cards and comments, the empty board, other
+  lines), magnet and snap distances, where new labels sit, which mouse
+  gestures draw lines, pan or lasso.
+- **Keyboard**, **Interface** - the minimap by default, the selection toolbar.
+- **Comments** - your name and the authors' colours.
+- **Import from Miro** - the import guide.
+- **Developer diagnostics** - a badge listing what the plugin could not do.
+
+</details>
+
+## Languages
+
+The plugin speaks English and Russian. It takes the language Obsidian itself
+speaks, and English for any other.
+
+## Limits
+
+- **Exporting to PDF and PowerPoint needs Obsidian on a computer**; on a phone
+  or tablet the rest works, the export does not.
+- **Tables from Miro arrive empty**: Miro's export carries no cell text.
+- Lines attached to other lines are **experimental** and off by default.
+- Very large boards (thousands of cards) stay responsive, but dragging many
+  cards at once is slower than in Miro.
+- The Advanced Canvas plugin is not needed; boards made for it open here too.
+
+## Installing
+
+**By hand**: download `main.js`, `manifest.json` and `styles.css` from the
+[latest release](../../releases/latest) and put them into
+`<vault>/.obsidian/plugins/miro-canvas/`, then enable **Miro Canvas** in
+Settings → Community plugins.
+
+The plugin is not in the community catalogue yet.
 
 ## Development
 
-Run these commands from this directory after installing the development
-dependencies in your own environment:
-
-```powershell
-npm ci
-npm run typecheck
-npm test
-npm run build
+```bash
+npm install
+npm run dev            # watch build
+npm run build          # production build into the repository root
+npm test               # unit tests
+npm run check          # tsc --noEmit
+npm run schema:check   # the pinned schema copy still matches miro2obsidian
 ```
 
-The build emits the three runtime assets required by Obsidian:
-`manifest.json`, `main.js`, and `styles.css`. To deploy that local build into
-the guarded project-local M0 test vault, run from the repository root:
+`tools/obsidian_oracle` holds browser smoke tests against a synthetic Canvas
+host and the scripts for testing in a real Obsidian vault; they need Python,
+Playwright and miro2obsidian (`pip install -r requirements-dev.txt`, then
+`python -m playwright install chromium` and
+`python -m tools.obsidian_oracle.smoke_plugin_ui`). Agents working on this
+repository start with [AGENTS.md](AGENTS.md); the design notes and the task
+list live in [docs/miro-canvas.md](docs/miro-canvas.md).
 
-```powershell
-cd plugins\miro-canvas
-npm ci
-npm run typecheck
-npm test
-npm run build
-cd ..\..
-python tools\obsidian_oracle\setup_m0_vault.py
-python tools\obsidian_oracle\check_environment.py
-```
+## License
 
-The setup script copies only those release assets into
-`_obsidian_oracle_vault\.obsidian\plugins\miro-canvas`, stages the four
-offline compatibility fixtures, and enables the local plugin. It refuses
-arbitrary vault paths and link/reparse points. It creates only an Advanced
-Canvas placeholder manifest; install its real runtime separately when a real
-Obsidian check is authorized. The setup scripts do not register or open the
-vault in an Obsidian window.
-
-For the exact profile activation/check pairs, the CAS boundary, fail-closed
-rules, and the real-app gate, see [`docs/miro-canvas.md`](../../docs/miro-canvas.md).
-
-`npm run dev` starts esbuild in watch mode. The production bundle is emitted as
-`main.js` next to `manifest.json` and `styles.css`, which is the layout expected
-by Obsidian's local plugin loader. The repository tracks `package-lock.json`, so
-`npm ci` installs the reproducible development dependency set.
-
-Native root persistence is enabled only when the known writable `Canvas.data`
-property and synchronous `requestSave(true)` history boundary are present.
-The bridge performs an in-memory compare-and-swap root replacement and asks
-Obsidian for its native undo snapshot; Obsidian's normal debounced disk save is
-not a synchronously proven filesystem transaction. Incompatible, read-only,
-malformed, or async boundaries fail closed and leave native Canvas usable.
-
-There is intentionally no `postinstall` hook and no runtime dependency. Keep
-generated `main.js` files and local vault copies out of source control unless a
-release process explicitly packages them.
+[MIT](LICENSE)

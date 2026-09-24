@@ -3,3 +3,5 @@ main.js
 main.js.map
 coverage/
 *.tsbuildinfo
+__pycache__/
+.pytest_cache/

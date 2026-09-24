@@ -2,13 +2,16 @@
   "name": "miro-canvas",
   "version": "0.1.0",
   "private": true,
-  "description": "Offline native Canvas extensions for Obsidian.",
+  "description": "Miro's look and Miro's tools on Obsidian's own Canvas.",
   "main": "main.js",
   "scripts": {
-    "build": "node esbuild.config.mjs --production",
     "dev": "node esbuild.config.mjs --watch",
+    "build": "node esbuild.config.mjs --production",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "schema:check": "node scripts/sync-schema.mjs --check",
+    "schema:sync": "node scripts/sync-schema.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

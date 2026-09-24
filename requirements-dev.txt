@@ -1,0 +1,7 @@
+# Browser smoke tests and real-vault scripts in tools/obsidian_oracle.
+pytest==9.1.1
+playwright==1.62.0
+Pillow==12.3.0
+# The converter that stages the example boards; pinned to the commit the schema
+# copy comes from (schema/pin.json).
+miro-2-obsidian @ git+https://github.com/NixWrk/Miro_2_Obsidian@2966bce76be5d16cd70ae775d0035fab370585f5

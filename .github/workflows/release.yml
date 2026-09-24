@@ -1,0 +1,52 @@
+name: Release
+
+# The tag is the version without a "v": the Obsidian catalogue asks for that.
+on:
+  push:
+    tags: ["*"]
+
+permissions:
+  contents: write
+  # To sign the build: anyone can check that main.js was built from this
+  # repository and not swapped on the way.
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      # Obsidian looks for the manifest's version and downloads the files of
+      # the release with that tag.
+      - name: Tag matches the manifest
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          manifest=$(node -p "require('./manifest.json').version")
+          echo "tag $tag, manifest $manifest"
+          test "$tag" = "$manifest"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: "main.js, styles.css"
+      # The release notes are this version's section of the changelog: from
+      # its "## " heading to the next one.
+      - name: Release notes for this version
+        run: awk -v version="$GITHUB_REF_NAME" '/^## /{ if (seen) exit; if (index($0, version)) seen = 1; next } seen' CHANGELOG.md > NOTES.md
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file NOTES.md \
+            main.js manifest.json styles.css

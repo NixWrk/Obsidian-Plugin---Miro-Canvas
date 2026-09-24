@@ -3,7 +3,8 @@
   "name": "Miro Canvas",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "Offline extensions for native Obsidian Canvas files.",
-  "author": "Miro 2 Obsidian",
-  "isDesktopOnly": false
+  "description": "Miro's look and Miro's tools on Obsidian's own Canvas: creation and drawing tools, lines and arrows, comments, layers, and export to PDF and PowerPoint.",
+  "author": "NixWrk",
+  "isDesktopOnly": false,
+  "authorUrl": "https://github.com/NixWrk"
 }

@@ -400,7 +400,7 @@ Production-прогон `TEST_BOARD` от 2026-08-16:
 
 `board_complete=false` означает ограничение публичных Miro API, а не дефект
 pipeline. Подробный снимок расхождений находится в
-[`MIRO_VS_CANVAS_DISPLAY_GAPS.ru.md`](MIRO_VS_CANVAS_DISPLAY_GAPS.ru.md).
+[`MIRO_VS_CANVAS_DISPLAY_GAPS.ru.md`](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/docs/MIRO_VS_CANVAS_DISPLAY_GAPS.ru.md).
 
 ## Контракт данных
 

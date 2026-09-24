@@ -565,8 +565,8 @@ their internals. The plugin can improve rendering only when data exists.
 - Comment content comes from REST, not Web SDK.
 - Exact slide and document internals may be partial.
 
-The [display-gap report](MIRO_VS_CANVAS_DISPLAY_GAPS.md) records the measured
-baseline and the [capability matrix](MIRO_CAPABILITIES.md) records source
+The [display-gap report](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/docs/MIRO_VS_CANVAS_DISPLAY_GAPS.md) records the measured
+baseline and the [capability matrix](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/docs/MIRO_CAPABILITIES.md) records source
 evidence.
 
 ## Implementation order
@@ -642,7 +642,7 @@ order (to front, forward, backward, to back) into the selection toolbar and
 menu (both done); foundations (schema,
 translations, agent skill); the converter as a product of its own; delivery and
 the Miro import guide; onboarding board and visual guide; testing with people;
-ecosystem - is recorded in the [ROADMAP](../ROADMAP.md) plan. The exporter stays
+ecosystem - is recorded in the [ROADMAP](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/ROADMAP.md) plan. The exporter stays
 in Python and is offered as a per-OS build or set up by an agent through a
 miro2obsidian skill or MCP server; the plugin never installs it by itself.
 
@@ -662,7 +662,7 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   letting the user remove it afterwards (the import question and its six-step
   guide are done 2026-09-24; the plugin never goes to the network itself, links
   open on a press); walk the full user journey on a clean machine (see
-  [ROADMAP](../ROADMAP.md)).
+  [ROADMAP](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/ROADMAP.md)).
 - Provide a skill or an MCP server so agents can work with miro-canvas boards as
   natively as with Canvas files (the light skill is done:
   `.agents/skills/miro-canvas-format`; the MCP server comes in phase 6).
