@@ -218,7 +218,7 @@ def install_miro_canvas_runtime(
     config = load_config()
     vault = _require_oracle_vault(vault_root, config)
     expected_version = version or str(config.get("required_plugins", {}).get(PLUGIN_ID, PLUGIN_VERSION))
-    source = Path(source_plugin_dir or (REPO_ROOT / "plugins" / PLUGIN_ID)).expanduser().absolute()
+    source = Path(source_plugin_dir or REPO_ROOT).expanduser().absolute()
     validate_miro_canvas_runtime(source, expected_version=expected_version)
 
     plugins = vault / ".obsidian" / "plugins"
@@ -264,7 +264,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source-plugin-dir",
         type=Path,
-        help="Built plugin directory (defaults to plugins/miro-canvas).",
+        help="Built plugin directory (defaults to the repository root).",
     )
     parser.add_argument("--version", help=f"Expected manifest version (default: {PLUGIN_VERSION}).")
     return parser

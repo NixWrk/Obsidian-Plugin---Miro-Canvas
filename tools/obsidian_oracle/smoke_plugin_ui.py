@@ -23,7 +23,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="miro-plugin-ui-") as temporary:
         bundle = Path(temporary) / "fixture.js"
         subprocess.run([
-            "node", str(REPO / "plugins/miro-canvas/node_modules/esbuild/bin/esbuild"),
+            "node", str(REPO / "node_modules/esbuild/bin/esbuild"),
             str(REPO / "tools/obsidian_oracle/fixtures/m1-browser.ts"),
             "--bundle", "--platform=browser", f"--outfile={bundle}",
         ], cwd=REPO, check=True)
@@ -39,7 +39,7 @@ def main() -> int:
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.set_content("<!doctype html><html><body></body></html>")
-            page.add_style_tag(path=str(REPO / "plugins/miro-canvas/styles.css"))
+            page.add_style_tag(path=str(REPO / "styles.css"))
             page.add_script_tag(path=str(bundle))
             assert page.evaluate("miroBrowser.mounted"), "M1 controls did not mount on real DOM"
             if args.controls:

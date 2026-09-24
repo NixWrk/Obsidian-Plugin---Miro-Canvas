@@ -47,7 +47,7 @@ def main() -> int:
     parser.add_argument(
         "--source-plugin-dir",
         type=Path,
-        help="Built miro-canvas directory (defaults to plugins/miro-canvas).",
+        help="Built miro-canvas directory (defaults to the repository root).",
     )
     parser.add_argument(
         "--skip-runtime",

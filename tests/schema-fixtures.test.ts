@@ -1,6 +1,7 @@
 /**
- * Phase 1a contract check: this plugin agrees with `miro2obsidian/schemas/v1/miro-canvas.schema.json`
- * and its fixture manifest, both owned by miro2obsidian at the repository root.
+ * Contract check: this plugin agrees with the board schema miro2obsidian
+ * publishes - the copy in `schema/v1`, pinned to one miro2obsidian commit by
+ * `schema/pin.json` - and with its fixture manifest.
  *
  * The plugin never reads the schema file to validate a board at runtime (it has its
  * own dependency-free reader in metadata.ts); this test only keeps the two
@@ -14,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { KNOWN_METADATA_FIELDS, validateMiroCanvasMetadata } from "../src/metadata";
 
 const TESTS_DIR = dirname(fileURLToPath(import.meta.url));
-const SCHEMAS_V1_DIR = join(TESTS_DIR, "..", "..", "..", "miro2obsidian", "schemas", "v1");
+const SCHEMAS_V1_DIR = join(TESTS_DIR, "..", "schema", "v1");
 const FIXTURES_DIR = join(SCHEMAS_V1_DIR, "fixtures");
 
 interface ManifestEntry {

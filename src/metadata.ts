@@ -272,7 +272,7 @@ const METADATA_FIELDS = new Set([
 
 /**
  * The root `miroCanvas` fields this version of the plugin knows about.  Kept
- * in sync with `miro2obsidian/schemas/v1/miro-canvas.schema.json`'s declared properties by
+ * in sync with `schema/v1/miro-canvas.schema.json` (miro2obsidian's, pinned)'s declared properties by
  * `tests/schema-fixtures.test.ts`, so the schema and this validator cannot
  * silently drift apart.
  */

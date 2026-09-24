@@ -1,9 +1,9 @@
-import { M1CanvasSession } from "../../../plugins/miro-canvas/src/m1-session";
-import { normalizeSettings } from "../../../plugins/miro-canvas/src/settings";
-import { M2CanvasTools } from "../../../plugins/miro-canvas/src/m2-tools";
-import { MetadataWriter } from "../../../plugins/miro-canvas/src/metadata-writer";
-import { createObsidianMetadataStore } from "../../../plugins/miro-canvas/src/obsidian-metadata-store";
-import type { LocalDocument } from "../../../plugins/miro-canvas/src/document-viewer";
+import { M1CanvasSession } from "../../../src/m1-session";
+import { normalizeSettings } from "../../../src/settings";
+import { M2CanvasTools } from "../../../src/m2-tools";
+import { MetadataWriter } from "../../../src/metadata-writer";
+import { createObsidianMetadataStore } from "../../../src/obsidian-metadata-store";
+import type { LocalDocument } from "../../../src/document-viewer";
 
 // Browser DOM integration fixture, NOT a substitute for the real-Obsidian gate.
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));

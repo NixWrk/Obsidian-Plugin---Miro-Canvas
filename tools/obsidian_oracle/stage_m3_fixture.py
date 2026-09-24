@@ -47,7 +47,7 @@ def stage_m3_fixture() -> Path:
 
     payloads = {
         document_asset: (fixture_root / "m0" / DOCUMENT_ASSET).read_bytes(),
-        image_asset: (TOOL_DIR.parent / "miro_websdk_exporter" / "icon-color.svg").read_bytes(),
+        image_asset: (TOOL_DIR / "fixtures" / "assets" / "icon-color.svg").read_bytes(),
         canvas: (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
     }
     created: list[Path] = []
