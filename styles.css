@@ -19,21 +19,28 @@
   color-scheme: light;
 }
 
-.miro-canvas-root [data-miro-canvas-appearance="true"] {
-  --miro-canvas-vertical-align: flex-start;
+/* Where a card's text sits between its top and bottom edges.  Native Canvas
+   stretches the preview's sizer over the whole card, which keeps the text at
+   the top whatever is chosen, so a card set to the middle or the bottom lets
+   the sizer keep its own height.  Text that outgrows the card starts at the
+   top rather than spilling over it. */
+.miro-canvas-root [data-miro-canvas-vertical-align="middle"] .markdown-preview-view,
+.miro-canvas-root [data-miro-canvas-vertical-align="bottom"] .markdown-preview-view {
+  display: flex;
+  flex-direction: column;
+  justify-content: safe var(--miro-canvas-vertical-align, center);
 }
 
-.miro-canvas-root [data-miro-canvas-appearance="true"][data-miro-canvas-vertical-align="center"] {
-  --miro-canvas-vertical-align: center;
+.miro-canvas-root [data-miro-canvas-vertical-align="middle"] .markdown-preview-view > .markdown-preview-sizer,
+.miro-canvas-root [data-miro-canvas-vertical-align="bottom"] .markdown-preview-view > .markdown-preview-sizer {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
 }
 
-.miro-canvas-root [data-miro-canvas-appearance="true"][data-miro-canvas-vertical-align="bottom"] {
-  --miro-canvas-vertical-align: flex-end;
-}
-
-.miro-canvas-root [data-miro-canvas-appearance="true"] > .canvas-node-content,
-.miro-canvas-root [data-miro-canvas-appearance="true"] > .markdown-preview-view {
-  justify-content: var(--miro-canvas-vertical-align, flex-start);
+.miro-canvas-root [data-miro-canvas-vertical-align="middle"] .markdown-preview-pusher,
+.miro-canvas-root [data-miro-canvas-vertical-align="bottom"] .markdown-preview-pusher {
+  display: none;
 }
 
 /* The corner dock: the minimap above one row of small icons, with the view
@@ -2168,6 +2175,9 @@
      with its size, the one its fitted text is measured against. */
   padding: 8% !important;
   overflow: hidden;
+  /* Obsidian keeps room for a scrollbar a note never shows; that room would
+     narrow the text below the width its size was fitted to, and break words. */
+  scrollbar-gutter: auto;
   color: var(--miro-sticky-ink, #1a1a1a);
   line-height: 1.3;
 }

@@ -13,12 +13,14 @@ import {
 	normalizeAppearanceState,
 	appearanceReducer,
 	colorToCss,
+	typographyDeclarations,
 	type AppearanceAction,
 	type AppearanceState,
 	type ColorSettings,
 	type PaletteColor,
 	type TypographySettings,
 } from "./appearance";
+import { applyEditorAppearanceToFrame, buildEditorAppearanceRules } from "./editor-appearance";
 import {
 	decideAttachmentLabel,
 	shouldShowAttachmentName,
@@ -233,6 +235,8 @@ const STRAIGHTEN_DISTANCE = 8;
 const APPEARANCE_ATTRIBUTE = "data-miro-canvas-appearance";
 const VERTICAL_ALIGN_ATTRIBUTE = "data-miro-canvas-vertical-align";
 const THEME_ROOT_CLASS = "miro-canvas-root";
+/** Past this many shells in one mutation batch, redecorating them one by one costs more than a full refresh. */
+const APPEARANCE_MUTATION_SHELL_BOUND = 200;
 
 function isObject(value: unknown): value is UnknownRecord {
 	return value !== null && (typeof value === "object" || typeof value === "function");
@@ -1243,6 +1247,15 @@ export class M1CanvasSession {
 	private readonly readonlyOriginal: boolean | undefined;
 	private readonly lockedDom = new Map<HTMLElement, { readonly classPresent: boolean; readonly attrPresent: boolean; readonly attrValue: string | null }>();
 	private readonly appearanceDom = new Map<HTMLElement, AppearanceDomSnapshot>();
+	/** Node shells this session has checked for an editor frame, so a card no longer being edited is still found once more to clean up. */
+	private readonly editorAppearanceDom = new Set<HTMLElement>();
+	/** Node shells a mutation batch just added, waiting for the next frame's pass; unset once a batch is too large to reason about shell by shell. */
+	private pendingAppearanceShells: Set<HTMLElement> | undefined;
+	/** True instead of a shell list when a batch is too large to enumerate cheaply; the next pass takes the full refresh path. */
+	private pendingAppearanceEverything = false;
+	private appearanceFrameQueued = false;
+	/** Editor frames this session has painted; teardown clears each one's style element. */
+	private readonly editorAppearanceFrames = new Set<HTMLElement>();
 	private readonly attachmentLabels: HTMLElement[] = [];
 	private readonly hiddenNativeAttachmentLabels = new Map<HTMLElement, {
 		readonly styles: Map<string, StylePropertySnapshot>;
@@ -1302,6 +1315,9 @@ export class M1CanvasSession {
 	/** Observer moving the overlays with native pans, zooms and drags between refreshes. */
 	private followObserver: { observe(target: unknown, options: unknown): void; disconnect(): void } | undefined;
 	private followTargets: readonly unknown[] = [];
+	/** Watches the native node layer for DOM Obsidian replaces without the scene or the appearance changing, so a re-created card still gets its look. */
+	private appearanceObserver: { observe(target: unknown, options: unknown): void; disconnect(): void } | undefined;
+	private appearanceObserverTarget: HTMLElement | undefined;
 	/** Shape kind of each selected element, kept while the document is the same object. */
 	private shapeCache: { readonly document: unknown; readonly shapes: Map<string, string | undefined> } | undefined;
 	private commentThreadCache: { readonly document: unknown; readonly threads: ReturnType<typeof listCommentThreads> } | undefined;
@@ -2693,6 +2709,7 @@ export class M1CanvasSession {
 		if (ownEdges.length > 0) this.scene = { ...this.scene, edges: [...this.scene.edges, ...ownEdges] };
 		this.policy = this.policyFromDocument(this.currentRawDocument);
 		this.attachNativeGuards();
+		this.ensureAppearanceObserver();
 		// Described again only when native Canvas saved a change or a press is
 		// held: describing every card of a large board is not free.
 		const signedFor = this.pointerHeld || this.selectionMovePreview !== undefined ? undefined : this.savedBoard?.document;
@@ -5168,12 +5185,12 @@ export class M1CanvasSession {
 			return undefined;
 		}
 		if (result.status === "applied") {
-			// An accepted-but-altered commit is reported in the panel rather than
-			// as a notice, so host behavior stays visible without interrupting.
+			// The board itself shows the change, so success raises no notice; an
+			// accepted-but-altered commit is reported in the panel, so host
+			// behavior stays visible without interrupting.
 			for (const diagnostic of result.diagnostics) {
 				this.addDiagnostic(diagnostic.message);
 			}
-			this.notice(words().shell.actionApplied(action));
 		} else if (result.status === "rejected") {
 			const diagnostic = result.diagnostics[0]?.message ?? words().shell.transactionRejected;
 			this.addDiagnostic(diagnostic);
@@ -6105,17 +6122,9 @@ export class M1CanvasSession {
 		this.captureAppearanceDom(element);
 		writeAttribute(element, APPEARANCE_ATTRIBUTE, "true");
 		if (typography !== undefined) {
-			this.setAppearanceStyle(element, "font-family", typography.fontFamily);
-			this.setAppearanceStyle(element, "font-size", `${typography.fontSize}px`);
-			this.setAppearanceStyle(element, "font-weight", typography.format.bold ? "700" : "400");
-			this.setAppearanceStyle(element, "font-style", typography.format.italic ? "italic" : "normal");
-			const decoration = [
-				...(typography.format.underline ? ["underline"] : []),
-				...(typography.format.strike ? ["line-through"] : []),
-			].join(" ") || "none";
-			this.setAppearanceStyle(element, "text-decoration", decoration);
-			this.setAppearanceStyle(element, "text-align", typography.alignment);
-			this.setAppearanceStyle(element, "line-height", String(typography.lineHeight ?? 1.2));
+			for (const [property, value] of typographyDeclarations(typography)) {
+				this.setAppearanceStyle(element, property, value);
+			}
 			const vertical = verticalJustification(typography.verticalAlign);
 			writeAttribute(element, VERTICAL_ALIGN_ATTRIBUTE, vertical.vertical);
 			this.setAppearanceStyle(element, "--miro-canvas-vertical-align", vertical.css);
@@ -6143,10 +6152,14 @@ export class M1CanvasSession {
 					this.setAppearanceStyle(element, "background-color", inner && seeThrough(colors.fill) ? "transparent" : colorToCss(colors.fill));
 				}
 				if (colors.border !== undefined) this.setAppearanceStyle(element, "border-color", colorToCss(colors.border));
-				// The card's marks take its highlight colour, with ink that reads on it.
+				// The card's marks take its highlight colour.  Text keeps the colour
+				// the card sets for it, as in Miro; text left in Obsidian's colour,
+				// which may be light, takes ink that reads on the marker.
 				if (colors.highlight !== undefined && colors.highlight !== null) {
 					this.setAppearanceStyle(element, "--miro-highlight", colorToCss(colors.highlight));
-					this.setAppearanceStyle(element, "--miro-highlight-ink", readableInk(colorToCss(colors.highlight).slice(0, 7)));
+					if (colors.text === undefined) {
+						this.setAppearanceStyle(element, "--miro-highlight-ink", readableInk(colorToCss(colors.highlight).slice(0, 7)));
+					}
 				}
 			}
 		}
@@ -6193,24 +6206,36 @@ export class M1CanvasSession {
 		return result;
 	}
 
+	/**
+	 * Paint one node's persisted typography and colors onto its current DOM:
+	 * the shell, every inner surface Canvas paints its own fill and font on,
+	 * and its editor frame when one applies.  Shared by the full restore-then-
+	 * apply-all pass and by the mutation-observer pass below, which calls it
+	 * only for the shells a mutation just added.
+	 */
+	private decorateNodeAppearance(node: unknown): void {
+		const id = readCanvasElementId(node);
+		const dom = readCanvasElementDom(node);
+		if (id === undefined || dom === undefined) {
+			return;
+		}
+		const override = this.appearance.localOverrides[id];
+		this.applyElementAppearance(dom, override?.typography, override?.colors, false);
+		for (const content of this.appearanceContentTargets(dom).slice(1)) {
+			// Native Canvas paints its own fill and border on an inner
+			// container that covers the outer node, and it carries explicit
+			// font rules there too.  Decorating only the shell is therefore
+			// invisible; every painted surface gets the same values.
+			this.applyElementAppearance(content, override?.typography, override?.colors, false, true);
+		}
+		this.refreshEditorAppearance(node, dom, override?.typography, override?.colors);
+	}
+
 	/** Apply persisted M1 appearance to native node/edge DOM and restore it on teardown. */
 	private refreshAppearanceDecorations(): void {
 		this.restoreAppearanceDom();
 		for (const node of this.scene.nodes) {
-			const id = readCanvasElementId(node);
-			const dom = readCanvasElementDom(node);
-			if (id === undefined || dom === undefined) {
-				continue;
-			}
-			const override = this.appearance.localOverrides[id];
-			this.applyElementAppearance(dom, override?.typography, override?.colors, false);
-			for (const content of this.appearanceContentTargets(dom).slice(1)) {
-				// Native Canvas paints its own fill and border on an inner
-				// container that covers the outer node, and it carries explicit
-				// font rules there too.  Decorating only the shell is therefore
-				// invisible; every painted surface gets the same values.
-				this.applyElementAppearance(content, override?.typography, override?.colors, false, true);
-			}
+			this.decorateNodeAppearance(node);
 		}
 		for (const edge of this.scene.edges) {
 			const id = readCanvasElementId(edge);
@@ -6225,6 +6250,246 @@ export class M1CanvasSession {
 				if (isElement(group)) this.applyElementAppearance(group, undefined, colors, true);
 			}
 		}
+	}
+
+	/**
+	 * Watch the native node layer for DOM Obsidian replaces on its own - a
+	 * re-import through the plugin's own layer ordering, the file reloading,
+	 * a card's preview mounting lazily as it enters the viewport, its editor
+	 * iframe arriving - none of which changes the scene or the appearance, so
+	 * `refresh()` never runs the decoration pass for it otherwise.  One
+	 * observer per session; created lazily once `canvasEl` exists, and moved
+	 * to watch a new one if the runtime ever swaps it.
+	 */
+	private ensureAppearanceObserver(): void {
+		const canvasEl = readRuntime(this.nativeCanvas(), "canvasEl");
+		if (!isElement(canvasEl) || canvasEl === this.appearanceObserverTarget) {
+			return;
+		}
+		if (this.appearanceObserver === undefined) {
+			const Observer = readRuntime(readRuntime(ownerDocument(this.root), "defaultView"), "MutationObserver");
+			if (typeof Observer !== "function") {
+				return;
+			}
+			try {
+				this.appearanceObserver = Reflect.construct(Observer, [
+					(records: unknown) => this.collectAppearanceMutations(records),
+				]) as NonNullable<M1CanvasSession["appearanceObserver"]>;
+			} catch {
+				return;
+			}
+			this.disposers.push(() => {
+				this.appearanceObserver?.disconnect();
+				this.appearanceObserver = undefined;
+				this.appearanceObserverTarget = undefined;
+				this.pendingAppearanceShells = undefined;
+				this.pendingAppearanceEverything = false;
+			});
+		}
+		try {
+			// Attributes are never watched: the plugin's own style and attribute
+			// writes must not wake this observer into an endless loop.
+			this.appearanceObserver.observe(canvasEl, { childList: true, subtree: true });
+			this.appearanceObserverTarget = canvasEl;
+		} catch {
+			// A canvasEl mid-teardown needs no watching.
+		}
+	}
+
+	/**
+	 * Record which node shells a mutation batch added, without touching their
+	 * layout: O(added elements), and never more than one querySelectorAll per
+	 * added subtree.  A batch too large to reason about shell-by-shell (e.g.
+	 * the whole board re-imported) is remembered as "everything" instead of an
+	 * ever-growing shell list.
+	 */
+	private collectAppearanceMutations(records: unknown): void {
+		if (this.disposed) {
+			return;
+		}
+		if (!this.pendingAppearanceEverything) {
+			const shells = this.pendingAppearanceShells ?? new Set<HTMLElement>();
+			this.pendingAppearanceShells = shells;
+			for (const record of Array.isArray(records) ? records as readonly unknown[] : []) {
+				const added = readRuntime(record, "addedNodes");
+				const length = finite(readRuntime(added, "length")) ?? 0;
+				for (let index = 0; index < length; index += 1) {
+					const candidate = readRuntime(added, index);
+					if (isElement(candidate)) {
+						this.collectAppearanceShell(candidate, shells);
+					}
+				}
+				if (shells.size > APPEARANCE_MUTATION_SHELL_BOUND) {
+					this.pendingAppearanceEverything = true;
+					this.pendingAppearanceShells = undefined;
+					break;
+				}
+			}
+		}
+		this.queueAppearanceMutationPass();
+	}
+
+	/** Add the shell an added element belongs to, or (a container the host just filled, such as a re-import) every shell inside it. */
+	private collectAppearanceShell(element: HTMLElement, shells: Set<HTMLElement>): void {
+		const closest = readRuntime(element, "closest");
+		if (typeof closest === "function") {
+			try {
+				const shell = Reflect.apply(closest, element, [".canvas-node"]);
+				if (isElement(shell)) {
+					// closest() checks the element itself first, so this also
+					// covers the common case: a card's own shell added whole.
+					shells.add(shell);
+					return;
+				}
+			} catch {
+				// A node mid-teardown can throw on its own closest(); fall through
+				// to scanning descendants below.
+			}
+		}
+		const querySelectorAll = readRuntime(element, "querySelectorAll");
+		if (typeof querySelectorAll !== "function") {
+			return;
+		}
+		try {
+			const matches = Reflect.apply(querySelectorAll, element, [".canvas-node"]);
+			const length = finite(readRuntime(matches, "length")) ?? 0;
+			for (let index = 0; index < length; index += 1) {
+				const candidate = readRuntime(matches, index);
+				if (isElement(candidate)) {
+					shells.add(candidate);
+				}
+			}
+		} catch {
+			// Selector support is optional; nothing found is no worse than before.
+		}
+	}
+
+	/** Coalesce every mutation callback before the next frame into one pass. */
+	private queueAppearanceMutationPass(): void {
+		if (this.appearanceFrameQueued) {
+			return;
+		}
+		this.appearanceFrameQueued = true;
+		const run = (): void => {
+			this.appearanceFrameQueued = false;
+			if (!this.disposed) {
+				this.runAppearanceMutationPass();
+			}
+		};
+		const view = readRuntime(ownerDocument(this.root), "defaultView");
+		const raf = readRuntime(view, "requestAnimationFrame");
+		if (typeof raf === "function") {
+			try {
+				Reflect.apply(raf, view, [run]);
+				return;
+			} catch {
+				// Fall through to a microtask below.
+			}
+		}
+		// No animation frame available (a headless runtime, or a unit test): a
+		// microtask still coalesces every callback that fires before it runs.
+		queueMicrotask(run);
+	}
+
+	/**
+	 * Decorate exactly the shells a mutation batch added: nodes with a
+	 * persisted override, and nodes this session already tracks for editor
+	 * cleanup.  A plain card with no override is never touched, so it stays
+	 * exactly native.  "Everything" instead runs the full, exact refresh path.
+	 */
+	private runAppearanceMutationPass(): void {
+		const everything = this.pendingAppearanceEverything;
+		const shells = this.pendingAppearanceShells;
+		this.pendingAppearanceEverything = false;
+		this.pendingAppearanceShells = undefined;
+		if (this.disposed) {
+			return;
+		}
+		if (everything) {
+			this.lastAppearanceSignature = "";
+			this.refresh();
+			return;
+		}
+		if (shells === undefined || shells.size === 0) {
+			return;
+		}
+		const nodeByDom = new Map<HTMLElement, unknown>();
+		for (const node of this.scene.nodes) {
+			const dom = readCanvasElementDom(node);
+			if (dom !== undefined) {
+				nodeByDom.set(dom, node);
+			}
+		}
+		for (const shell of shells) {
+			const node = nodeByDom.get(shell);
+			if (node === undefined) {
+				continue;
+			}
+			const id = readCanvasElementId(node);
+			const hasOverride = id !== undefined && this.appearance.localOverrides[id] !== undefined;
+			if (hasOverride || this.editorAppearanceDom.has(shell)) {
+				this.decorateNodeAppearance(node);
+			}
+		}
+	}
+
+	/**
+	 * Obsidian edits a card's text in a same-origin iframe the node keeps for
+	 * it, and only while the card is being edited.  Finding it costs one
+	 * querySelector, so it is spent only on a node that is editing now, or
+	 * one this session has decorated before and still owes a cleanup - never
+	 * walked on every node of a large board on every refresh.
+	 */
+	private refreshEditorAppearance(
+		node: unknown,
+		dom: HTMLElement,
+		typography: TypographySettings | undefined,
+		colors: ColorSettings | undefined,
+	): void {
+		const editing = readRuntime(node, "isEditing") === true;
+		if (!editing && !this.editorAppearanceDom.has(dom)) {
+			return;
+		}
+		const frame = this.findEditorFrame(dom);
+		if (frame === undefined) {
+			this.editorAppearanceDom.delete(dom);
+			return;
+		}
+		const rules = buildEditorAppearanceRules(typography, colors);
+		if (rules.length === 0 && !this.editorAppearanceFrames.has(frame)) {
+			// Never decorated: a card with no override stays exactly native.
+			return;
+		}
+		this.editorAppearanceDom.add(dom);
+		if (rules.length === 0) {
+			this.editorAppearanceFrames.delete(frame);
+		} else {
+			this.editorAppearanceFrames.add(frame);
+		}
+		applyEditorAppearanceToFrame(frame, rules);
+	}
+
+	private findEditorFrame(dom: HTMLElement): HTMLElement | undefined {
+		const querySelector = readRuntime(dom, "querySelector");
+		if (typeof querySelector !== "function") {
+			return undefined;
+		}
+		try {
+			const frame = Reflect.apply(querySelector, dom, ["iframe.embed-iframe"]);
+			return isElement(frame) ? frame : undefined;
+		} catch {
+			// A node mid-teardown can throw on its own querySelector.
+			return undefined;
+		}
+	}
+
+	/** Undo editor-frame styling this session added, mirroring restoreAppearanceDom. */
+	private teardownEditorAppearance(): void {
+		for (const frame of this.editorAppearanceFrames) {
+			applyEditorAppearanceToFrame(frame, []);
+		}
+		this.editorAppearanceFrames.clear();
+		this.editorAppearanceDom.clear();
 	}
 
 	private attachmentLabelTargets(element: HTMLElement): readonly HTMLElement[] {
@@ -6926,7 +7191,13 @@ export class M1CanvasSession {
 			for (const [key, operation] of Object.entries(operations)) {
 				this.guardNativeMethod(element, key, (original, receiver, args) => {
 					const ids = allIds([element]);
-					return this.nativeEditAllowed(operation, ids) ? Reflect.apply(original, receiver, args) : undefined;
+					if (!this.nativeEditAllowed(operation, ids)) {
+						return undefined;
+					}
+					// The card's editor iframe, wherever startEditing inserts it, is
+					// itself a childList addition inside the node's own shell, so the
+					// appearance-decoration observer above catches it on its own.
+					return Reflect.apply(original, receiver, args);
 				});
 			}
 			// Native Canvas edits an edge's label - on Enter, a double click or
@@ -7222,6 +7493,7 @@ export class M1CanvasSession {
 		}
 		this.lockedDom.clear();
 		this.restoreAppearanceDom();
+		this.teardownEditorAppearance();
 		this.restoreThemeRoot();
 		if (this.readonlyOriginal !== undefined && this.readNativeReadonly() !== this.readonlyOriginal) {
 			this.setNativeReadonly(this.readonlyOriginal);

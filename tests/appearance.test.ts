@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { setLocale } from "../src/i18n";
 import {
+  OFFERED_FONT_FAMILIES,
+  fontLabel,
+  fontStack,
   APPEARANCE_ACTIONS,
   DEFAULT_FONT_SIZE,
   DEFAULT_TYPOGRAPHY,
@@ -417,5 +420,32 @@ describe("built-in palette in Russian", () => {
     expect(defaultPalette().find((entry) => entry.id === "miro-red")?.label).toBe("Красный");
     expect(defaultPalette().find((entry) => entry.id === "obsidian-blue")?.label).toBe("Синий Obsidian");
     expect(defaultPalette().find((entry) => entry.id === "canvas-purple")?.label).toBe("Фиолетовый Canvas");
+  });
+});
+
+describe("fonts", () => {
+  afterEach(() => setLocale("en"));
+
+  it("gives a missing font a stand-in of its own kind, never the browser's default serif", () => {
+    expect(fontStack("Roboto")).toBe('"Roboto", Inter, sans-serif');
+    expect(fontStack("Open Sans")).toBe('"Open Sans", Inter, sans-serif');
+    expect(fontStack("Georgia")).toBe('"Georgia", serif');
+    expect(fontStack("PT Serif")).toBe('"PT Serif", serif');
+    expect(fontStack("Courier New")).toBe('"Courier New", "Source Code Pro", monospace');
+    expect(fontStack("Inter")).toBe('"Inter", sans-serif');
+  });
+
+  it("leaves generic families and ready-made stacks as they are", () => {
+    expect(fontStack("serif")).toBe("serif");
+    expect(fontStack("sans-serif")).toBe("sans-serif");
+    expect(fontStack("Inter, sans-serif")).toBe("Inter, sans-serif");
+  });
+
+  it("offers only fonts every machine shows as themselves, named in the language in use", () => {
+    expect(OFFERED_FONT_FAMILIES).toEqual(["Inter", "Source Code Pro", "sans-serif", "serif"]);
+    setLocale("ru");
+    expect(fontLabel("serif")).toBe("Системный с засечками");
+    expect(fontLabel("sans-serif")).toBe("Системный без засечек");
+    expect(fontLabel("Inter")).toBe("Inter");
   });
 });

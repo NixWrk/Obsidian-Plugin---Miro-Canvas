@@ -330,13 +330,13 @@ describe("selection toolbar", () => {
     byLabel(root, "Bold").dispatch("click");
     byLabel(root, "Align right").dispatch("click");
     byLabel(root, "Align bottom").dispatch("click");
-    choice(root, "Font", "Georgia").dispatch("click");
+    choice(root, "Font", "serif").dispatch("click");
     expect(appearance).toEqual([
       { type: APPEARANCE_ACTIONS.setFormat, format: { italic: true } },
       { type: APPEARANCE_ACTIONS.setFormat, format: { bold: false } },
       { type: APPEARANCE_ACTIONS.setAlignment, alignment: "right" },
       { type: APPEARANCE_ACTIONS.setTypography, typography: { verticalAlign: "bottom" } },
-      { type: APPEARANCE_ACTIONS.setFontFamily, fontFamily: "Georgia" },
+      { type: APPEARANCE_ACTIONS.setFontFamily, fontFamily: "serif" },
     ]);
   });
 

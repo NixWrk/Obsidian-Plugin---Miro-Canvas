@@ -18,6 +18,10 @@
 
 import {
   APPEARANCE_ACTIONS,
+  OFFERED_FONT_FAMILIES,
+  fontLabel,
+  fontStack,
+  isSafeFontFamily,
   type AppearanceAction,
   type ColorSlot,
   type PaletteColor,
@@ -131,10 +135,8 @@ const MAX_BORDER_WIDTH = 100;
 /** The border and line sliders cover the widths people pick. */
 const BORDER_SLIDER_MAX = 20;
 const LINE_SLIDER_MAX = 24;
-const FONT_FAMILIES = [
-  "Open Sans", "Inter", "Roboto", "Noto Sans", "Arial", "Georgia",
-  "Times New Roman", "Courier New", "system-ui", "sans-serif",
-] as const;
+/** Where Obsidian publishes the fonts its appearance settings name; "??" where none is set. */
+const OBSIDIAN_FONT_VARIABLES = ["--font-text-theme", "--font-interface-theme", "--font-monospace-theme"] as const;
 /** Icon and value only; `alignments()` adds the label in the language in use. */
 const ALIGNMENT_ICONS: readonly { readonly value: TextAlignment; readonly icon: string }[] = [
   { value: "left", icon: "align-left" },
@@ -236,6 +238,21 @@ function highlightPalette(): readonly PaletteColor[] {
     ["pink", names.pink, "#f8c4dc"], ["violet", names.violet, "#d9ccf0"], ["blue", names.blue, "#bfe3fb"],
     ["cyan", names.cyan, "#b8ecf0"], ["green", names.green, "#cde8b0"], ["lime", names.lime, "#e8f0a4"], ["gray", names.gray, "#e3e3e3"],
   ].map(([id, label, color]) => Object.freeze({ id: `highlight-${id!}`, label: label!, color: color!, source: "miro" as const }));
+}
+
+/** The fonts the list offers: those Obsidian's own settings name first, then the ones every machine has. */
+function offeredFonts(document: Document): readonly string[] {
+  const fromObsidian: string[] = [];
+  try {
+    const style = document.defaultView?.getComputedStyle?.(document.body);
+    for (const variable of OBSIDIAN_FONT_VARIABLES) {
+      const first = style?.getPropertyValue(variable).split(",")[0]?.trim().replace(/^["']|["']$/gu, "");
+      if (first !== undefined && first !== "??" && isSafeFontFamily(first)) fromObsidian.push(first);
+    }
+  } catch {
+    // A document without styles offers the fonts every machine has.
+  }
+  return [...new Set([...fromObsidian, ...OFFERED_FONT_FAMILIES])];
 }
 
 function hasDocument(value: unknown): value is Document {
@@ -602,11 +619,11 @@ export class SelectionToolbar {
     const textGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
     const font = this.makePopover(textGroup, words().toolbar.font, "miro-canvas-toolbar__button--font");
     const fontList = this.block(font.panel, undefined, "miro-canvas-toolbar__list");
-    const fontOptions = FONT_FAMILIES.map((family) => {
-      const option = append(fontList, makeChoice(document, family, family, "miro-canvas-toolbar__button--font-option"));
-      option.textContent = family;
+    const fontOptions = offeredFonts(document).map((family) => {
+      const option = append(fontList, makeChoice(document, fontLabel(family), family, "miro-canvas-toolbar__button--font-option"));
+      option.textContent = fontLabel(family);
       // Each family is shown in its own face, so the list is its own preview.
-      option.style.setProperty?.("font-family", family);
+      option.style.setProperty?.("font-family", fontStack(family));
       return option;
     });
     const stepper = append(textGroup, make(document, "span", "miro-canvas-toolbar__stepper"));
@@ -948,8 +965,8 @@ export class SelectionToolbar {
     showPicture(refs.shape.button, shown.kind, () => shapePicture(document, shown), "▭");
 
     const typography = state.typography;
-    refs.font.button.textContent = typography.fontFamily;
-    refs.font.button.style.setProperty?.("font-family", typography.fontFamily);
+    refs.font.button.textContent = fontLabel(typography.fontFamily);
+    refs.font.button.style.setProperty?.("font-family", fontStack(typography.fontFamily));
     pressWhere(refs.fontOptions, typography.fontFamily);
     refs.fontSize.value = String(typography.fontSize);
     let styled = false;

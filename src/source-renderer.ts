@@ -4,6 +4,7 @@ import {
 } from "./connector-endpoints";
 import { SHAPE_CLIP_PATHS, inscribedInsets, shapeOutline, shapePath, type ShapePoint } from "./shape-geometry";
 import { CAP_PATHS, capFilled, strokeDash, headMarkerAttributes } from "./connector-style";
+import { fontStack } from "./appearance";
 import { readableInk } from "./miro-palette";
 import { codeLineCount, fitFontSize, lineNumbersCss, plainText } from "./text-fit";
 import { authorColor, authorInitial, shortTime } from "./comment-thread";
@@ -678,7 +679,8 @@ function applyNodeCss(
 ): void {
   for (const [property, value] of Object.entries(descriptor.css)) {
     if (TYPOGRAPHY_CSS.has(property)) {
-      patchStyle(content, property, value, patches);
+      // A family the machine lacks falls back to a face of its own kind.
+      patchStyle(content, property, property === "font-family" ? fontStack(value) : value, patches);
     } else if (BOX_CSS.has(property)) {
       if (layer !== undefined) {
         // A see-through fill is the node's own, painted once under the

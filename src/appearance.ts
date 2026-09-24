@@ -519,6 +519,70 @@ export function colorToCss(value: unknown): string {
 
 export const toCssColor = colorToCss;
 
+/**
+ * The font, weight, style, decoration, alignment and line height a
+ * typography setting paints, as CSS property/value pairs.  A card's shown
+ * DOM and its editor frame both take the exact same declarations, so this is
+ * the one place the mapping (bold to 700, underline/strike to a decoration
+ * list, and so on) is written.
+ */
+export function typographyDeclarations(typography: TypographySettings): readonly (readonly [property: string, value: string])[] {
+  const decoration = [
+    ...(typography.format.underline ? ["underline"] : []),
+    ...(typography.format.strike ? ["line-through"] : []),
+  ].join(" ") || "none";
+  return freeze([
+    ["font-family", fontStack(typography.fontFamily)],
+    ["font-size", `${typography.fontSize}px`],
+    ["font-weight", typography.format.bold ? "700" : "400"],
+    ["font-style", typography.format.italic ? "italic" : "normal"],
+    ["text-decoration", decoration],
+    ["text-align", typography.alignment],
+    ["line-height", String(typography.lineHeight ?? DEFAULT_LINE_HEIGHT)],
+  ] as const);
+}
+
+/** CSS's own family names: every machine has a face for each. */
+const GENERIC_FONT_FAMILIES = new Set(["serif", "sans-serif", "monospace", "system-ui", "cursive", "fantasy", "ui-serif", "ui-sans-serif", "ui-monospace"]);
+
+/**
+ * The fonts the toolbar offers.  Inter and Source Code Pro ship with
+ * Obsidian and the system's own sans-serif and serif faces exist everywhere,
+ * so every choice looks different on every machine; a font the machine does
+ * not have would silently turn into the same fallback as any other missing
+ * one.  The fonts set in Obsidian's own appearance settings are added where
+ * the toolbar is built.
+ */
+export const OFFERED_FONT_FAMILIES = Object.freeze(["Inter", "Source Code Pro", "sans-serif", "serif"] as const);
+
+/** How a font is named in the toolbar: a generic family by what it looks like, any other by its own name. */
+export function fontLabel(family: string): string {
+  const names = words().toolbar;
+  const key = family.trim().toLowerCase();
+  if (key === "sans-serif") return names.systemSans;
+  if (key === "serif") return names.systemSerif;
+  if (key === "monospace") return names.systemMono;
+  return family.trim();
+}
+
+/**
+ * The family a card names, followed by a face of the same kind for a
+ * machine that lacks it.  Without one the browser falls back to its default
+ * serif face, so a missing sans-serif font looked like Times New Roman.
+ * The kind is read from the name: monospace, serif, or sans-serif otherwise.
+ */
+export function fontStack(family: string): string {
+  const trimmed = family.trim();
+  const key = trimmed.toLowerCase();
+  if (trimmed.includes(",") || GENERIC_FONT_FAMILIES.has(key)) return trimmed;
+  // A validated family has no quotes of its own, so quoting it is safe and
+  // keeps a name that starts with a digit a single family.
+  const named = `"${trimmed}"`;
+  if (/mono|code|courier|consol/u.test(key)) return `${named}, "Source Code Pro", monospace`;
+  if (/serif|georgia|times|garamond|slab|playfair|merriweather|lora|literata/u.test(key) && !/sans/u.test(key)) return `${named}, serif`;
+  return key === "inter" ? `${named}, sans-serif` : `${named}, Inter, sans-serif`;
+}
+
 function validFontFamily(value: unknown): value is string {
   if (typeof value !== "string") {
     return false;
