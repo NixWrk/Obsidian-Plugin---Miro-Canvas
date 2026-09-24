@@ -727,15 +727,18 @@ export const EN = {
 	 * link in the browser or copies text.
 	 */
 	importGuide: {
-		settingsHeading: "Import from Miro",
+		settingsHeading: "Getting started",
 		openGuideButton: "Open the import guide",
+		createWelcomeBoardButton: "Create the welcome board",
+		createWelcomeBoardFailed: "Could not create the welcome board.",
 
-		questionTitle: "Import boards from Miro?",
-		questionBody1: "This plugin works on any Canvas, Miro board or not.",
-		questionBody2: "Bringing a Miro board in takes a small separate program you can remove afterwards.",
-		showMeHow: "Show me how",
+		questionTitle: "Welcome to Miro Canvas",
+		questionBody1: "This plugin adds Miro's tools to an ordinary Canvas: cards, stickies, shapes, lines and more.",
+		questionBody2: "See them all on a welcome board, or bring in boards you already made in Miro.",
+		openWelcomeBoardButton: "Open the welcome board",
+		showMeHow: "Import boards from Miro",
 		notNow: "Not now",
-		notNowNote: "The guide stays available in the plugin's settings.",
+		notNowNote: "The welcome board and the import guide stay available in the plugin's settings.",
 
 		guideTitle: "Import boards from Miro",
 
@@ -771,6 +774,83 @@ export const EN = {
 
 		copied: "Copied to the clipboard.",
 		copyFailed: "Could not copy to the clipboard.",
+	},
+	/**
+	 * The optional welcome board (welcome-board.ts): its file name, its frame
+	 * titles in reading order and the few words it carries - most frames show
+	 * rather than tell.  A frame title gets its number on the board.
+	 */
+	welcome: {
+		fileName: "Miro Canvas - Welcome.canvas",
+
+		welcomeTitle: "Welcome",
+		welcomeIntro: "An ordinary Canvas with Miro's tools. Try anything here — Ctrl+Z undoes it.",
+
+		textTitle: "Text",
+
+		coloursTitle: "Colours",
+		markdownSample: "Markdown works inside a card too: **bold**, *italic*, ~~struck~~, ==marked== and `code`.",
+
+		stickiesTitle: "Sticky notes",
+		sticky1: "Idea",
+		sticky2: "Question",
+		sticky3: "Doing",
+		sticky4: "Done",
+		sticky5: "Goal",
+		sticky6: "Risk",
+		sticky7: "Thanks!",
+		stickyLong: "A longer note makes its text smaller to fit",
+
+		shapesTitle: "Shapes and flowcharts",
+		flowStart: "Start",
+		flowStep: "Do the step",
+		flowDecision: "Looks right?",
+		flowDone: "Done",
+		flowNext: "next",
+		flowYes: "yes",
+		flowNo: "no",
+
+		linesTitle: "Lines and arrows",
+		lineFrom: "From",
+		lineTo: "To",
+		lineConnects: "connects",
+		lineElbowed: "elbowed",
+		lineCurved: "curved",
+		linesHint: "Drag the middle of a line to bend it.",
+
+		drawingTitle: "Drawing",
+		drawingMarked: "A highlighter stroke over text",
+		drawingHint: "Smart drawing turns a rough shape into a clean one.",
+
+		layersTitle: "Layers and locking",
+		layerBack: "Back",
+		layerMiddle: "Middle",
+		layerFront: "Front",
+		lockedCard: "Locked",
+		layersHint: "Layer is in the right-click menu and the selection toolbar. The board menu's review mode locks the whole board.",
+
+		commentsTitle: "Comments",
+		commentCard: "This idea needs a review.",
+		comment: "Looks great — one small note.",
+		reply: "Thanks, fixed it!",
+		commentAnywhere: "A comment can be pinned anywhere, even on the empty board.",
+
+		codeTitle: "Code and tables",
+		codeFileName: "hello.js",
+		codeBody: "console.log(\"Hello, Miro Canvas!\");",
+		tableTitle: "Roadmap",
+		tableStep: "Step",
+		tableStatus: "Status",
+		tableImport: "Import",
+		tableImportStatus: "Done",
+		tableStyle: "Style",
+		tableStyleStatus: "Next",
+
+		exportTitle: "Export",
+		exportHint: "Board menu → Export to PDF or PowerPoint. Two pages are already marked: over Welcome and Sticky notes.",
+
+		fromMiroTitle: "Bring your Miro boards",
+		fromMiroHint: "Settings → Miro Canvas → Open the import guide",
 	},
 };
 

@@ -16,6 +16,9 @@ const SAME_IN_RUSSIAN = new Set<string>([
   "importGuide.windows",
   "importGuide.macos",
   "importGuide.linux",
+  // A file name and a line of code: neither is prose.
+  "welcome.codeFileName",
+  "welcome.codeBody",
 ]);
 
 type Table = { readonly [key: string]: unknown };

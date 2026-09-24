@@ -29,6 +29,8 @@ export interface SettingsTabHost {
   readonly accountName?: () => string | undefined;
   /** Opens the "Import boards from Miro" guide; the same one the first-run question offers. */
   readonly openImportGuide: () => void;
+  /** Writes (or opens, if it already exists) the welcome board; the same action the first-run question offers. */
+  readonly createWelcomeBoard: () => void;
 }
 
 export class MiroCanvasSettingTab extends PluginSettingTab {
@@ -163,6 +165,11 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
 
     const importLabels = words().importGuide;
     new Setting(containerEl).setName(importLabels.settingsHeading).setHeading();
+    new Setting(containerEl)
+      .addButton((button) => button
+        .setButtonText(importLabels.createWelcomeBoardButton)
+        .setCta()
+        .onClick(() => this.host.createWelcomeBoard()));
     new Setting(containerEl)
       .addButton((button) => button
         .setButtonText(importLabels.openGuideButton)

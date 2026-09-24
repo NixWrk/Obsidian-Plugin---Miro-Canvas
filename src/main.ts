@@ -29,6 +29,7 @@ import { MiroCanvasSettingTab } from "./settings-tab";
 import { setAuthorColors } from "./comment-thread";
 import { layerActions } from "./layer-order";
 import { localeFor, setLocale, words } from "./i18n";
+import { createWelcomeBoard } from "./welcome-board";
 
 const NATIVE_CANVAS_VIEW_TYPE = "canvas";
 
@@ -121,6 +122,7 @@ export default class MiroCanvasPlugin extends Plugin {
       commentAuthors: () => this.m1Session?.commentAuthors() ?? [],
       accountName: () => obsidianAccountName(window.localStorage),
       openImportGuide: () => this.openImportGuide(),
+      createWelcomeBoard: () => this.openWelcomeBoard(),
     }));
     // Advanced Canvas is optional.  Its adapter fails closed, so this probe
     // cannot prevent the native Canvas shell from loading.
@@ -482,7 +484,7 @@ export default class MiroCanvasPlugin extends Plugin {
     return true;
   }
 
-  /** The first-run "Import boards from Miro?" question; never asked twice. */
+  /** The first-run welcome question; never asked twice. */
   private maybeAskImportQuestion(): void {
     if (this.shellDisposed || !shouldAskImportQuestion(this.canvasSettings)) return;
     this.openImportQuestion();
@@ -496,18 +498,30 @@ export default class MiroCanvasPlugin extends Plugin {
     modal.contentEl.createEl("p", { text: strings.questionBody1 });
     modal.contentEl.createEl("p", { text: strings.questionBody2 });
     const buttons = modal.contentEl.createDiv({ cls: "miro-canvas-import-question__buttons" });
-    const showMeHow = buttons.createEl("button", { text: strings.showMeHow, cls: "mod-cta" });
+    const openWelcomeBoard = buttons.createEl("button", { text: strings.openWelcomeBoardButton, cls: "mod-cta" });
+    openWelcomeBoard.addEventListener("click", () => {
+      modal.close();
+      this.openWelcomeBoard();
+    });
+    const showMeHow = buttons.createEl("button", { text: strings.showMeHow });
     showMeHow.addEventListener("click", () => {
       modal.close();
       this.openImportGuide();
     });
     buttons.createEl("button", { text: strings.notNow }).addEventListener("click", () => modal.close());
     modal.contentEl.createEl("p", { text: strings.notNowNote, cls: "miro-canvas-import-question__note" });
-    // Both buttons close the modal, and so does the native close control or
+    // Every button closes the modal, and so does the native close control or
     // Escape; onClose is the one place that records an answer, so the
     // question is put once regardless of how a person leaves it.
     modal.onClose = () => void this.saveCanvasSettings({ importQuestionAnswered: true });
     modal.open();
+  }
+
+  /** The same welcome board the first-run question and the settings tab's button write and open. */
+  private openWelcomeBoard(): void {
+    void createWelcomeBoard({ app: this.app, isFile: (value): value is TFile => value instanceof TFile }).catch(
+      () => new Notice(words().importGuide.createWelcomeBoardFailed),
+    );
   }
 
   /** The same guide the first-run question and the settings tab's button open. */

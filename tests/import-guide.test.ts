@@ -204,11 +204,11 @@ describe("import guide in Russian", () => {
     const list = steps(root);
     expect(list.map(stepTitle)).toEqual([
       "Установите miro2obsidian",
-      "Или доверьте это ИИ-агенту",
-      "Создайте собственное приложение Miro",
-      "Экспортируйте в это хранилище",
+      "Или поручите это ИИ-агенту",
+      "Создайте своё приложение Miro",
+      "Выгрузите доску в это хранилище",
       "Откройте доску",
-      "После этого",
+      "Потом",
     ]);
     expect(buttons(list[0]!)[0]!.textContent).toBe("Скачать для Windows");
   });
