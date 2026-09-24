@@ -68,7 +68,7 @@ jobs:
           for mode in "" --interactions --controls; do
             if ! python -m tools.obsidian_oracle.smoke_plugin_ui $mode > smoke.log 2>&1; then
               cat smoke.log
-              message=$(tail -n 25 smoke.log | sed 's/%/%25/g' | tr '\n' ' ' | cut -c1-2000)
+              message=$( (head -n 20 smoke.log; echo "[...]"; tail -n 8 smoke.log) | sed 's/%/%25/g' | tr '\n' ' ' | cut -c1-3000)
               echo "::error title=smoke ${mode:-base}::$message"
               exit 1
             fi
