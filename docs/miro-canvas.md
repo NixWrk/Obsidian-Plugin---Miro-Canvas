@@ -651,7 +651,13 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   word in `src/locales/`, the Russian table must have exactly the English keys,
   a test finds untranslated entries; maintainers' diagnostics stay English).
 - Offer an optional onboarding board on first setup (and from settings) that
-  shows every tool on real items.
+  shows every tool on real items (done 2026-09-24: `src/welcome-board.ts`
+  builds twelve frames - welcome, text, colours, sticky notes, shapes and
+  flowcharts, lines, drawing, layers and locking, comments, code and tables,
+  export, Miro import - that show rather than tell, from the same records the
+  tools write; the first-run question offers it, and Settings → Getting
+  started makes it again; an existing board of that name is opened, never
+  overwritten).
 - Write a visual guide to the plugin's features and the order of its settings,
   with screenshots, for users and for the release page.
 - PDF/PPTX export: slides as a deck and marked board areas as pages (done
@@ -669,6 +675,54 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   `.agents/skills/miro-canvas-format`; the MCP server comes in phase 6).
 - Tune settings and layouts for other operating systems, phones and tablets
   (see M5 below).
+- Fonts (`FUT-016`). The base is done 2026-09-24: the list offers only fonts
+  every machine shows as themselves (Inter and Source Code Pro from Obsidian,
+  the system's sans-serif and serif) and the fonts set in Obsidian's own
+  appearance settings; a font the machine lacks (on older boards or from Miro)
+  shows as a face of the same kind instead of Times New Roman. Next, font
+  packs people download and remove in the plugin's settings: a Miro pack (the
+  open fonts of Miro's list; its closed ones - Roobert, Spoof, Tiempos Text and
+  the like - get close open substitutes), a Word pack (open fonts metric-
+  compatible with Calibri, Cambria, Arial, Times New Roman and Courier New:
+  Carlito, Caladea, Liberation; Microsoft's own fonts cannot be shipped), an
+  Excalidraw pack (Excalifont, Virgil, Nunito, Lilita One, Comic Shanns and
+  others), fonts added from a file (.ttf, .otf, .woff2 - GOST, for example),
+  and a list of one's own: keep what is used, remove the rest, set the order.
+  Packs are assets of this repository's releases with their licences (OFL,
+  Apache or MIT only); a download happens only on a press and shows its size,
+  and the README names it as the one place the plugin goes to the network. A
+  font is loaded into memory only when something is written in it.
+- Check every kind of link and formula inside the plugin (`FUT-017`): wiki and
+  Markdown links to notes, headings and blocks, web addresses, embeds
+  (`![[...]]`) of notes, pictures, PDFs and other canvases, links from Miro
+  boards, inline and block LaTeX - in a shown card, while editing, in sticky
+  notes, shapes, tables, line labels, comments and in the PDF and PowerPoint
+  export; fix what is found.
+- The bottom tool bar (`FUT-018`): bring Canvas's own card, note from the
+  vault and file from the vault back into quick access, draggable onto the
+  board as in Canvas itself (they are now hidden under More and cannot be
+  dragged); give the sticky note an icon unlike the card's; let people choose
+  in the settings which tools the bar shows and in what order, the rest
+  staying under More.
+- Movable panels (`FUT-019`): the tool bar and the corner dock (minimap, zoom,
+  board settings) can be dragged anywhere on screen; the place is remembered.
+- Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
+  tables, line labels and comments, and file names; jump to a match with a
+  highlight, next and previous.
+- A selection toolbar laid out as Miro's (`FUT-021`): the same groups in the
+  same order - shape | font and size | text style, alignment, list, link |
+  text colour, marker, fill | comment, lock, "More" (order, delete, copy and
+  the rest). Border, order, delete, "zoom to selection" and "edit" now stand
+  as buttons of their own, and list, link and comment are missing.
+- Updates (`FUT-022`). Obsidian's rules forbid a plugin updating itself, so
+  updates come as GitHub releases (a version tag with main.js, manifest.json
+  and styles.css): before the community catalogue through the BRAT plugin,
+  which installs and updates a plugin from this repository's releases
+  (described in the README); once in the catalogue through Obsidian's own
+  update check. The plugin itself gets a "Check for updates" button in its
+  settings: on a press it compares its version with the latest GitHub release
+  and shows what is new, with a link; it downloads nothing and never goes to
+  the network without the press.
 
 ### Future: ecosystem migration
 

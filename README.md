@@ -49,8 +49,12 @@ the file opens as an ordinary Canvas.
    **More**.
 4. Click the board to place the item; select it to style it.
 
-The first time the plugin starts it asks whether you want to import boards
-from Miro. Either answer is fine; the guide stays in the plugin's settings.
+The first time the plugin starts it offers a **welcome board** - twelve frames
+with every tool on real items: text in several fonts and marks, colours and
+markers, sticky notes, shapes and a flowchart, lines of every style, drawing,
+layers, comments, code and tables, export pages - and asks whether you want to
+import boards from Miro. Any answer is fine: both stay under Settings → Miro
+Canvas → **Getting started**.
 
 ## Bringing boards over from Miro
 
@@ -188,7 +192,7 @@ so nothing is taken from Obsidian or other plugins.
   gestures draw lines, pan or lasso.
 - **Keyboard**, **Interface** - the minimap by default, the selection toolbar.
 - **Comments** - your name and the authors' colours.
-- **Import from Miro** - the import guide.
+- **Getting started** - the welcome board and the Miro import guide.
 - **Developer diagnostics** - a badge listing what the plugin could not do.
 
 </details>
