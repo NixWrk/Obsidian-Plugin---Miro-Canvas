@@ -60,8 +60,19 @@ jobs:
       - run: npm ci
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
-      # The plugin in a browser against a synthetic Canvas host.
-      - run: python -m tools.obsidian_oracle.smoke_plugin_ui
-      - run: python -m tools.obsidian_oracle.smoke_plugin_ui --interactions
-      - run: python -m tools.obsidian_oracle.smoke_plugin_ui --controls
+      # The plugin in a browser against a synthetic Canvas host. A failure is
+      # also raised as an annotation, which anyone can read without signing in.
+      - name: Browser smoke tests
+        shell: bash
+        run: |
+          for mode in "" --interactions --controls; do
+            if ! python -m tools.obsidian_oracle.smoke_plugin_ui $mode > smoke.log 2>&1; then
+              cat smoke.log
+              message=$(tail -n 25 smoke.log | sed 's/%/%25/g' | tr '
+' ' ' | cut -c1-2000)
+              echo "::error title=smoke ${mode:-base}::$message"
+              exit 1
+            fi
+            tail -n 1 smoke.log
+          done
       - run: python -m pytest -q tools/obsidian_oracle/tests
