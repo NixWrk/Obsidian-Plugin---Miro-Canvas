@@ -27,9 +27,12 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 
 You open a `.canvas` file as usual - it is still Obsidian's Canvas, with its
 own cards, links, files and history - and the board behaves the way a Miro
-board does. At the bottom there is a bar of tools: select, text, sticky note,
-shape, pen, lines and arrows, comment, frame, and more. Select something and a
-toolbar appears above it with fonts, colours, borders, shapes and line styles.
+board does. At the bottom there is a bar of tools: select, text, native
+Canvas's own card, sticky note, shape, pen, lines and arrows, comment, frame,
+native Canvas's note and file from the vault, and more. Settings → Miro
+Canvas → **Tool bar** chooses which of them sit on the bar and in what order;
+the rest stay under **More**. Select something and a toolbar appears above it
+with fonts, colours, borders, shapes and line styles.
 In the corner there is a minimap and a small dock with the zoom and the board's
 settings.
 
@@ -47,8 +50,11 @@ The plugin goes to the network for one thing only - see
 2. Open any `.canvas` file, or create one.
 3. Pick a tool at the bottom, or press its letter: **V** select, **T** text,
    **N** sticky note, **S** shape, **P** pen, **L** lines and arrows, **C**
-   comment, **F** frame. The rest - code block, table, web link - is under
-   **More**.
+   comment, **F** frame. Native Canvas's own card, note from the vault and
+   file from the vault sit on the bar too, draggable onto the board as in
+   Canvas itself. Code block, table and web link start under **More**;
+   Settings → Miro Canvas → **Tool bar** moves anything between the bar and
+   More, in whatever order you like.
 4. Click the board to place the item; select it to style it.
 
 The first time the plugin starts it offers a **welcome board** - twelve frames
@@ -153,7 +159,7 @@ miro2obsidian's `miro-canvas-format` skill.
 
 | Letter | Tool |
 | --- | --- |
-| V | Select (and lasso, when its button is shown) |
+| V | Select (and lasso, when it is on the bar) |
 | T | Text |
 | N | Sticky note |
 | S | Shape - basic shapes and flowcharts |
@@ -161,7 +167,11 @@ miro2obsidian's `miro-canvas-format` skill.
 | L | Lines and arrows |
 | C | Comment |
 | F | Frame |
-| More | Code block, table, web link |
+
+A letter arms its tool whether the bar shows it or not. Native Canvas's own
+card, note from the vault and file from the vault have no letter; Settings →
+Miro Canvas → **Tool bar** chooses which of every tool above sit on the bar
+and in what order - the rest stay under **More**.
 
 The letters work while the board has focus; editors keep their own keys.
 Escape resets the tools and the selection.

@@ -12,8 +12,10 @@ describe("selection gesture preferences", () => {
     expect(matchesPointer("right", { ...mouse, button: 2 })).toBe(true);
     expect(matchesPointer("ctrl+shift+left", { ...mouse, metaKey: true, shiftKey: true })).toBe(true);
   });
-  it("normalizes old and malformed preferences", () => {
-    expect(normalizeSettings({ lassoBinding: "invalid", showLassoTool: false, showConnectorTool: false }))
-      .toMatchObject({ lassoBinding: "alt+left", showLassoTool: false, showConnectorTool: false });
+  it("normalizes old and malformed preferences, migrating the old lasso and connector toggles", () => {
+    const stored = normalizeSettings({ lassoBinding: "invalid", showLassoTool: false, showConnectorTool: false });
+    expect(stored.lassoBinding).toBe("alt+left");
+    expect(stored.toolbarItems).not.toContain("lasso");
+    expect(stored.toolbarItems).not.toContain("connector");
   });
 });

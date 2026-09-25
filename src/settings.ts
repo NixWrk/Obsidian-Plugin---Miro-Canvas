@@ -10,6 +10,7 @@
 
 import { words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
+import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, type ToolbarItem } from "./quick-tools";
 import { readAvailableUpdate, type AvailableUpdate } from "./update-check";
 export type WheelZoomModifier = "none" | "ctrl" | "shift" | "alt";
 
@@ -41,8 +42,8 @@ export interface MiroCanvasSettings {
   readonly lassoBinding: PointerBinding;
   readonly panBinding: PointerBinding;
   readonly lineBinding: PointerBinding;
-  readonly showLassoTool: boolean;
-  readonly showConnectorTool: boolean;
+  /** The bottom tool bar's own content, in order; whatever is missing sits under More, in `ALL_TOOLBAR_ITEMS` order. */
+  readonly toolbarItems: readonly ToolbarItem[];
   /**
    * The warning badge listing what the plugin could not do as asked.  It is
    * for whoever develops or debugs the plugin, so it starts hidden; it is
@@ -111,8 +112,7 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   lassoBinding: "alt+left",
   panBinding: "none",
   lineBinding: "right",
-  showLassoTool: true,
-  showConnectorTool: true,
+  toolbarItems: DEFAULT_TOOLBAR_ITEMS,
   developerDiagnostics: false,
   commentAuthor: "",
   commentAuthorColors: Object.freeze({}),
@@ -179,6 +179,31 @@ function readBoolean(source: Record<string, unknown>, key: string, fallback: boo
   return typeof value === "boolean" ? value : fallback;
 }
 
+/**
+ * The bottom tool bar's own content: an ordered, de-duplicated subset of
+ * `ALL_TOOLBAR_ITEMS`, dropping anything unknown.  A file with no
+ * `toolbarItems` at all predates this setting; it migrates the older
+ * `showLassoTool` / `showConnectorTool` booleans instead, leaving that tool
+ * out of the default bar where one was set to false.
+ */
+function readToolbarItems(value: unknown, legacyShowLasso: unknown, legacyShowConnector: unknown): readonly ToolbarItem[] {
+  if (Array.isArray(value)) {
+    const seen = new Set<ToolbarItem>();
+    const items: ToolbarItem[] = [];
+    for (const entry of value) {
+      if (typeof entry !== "string" || seen.has(entry as ToolbarItem) || !(ALL_TOOLBAR_ITEMS as readonly string[]).includes(entry)) continue;
+      seen.add(entry as ToolbarItem);
+      items.push(entry as ToolbarItem);
+    }
+    return Object.freeze(items);
+  }
+  return Object.freeze(DEFAULT_TOOLBAR_ITEMS.filter((item) => {
+    if (item === "lasso" && legacyShowLasso === false) return false;
+    if (item === "connector" && legacyShowConnector === false) return false;
+    return true;
+  }));
+}
+
 /** Accepts any stored value and always returns usable settings. */
 export function normalizeSettings(value: unknown): MiroCanvasSettings {
   if (!isRecord(value)) {
@@ -210,8 +235,7 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     lassoBinding: POINTER_BINDINGS.includes(value.lassoBinding as PointerBinding) ? value.lassoBinding as PointerBinding : DEFAULT_SETTINGS.lassoBinding,
     panBinding: POINTER_BINDINGS.includes(value.panBinding as PointerBinding) ? value.panBinding as PointerBinding : DEFAULT_SETTINGS.panBinding,
     lineBinding: POINTER_BINDINGS.includes(value.lineBinding as PointerBinding) ? value.lineBinding as PointerBinding : DEFAULT_SETTINGS.lineBinding,
-    showLassoTool: readBoolean(value, "showLassoTool", DEFAULT_SETTINGS.showLassoTool),
-    showConnectorTool: readBoolean(value, "showConnectorTool", DEFAULT_SETTINGS.showConnectorTool),
+    toolbarItems: readToolbarItems(value.toolbarItems, value.showLassoTool, value.showConnectorTool),
     developerDiagnostics: readBoolean(value, "developerDiagnostics", DEFAULT_SETTINGS.developerDiagnostics),
     commentAuthor: typeof value.commentAuthor === "string" ? value.commentAuthor.trim().slice(0, MAX_AUTHOR_NAME) : DEFAULT_SETTINGS.commentAuthor,
     commentAuthorColors: readAuthorColors(value.commentAuthorColors),

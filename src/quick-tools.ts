@@ -1,10 +1,13 @@
 /**
  * The board's creation tools, at the bottom of the view where native Canvas
  * keeps its own card menu: Miro's quick-access set of select, text, sticky
- * note, shape, connection line, comment and frame, and a "more" menu with a
- * code block, a web link and native Canvas's own cards.  A tool is armed by
- * its button or its letter and used once on the board; the host owns the
- * gesture and the creation.
+ * note, shape, connection line, comment and frame, and a "more" menu for
+ * whatever a person has left off the bar.  A tool is armed by its button or
+ * its letter and used once on the board; the host owns the gesture and the
+ * creation.  Native Canvas's own card, note and media buttons live among
+ * these too, as slots this module builds but the session fills: the real
+ * button elements move in from `cardMenuEl`, carrying their own drag-to-add
+ * and click behaviour with them.
  */
 import { words } from "./i18n";
 import { SHAPE_CATALOG, shapeCatalogEntry, shapeCatalogLabel } from "./shape-catalog";
@@ -21,6 +24,34 @@ export const QUICK_TOOLS = [
 ] as const;
 export type QuickTool = (typeof QUICK_TOOLS)[number];
 
+/** Native Canvas's own three card-menu buttons, moved into this bar rather than built by it. */
+export const NATIVE_TOOLBAR_ITEMS = ["card", "note", "media"] as const;
+export type NativeToolbarItem = (typeof NATIVE_TOOLBAR_ITEMS)[number];
+
+/**
+ * Everything a person can place on the bar or leave under More: the
+ * plugin's own tools that belong at this level (not the pen's own row, which
+ * keeps its tools regardless) and native Canvas's three.  In the order Miro's
+ * own bar lists its tools, native Canvas's between the ones closest to it.
+ * The setting `toolbarItems` (settings.ts) is an ordered, de-duplicated
+ * subset of this list: the bar's own content, in the order shown; whatever
+ * is missing sits under More, in this list's order.
+ */
+export const ALL_TOOLBAR_ITEMS = [
+  "select", "lasso", "text", "card", "sticky", "shape", "pen", "connector", "comment", "frame", "note", "media",
+  "code", "table", "link",
+] as const;
+export type ToolbarItem = (typeof ALL_TOOLBAR_ITEMS)[number];
+
+/** The bar's content before anyone has chosen otherwise: everything but code, the grid and the link. */
+export const DEFAULT_TOOLBAR_ITEMS: readonly ToolbarItem[] =
+  ALL_TOOLBAR_ITEMS.filter((item) => item !== "code" && item !== "table" && item !== "link");
+
+/** True for one of native Canvas's own three buttons, as opposed to one of the plugin's own tools. */
+export function isNativeToolbarItem(item: ToolbarItem): item is NativeToolbarItem {
+  return (NATIVE_TOOLBAR_ITEMS as readonly string[]).includes(item);
+}
+
 interface ToolIconSpec {
   readonly tool: QuickTool;
   readonly icon: string;
@@ -33,24 +64,35 @@ interface ToolSpec extends ToolIconSpec {
   readonly label: string;
 }
 
-const BAR_TOOL_ICONS: readonly ToolIconSpec[] = [
+/** Every plugin tool the bar or More can hold, in `ALL_TOOLBAR_ITEMS` order. */
+const TOOLBAR_TOOL_ICONS: readonly ToolIconSpec[] = [
   { tool: "select", icon: "mouse-pointer-2", glyph: "↖", key: "V" },
   // Next to Select: it is a way of selecting large parts of a board.
   { tool: "lasso", icon: "lasso", glyph: "◌" },
   { tool: "text", icon: "type", glyph: "T", key: "T" },
+  // Never drawn from this icon: stickyToolButton paints the plugin's own
+  // picture instead, so it reads as unlike native Canvas's card button.
   { tool: "sticky", icon: "sticky-note", glyph: "▢", key: "N" },
   { tool: "shape", icon: "shapes", glyph: "◇", key: "S" },
   { tool: "pen", icon: "pen", glyph: "✎", key: "P" },
   { tool: "connector", icon: "move-up-right", glyph: "↗", key: "L" },
   { tool: "comment", icon: "message-circle", glyph: "💬", key: "C" },
   { tool: "frame", icon: "frame", glyph: "#", key: "F" },
-];
-
-const MORE_TOOL_ICONS: readonly ToolIconSpec[] = [
   { tool: "code", icon: "code-xml", glyph: "</>" },
   { tool: "table", icon: "table", glyph: "▦" },
   { tool: "link", icon: "link", glyph: "🔗" },
 ];
+
+/** Native Canvas's own icon for each of its buttons, for the settings list only: the real button on the bar keeps its true icon regardless of this. */
+const NATIVE_ITEM_ICONS: Readonly<Record<NativeToolbarItem, string>> = {
+  card: "sticky-note", note: "file-text", media: "file-image",
+};
+
+function toolIconSpec(tool: QuickTool): ToolIconSpec {
+  const spec = TOOLBAR_TOOL_ICONS.find((entry) => entry.tool === tool);
+  if (spec === undefined) throw new Error(`no icon for tool ${tool}`);
+  return spec;
+}
 
 /** A tool's name, in the language in use. */
 function toolLabel(tool: QuickTool): string {
@@ -64,26 +106,54 @@ function toolLabel(tool: QuickTool): string {
   return labelOf[tool];
 }
 
+/** A toolbar item's name, in the language in use: a plugin tool's own name, or native Canvas's item name for the settings list. */
+export function toolbarItemLabel(item: ToolbarItem): string {
+  if (isNativeToolbarItem(item)) {
+    const names = words().tools;
+    return item === "card" ? names.card : item === "note" ? names.note : names.media;
+  }
+  return toolLabel(item);
+}
+
 function withLabels(specs: readonly ToolIconSpec[]): readonly ToolSpec[] {
   return specs.map((spec) => ({ ...spec, label: toolLabel(spec.tool) }));
 }
 
-/** The creation bar's own tools, with their names in the language in use. */
-function barTools(): readonly ToolSpec[] {
-  return withLabels(BAR_TOOL_ICONS);
-}
-
-/** The "more" menu's tools, with their names in the language in use. */
-function moreTools(): readonly ToolSpec[] {
-  return withLabels(MORE_TOOL_ICONS);
+/**
+ * Paints one toolbar item's icon into an element the caller owns, for the
+ * settings list: the plugin's own drawing for the sticky note (so it never
+ * looks like native Canvas's card there either), a plugin icon name for the
+ * rest, and native Canvas's own icon name for its three, purely as a
+ * reference - the real button on the bar always keeps its own true icon.
+ * Falls back to a glyph where nothing can be drawn, as in tests.
+ */
+export function paintToolbarIcon(
+  target: HTMLElement, item: ToolbarItem, document: Document, setIcon?: (element: HTMLElement, icon: string) => void,
+): void {
+  if (item === "sticky") {
+    const picture = stickyPicture(document);
+    if (picture !== undefined) {
+      target.appendChild(picture);
+      return;
+    }
+  }
+  const icon = isNativeToolbarItem(item) ? NATIVE_ITEM_ICONS[item] : toolIconSpec(item).icon;
+  const glyph = isNativeToolbarItem(item) ? "▢" : toolIconSpec(item).glyph;
+  if (setIcon !== undefined) {
+    try {
+      setIcon(target, icon);
+      return;
+    } catch {
+      // Falls through to the glyph.
+    }
+  }
+  target.textContent = glyph;
 }
 
 export interface QuickToolsState {
   readonly connectorColor?: string;
   readonly connectorWidth?: number;
   readonly connectorHeadSize?: number;
-  readonly showLassoTool?: boolean;
-  readonly showConnectorTool?: boolean;
   /** False in review mode: nothing can be made. */
   readonly editable: boolean;
   readonly armed: QuickTool;
@@ -142,6 +212,29 @@ function linePicture(document: Document, spec: LineKindSpec): SVGSVGElement | un
   return svg;
 }
 
+/**
+ * The plugin's own sticky note: a small filled square in Miro's yellow with
+ * a folded corner, drawn the way `linePicture` draws its own course - unlike
+ * native Canvas's card button, an outline that used the same lucide picture
+ * the sticky tool used to.
+ */
+function stickyPicture(document: Document): SVGSVGElement | undefined {
+  if (typeof document.createElementNS !== "function") return undefined;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", "miro-canvas-sticky-icon");
+  svg.setAttribute("aria-hidden", "true");
+  const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  body.setAttribute("class", "miro-canvas-sticky-icon__body");
+  body.setAttribute("d", "M4 4H15L20 9V20H4Z");
+  svg.appendChild(body);
+  const fold = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  fold.setAttribute("class", "miro-canvas-sticky-icon__fold");
+  fold.setAttribute("d", "M15 4V9H20Z");
+  svg.appendChild(fold);
+  return svg;
+}
+
 /** The largest sample the pen's row draws; a larger size is shown at this. */
 const MAX_PREVIEW = 28;
 
@@ -157,18 +250,20 @@ function isEraser(tool: QuickTool): boolean {
 export interface QuickToolsOptions {
   readonly document?: Document;
   readonly setIcon?: (element: HTMLElement, icon: string) => void;
+  /** The bar's own content, in order; whatever is missing sits under More. Defaults to `DEFAULT_TOOLBAR_ITEMS`. */
+  readonly toolbarItems?: readonly ToolbarItem[];
 }
 
-/** The letter each tool answers to. */
+/** The letter each tool answers to, whatever the bar holds: letters arm a tool whether it sits on the bar or under More. */
 export const QUICK_TOOL_KEYS: ReadonlyMap<string, QuickTool> = new Map(
-  BAR_TOOL_ICONS.filter((spec) => spec.key !== undefined).map((spec) => [spec.key!, spec.tool]),
+  TOOLBAR_TOOL_ICONS.filter((spec) => spec.key !== undefined).map((spec) => [spec.key!, spec.tool]),
 );
 
 export class QuickTools {
   public readonly element: HTMLElement;
-  /** Where the host puts native Canvas's own card buttons. */
-  public readonly nativeSlot: HTMLElement;
   private readonly document: Document;
+  /** Where the session puts native Canvas's own card, note and media buttons, by which one it is. */
+  private readonly nativeSlots = new Map<NativeToolbarItem, HTMLElement>();
   private readonly buttons = new Map<QuickTool, HTMLButtonElement>();
   private readonly shapeButtons = new Map<string, HTMLButtonElement>();
   private readonly penColors = new Map<string, HTMLButtonElement>();
@@ -292,63 +387,15 @@ export class QuickTools {
     this.sizeNumber = sizeNumber;
     this.sizePreview = sizePreview;
     const bar = root.appendChild(this.make("div", "miro-canvas-toolbar__bar"));
-    for (const spec of barTools()) {
-      if (spec.tool === "shape") {
-        const host = bar.appendChild(this.make("span", "miro-canvas-toolbar__popover"));
-        const button = host.appendChild(this.toolButton(spec));
-        const panel = host.appendChild(this.panel(button, "miro-canvas-toolbar__panel--shapes", () => {
-          if (lineKind(this.shownShape)) this.actions.onShape("rectangle");
-          this.actions.onArm("shape");
-        }));
-        // Lines first, as Miro lists them, then the basic shapes and the
-        // flowchart's own symbols.
-        const option = (grid: HTMLElement, kind: string, label: string, picture: Element | undefined, glyph: string): void => {
-          const choice = grid.appendChild(this.make("button", "miro-canvas-toolbar__button miro-canvas-toolbar__button--picture"));
-          choice.type = "button";
-          choice.setAttribute("aria-label", label);
-          choice.setAttribute("data-tooltip-delay", PICTURE_TOOLTIP_DELAY);
-          choice.setAttribute("data-shape", kind);
-          if (picture !== undefined) choice.appendChild(picture);
-          else choice.textContent = glyph;
-          this.listen(choice, "click", () => {
-            this.closePanels();
-            this.actions.onShape(kind);
-            this.actions.onArm(lineKind(kind) ? "connector" : "shape");
-          });
-          this.shapeButtons.set(kind, choice);
-        };
-        const section = (title: string): HTMLElement => {
-          panel.appendChild(this.make("div", "miro-canvas-toolbar__heading", title));
-          return panel.appendChild(this.make("div", "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--shapes"));
-        };
-        for (const [part, title] of [["basic", words().toolbar.basic], ["flowchart", words().toolbar.flowchart]] as const) {
-          const grid = section(title);
-          for (const entry of SHAPE_CATALOG.filter((item) => item.section === part)) {
-            option(grid, entry.kind, shapeCatalogLabel(entry), shapePicture(document, entry), entry.name);
-          }
-        }
-        continue;
-      }
-      if (spec.tool === "pen") {
-        // The pen button wears the colour it will draw with and arms the
-        // drawing tool last used, which opens the pen's row.
-        const button = bar.appendChild(this.iconButton(`${spec.label}\n${spec.key}`, spec.icon, spec.glyph));
-        button.setAttribute("data-tool-group", "drawing");
-        this.listen(button, "click", () => this.actions.onArm(this.drawingTool));
-        this.penButton = button;
-        continue;
-      }
-      bar.appendChild(this.toolButton(spec));
-    }
+    const configured = this.options.toolbarItems ?? DEFAULT_TOOLBAR_ITEMS;
+    const onBar = new Set<ToolbarItem>(configured);
+    for (const item of configured) this.placeToolbarItem(bar, item, false);
     const moreHost = bar.appendChild(this.make("span", "miro-canvas-toolbar__popover miro-canvas-tools__more"));
     const more = moreHost.appendChild(this.iconButton(words().tools.more, "plus", "+"));
     const morePanel = moreHost.appendChild(this.panel(more, "miro-canvas-tools__menu"));
-    for (const spec of moreTools()) {
-      const item = morePanel.appendChild(this.toolButton(spec, true));
-      this.listen(item, "click", () => this.closePanels());
+    for (const item of ALL_TOOLBAR_ITEMS) {
+      if (!onBar.has(item)) this.placeToolbarItem(morePanel, item, true);
     }
-    this.nativeSlot = morePanel.appendChild(this.make("div", "miro-canvas-tools__native"));
-    this.listen(this.nativeSlot, "click", () => this.closePanels());
     // The board must not start a drag or a selection under the bar.
     this.listen(root, "pointerdown", (event) => event.stopPropagation());
     this.listen(root, "keydown", (event) => {
@@ -370,9 +417,6 @@ export class QuickTools {
     this.connectorPreview.style?.setProperty?.("--miro-canvas-preview-size",`${Math.min(state.connectorWidth??2,MAX_PREVIEW)}px`);
     this.connectorPreview.style?.setProperty?.("--miro-canvas-preview-color",this.connectorColor.value);
     if(this.document.activeElement!==this.connectorWidth)this.connectorWidth.value=String(state.connectorWidth??2);
-    const lasso = this.buttons.get("lasso"), connector = this.buttons.get("connector");
-    if (lasso !== undefined) lasso.hidden = state.showLassoTool === false;
-    if (connector !== undefined) connector.hidden = state.showConnectorTool === false;
     this.element.setAttribute("data-miro-canvas-editable", state.editable ? "true" : "false");
     for (const [tool, button] of this.buttons) {
       button.setAttribute("aria-pressed", tool === state.armed ? "true" : "false");
@@ -431,8 +475,14 @@ export class QuickTools {
     if (!state.editable) this.closePanels();
   }
 
-  public closePanels(): void {
+  /**
+   * Closes every open popover, except one a `keepOpen` button sits inside -
+   * so opening a nested popover (the shape picker, moved under More) does
+   * not hide the More menu that holds its own button.
+   */
+  public closePanels(keepOpen?: HTMLButtonElement): void {
     for (const { button, panel } of this.panels) {
+      if (keepOpen !== undefined && panel.contains(keepOpen)) continue;
       panel.hidden = true;
       button.setAttribute("aria-expanded", "false");
     }
@@ -441,6 +491,115 @@ export class QuickTools {
   public dispose(): void {
     for (const remove of this.listeners.splice(0)) remove();
     this.element.remove();
+  }
+
+  /** Where the session puts one of native Canvas's own card, note or media buttons, wherever it currently sits. */
+  public nativeSlot(item: NativeToolbarItem): HTMLElement | undefined {
+    return this.nativeSlots.get(item);
+  }
+
+  /** Moves one of native Canvas's own buttons - the element itself, never a copy - into its configured place. */
+  public placeNativeButton(item: NativeToolbarItem, button: HTMLElement): void {
+    this.nativeSlots.get(item)?.prepend(button);
+  }
+
+  /** One item of the bar or More: a native slot the session fills, or one of the plugin's own tools. */
+  private placeToolbarItem(host: HTMLElement, item: ToolbarItem, withLabel: boolean): void {
+    if (isNativeToolbarItem(item)) {
+      const slot = host.appendChild(this.make("span", `miro-canvas-toolbar__native-slot${withLabel ? " miro-canvas-tools__native" : ""}`));
+      slot.setAttribute("data-native", item);
+      if (withLabel) {
+        slot.appendChild(this.make("span", "miro-canvas-tools__item-label", toolbarItemLabel(item)));
+        this.listen(slot, "click", () => this.closePanels());
+      }
+      this.nativeSlots.set(item, slot);
+      return;
+    }
+    const spec: ToolSpec = { ...toolIconSpec(item), label: toolLabel(item) };
+    if (item === "shape") {
+      this.placeShapeButton(host, spec, withLabel);
+      return;
+    }
+    if (item === "pen") {
+      this.placePenButton(host, spec, withLabel);
+      return;
+    }
+    const button = host.appendChild(item === "sticky" ? this.stickyToolButton(spec, withLabel) : this.toolButton(spec, withLabel));
+    if (withLabel) this.listen(button, "click", () => this.closePanels());
+  }
+
+  /** The shape tool: a button that opens a picker of lines, basic shapes and flowchart symbols. */
+  private placeShapeButton(host: HTMLElement, spec: ToolSpec, withLabel: boolean): void {
+    const shapeHost = host.appendChild(this.make("span", "miro-canvas-toolbar__popover"));
+    const button = shapeHost.appendChild(this.toolButton(spec, withLabel));
+    const panel = shapeHost.appendChild(this.panel(button, "miro-canvas-toolbar__panel--shapes", () => {
+      if (lineKind(this.shownShape)) this.actions.onShape("rectangle");
+      this.actions.onArm("shape");
+    }));
+    // Lines first, as Miro lists them, then the basic shapes and the
+    // flowchart's own symbols.
+    const option = (grid: HTMLElement, kind: string, label: string, picture: Element | undefined, glyph: string): void => {
+      const choice = grid.appendChild(this.make("button", "miro-canvas-toolbar__button miro-canvas-toolbar__button--picture"));
+      choice.type = "button";
+      choice.setAttribute("aria-label", label);
+      choice.setAttribute("data-tooltip-delay", PICTURE_TOOLTIP_DELAY);
+      choice.setAttribute("data-shape", kind);
+      if (picture !== undefined) choice.appendChild(picture);
+      else choice.textContent = glyph;
+      this.listen(choice, "click", () => {
+        this.closePanels();
+        this.actions.onShape(kind);
+        this.actions.onArm(lineKind(kind) ? "connector" : "shape");
+      });
+      this.shapeButtons.set(kind, choice);
+    };
+    const section = (title: string): HTMLElement => {
+      panel.appendChild(this.make("div", "miro-canvas-toolbar__heading", title));
+      return panel.appendChild(this.make("div", "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--shapes"));
+    };
+    for (const [part, title] of [["basic", words().toolbar.basic], ["flowchart", words().toolbar.flowchart]] as const) {
+      const grid = section(title);
+      for (const entry of SHAPE_CATALOG.filter((item) => item.section === part)) {
+        option(grid, entry.kind, shapeCatalogLabel(entry), shapePicture(this.document, entry), entry.name);
+      }
+    }
+  }
+
+  /** The pen: wears the colour it will draw with and arms whichever drawing tool was last used, which opens the pen's row. */
+  private placePenButton(host: HTMLElement, spec: ToolSpec, withLabel: boolean): void {
+    const button = host.appendChild(this.iconButton(`${spec.label}\n${spec.key}`, spec.icon, spec.glyph));
+    button.setAttribute("data-tool-group", "drawing");
+    if (withLabel) {
+      button.classList.add("miro-canvas-tools__item");
+      button.appendChild(this.make("span", "miro-canvas-tools__item-label", spec.label));
+    }
+    this.listen(button, "click", () => {
+      this.actions.onArm(this.drawingTool);
+      if (withLabel) this.closePanels();
+    });
+    this.penButton = button;
+  }
+
+  /** The sticky note: the plugin's own picture, never native Canvas's card icon. */
+  private stickyToolButton(spec: ToolSpec, withLabel: boolean): HTMLButtonElement {
+    const label = spec.key === undefined ? spec.label : `${spec.label}\n${spec.key}`;
+    const button = this.make("button", "miro-canvas-toolbar__button");
+    button.type = "button";
+    button.setAttribute("aria-label", label);
+    button.setAttribute("data-tooltip-position", "top");
+    button.setAttribute("data-tooltip-delay", BAR_TOOLTIP_DELAY);
+    button.setAttribute("data-tool", spec.tool);
+    button.setAttribute("aria-pressed", "false");
+    const picture = stickyPicture(this.document);
+    if (picture !== undefined) button.appendChild(picture);
+    else button.textContent = spec.glyph;
+    if (withLabel) {
+      button.classList.add("miro-canvas-tools__item");
+      button.appendChild(this.make("span", "miro-canvas-tools__item-label", spec.label));
+    }
+    this.listen(button, "click", () => this.actions.onArm(spec.tool));
+    this.buttons.set(spec.tool, button);
+    return button;
   }
 
   private toolButton(spec: ToolSpec, withLabel = false): HTMLButtonElement {
@@ -485,7 +644,9 @@ export class QuickTools {
     this.listen(button, "click", () => {
       const open = panel.hidden;
       if (open) onOpen?.();
-      this.closePanels();
+      // Keep an ancestor open: this button may be a shape picker moved under
+      // More, nested inside the very panel this closes everything else in.
+      this.closePanels(button);
       if (!open) return;
       panel.hidden = false;
       button.setAttribute("aria-expanded", "true");

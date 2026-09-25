@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { authorColor, setAuthorColors } from "../src/comment-thread";
 import { setLocale } from "../src/i18n";
+import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS } from "../src/quick-tools";
 import {
   DEFAULT_COMMENT_AUTHOR,
   DEFAULT_SETTINGS,
@@ -169,5 +170,42 @@ describe("plugin settings", () => {
     expect(pointerBindingLabel("alt+left")).toBe("Alt + left button");
     setLocale("ru");
     expect(pointerBindingLabel("alt+left")).toBe("Alt + левая кнопка");
+  });
+
+  it("puts everything but code, the grid and the link on the bar by default", () => {
+    expect(DEFAULT_SETTINGS.toolbarItems).toEqual(DEFAULT_TOOLBAR_ITEMS);
+    expect(DEFAULT_TOOLBAR_ITEMS).not.toContain("code");
+    expect(DEFAULT_TOOLBAR_ITEMS).not.toContain("table");
+    expect(DEFAULT_TOOLBAR_ITEMS).not.toContain("link");
+    // Missing from the bar simply means "under More": nothing else marks it so.
+    for (const item of ALL_TOOLBAR_ITEMS) {
+      if (!DEFAULT_TOOLBAR_ITEMS.includes(item)) expect(["code", "table", "link"]).toContain(item);
+    }
+  });
+
+  it("keeps an explicit tool bar order, dropping unknown and repeated entries", () => {
+    const stored = normalizeSettings({ toolbarItems: ["frame", "not-a-tool", "select", "frame", "card"] });
+    expect(stored.toolbarItems).toEqual(["frame", "select", "card"]);
+  });
+
+  it("accepts an explicitly empty tool bar rather than falling back to the default", () => {
+    expect(normalizeSettings({ toolbarItems: [] }).toolbarItems).toEqual([]);
+  });
+
+  it("falls back to the default tool bar when nothing was stored, keyed by ALL_TOOLBAR_ITEMS order", () => {
+    expect(normalizeSettings({}).toolbarItems).toEqual(DEFAULT_TOOLBAR_ITEMS);
+    expect(normalizeSettings({ toolbarItems: "select,frame" }).toolbarItems).toEqual(DEFAULT_TOOLBAR_ITEMS);
+  });
+
+  it("migrates the old showLassoTool and showConnectorTool booleans when no tool bar was ever saved", () => {
+    const lassoHidden = normalizeSettings({ showLassoTool: false });
+    expect(lassoHidden.toolbarItems).not.toContain("lasso");
+    expect(lassoHidden.toolbarItems).toContain("connector");
+    const connectorHidden = normalizeSettings({ showConnectorTool: false });
+    expect(connectorHidden.toolbarItems).toContain("lasso");
+    expect(connectorHidden.toolbarItems).not.toContain("connector");
+    // A file that already has a tool bar order ignores the old booleans entirely.
+    const both = normalizeSettings({ showLassoTool: false, showConnectorTool: false, toolbarItems: ["lasso", "connector"] });
+    expect(both.toolbarItems).toEqual(["lasso", "connector"]);
   });
 });

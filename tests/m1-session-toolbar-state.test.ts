@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveSelectionToolbarPresentation } from "../src/m1-session";
+import { nativeToolbarItemOf, resolveSelectionToolbarPresentation } from "../src/m1-session";
+
+/** A native card-menu button stands in for the real element: only its icon class matters here. */
+function nativeButton(iconClass: string | undefined): Element {
+  return {
+    querySelector: (selector: string) => (iconClass !== undefined && selector === `.${iconClass}` ? {} : null),
+  } as unknown as Element;
+}
+
+describe("identifying native Canvas's own card-menu buttons", () => {
+  it("tells card, note and media apart by the lucide icon each one carries, whatever their order", () => {
+    expect(nativeToolbarItemOf(nativeButton("lucide-sticky-note"), 1)).toBe("card");
+    expect(nativeToolbarItemOf(nativeButton("lucide-file-text"), 0)).toBe("note");
+    expect(nativeToolbarItemOf(nativeButton("lucide-file-image"), 2)).toBe("media");
+  });
+
+  it("falls back to cardMenuEl's own position when a future build changes the icon", () => {
+    expect(nativeToolbarItemOf(nativeButton("lucide-something-else"), 0)).toBe("card");
+    expect(nativeToolbarItemOf(nativeButton("lucide-something-else"), 1)).toBe("note");
+    expect(nativeToolbarItemOf(nativeButton("lucide-something-else"), 2)).toBe("media");
+    expect(nativeToolbarItemOf(nativeButton(undefined), 3)).toBeUndefined();
+  });
+});
 
 describe("effective selection toolbar presentation", () => {
   it("shows imported Miro shape, typography, colors, and border before any local edit", () => {

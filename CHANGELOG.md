@@ -67,3 +67,8 @@ along.
 - Updates: once a day at start, unless turned off, the plugin asks GitHub for
   the latest release; a newer one shows in the status bar and opens its
   notes. Settings -> Updates has the switch and a button to check now.
+- The bottom tool bar has native Canvas's own card, note from the vault and
+  file from the vault back in quick access, draggable onto the board as in
+  Canvas itself; the sticky note now wears its own picture instead of the
+  card's. Settings -> Tool bar chooses which tools sit on the bar and in
+  what order, the rest staying under More.

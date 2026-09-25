@@ -708,7 +708,15 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   board as in Canvas itself (they are now hidden under More and cannot be
   dragged); give the sticky note an icon unlike the card's; let people choose
   in the settings which tools the bar shows and in what order, the rest
-  staying under More.
+  staying under More. Done in the plugin 2026-09-25 (`src/quick-tools.ts`,
+  `src/settings.ts`, `src/settings-tab.ts`): one ordered setting
+  `toolbarItems` (migrated from the old `showLassoTool` / `showConnectorTool`
+  booleans) decides the bar's own content; native Canvas's three buttons move
+  as the same elements, never copies, so their own drag-to-add and click
+  keep working wherever they land; the sticky tool now draws its own small
+  yellow note instead of the lucide picture native Canvas's card used too;
+  Settings → Tool bar lists every item with a toggle and up/down buttons, and
+  a reset to default.
 - Movable panels (`FUT-019`): the tool bar and the corner dock (minimap, zoom,
   board settings) can be dragged anywhere on screen; the place is remembered.
 - Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,

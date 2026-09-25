@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { setLocale } from "../src/i18n";
-import { QUICK_TOOLS, QUICK_TOOL_KEYS, QuickTools, type QuickTool } from "../src/quick-tools";
+import {
+  ALL_TOOLBAR_ITEMS, QUICK_TOOLS, QUICK_TOOL_KEYS, QuickTools, type NativeToolbarItem, type QuickTool, type ToolbarItem,
+} from "../src/quick-tools";
 
 class FakeElement {
   public readonly nodeType = 1;
@@ -44,6 +46,11 @@ class FakeElement {
     return child;
   }
 
+  public prepend(child: FakeElement): void {
+    child.parentNode = this;
+    this.children.unshift(child);
+  }
+
   public removeChild(child: FakeElement): FakeElement {
     this.children.splice(this.children.indexOf(child), 1);
     child.parentNode = undefined;
@@ -77,6 +84,14 @@ class FakeElement {
   public remove(): void {
     this.parentNode?.children.splice(this.parentNode.children.indexOf(this), 1);
     this.parentNode = undefined;
+  }
+
+  /** True for itself or any element reachable by walking up `other`'s own parents. */
+  public contains(other: FakeElement): boolean {
+    for (let node: FakeElement | undefined = other; node !== undefined; node = node.parentNode) {
+      if (node === this) return true;
+    }
+    return false;
   }
 }
 
@@ -138,6 +153,51 @@ function build(): { readonly tools: QuickTools; readonly root: FakeElement; read
     { document: new FakeDocument() as unknown as Document },
   );
   return { tools, root: tools.element as unknown as FakeElement, calls };
+}
+
+function buildWithItems(toolbarItems: readonly ToolbarItem[]): { readonly tools: QuickTools; readonly root: FakeElement } {
+  const tools = new QuickTools(
+    { onArm: () => {}, onShape: () => {}, onPen: () => {} },
+    { document: new FakeDocument() as unknown as Document, toolbarItems },
+  );
+  return { tools, root: tools.element as unknown as FakeElement };
+}
+
+/** The one direct child of root that is the bar itself, not the pen's row or the connector's. */
+function mainBar(root: FakeElement): FakeElement {
+  const candidates = root.children.filter((child) => child.classes.has("miro-canvas-toolbar__bar")
+    && !child.classes.has("miro-canvas-tools__connectors") && !child.classes.has("miro-canvas-tools__drawing"));
+  if (candidates.length !== 1) throw new Error(`expected one main bar, found ${candidates.length}`);
+  return candidates[0]!;
+}
+
+/** Which toolbar item a bar or More element stands for: its own attribute, or - for the shape popover - its inner button's. */
+function itemOf(node: FakeElement): ToolbarItem | undefined {
+  const native = node.attributes.get("data-native");
+  if (native !== undefined) return native as ToolbarItem;
+  const tool = node.attributes.get("data-tool");
+  if (tool !== undefined) return tool as ToolbarItem;
+  if (node.attributes.get("data-tool-group") === "drawing") return "pen";
+  const inner = node.children.find((child) => child.attributes.get("data-tool") !== undefined);
+  return inner?.attributes.get("data-tool") as ToolbarItem | undefined;
+}
+
+/** The bar's own items, left to right, stopping at the "More" popover. */
+function barOrder(root: FakeElement): ToolbarItem[] {
+  const items: ToolbarItem[] = [];
+  for (const child of mainBar(root).children) {
+    if (child.classes.has("miro-canvas-tools__more")) break;
+    const item = itemOf(child);
+    if (item !== undefined) items.push(item);
+  }
+  return items;
+}
+
+/** What sits under More, in the order its panel lists them. */
+function moreOrder(root: FakeElement): ToolbarItem[] {
+  const moreHost = mainBar(root).children.find((child) => child.classes.has("miro-canvas-tools__more"))!;
+  const panel = moreHost.children.find((child) => child.classes.has("miro-canvas-tools__menu"))!;
+  return panel.children.map((child) => itemOf(child)).filter((item): item is ToolbarItem => item !== undefined);
 }
 
 describe("quick tools", () => {
@@ -281,6 +341,60 @@ describe("quick tools", () => {
     tools.dispose();
     toolButton(root, "select").dispatch("click");
     expect(calls).toEqual([]);
+  });
+
+  it("builds the bar in the order it is given, everything else under More in ALL_TOOLBAR_ITEMS order", () => {
+    const items: readonly ToolbarItem[] = ["frame", "select", "card", "table"];
+    const { root } = buildWithItems(items);
+    expect(barOrder(root)).toEqual(items);
+    expect(moreOrder(root)).toEqual(ALL_TOOLBAR_ITEMS.filter((item) => !items.includes(item)));
+  });
+
+  it("keeps native Canvas's three items in their own place among the plugin's tools", () => {
+    const { root } = buildWithItems(["card", "sticky", "note", "media"]);
+    expect(barOrder(root)).toEqual(["card", "sticky", "note", "media"]);
+  });
+
+  it("gives the sticky tool its own picture, never a lucide icon that could be native Canvas's card", () => {
+    const setIconCalls: string[] = [];
+    const tools = new QuickTools(
+      { onArm: () => {}, onShape: () => {}, onPen: () => {} },
+      { document: new FakeDocument() as unknown as Document, setIcon: (_element, icon) => { setIconCalls.push(icon); } },
+    );
+    const root = tools.element as unknown as FakeElement;
+    const sticky = toolButton(root, "sticky");
+    const picture = sticky.children.find((child) => (child.attributes.get("class") ?? "").includes("miro-canvas-sticky-icon"));
+    expect(picture).toBeDefined();
+    // Nothing asked Obsidian to draw the "sticky-note" lucide picture - native Canvas's own card icon.
+    expect(setIconCalls).not.toContain("sticky-note");
+  });
+
+  it("moves native Canvas's own buttons - the very elements, never copies - into their configured slot", () => {
+    const { tools, root } = buildWithItems(["select", "card", "text"]);
+    const cardButton = new FakeElement("div");
+    tools.placeNativeButton("card", cardButton as unknown as HTMLElement);
+    const slot = descendants(root).find((item) => item.attributes.get("data-native") === "card")!;
+    expect(slot.children).toContain(cardButton);
+    expect(tools.nativeSlot("card")).toBe(slot as unknown as HTMLElement);
+    // Left off the bar entirely: note and media both land under More instead.
+    const note = new FakeElement("div");
+    tools.placeNativeButton("note", note as unknown as HTMLElement);
+    const noteSlot = descendants(root).find((item) => item.attributes.get("data-native") === "note")!;
+    expect(noteSlot.classes.has("miro-canvas-tools__native")).toBe(true);
+    expect(noteSlot.children).toContain(note);
+  });
+
+  it("keeps More itself open when a popover nested inside it - shape, moved under More - opens", () => {
+    // Neither shape nor code is on this bar, so both sit nested inside More.
+    const { root } = buildWithItems(["select", "text"]);
+    const more = byLabel(root, "More tools");
+    more.dispatch("click");
+    expect(panelOf(more).hidden).toBe(false);
+    const shapeButton = toolButton(root, "shape");
+    shapeButton.dispatch("click");
+    expect(panelOf(shapeButton).hidden).toBe(false);
+    // More holds the shape button, so closing "every other panel" must spare it.
+    expect(panelOf(more).hidden).toBe(false);
   });
 });
 

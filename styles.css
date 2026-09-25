@@ -1018,29 +1018,39 @@
   color: var(--text-normal);
 }
 
-.miro-canvas-tools__native {
-  display: flex;
-  gap: 2px;
-  padding-top: 6px;
-  border-top: 1px solid var(--miro-canvas-toolbar-border);
+/* Native Canvas's own card, note and media buttons: the real elements move
+   in here, wherever a person has put them - on the bar itself or listed
+   under More - and take the bar's own button look either way. */
+.miro-canvas-toolbar__native-slot {
+  display: inline-flex;
+  align-items: center;
 }
 
-.miro-canvas-tools__native .canvas-card-menu-button {
+.miro-canvas-tools .miro-canvas-toolbar__native-slot.miro-canvas-tools__native {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  padding: 6px 8px 0;
+  border-top: 1px solid var(--miro-canvas-toolbar-border);
+  color: var(--text-normal);
+}
+
+.miro-canvas-toolbar .canvas-card-menu-button {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: var(--miro-canvas-toolbar-size);
+  height: var(--miro-canvas-toolbar-size);
   color: var(--icon-color);
   border-radius: var(--radius-s, 4px);
   cursor: grab;
 }
 
-.miro-canvas-tools__native .canvas-card-menu-button:hover {
+.miro-canvas-toolbar .canvas-card-menu-button:hover {
   color: var(--icon-color-hover);
   background: var(--background-modifier-hover);
 }
 
-.miro-canvas-tools__native .canvas-card-menu-button svg {
+.miro-canvas-toolbar .canvas-card-menu-button svg {
   width: var(--icon-m, 18px);
   height: var(--icon-m, 18px);
 }
@@ -1644,6 +1654,29 @@
 .miro-canvas-shape-icon--square { width: 18px; height: 18px; }
 .miro-canvas-shape-icon--wide { width: 22px; height: 15px; }
 .miro-canvas-shape-icon--tall { width: 13px; height: 20px; }
+
+/* The sticky tool's own picture: a small filled note in Miro's yellow with a
+   folded corner, fixed colours so it reads the same in both themes and
+   never looks like native Canvas's outline card icon. */
+.miro-canvas-sticky-icon {
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+}
+
+.miro-canvas-sticky-icon__body {
+  fill: #ffd02f;
+  stroke: rgb(0 0 0 / 35%);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.miro-canvas-sticky-icon__fold {
+  fill: #e0ad00;
+  stroke: rgb(0 0 0 / 35%);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
 
 .miro-canvas-line-icon {
   width: 32px;
@@ -3535,6 +3568,25 @@
 .miro-canvas-import-guide__step-icon svg {
   width: 14px;
   height: 14px;
+}
+
+/* The "Tool bar" settings list: each row's icon, the same one the bar or
+   More would show for that item. */
+.miro-canvas-settings-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  color: var(--icon-color);
+  flex-shrink: 0;
+}
+
+.miro-canvas-settings-tool-icon .svg-icon,
+.miro-canvas-settings-tool-icon .miro-canvas-sticky-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .miro-canvas-import-guide__step-title {

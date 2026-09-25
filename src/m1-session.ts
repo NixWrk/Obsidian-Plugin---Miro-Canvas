@@ -115,7 +115,7 @@ import { matchesPointer } from "./pointer-bindings";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
-import { QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type QuickTool } from "./quick-tools";
+import { NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool } from "./quick-tools";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
 import {
 	blockArrowOutline, bowPoint, lineBoardPoints, lineFromBoard, lineKind, planLine, type LineKindSpec, type LinePoint,
@@ -457,6 +457,23 @@ function isElement(value: unknown): value is HTMLElement {
 		&& readRuntime(value, "nodeType") === 1
 		&& typeof readRuntime(value, "appendChild") === "function"
 		&& typeof readRuntime(value, "removeChild") === "function";
+}
+
+/** Native Canvas's own icon class inside each of its three card-menu buttons (verified in Obsidian 1.13.7). */
+const NATIVE_ICON_CLASS: Readonly<Record<NativeToolbarItem, string>> = {
+	card: "lucide-sticky-note", note: "lucide-file-text", media: "lucide-file-image",
+};
+
+/**
+ * Which of native Canvas's own three buttons an element is: by the lucide
+ * icon drawn inside it, robust to native Canvas moving the buttons around;
+ * by its position in `cardMenuEl` where a future build changed the icon.
+ */
+export function nativeToolbarItemOf(button: Element, index: number): NativeToolbarItem | undefined {
+	for (const item of NATIVE_TOOLBAR_ITEMS) {
+		if (button.querySelector(`.${NATIVE_ICON_CLASS[item]}`) !== null) return item;
+	}
+	return NATIVE_TOOLBAR_ITEMS[index];
 }
 
 function ownerDocument(value: unknown): Document | undefined {
@@ -1548,6 +1565,7 @@ export class M1CanvasSession {
 			},
 		}, {
 			document: controlDocument,
+			toolbarItems: settings.toolbarItems,
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
 		});
 	}
@@ -3479,13 +3497,17 @@ export class M1CanvasSession {
 		const cardMenu = readRuntime(this.nativeCanvas(), "cardMenuEl");
 		if (isElement(cardMenu)) {
 			const moved = Array.from(cardMenu.children);
-			for (const child of moved) tools.nativeSlot.appendChild(child);
+			moved.forEach((child, index) => {
+				const item = nativeToolbarItemOf(child, index);
+				if (item !== undefined) tools.placeNativeButton(item, child as HTMLElement);
+			});
 			root.classList.add("miro-canvas-has-tools");
 			this.disposers.push(() => {
 				root.classList.remove("miro-canvas-has-tools");
 				for (const child of moved) {
 					try {
-						if (child.parentElement === tools.nativeSlot) cardMenu.appendChild(child);
+						// Wherever it ended up - the bar itself, or listed under More.
+						if (child.parentElement !== null && child.parentElement !== cardMenu) cardMenu.appendChild(child);
 					} catch {
 						// A menu native Canvas has already destroyed needs nothing back.
 					}
@@ -3577,7 +3599,6 @@ export class M1CanvasSession {
 			connectorColor: this.connectorColor ?? this.boardInk(),
 			connectorWidth: this.connectorWidth,
 			...(this.connectorHeadSize === undefined ? {} : { connectorHeadSize: this.connectorHeadSize }),
-			showLassoTool: this.settings.showLassoTool, showConnectorTool: this.settings.showConnectorTool,
 			editable, armed: this.armedTool, shape: this.toolShape,
 			penColor: this.penInk(), penWidth: this.penWidth, eraserSize: this.eraserSize,
 		});

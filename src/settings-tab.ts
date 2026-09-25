@@ -6,11 +6,12 @@
  * fallbacks stay testable without an Obsidian runtime.
  */
 
-import { PluginSettingTab, Setting, type App, type Plugin } from "obsidian";
+import { PluginSettingTab, Setting, setIcon, type App, type Plugin } from "obsidian";
 
 import { authorColor } from "./comment-thread";
 import { words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
+import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, paintToolbarIcon, toolbarItemLabel, type ToolbarItem } from "./quick-tools";
 import type { UpdateCheck } from "./update-check";
 import {
   DEFAULT_COMMENT_AUTHOR,
@@ -112,10 +113,6 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         for (const chord of POINTER_BINDINGS) dropdown.addOption(chord, pointerBindingLabel(chord));
         dropdown.setValue(this.host.settings.lassoBinding).onChange(value => void this.host.saveSettings({ lassoBinding: value as PointerBinding }));
       });
-    for (const [key, title] of [["showLassoTool", labels.showLassoName], ["showConnectorTool", labels.showConnectorName]] as const) {
-      new Setting(containerEl).setName(title).addToggle(toggle => toggle.setValue(this.host.settings[key])
-        .onChange(value => void this.host.saveSettings({ [key]: value })));
-    }
     for (const [key, title, description] of [
       ["panBinding", labels.panGestureName, labels.panGestureDesc],
       ["lineBinding", labels.lineGestureName, labels.lineGestureDesc],
@@ -166,6 +163,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         .setValue(this.host.settings.selectionToolbarEnabled)
         .onChange((value) => void this.host.saveSettings({ selectionToolbarEnabled: value })));
 
+    this.toolBar(containerEl);
     this.comments(containerEl);
 
     const importLabels = words().importGuide;
@@ -219,6 +217,58 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
               : labels.failed);
         }
       }));
+  }
+
+  /**
+   * The bottom tool bar: every item, on the bar or under More, with a toggle
+   * for "on the bar" and up/down buttons that reorder the ones on it.  The
+   * list shows the bar's own items first, in their order, then the rest in
+   * `ALL_TOOLBAR_ITEMS` order; changing anything rebuilds this same list so
+   * moving an item always shows where it landed.
+   */
+  private toolBar(containerEl: HTMLElement): void {
+    const labels = words().settings;
+    new Setting(containerEl).setName(labels.toolBarHeading).setDesc(labels.toolBarDesc).setHeading();
+    new Setting(containerEl)
+      .addButton((button) => button
+        .setButtonText(labels.toolBarReset)
+        .onClick(() => void this.host.saveSettings({ toolbarItems: DEFAULT_TOOLBAR_ITEMS }).then(() => this.display())));
+    const current = this.host.settings.toolbarItems;
+    const onBar = new Set(current);
+    const listed: readonly ToolbarItem[] = [...current, ...ALL_TOOLBAR_ITEMS.filter((item) => !onBar.has(item))];
+    for (const item of listed) {
+      const position = current.indexOf(item);
+      const setting = new Setting(containerEl).setName(toolbarItemLabel(item));
+      const icon = setting.nameEl.createSpan({ cls: "miro-canvas-settings-tool-icon" });
+      setting.nameEl.prepend(icon);
+      paintToolbarIcon(icon, item, containerEl.ownerDocument, (element, name) => setIcon(element, name));
+      setting
+        .addToggle((toggle) => toggle
+          .setTooltip(labels.toolBarOnBar)
+          .setValue(position !== -1)
+          .onChange((value) => {
+            const next = value ? [...current, item] : current.filter((existing) => existing !== item);
+            void this.host.saveSettings({ toolbarItems: next }).then(() => this.display());
+          }))
+        .addExtraButton((extra) => extra
+          .setIcon("arrow-up")
+          .setTooltip(labels.toolBarMoveUp)
+          .setDisabled(position <= 0)
+          .onClick(() => {
+            const next = [...current];
+            [next[position - 1], next[position]] = [next[position]!, next[position - 1]!];
+            void this.host.saveSettings({ toolbarItems: next }).then(() => this.display());
+          }))
+        .addExtraButton((extra) => extra
+          .setIcon("arrow-down")
+          .setTooltip(labels.toolBarMoveDown)
+          .setDisabled(position === -1 || position === current.length - 1)
+          .onClick(() => {
+            const next = [...current];
+            [next[position], next[position + 1]] = [next[position + 1]!, next[position]!];
+            void this.host.saveSettings({ toolbarItems: next }).then(() => this.display());
+          }));
+    }
   }
 
   /** Who signs the comments written here, and the colour each author's pins wear. */
