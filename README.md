@@ -58,9 +58,13 @@ The plugin goes to the network for one thing only - see
    **N** sticky note, **S** shape, **P** pen, **L** lines and arrows, **C**
    comment, **F** frame. Native Canvas's own card, note from the vault and
    file from the vault sit on the bar too, draggable onto the board as in
-   Canvas itself. Code block, table and web link start under **More**;
-   Settings → Miro Canvas → **Tool bar** moves anything between the bar and
-   More, in whatever order you like.
+   Canvas itself - and so are the plugin's own text, sticky note, shape,
+   comment, frame, code block, table and web link: press one of their
+   buttons and drag onto the board to drop the item where you release it,
+   or just click to place it centred where you clicked, as before. Code
+   block, table and web link start under **More**; Settings → Miro Canvas →
+   **Tool bar** moves anything between the bar and More, in whatever order
+   you like.
 4. Click the board to place the item; select it to style it.
 
 The first time the plugin starts it offers a **welcome board** - twelve frames
@@ -80,7 +84,11 @@ item, and there is a command with the same name. It puts the board into a
 mode with a banner across the top: drag the bottom bar, the corner dock's
 icon row or the minimap to a new corner or edge - each stays inside the view
 and in its place however the window is resized, and turns vertical near a
-side edge. Drag a tool on the bottom bar to reorder it, off the bar onto the
+side edge. The bottom bar and the dock's icon row can also be turned
+between a row and a column directly, with a small flip button beside their
+drag handle, whichever edge they sit on; a vertical bar opens its own menus
+and rows sideways, towards the middle of the board, instead of off the edge.
+Drag a tool on the bottom bar to reorder it, off the bar onto the
 board to put it in a tray instead, or back from the tray onto the bar at any
 point; this writes the same **Tool bar** setting the settings tab edits, so
 either way works and neither is a second source of truth. **Reset** in the

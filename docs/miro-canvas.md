@@ -739,7 +739,7 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   Settings → Tool bar lists every item with a toggle and up/down buttons, and
   a reset to default.
 - Arranging the board's panels on the board itself (`FUT-019`, extended
-  2026-09-25 at the user's request). Done in the plugin 2026-09-25
+  twice on 2026-09-25 at the user's request). Done in the plugin 2026-09-25
   (`src/panel-layout.ts`, `src/panel-arrange.ts`, `src/settings.ts`,
   `src/m1-controls.ts`, `src/m1-session.ts`, `src/main.ts`): "Arrange panels"
   in the dock's board menu, and a command with no default hotkey, put the
@@ -759,7 +759,27 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   still rebuilds, as the settings list's own edits always have, and the
   mode stays open across that rebuild on the same board. The selection
   toolbar is not among the movable panels: it keeps following the
-  selection, as before.
+  selection, as before. A person can also choose a bar's orientation
+  directly, rather than relying only on the anchor: the layout mode's grip
+  now sits beside a small flip button (`rotate-cw`, "Turn the panel") on
+  the tool bar and the dock's icon row, which turns the bar between a row
+  and a column at once and re-resolves its rect so it stays inside the
+  view; the choice is stored as an `orientation` on the panel's own
+  `panelLayout` entry, and only overrides the old side-anchor default once
+  it is actually made. A vertical bar's own popovers - the More menu, the
+  shape picker - and its pen and lines rows now open sideways, towards the
+  board's middle, instead of off the edge they no longer have room for.
+  Canvas's own card, note and file buttons already create by dragging;
+  the plugin's own creating tools (text, sticky note, shape, comment,
+  frame, code block, table, link) now do too: pressing one of their
+  buttons, on the bar or under "+", and moving the pointer past 4 screen
+  pixels shows a ghost of the item at its default size and the board's
+  zoom, and releasing it over the board creates it there, centred on the
+  drop point, through the very same path a click with that tool armed
+  takes - one undo step, selected afterwards, exactly as a click leaves
+  it. Releasing over a panel or outside the view, or pressing Escape,
+  makes nothing; a plain press with no real movement still just arms the
+  tool.
 - Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
   highlight, next and previous.

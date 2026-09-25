@@ -100,4 +100,16 @@ along.
   reorder it, off the bar into a tray, or back from the tray onto the bar,
   writing the same Tool bar setting the settings tab edits. Reset puts
   everything back; Done, Escape or opening another board leaves the mode.
-  The selection toolbar keeps following the selection, as before.
+  The selection toolbar keeps following the selection, as before. The
+  bottom bar and the dock's icon row can also be turned between a row and a
+  column directly, with a small flip button beside their drag handle,
+  whichever edge they sit on; a vertical bar opens its own menus and rows
+  sideways, towards the board's middle, instead of off the edge.
+- Text, sticky note, shape, comment, frame, code block, table and web link
+  can now be dragged straight off the bottom bar (or the More menu) onto
+  the board to create them there, the way native Canvas's own card, note
+  and file buttons already do: press the button and drag past a few
+  pixels to see a ghost of the item, then release over the board to create
+  it centred where you dropped it, selected afterward, as one undo step.
+  Releasing over a panel or outside the view, or pressing Escape, makes
+  nothing; a plain click still just arms the tool.
