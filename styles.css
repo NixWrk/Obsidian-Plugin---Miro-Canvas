@@ -346,6 +346,14 @@
   pointer-events: none;
 }
 
+/* The plugin's name stands in only where Canvas shows none of its own.
+   Canvas adds its label as it draws the card, which can be after the
+   plugin looked, so the plugin's name steps aside once Canvas's is there
+   instead of showing the file's name twice. */
+.canvas-node:has(> .canvas-node-label) > .miro-canvas-attachment-label {
+  display: none;
+}
+
 .miro-canvas-locked {
   outline: 1px dashed var(--text-muted, #888);
   outline-offset: 2px;
