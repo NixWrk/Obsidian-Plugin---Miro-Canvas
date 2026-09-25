@@ -19,6 +19,12 @@
  * The board never knows the theme it opens in, so everything it paints is
  * either a colour that reads on light and dark boards alike or left to
  * Obsidian's own colours.
+ *
+ * The "Files and notes" frame points native Canvas file nodes at a small
+ * folder of sample files (welcome-samples.ts has the two binary ones' bytes;
+ * `sampleNoteContent`/`sampleCanvasContent` below build the text ones) that
+ * `createWelcomeBoard` writes next to the board, on the same press, so the
+ * frame never points at a file that does not exist.
  */
 
 import type { App, TFile } from "obsidian";
@@ -34,10 +40,80 @@ import { addLocalComment, addReply } from "./local-comments";
 import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata } from "./metadata";
 import { readableInk } from "./miro-palette";
 import type { ShapeKind } from "./shape-catalog";
+import { WELCOME_SAMPLE_DOCX_BASE64, WELCOME_SAMPLE_PDF_BASE64, WELCOME_SAMPLE_PNG_BASE64, decodeWelcomeSample } from "./welcome-samples";
 
 export interface WelcomeBoardOptions {
 	/** Makes every id reproducible, so two builds can be compared in a test. */
 	readonly seed?: number;
+	/** Where the "Files and notes" frame's file nodes point; defaults to `welcomeSamplePaths()` so a test can hand it fixed paths without a vault. */
+	readonly samples?: WelcomeSamplePaths;
+}
+
+/** The vault paths of the small folder of sample files the board's frame points at. */
+export interface WelcomeSamplePaths {
+	readonly folder: string;
+	readonly note: string;
+	readonly canvas: string;
+	readonly picture: string;
+	readonly pdf: string;
+	readonly docx: string;
+}
+
+/**
+ * The two attachments with names fixed by the frame, not by the locale - a
+ * translated file name would break the link the moment the language
+ * changed.  The note and the small canvas keep their own words, since
+ * nothing outside the board reads their file names.
+ */
+export const WELCOME_SAMPLE_ATTACHMENT_NAMES = { picture: "Picture.png", pdf: "Document.pdf", docx: "Document.docx" } as const;
+
+/** The sample folder and files `createWelcomeBoard` writes, and where the board's file nodes point. */
+export function welcomeSamplePaths(): WelcomeSamplePaths {
+	const strings = words().welcome;
+	const folder = strings.samplesFolderName;
+	return {
+		folder,
+		note: `${folder}/${strings.samplesNoteFileName}`,
+		canvas: `${folder}/${strings.samplesCanvasFileName}`,
+		picture: `${folder}/${WELCOME_SAMPLE_ATTACHMENT_NAMES.picture}`,
+		pdf: `${folder}/${WELCOME_SAMPLE_ATTACHMENT_NAMES.pdf}`,
+		docx: `${folder}/${WELCOME_SAMPLE_ATTACHMENT_NAMES.docx}`,
+	};
+}
+
+/**
+ * The sample note's own words: a short paragraph, a list, and a wiki link
+ * back to the board.  No heading: Canvas already shows the note's name above
+ * it, and a heading repeating the name read twice.
+ */
+export function sampleNoteContent(): string {
+	const strings = words().welcome;
+	const boardName = strings.fileName.replace(/\.canvas$/, "");
+	return [
+		strings.samplesNoteIntro,
+		"",
+		`- ${strings.samplesNoteItem1}`,
+		`- ${strings.samplesNoteItem2}`,
+		"",
+		`${strings.samplesNoteBackToBoard} [[${boardName}]]`,
+		"",
+	].join("\n");
+}
+
+/** The sample canvas: two text cards and the native edge joining them - a plain Canvas file, none of it plugin metadata. */
+export function sampleCanvasContent(): string {
+	const strings = words().welcome;
+	const nextId = idFactory(0x53ee11a);
+	const fromId = nextId();
+	const toId = nextId();
+	const document = {
+		nodes: [
+			{ id: fromId, type: "text", text: strings.samplesCanvasCard1, x: 0, y: 0, width: 240, height: 120 },
+			{ id: toId, type: "text", text: strings.samplesCanvasCard2, x: 320, y: 0, width: 240, height: 120 },
+		],
+		edges: [{ id: nextId(), fromNode: fromId, fromSide: "right", toNode: toId, toSide: "left" }],
+	};
+	return JSON.stringify(document, null, "\t");
 }
 
 interface Rect {
@@ -61,7 +137,7 @@ interface CardStyle {
 const FRAMES = [
 	"welcome", "text", "colours", "stickies",
 	"shapes", "lines", "drawing", "layers",
-	"comments", "code", "export", "fromMiro",
+	"comments", "code", "files", "exportAndMiro",
 ] as const;
 type FrameName = (typeof FRAMES)[number];
 
@@ -171,7 +247,7 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	const titles: Readonly<Record<FrameName, string>> = {
 		welcome: strings.welcomeTitle, text: strings.textTitle, colours: strings.coloursTitle, stickies: strings.stickiesTitle,
 		shapes: strings.shapesTitle, lines: strings.linesTitle, drawing: strings.drawingTitle, layers: strings.layersTitle,
-		comments: strings.commentsTitle, code: strings.codeTitle, export: strings.exportTitle, fromMiro: strings.fromMiroTitle,
+		comments: strings.commentsTitle, code: strings.codeTitle, files: strings.filesTitle, exportAndMiro: strings.exportAndMiroTitle,
 	};
 	FRAMES.forEach((frame, index) => {
 		const rect = frameRect(frame);
@@ -187,13 +263,16 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 		if (style !== undefined) overrides[id] = { ...style };
 		return id;
 	};
-	/** A caption: text on the board itself, with no card around it. */
-	const caption = (rect: Rect, text: string): string =>
-		card(rect, text, { typography: { fontSize: 16, verticalAlign: "center" }, colors: { fill: null, border: null }, borderStyle: "none" });
-	/** A card standing for a Miro item: a sticky note, a drawing, a code block. */
+	/** A card standing for a Miro item: a sticky note, a drawing, a code block, text. */
 	const item = (rect: Rect, text: string, local: LocalItem): string => {
 		const id = card(rect, text);
 		overrides[id] = itemOverride(local);
+		return id;
+	};
+	/** A caption: text as the text tool makes it, on the board itself with no card around it. */
+	const caption = (rect: Rect, text: string): string => {
+		const id = item(rect, text, { type: "text" });
+		overrides[id] = { ...overrides[id], typography: { fontSize: 16, verticalAlign: "center" } };
 		return id;
 	};
 	const connect = (partial: { readonly from: CanvasAnchor; readonly to: CanvasAnchor } & Partial<BoardConnector>): void => {
@@ -332,7 +411,9 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	connect({ from: pointIn("lines", 400, 330), to: pointIn("lines", 660, 400), route: "curved", color: MIRO.purple, width: 3, label: strings.lineCurved });
 	caption(within("lines", 40, 440, 640, 40), strings.linesHint);
 
-	// 7. Drawing: pen strokes in three colours, and a highlighter stroke over a card.
+	// 7. Drawing: pen strokes in three colours, then highlighter strokes, each
+	// row named by its tool.  A stroke is an item of its own: nothing here
+	// lies over a card, where it would look like part of it.
 	{
 		const box = { width: 300, height: 120 };
 		const points: number[] = [];
@@ -340,11 +421,11 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 			const t = index / 12;
 			points.push(t * box.width, box.height / 2 - Math.sin(t * Math.PI * 2) * box.height * 0.35);
 		}
-		item(within("drawing", 60, 60, box.width, box.height), "", stroke(MIRO.blue, 4, box, points));
+		item(within("drawing", 60, 40, box.width, box.height), "", stroke(MIRO.blue, 4, box, points));
 	}
 	{
 		const box = { width: 110, height: 90 };
-		item(within("drawing", 410, 75, box.width, box.height), "", stroke(MIRO.green, 6, box, [0, 50, 40, 90, 110, 0]));
+		item(within("drawing", 410, 55, box.width, box.height), "", stroke(MIRO.green, 6, box, [0, 50, 40, 90, 110, 0]));
 	}
 	{
 		const box = { width: 110, height: 110 };
@@ -353,13 +434,18 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 			const angle = (index / 24) * Math.PI * 2;
 			points.push(55 + Math.cos(angle) * 50, 55 + Math.sin(angle) * 50);
 		}
-		item(within("drawing", 560, 65, box.width, box.height), "", stroke(MIRO.red, 4, box, points));
+		item(within("drawing", 560, 45, box.width, box.height), "", stroke(MIRO.red, 4, box, points));
 	}
-	card(within("drawing", 60, 250, 400, 70), strings.drawingMarked, { typography: { fontSize: 20, verticalAlign: "center" } });
+	caption(within("drawing", 40, 170, 640, 36), tools.pen);
 	{
-		const box = { width: 380, height: 36 };
-		item(within("drawing", 70, 267, box.width, box.height), "", stroke(MIRO.yellow, 22, box, [0, 18, 380, 18], 0.5));
+		const box = { width: 280, height: 60 };
+		item(within("drawing", 60, 240, box.width, box.height), "", stroke(MIRO.yellow, 22, box, [0, 45, 70, 15, 140, 45, 210, 15, 280, 45], 0.5));
 	}
+	{
+		const box = { width: 280, height: 60 };
+		item(within("drawing", 400, 240, box.width, box.height), "", stroke(MIRO.green, 22, box, [0, 30, 280, 30], 0.5));
+	}
+	caption(within("drawing", 40, 320, 640, 36), tools.highlighter);
 	caption(within("drawing", 40, 420, 640, 40), strings.drawingHint);
 
 	// 8. Layers and locking: three overlapping cards, back to front by their
@@ -408,11 +494,27 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 		item(within("code", 40, 200, 640, 160), table, { type: "table", title: strings.tableTitle });
 	}
 
-	// 11. Export: where it lives; the pages themselves are added below.
-	card(within("export", 40, 40, 640, 140), strings.exportHint, { typography: centred(20) });
+	// 11. Files and notes: native Canvas file nodes, pointing at the sample
+	// folder `createWelcomeBoard` writes alongside this board - a note,
+	// another canvas, and the three attachment kinds Canvas already knows how
+	// to show.  Sizes stay "about" the ones asked for: the frame has no room
+	// to spare once a page-tall PDF preview sits beside everything else.
+	const samples = options.samples ?? welcomeSamplePaths();
+	const fileNode = (rect: Rect, path: string): void => {
+		nodes.push({ id: nextId(), type: "file", file: path, x: round(rect.x), y: round(rect.y), width: round(rect.width), height: round(rect.height) });
+	};
+	fileNode(within("files", 40, 40, 300, 160), samples.note);
+	fileNode(within("files", 380, 40, 300, 160), samples.canvas);
+	fileNode(within("files", 40, 220, 200, 140), samples.picture);
+	fileNode(within("files", 260, 220, 200, 200), samples.pdf);
+	fileNode(within("files", 480, 220, 200, 120), samples.docx);
+	caption(within("files", 40, 430, 640, 60), strings.filesHint);
 
-	// 12. Bring your Miro boards: where the import guide lives.
-	card(within("fromMiro", 40, 40, 640, 140), strings.fromMiroHint, { typography: { ...centred(22), format: { bold: true } }, colors: painted(MIRO.yellow) });
+	// 12. Export and Miro import: where each one lives, one card apiece,
+	// stacked in the frame that used to hold "Export" and "Bring your Miro
+	// boards" on their own.
+	card(within("exportAndMiro", 40, 40, 640, 140), strings.exportHint, { typography: centred(20) });
+	card(within("exportAndMiro", 40, 220, 640, 140), strings.fromMiroHint, { typography: { ...centred(22), format: { bold: true } }, colors: painted(MIRO.yellow) });
 
 	// The export pages: one A4 sheet over Welcome, one over Sticky notes, so
 	// the export panel opens with something to show.
@@ -440,14 +542,69 @@ export interface WelcomeBoardHost {
 	readonly app: App;
 	/** The `instanceof TFile` check, passed in so this module never has to import "obsidian" at runtime. */
 	readonly isFile: (value: unknown) => value is TFile;
+	/**
+	 * Obsidian's own path normalisation, lent the same way as `isFile` so this
+	 * module never imports "obsidian" as a value.  Falls back to a plain
+	 * slash cleanup - every path here is built by this module itself, from
+	 * fixed names and the locale, never from outside input - when a host
+	 * does not pass one.
+	 */
+	readonly normalizePath?: (path: string) => string;
+}
+
+/** The slash cleanup `normalizePath` does, for a host that has not lent the real one. */
+function fallbackNormalizePath(path: string): string {
+	return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+/** A sample's bytes as `createBinary` wants them: an `ArrayBuffer`, not the `Uint8Array` it decodes to. */
+function sampleBytes(base64: string): ArrayBuffer {
+	const bytes = decodeWelcomeSample(base64);
+	// This module's own decode always allocates a plain, whole ArrayBuffer -
+	// never a SharedArrayBuffer or a view into a larger one - so the slice
+	// below only ever produces an ArrayBuffer.
+	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+/** Creates one sample file if it is missing; a file already there is kept exactly as it is. */
+async function createSampleFile(host: WelcomeBoardHost, path: string, write: (path: string) => Promise<unknown>): Promise<void> {
+	const normalize = host.normalizePath ?? fallbackNormalizePath;
+	const normalized = normalize(path);
+	if (host.app.vault.getAbstractFileByPath(normalized) !== null) return;
+	await write(normalized);
 }
 
 /**
- * Writes the welcome board and opens it.  A file already at that path is
- * opened as it is - this never overwrites a person's own board - and this is
- * the only file it ever writes, on the person's own press.
+ * Writes the sample folder and the files in it that the "Files and notes"
+ * frame points at - a note, a small canvas, a picture, a PDF and a Word
+ * document - creating only what is missing.  Returns the paths whether or
+ * not anything had to be written, so `buildWelcomeBoard` always points at
+ * where the samples now are.
+ */
+export async function createWelcomeSamples(host: WelcomeBoardHost): Promise<WelcomeSamplePaths> {
+	const paths = welcomeSamplePaths();
+	const normalize = host.normalizePath ?? fallbackNormalizePath;
+	const folder = normalize(paths.folder);
+	if (host.app.vault.getAbstractFileByPath(folder) === null) {
+		await host.app.vault.createFolder(folder);
+	}
+	await createSampleFile(host, paths.note, (path) => host.app.vault.create(path, sampleNoteContent()));
+	await createSampleFile(host, paths.canvas, (path) => host.app.vault.create(path, sampleCanvasContent()));
+	await createSampleFile(host, paths.picture, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_PNG_BASE64)));
+	await createSampleFile(host, paths.pdf, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_PDF_BASE64)));
+	await createSampleFile(host, paths.docx, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_DOCX_BASE64)));
+	return paths;
+}
+
+/**
+ * Writes the welcome board's sample folder and files, then the board itself,
+ * and opens the board.  A file already at its path - the board, or any one
+ * sample - is opened or kept exactly as it is, never overwritten or
+ * rewritten; a missing one is created.  These, on the person's own press,
+ * are the only files this module ever writes.
  */
 export async function createWelcomeBoard(host: WelcomeBoardHost): Promise<TFile> {
+	await createWelcomeSamples(host);
 	const path = words().welcome.fileName;
 	const existing = host.app.vault.getAbstractFileByPath(path);
 	const file = host.isFile(existing) ? existing : await host.app.vault.create(path, JSON.stringify(buildWelcomeBoard(), null, "\t"));

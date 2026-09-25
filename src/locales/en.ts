@@ -842,7 +842,6 @@ export const EN = {
 		linesHint: "Drag the middle of a line to bend it.",
 
 		drawingTitle: "Drawing",
-		drawingMarked: "A highlighter stroke over text",
 		drawingHint: "Smart drawing turns a rough shape into a clean one.",
 
 		layersTitle: "Layers and locking",
@@ -869,10 +868,20 @@ export const EN = {
 		tableStyle: "Style",
 		tableStyleStatus: "Next",
 
-		exportTitle: "Export",
-		exportHint: "Board menu → Export to PDF or PowerPoint. Two pages are already marked: over Welcome and Sticky notes.",
+		filesTitle: "Files and notes",
+		filesHint: "Notes, other canvases and any file from the vault - drag them in from the file list.",
+		samplesFolderName: "Miro Canvas - Welcome files",
+		samplesNoteFileName: "Note.md",
+		samplesCanvasFileName: "Small board.canvas",
+		samplesNoteIntro: "This is an ordinary note, shown on the board like any other file.",
+		samplesNoteItem1: "A markdown note",
+		samplesNoteItem2: "Any file from the vault",
+		samplesNoteBackToBoard: "Back to the board:",
+		samplesCanvasCard1: "A small canvas",
+		samplesCanvasCard2: "with a line to this card",
 
-		fromMiroTitle: "Bring your Miro boards",
+		exportAndMiroTitle: "Export and Miro import",
+		exportHint: "Board menu → Export to PDF or PowerPoint. Two pages are already marked: over Welcome and Sticky notes.",
 		fromMiroHint: "Settings → Miro Canvas → Open the import guide",
 	},
 };

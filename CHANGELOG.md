@@ -20,7 +20,11 @@ along.
 - English and Russian, following Obsidian's language.
 - A first-run question and a guide for importing boards from Miro.
 - A welcome board, offered on first run and from the settings: twelve frames
-  that show every tool on real items.
+  that show every tool on real items, including a "Files and notes" frame
+  and the small sample folder (a note, a canvas, a picture, a PDF and a Word
+  document) creating the board writes beside it.
+- A file on a board shows its name once: the plugin's own name for it steps
+  aside once Canvas has drawn its label.
 - Text placed in the middle or at the bottom of a card now sits there; it
   stayed at the top before.
 - Highlighted text keeps the text colour the card sets.

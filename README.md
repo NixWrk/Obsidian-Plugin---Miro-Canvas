@@ -54,9 +54,12 @@ The plugin goes to the network for one thing only - see
 The first time the plugin starts it offers a **welcome board** - twelve frames
 with every tool on real items: text in several fonts and marks, colours and
 markers, sticky notes, shapes and a flowchart, lines of every style, drawing,
-layers, comments, code and tables, export pages - and asks whether you want to
-import boards from Miro. Any answer is fine: both stay under Settings → Miro
-Canvas → **Getting started**.
+layers, comments, code and tables, a note and other files, export pages - and
+asks whether you want to import boards from Miro. Any answer is fine: both
+stay under Settings → Miro Canvas → **Getting started**. Creating the board
+also creates a small folder of sample files beside it (a note, a small
+canvas, a picture, a PDF and a Word document), so its "Files and notes" frame
+always points at real files.
 
 ## Bringing boards over from Miro
 

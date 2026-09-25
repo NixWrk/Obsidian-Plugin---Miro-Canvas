@@ -654,10 +654,15 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   shows every tool on real items (done 2026-09-24: `src/welcome-board.ts`
   builds twelve frames - welcome, text, colours, sticky notes, shapes and
   flowcharts, lines, drawing, layers and locking, comments, code and tables,
-  export, Miro import - that show rather than tell, from the same records the
-  tools write; the first-run question offers it, and Settings → Getting
-  started makes it again; an existing board of that name is opened, never
-  overwritten).
+  files and notes, export and Miro import - that show rather than tell, from
+  the same records the tools write; the first-run question offers it, and
+  Settings → Getting started makes it again; an existing board of that name
+  is opened, never overwritten. Extended 2026-09-25: the "Files and notes"
+  frame shows native Canvas file nodes - a note, a small canvas and a
+  picture, a PDF and a Word document - and creating the board also creates
+  that small sample folder beside it, on the same press, writing only what
+  is missing; the binaries live as base64 in `src/welcome-samples.ts`, built
+  and checked by `tools/make_welcome_samples.py`).
 - Write a visual guide to the plugin's features and the order of its settings,
   with screenshots, for users and for the release page.
 - PDF/PPTX export: slides as a deck and marked board areas as pages (done

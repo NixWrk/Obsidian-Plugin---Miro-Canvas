@@ -807,7 +807,6 @@ export const RU: Messages = {
 		linesHint: "Потяните середину линии, чтобы изогнуть её.",
 
 		drawingTitle: "Рисование",
-		drawingMarked: "Маркер поверх текста",
 		drawingHint: "Умное рисование превращает набросок в ровную фигуру.",
 
 		layersTitle: "Порядок и блокировка",
@@ -834,10 +833,20 @@ export const RU: Messages = {
 		tableStyle: "Оформление",
 		tableStyleStatus: "Дальше",
 
-		exportTitle: "Экспорт",
-		exportHint: "Меню доски → «Экспорт в PDF или PowerPoint». Две страницы уже отмечены: над «Знакомством» и «Стикерами».",
+		filesTitle: "Файлы и заметки",
+		filesHint: "Заметки, другие холсты и любые файлы из хранилища — перетащите их из списка файлов.",
+		samplesFolderName: "Miro Canvas - Знакомство, файлы",
+		samplesNoteFileName: "Заметка.md",
+		samplesCanvasFileName: "Мини-доска.canvas",
+		samplesNoteIntro: "Это обычная заметка — Canvas показывает её на доске, как любой другой файл.",
+		samplesNoteItem1: "Заметка в формате Markdown",
+		samplesNoteItem2: "Любой файл из хранилища",
+		samplesNoteBackToBoard: "Назад к доске:",
+		samplesCanvasCard1: "Небольшой холст",
+		samplesCanvasCard2: "с линией к этой карточке",
 
-		fromMiroTitle: "Перенесите свои доски из Miro",
+		exportAndMiroTitle: "Экспорт и перенос из Miro",
+		exportHint: "Меню доски → «Экспорт в PDF или PowerPoint». Две страницы уже отмечены: над «Знакомством» и «Стикерами».",
 		fromMiroHint: "Настройки → Miro Canvas → «Открыть руководство по импорту»",
 	},
 };

@@ -1,8 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { setLocale } from "../src/i18n";
+import type { App, TFile } from "obsidian";
+import { setLocale, words } from "../src/i18n";
 import { validateMiroCanvasMetadata } from "../src/metadata";
-import { buildWelcomeBoard } from "../src/welcome-board";
+import {
+  buildWelcomeBoard,
+  createWelcomeBoard,
+  sampleCanvasContent,
+  sampleNoteContent,
+  welcomeSamplePaths,
+  type WelcomeBoardHost,
+} from "../src/welcome-board";
 
 interface CanvasNode {
   readonly id: string;
@@ -13,6 +21,44 @@ interface CanvasNode {
   readonly height: number;
   readonly text?: string;
   readonly label?: string;
+  readonly file?: string;
+}
+
+/** A fake vault, just real enough for createWelcomeBoard: paths already in `existing` are there from the start; every write lands in the same map. */
+function fakeHost(existing: Iterable<string> = []): {
+  readonly host: WelcomeBoardHost;
+  readonly files: Map<string, { readonly path: string }>;
+  readonly createFolder: ReturnType<typeof vi.fn>;
+  readonly create: ReturnType<typeof vi.fn>;
+  readonly createBinary: ReturnType<typeof vi.fn>;
+  readonly openFile: ReturnType<typeof vi.fn>;
+} {
+  const files = new Map<string, { readonly path: string }>();
+  for (const path of existing) files.set(path, { path });
+  const createFolder = vi.fn(async (path: string) => { files.set(path, { path }); });
+  const create = vi.fn(async (path: string, _content: string) => {
+    const file = { path };
+    files.set(path, file);
+    return file;
+  });
+  const createBinary = vi.fn(async (path: string, _data: Uint8Array) => {
+    const file = { path };
+    files.set(path, file);
+    return file;
+  });
+  const openFile = vi.fn(async () => {});
+  const app = {
+    vault: {
+      getAbstractFileByPath: (path: string) => files.get(path) ?? null,
+      createFolder,
+      create,
+      createBinary,
+    },
+    workspace: { getLeaf: () => ({ openFile }) },
+  } as unknown as App;
+  const isFile = (value: unknown): value is TFile =>
+    typeof value === "object" && value !== null && "path" in value;
+  return { host: { app, isFile }, files, createFolder, create, createBinary, openFile };
 }
 
 interface CanvasEdge {
@@ -141,5 +187,92 @@ describe("buildWelcomeBoard", () => {
     const frames = nodesOf(document).filter((node) => node.type === "group");
     expect(frames[0]!.label).toContain("Знакомство");
     expect(frames[3]!.label).toContain("Стикеры");
+    expect(frames[10]!.label).toContain("Файлы");
+    expect(frames[11]!.label).toContain("Экспорт");
+  });
+
+  it("points the files frame at the board's five sample files by default", () => {
+    const document = buildWelcomeBoard();
+    const paths = welcomeSamplePaths();
+    const nodes = nodesOf(document);
+    const fileNodes = nodes.filter((node) => node.type === "file");
+    expect(fileNodes).toHaveLength(5);
+    expect(fileNodes.map((node) => node.file).sort()).toEqual(
+      [paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx].sort(),
+    );
+    const filesFrame = nodes.filter((node) => node.type === "group")[10]!;
+    for (const fileNode of fileNodes) {
+      expect(frame(filesFrame, fileNode.x, fileNode.y, fileNode.width, fileNode.height)).toBe(true);
+    }
+  });
+
+  it("builds its file nodes from given sample paths, with no vault involved", () => {
+    const samples = {
+      folder: "Sample folder", note: "Sample folder/n.md", canvas: "Sample folder/c.canvas",
+      picture: "Sample folder/p.png", pdf: "Sample folder/d.pdf", docx: "Sample folder/w.docx",
+    };
+    const document = buildWelcomeBoard({ samples });
+    const fileNodes = nodesOf(document).filter((node) => node.type === "file");
+    expect(fileNodes.map((node) => node.file).sort()).toEqual(
+      [samples.note, samples.canvas, samples.picture, samples.pdf, samples.docx].sort(),
+    );
+  });
+});
+
+describe("sampleNoteContent and sampleCanvasContent", () => {
+  it("writes an intro, a two-item list and a wiki link back to the board, and no heading repeating its name", () => {
+    const note = sampleNoteContent();
+    expect(note).not.toMatch(/^#/m);
+    expect(note).toContain("This is an ordinary note");
+    expect(note.match(/^- /gm)).toHaveLength(2);
+    expect(note).toContain("[[Miro Canvas - Welcome]]");
+  });
+
+  it("builds a small canvas with two cards joined by one native edge", () => {
+    const canvas = JSON.parse(sampleCanvasContent()) as { nodes: unknown[]; edges: { fromNode: string; toNode: string }[] };
+    expect(canvas.nodes).toHaveLength(2);
+    expect(canvas.edges).toHaveLength(1);
+    const ids = canvas.nodes.map((node) => (node as { id: string }).id);
+    expect(ids).toContain(canvas.edges[0]!.fromNode);
+    expect(ids).toContain(canvas.edges[0]!.toNode);
+  });
+});
+
+describe("createWelcomeBoard", () => {
+  it("creates the sample folder and every sample file, then the board, when nothing exists yet", async () => {
+    const paths = welcomeSamplePaths();
+    const boardPath = words().welcome.fileName;
+    const { host, createFolder, create, createBinary, openFile } = fakeHost();
+    await createWelcomeBoard(host);
+    expect(createFolder).toHaveBeenCalledWith(paths.folder);
+    expect(create).toHaveBeenCalledWith(paths.note, sampleNoteContent());
+    expect(create).toHaveBeenCalledWith(paths.canvas, sampleCanvasContent());
+    expect(create).toHaveBeenCalledWith(boardPath, expect.any(String));
+    expect(createBinary).toHaveBeenCalledTimes(3);
+    expect(openFile).toHaveBeenCalled();
+  });
+
+  it("writes nothing when the folder and every sample and the board already exist", async () => {
+    const paths = welcomeSamplePaths();
+    const boardPath = words().welcome.fileName;
+    const { host, createFolder, create, createBinary, openFile, files } = fakeHost(
+      [paths.folder, paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx, boardPath],
+    );
+    const boardBefore = files.get(boardPath);
+    await createWelcomeBoard(host);
+    expect(createFolder).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(createBinary).not.toHaveBeenCalled();
+    expect(openFile).toHaveBeenCalledWith(boardBefore, { active: true });
+  });
+
+  it("creates only what is missing, and never rewrites a sample that is already there", async () => {
+    const paths = welcomeSamplePaths();
+    const { host, createFolder, create, createBinary } = fakeHost([paths.folder, paths.note]);
+    await createWelcomeBoard(host);
+    expect(createFolder).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalledWith(paths.note, expect.any(String));
+    expect(create).toHaveBeenCalledWith(paths.canvas, sampleCanvasContent());
+    expect(createBinary).toHaveBeenCalledTimes(3);
   });
 });

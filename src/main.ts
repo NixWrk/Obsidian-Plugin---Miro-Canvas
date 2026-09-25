@@ -1,5 +1,5 @@
 import * as obsidian from "obsidian";
-import { MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
 import {
   inspectAdvancedCanvas,
@@ -610,7 +610,7 @@ export default class MiroCanvasPlugin extends Plugin {
 
   /** The same welcome board the first-run question and the settings tab's button write and open. */
   private openWelcomeBoard(): void {
-    void createWelcomeBoard({ app: this.app, isFile: (value): value is TFile => value instanceof TFile }).catch(
+    void createWelcomeBoard({ app: this.app, isFile: (value): value is TFile => value instanceof TFile, normalizePath }).catch(
       () => new Notice(words().importGuide.createWelcomeBoardFailed),
     );
   }
