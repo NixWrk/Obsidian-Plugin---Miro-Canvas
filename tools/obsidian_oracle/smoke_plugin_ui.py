@@ -1015,10 +1015,16 @@ def main() -> int:
             assert page.locator(".miro-canvas-dock").count() == 1
             assert page.locator(".miro-canvas-dock__map").count() == 1
             assert page.evaluate("document.querySelector('.miro-canvas-dock').parentElement === miroBrowser.root")
-            assert page.evaluate("document.querySelector('.miro-canvas-dock').contains(document.querySelector('.miro-canvas-dock__map'))")
+            # The minimap is its own panel (FUT-019), a sibling of the icon
+            # row's dock rather than nested inside it, so the "arrange panels"
+            # mode can drag the two apart.
+            assert page.evaluate("document.querySelector('.miro-canvas-dock__map').parentElement === miroBrowser.root")
+            assert page.evaluate("!document.querySelector('.miro-canvas-dock').contains(document.querySelector('.miro-canvas-dock__map'))")
             assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-dock')).position") == "absolute"
             assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-dock')).right") == "12px"
             assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-dock')).bottom") == "36px"
+            assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-dock__map')).position") == "absolute"
+            assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-dock__map')).right") == "12px"
             assert page.evaluate("miroBrowser.getSaves()") == 0, "Opening a board saved it"
             assert page.evaluate("miroBrowser.node.nodeEl.getAttribute('data-miro-source-kind')") == "text"
             assert page.evaluate("miroBrowser.fileNode.nodeEl.getAttribute('data-miro-source-kind')") == "media"

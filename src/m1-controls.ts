@@ -71,6 +71,8 @@ export interface M1ControlsActions {
 	readonly openSettings?: () => void;
 	/** Set up an export of the board to PDF or PowerPoint. */
 	readonly openExport?: () => void;
+	/** Enter (or, already in it, leave) the mode that drags the bar, the dock and the minimap in place. */
+	readonly onArrangePanels?: () => void;
 }
 
 export interface M1ControlsOptions {
@@ -90,6 +92,7 @@ interface Menu {
 
 interface ControlRefs {
 	readonly minimapCanvas: HTMLCanvasElement;
+	/** The minimap's own panel: no longer nested in the icon row's dock, so the two can be dragged apart. */
 	readonly map: HTMLElement;
 	readonly bar: HTMLElement;
 	readonly minimapToggle: HTMLButtonElement;
@@ -209,8 +212,10 @@ export class M1Controls {
 		root.setAttribute("data-miro-canvas-panel", "true");
 		root.setAttribute("aria-label", options.title ?? words().dock.ariaLabel);
 		this.element = root;
-		this.minimapElement = root;
 		this.refs = this.build(root);
+		// The minimap is its own panel now, not the icon row's - so the two
+		// can be dragged apart; the session mounts both, as it always has.
+		this.minimapElement = this.refs.map;
 	}
 
 	private listen<T extends EventTarget>(target: T, event: string, handler: EventListener): void {
@@ -303,7 +308,10 @@ export class M1Controls {
 	private build(root: HTMLElement): ControlRefs {
 		const document = this.document!;
 		const dock = words().dock;
-		const map = append(root, makeElement(document, "div", "miro-canvas-dock__map"));
+		// Its own top-level panel, not a child of the icon row's dock: the two
+		// can sit apart on the board and move independently of each other.
+		const map = makeElement(document, "div", "miro-canvas-dock__map");
+		map.setAttribute("data-miro-canvas-panel", "true");
 		const minimapCanvas = makeElement(document, "canvas", "miro-canvas-panel__minimap-canvas");
 		minimapCanvas.width = 240;
 		minimapCanvas.height = 160;
@@ -392,6 +400,9 @@ export class M1Controls {
 		if (this.actions.openSourceInspector !== undefined) {
 			this.item(board.panel, "file-search", "?", dock.sourceProvenance, { run: () => this.close(() => this.actions.openSourceInspector?.()) });
 		}
+		if (this.actions.onArrangePanels !== undefined) {
+			this.item(board.panel, "move", "✥", dock.arrangePanels, { run: () => this.close(() => this.actions.onArrangePanels?.()) });
+		}
 		if (this.actions.openSettings !== undefined) {
 			this.item(board.panel, "settings", "⚙", dock.pluginSettings, { run: () => this.close(() => this.actions.openSettings?.()) });
 		}
@@ -401,7 +412,6 @@ export class M1Controls {
 		const diagnosticsList = append(diagnosticsMenu.panel, makeElement(document, "div", "miro-canvas-panel__diagnostics"));
 		diagnosticsList.setAttribute("role", "log");
 
-		// The bar goes last so the menus open over the map, above the bar.
 		append(root, bar);
 		this.listen(root, "keydown", (event) => {
 			if ((event as KeyboardEvent).key === "Escape") this.closeMenus();
@@ -664,6 +674,7 @@ export class M1Controls {
 			dispose();
 		}
 		this.element.remove?.();
+		this.minimapElement.remove?.();
 		this.lastState = undefined;
 		this.lastDiagnosticsKey = "";
 	}

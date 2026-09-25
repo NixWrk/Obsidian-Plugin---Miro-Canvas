@@ -739,12 +739,27 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   Settings → Tool bar lists every item with a toggle and up/down buttons, and
   a reset to default.
 - Arranging the board's panels on the board itself (`FUT-019`, extended
-  2026-09-25 at the user's request): a layout mode, entered from the dock,
-  in which the tool bar, the dock, the minimap and the selection toolbar
-  can be dragged anywhere on screen, and the items inside the tool bar can
-  be dragged to a new place, dropped off it, or added from a tray of the
-  tools not on it - instead of the settings list, which also stays. Places
-  are remembered.
+  2026-09-25 at the user's request). Done in the plugin 2026-09-25
+  (`src/panel-layout.ts`, `src/panel-arrange.ts`, `src/settings.ts`,
+  `src/m1-controls.ts`, `src/m1-session.ts`, `src/main.ts`): "Arrange panels"
+  in the dock's board menu, and a command with no default hotkey, put the
+  board into a mode with a banner ("Drag the panels and tools", Reset,
+  Done); the tool bar, the dock's icon row and the minimap - now its own
+  panel, apart from the icon row - can be dragged to a new place, stored as
+  the nearest corner or edge plus an offset (`panelLayout`, one entry per
+  panel; a panel with none keeps its own CSS default) so a resized window
+  keeps each one inside the view and in place, snapping to the edges and
+  centre lines within 12px and turning vertical near a side edge. The bar's
+  own items can be dragged to reorder, off the bar into a tray of what is
+  left, or back onto it, writing the same `toolbarItems` the settings list
+  already edited - neither is a second source of truth. Escape, Done, or
+  switching boards leaves the mode; while it is on the board ignores
+  presses, as it already did under every one of these panels. A panel
+  drag persists through a light path with no session rebuild; a bar change
+  still rebuilds, as the settings list's own edits always have, and the
+  mode stays open across that rebuild on the same board. The selection
+  toolbar is not among the movable panels: it keeps following the
+  selection, as before.
 - Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
   highlight, next and previous.

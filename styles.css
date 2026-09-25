@@ -89,7 +89,16 @@
 }
 
 .miro-canvas-dock__map {
+  /* Its own top-level panel now, not the icon row's dock: stacked above the
+     bar by default, but free to move apart from it in the arrange mode. */
+  position: absolute;
+  right: 12px;
+  bottom: 76px;
+  z-index: 100;
   padding: 4px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small, 13px);
+  pointer-events: auto;
 }
 
 .miro-canvas-panel__minimap-canvas {
@@ -838,6 +847,11 @@
   .miro-canvas-dock {
     right: 10px;
     bottom: 32px;
+  }
+
+  .miro-canvas-dock__map {
+    right: 10px;
+    bottom: 70px;
   }
 
   .miro-canvas-panel__minimap-canvas {
@@ -3674,4 +3688,190 @@
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s, 4px);
+}
+
+/* "Arrange panels": the banner across the top of the board, the tray of
+   tools left off the bar, and the drag affordance the mode adds to the
+   bar, the dock and the minimap.  None of this exists outside the mode. */
+.miro-canvas-arrange-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  transform: translateX(-50%);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s, 0 4px 18px rgb(0 0 0 / 18%));
+  font-size: var(--font-ui-small, 13px);
+}
+
+.miro-canvas-arrange-banner__text {
+  white-space: nowrap;
+}
+
+.miro-canvas-arrange-banner__button {
+  padding: 4px 10px;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+}
+
+.miro-canvas-arrange-banner__button--done {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: transparent;
+}
+
+.miro-canvas-arrange-banner__button:hover {
+  background: var(--background-modifier-hover);
+}
+
+.miro-canvas-arrange-banner__button--done:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.miro-canvas-arrange-tray {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(320px, calc(100% - 24px));
+  padding: 6px;
+  transform: translateX(-50%);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s, 0 4px 18px rgb(0 0 0 / 18%));
+  font-size: var(--font-ui-small, 13px);
+}
+
+.miro-canvas-arrange-tray__heading {
+  padding: 2px 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+  text-transform: uppercase;
+}
+
+.miro-canvas-arrange-tray__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.miro-canvas-arrange-tray__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: grab;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+}
+
+.miro-canvas-arrange-tray__item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.miro-canvas-arrange-tray__icon {
+  display: inline-flex;
+  width: var(--icon-s, 16px);
+  height: var(--icon-s, 16px);
+}
+
+.miro-canvas-arrange-ghost {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s, 4px);
+  box-shadow: var(--shadow-s, 0 4px 18px rgb(0 0 0 / 18%));
+  font-size: var(--font-ui-small, 13px);
+}
+
+.miro-canvas-arrange-ghost__icon {
+  display: inline-flex;
+  width: var(--icon-s, 16px);
+  height: var(--icon-s, 16px);
+}
+
+/* The drag affordance: a dashed outline and a grab cursor, shown only while
+   the mode is on. */
+[data-miro-canvas-arrange="true"] {
+  cursor: grab;
+  outline: 1.5px dashed var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* A packed bar has little empty room of its own to drag by, so the mode
+   adds its own small handle - first in the panel, so it is easy to find. */
+.miro-canvas-arrange-grip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 100%;
+  min-height: 20px;
+  margin-right: 2px;
+  color: var(--interactive-accent);
+  cursor: grab;
+}
+
+.miro-canvas-arrange-grip::before {
+  content: "⠿";
+}
+
+[data-miro-canvas-panel-orientation="vertical"] .miro-canvas-arrange-grip {
+  width: 100%;
+  height: 14px;
+  margin-right: 0;
+  margin-bottom: 2px;
+}
+
+/* A panel dragged near a left or right edge turns vertical - this is the
+   place it was put in, so it holds whether the mode is on or not;
+   `applyPanelPosition` sets the orientation attribute for every panel it
+   positions, mode or no mode. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-dock .miro-canvas-dock__bar {
+  flex-direction: column;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar > .miro-canvas-toolbar__group,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-dock .miro-canvas-dock__group {
+  flex-direction: column;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar > :not([hidden]) ~ .miro-canvas-toolbar__group,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-dock .miro-canvas-dock__group + .miro-canvas-dock__group {
+  margin-left: 0;
+  padding-left: 0;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-left: none;
+  border-top: 1px solid var(--miro-canvas-dock-border);
+}
+
+.miro-canvas-toolbar__bar[data-miro-canvas-arrange-drop="remove"] {
+  outline: 1.5px dashed var(--text-error, #e03131);
+  outline-offset: 2px;
 }

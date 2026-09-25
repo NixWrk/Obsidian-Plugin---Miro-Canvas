@@ -115,7 +115,11 @@ import { matchesPointer } from "./pointer-bindings";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
-import { NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool } from "./quick-tools";
+import {
+	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
+} from "./quick-tools";
+import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
+import { applyPanelPosition, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
 import {
 	blockArrowOutline, bowPoint, lineBoardPoints, lineFromBoard, lineKind, planLine, type LineKindSpec, type LinePoint,
@@ -174,6 +178,14 @@ export interface M1SessionOptions {
 	readonly onConnectorMenu?: (event: MouseEvent, run: (action: "cut" | "copy" | "paste" | "delete") => void) => void;
 	/** A card, a label or the toolbar's own font list just named this family; the host reads its faces only now. */
 	readonly onFontUsed?: (family: string) => void;
+	/** Re-enter "arrange panels" right after this session replaces the last one - a settings save from inside the mode, on the same board, must not close it. */
+	readonly initialArrangeMode?: boolean;
+	/** A panel was dragged to a new place: a light change to persist, with no session rebuild needed for it to show. */
+	readonly onPanelLayoutChanged?: (layout: MiroCanvasSettings["panelLayout"]) => void;
+	/** The bar's own items changed - reordered, added from the tray or removed to it - the same `toolbarItems` the settings list writes. */
+	readonly onToolbarItemsChanged?: (items: readonly ToolbarItem[]) => void;
+	/** "Reset" in the arrange mode's banner: back to the default bar and today's places. */
+	readonly onResetPanels?: () => void;
 }
 
 export type M1SessionStatus = "ready" | "unavailable" | "incompatible";
@@ -231,7 +243,8 @@ const MINIMAP_DRAG_INTERVAL = 200;
 /** What a press starts no rectangle selection on: the things it would select, and text. */
 const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.miro-canvas-mixed-selection-frame,"
 	+ ".miro-board-connector,.miro-canvas-connector-labels,input,textarea,[contenteditable=true]";
-const PANEL_SELECTOR = ".miro-canvas-panel, .miro-canvas-dock, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar, .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools";
+const PANEL_SELECTOR = ".miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
+	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray";
 const DEFAULT_TOOLBAR_FONT = "Inter";
 const DEFAULT_TOOLBAR_FONT_SIZE = 16;
 const REFRESH_INTERVAL_MS = 750;
@@ -1312,7 +1325,8 @@ export class M1CanvasSession {
 
 	private writer: MetadataWriter | null;
 	private readonly options: M1SessionOptions;
-	private readonly settings: MiroCanvasSettings;
+	/** Not readonly: `applyPanelLayout` updates its own copy of `panelLayout` without a full session rebuild. */
+	private settings: MiroCanvasSettings;
 	private readonly disposers: Array<() => void> = [];
 	private readonly sourceRenderer: SourceRenderer | undefined;
 	private slideShow: SlideShow | undefined;
@@ -1400,6 +1414,7 @@ export class M1CanvasSession {
 	/** Where a comment being written will be pinned. */
 	private commentDraft: CanvasAnchor | undefined;
 	private readonly quickTools: QuickTools | undefined;
+	private readonly arrangeMode: PanelArrangeMode | undefined;
 	private armedTool: QuickTool = "select";
 	private toolShape = "rectangle";
 	/** An export being set up or run: its panel, the pages over the board, and where it stands. */
@@ -1509,6 +1524,7 @@ export class M1CanvasSession {
 			openCommandModal: () => this.openCommandModal(),
 			openSourceInspector: () => this.openSourceInspector(),
 			openExport: () => this.openExport(),
+			onArrangePanels: () => this.toggleArrangeMode(),
 			...(options.onOpenSettings === undefined ? {} : { openSettings: options.onOpenSettings }),
 		};
 		const controlDocument = options.document ?? ownerDocument(this.root);
@@ -1583,6 +1599,73 @@ export class M1CanvasSession {
 			toolbarItems: settings.toolbarItems,
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
 		});
+		this.arrangeMode = controlDocument === undefined || this.root === undefined ? undefined : new PanelArrangeMode({
+			document: controlDocument,
+			boardRoot: this.root,
+			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
+			panels: () => this.arrangePanels(),
+			toolbarBar: () => this.quickTools?.itemsRow,
+			toolbarItems: () => this.settings.toolbarItems,
+			savePanelPosition: (id, position) => this.commitPanelPosition(id, position),
+			saveToolbarItems: (items) => this.options.onToolbarItemsChanged?.(items),
+			resetLayout: () => this.options.onResetPanels?.(),
+			onExit: () => undefined,
+		});
+	}
+
+	/** The three panels the arrange mode may drag, by id; a panel this session never built is left out. */
+	private arrangePanels(): Readonly<Partial<Record<PanelId, HTMLElement>>> {
+		const panels: Partial<Record<PanelId, HTMLElement>> = {};
+		if (isElement(this.quickTools?.element)) panels.toolbar = this.quickTools.element;
+		if (isElement(this.controls.element)) panels.dockBar = this.controls.element;
+		if (isElement(this.controls.minimapElement)) panels.minimap = this.controls.minimapElement;
+		return panels;
+	}
+
+	/** Writes one panel's new place into this session's own settings and applies it at once; the host persists it, with no rebuild needed for it to show. */
+	private commitPanelPosition(id: PanelId, position: PanelPosition): void {
+		const layout = { ...this.settings.panelLayout, [id]: position };
+		this.settings = { ...this.settings, panelLayout: layout };
+		this.updatePanelPositions();
+		this.options.onPanelLayoutChanged?.(layout);
+	}
+
+	/**
+	 * Re-applies every panel's stored place - the one style write `panelLayout`
+	 * ever needs outside a drag - after mounting and after a resize, so a
+	 * panel keeps its place (and stays inside the view) whatever the window
+	 * does.  A panel with no stored place is left to its own CSS default.
+	 */
+	private updatePanelPositions(): void {
+		const panels = this.arrangePanels();
+		for (const id of PANEL_IDS) {
+			const element = panels[id];
+			// A synthetic host in a test may stand in a real `HTMLElement` with
+			// something that has no real `style` or layout of its own; nothing
+			// here is worth doing for it, so it is left alone rather than failing.
+			if (element === undefined || typeof element.style?.setProperty !== "function") continue;
+			const position = this.settings.panelLayout[id];
+			if (position === undefined) {
+				applyPanelPosition(element, undefined, { width: 0, height: 0 }, { width: 0, height: 0 });
+				continue;
+			}
+			const rect = typeof element.getBoundingClientRect === "function"
+				? element.getBoundingClientRect()
+				: { width: 0, height: 0 };
+			applyPanelPosition(element, position, clientSize(this.root), { width: rect.width, height: rect.height });
+		}
+	}
+
+	/** Whether "arrange panels" is on; the dock's board menu and the plugin's command both toggle it. */
+	public get arrangeModeActive(): boolean {
+		return this.arrangeMode?.active === true;
+	}
+
+	/** Enters "arrange panels", or leaves it if already on. */
+	public toggleArrangeMode(): void {
+		if (this.arrangeMode === undefined) return;
+		if (this.arrangeMode.active) this.arrangeMode.exit();
+		else this.arrangeMode.enter();
 	}
 
 	/**
@@ -2693,6 +2776,8 @@ export class M1CanvasSession {
 		this.attachRectangleSelection();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
+		this.updatePanelPositions();
+		if (this.options.initialArrangeMode === true) this.arrangeMode?.enter();
 		this.refresh();
 		return true;
 	}
@@ -7032,7 +7117,10 @@ export class M1CanvasSession {
 		const ResizeObserverConstructor = readRuntime(globalThis, "ResizeObserver");
 		if (typeof ResizeObserverConstructor === "function") {
 			try {
-				const observer = new (ResizeObserverConstructor as new (callback: () => void) => { observe: (target: HTMLElement) => void; disconnect: () => void })((() => this.refresh()) as () => void);
+				const observer = new (ResizeObserverConstructor as new (callback: () => void) => { observe: (target: HTMLElement) => void; disconnect: () => void })((() => {
+					this.refresh();
+					this.updatePanelPositions();
+				}) as () => void);
 				observer.observe(this.root);
 				this.disposers.push(() => observer.disconnect());
 				return;
@@ -7042,7 +7130,10 @@ export class M1CanvasSession {
 		}
 		const window = readRuntime(ownerDocument(this.root), "defaultView");
 		if (isObject(window)) {
-			this.listen(window as unknown as EventTarget, "resize", () => this.refresh());
+			this.listen(window as unknown as EventTarget, "resize", () => {
+				this.refresh();
+				this.updatePanelPositions();
+			});
 		}
 	}
 
@@ -7655,6 +7746,7 @@ export class M1CanvasSession {
 		this.selectionMoveEnd?.();
 		this.slideShow?.stop();
 		this.closeExport();
+		this.arrangeMode?.dispose();
 		this.controls.dispose();
 		this.connectorLayer?.dispose();
 		this.connectorLabels?.dispose();

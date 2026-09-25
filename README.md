@@ -8,6 +8,7 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 
 - [What it looks like](#what-it-looks-like)
 - [Getting started](#getting-started)
+- [Arranging the panels](#arranging-the-panels)
 - [Bringing boards over from Miro](#bringing-boards-over-from-miro)
 - [Drawing, lines and arrows](#drawing-lines-and-arrows)
 - [What is on top of what](#what-is-on-top-of-what)
@@ -71,6 +72,20 @@ stay under Settings → Miro Canvas → **Getting started**. Creating the board
 also creates a small folder of sample files beside it (a note, a small
 canvas, a picture, a PDF and a Word document), so its "Files and notes" frame
 always points at real files.
+
+## Arranging the panels
+
+The board's own menu (the gear in the corner dock) has an **Arrange panels**
+item, and there is a command with the same name. It puts the board into a
+mode with a banner across the top: drag the bottom bar, the corner dock's
+icon row or the minimap to a new corner or edge - each stays inside the view
+and in its place however the window is resized, and turns vertical near a
+side edge. Drag a tool on the bottom bar to reorder it, off the bar onto the
+board to put it in a tray instead, or back from the tray onto the bar at any
+point; this writes the same **Tool bar** setting the settings tab edits, so
+either way works and neither is a second source of truth. **Reset** in the
+banner puts everything back; **Done**, Escape, or opening another board
+leaves the mode. The selection toolbar always keeps following the selection.
 
 ## Bringing boards over from Miro
 

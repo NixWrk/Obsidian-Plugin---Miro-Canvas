@@ -14,6 +14,7 @@ import {
   type ObsidianMetadataStoreProbe,
 } from "./obsidian-metadata-store";
 import { M1CanvasSession } from "./m1-session";
+import { DEFAULT_TOOLBAR_ITEMS } from "./quick-tools";
 import { M2CanvasTools, type InitialCommentTarget } from "./m2-tools";
 import { createObsidianDocumentHost } from "./obsidian-document-host";
 import { buildImportGuide, openExternalLink, vaultFolderPath, type ImportGuideActions } from "./import-guide";
@@ -386,6 +387,12 @@ export default class MiroCanvasPlugin extends Plugin {
       name: words().commands.toggleMinimap,
       checkCallback: (checking) => this.runM1Command(checking, (session) => session.navigate("toggle-minimap")),
     });
+    this.addCommand({
+      id: "m1-arrange-panels",
+      name: words().commands.arrangePanels,
+      // No default hotkey: entering this mode is deliberate, from the board menu or the palette.
+      checkCallback: (checking) => this.runM1Command(checking, (session) => session.toggleArrangeMode()),
+    });
 
     this.registerEvent(
       this.app.workspace.on(
@@ -439,6 +446,11 @@ export default class MiroCanvasPlugin extends Plugin {
       return;
     }
 
+    // A settings save from inside "arrange panels" rebuilds this same board's
+    // session; the mode must stay open through that.  Switching to a
+    // different board is a real departure, so it closes the mode instead.
+    const sameBoard = this.currentCanvasView === view;
+    const wasArranging = sameBoard && this.m1Session?.arrangeModeActive === true;
     this.toolsModal?.close();
     this.m1Session?.dispose();
     this.m1Session = null;
@@ -475,6 +487,10 @@ export default class MiroCanvasPlugin extends Plugin {
       // the one signal that family's bytes are worth reading.
       onFontUsed: (family) => this.fontFaces.want([family]),
       settings: this.canvasSettings,
+      initialArrangeMode: wasArranging,
+      onPanelLayoutChanged: (layout) => void this.saveSettingsQuietly({ panelLayout: layout }),
+      onToolbarItemsChanged: (items) => void this.saveCanvasSettings({ toolbarItems: items }),
+      onResetPanels: () => void this.saveCanvasSettings({ toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {} }),
       ...(this.metadataStoreProbe?.store !== undefined ? {} : {
         persistenceProblem: this.metadataStoreProbe?.diagnostics
           .map((item) => item.message).join(" ") || "no native Canvas runtime was found.",
@@ -510,7 +526,7 @@ export default class MiroCanvasPlugin extends Plugin {
     }
   }
 
-  /** A settings change that needs no rebuilt session: when updates were last checked. */
+  /** A settings change that needs no rebuilt session: when updates were last checked, or a panel's new place. */
   private async saveSettingsQuietly(patch: Partial<MiroCanvasSettings>): Promise<void> {
     this.canvasSettings = normalizeSettings({ ...this.canvasSettings, ...patch });
     await this.saveData(this.canvasSettings);

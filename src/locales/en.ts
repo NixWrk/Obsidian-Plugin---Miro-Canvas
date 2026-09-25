@@ -98,6 +98,7 @@ export const EN = {
 		zoomReset: "Reset zoom",
 		fitBoard: "Fit board",
 		toggleMinimap: "Toggle minimap",
+		arrangePanels: "Arrange panels",
 		/** The keyboard-navigation commands of `NAVIGATION_COMMANDS`, read lazily so hotkeys still bind by id. */
 		navigation: {
 			zoomIn: "Zoom in",
@@ -166,6 +167,7 @@ export const EN = {
 		attachmentNames: "Attachment names",
 		nameOnSelection: "Name on selected attachment",
 		commands: "Commands",
+		arrangePanels: "Arrange panels",
 		sourceProvenance: "Source & provenance",
 		pluginSettings: "Plugin settings",
 		close: "Close",
@@ -196,6 +198,14 @@ export const EN = {
 		none: "None",
 		noteTruncated: "Read-only summary; bounded limits were reached.",
 		noteComplete: "Read-only summary; source values remain in the Canvas file.",
+	},
+	/** The "arrange panels" mode: its banner, and the tray listing the tools left off the bar. */
+	arrange: {
+		bannerText: "Drag the panels and tools",
+		done: "Done",
+		reset: "Reset",
+		trayAriaLabel: "Tools left off the bar",
+		trayHeading: "Off the bar",
 	},
 	/** The Obsidian settings tab, and the pointer-binding labels `settings.ts` itself owns. */
 	settings: {
@@ -257,6 +267,7 @@ export const EN = {
 		toolbarDesc: "The formatting toolbar that floats above the selected element.",
 		toolBarHeading: "Tool bar",
 		toolBarDesc: "Choose which tools sit on the bottom bar and in what order; the rest stay under the “+” menu.",
+		toolBarArrangeHint: "This list is one way to do it; the board's menu also has an “Arrange panels” mode that drags the bar, the dock and the minimap in place.",
 		toolBarReset: "Reset to default",
 		toolBarOnBar: "On the bar",
 		toolBarMoveUp: "Move up",

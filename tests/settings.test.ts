@@ -213,6 +213,40 @@ describe("plugin settings", () => {
     expect(both.toolbarItems).toEqual(["lasso", "connector"]);
   });
 
+  it("keeps an empty panel layout by default - today's places, from CSS alone", () => {
+    expect(DEFAULT_SETTINGS.panelLayout).toEqual({});
+    expect(normalizeSettings({}).panelLayout).toEqual({});
+  });
+
+  it("keeps a well-formed panel layout entry per panel", () => {
+    const stored = normalizeSettings({
+      panelLayout: {
+        toolbar: { anchor: "bottom-center", dx: 0, dy: 16 },
+        minimap: { anchor: "top-right", dx: 12, dy: 12 },
+      },
+    });
+    expect(stored.panelLayout).toEqual({
+      toolbar: { anchor: "bottom-center", dx: 0, dy: 16 },
+      minimap: { anchor: "top-right", dx: 12, dy: 12 },
+    });
+  });
+
+  it("drops an unknown panel and a broken entry, keeping the rest", () => {
+    const stored = normalizeSettings({
+      panelLayout: {
+        toolbar: { anchor: "not-an-anchor", dx: 0, dy: 0 },
+        dockBar: { anchor: "top-left", dx: 5, dy: 5 },
+        somePanel: { anchor: "top-left", dx: 0, dy: 0 },
+      },
+    });
+    expect(stored.panelLayout).toEqual({ dockBar: { anchor: "top-left", dx: 5, dy: 5 } });
+  });
+
+  it("falls back to an empty panel layout for anything that is not a stored object", () => {
+    expect(normalizeSettings({ panelLayout: "bottom-right" }).panelLayout).toEqual({});
+    expect(normalizeSettings({ panelLayout: null }).panelLayout).toEqual({});
+  });
+
   it("keeps only safe, de-duplicated font pack ids", () => {
     expect(DEFAULT_SETTINGS.fontPacks).toEqual([]);
     expect(normalizeSettings({ fontPacks: ["word", "word", "excalidraw"] }).fontPacks).toEqual(["word", "excalidraw"]);

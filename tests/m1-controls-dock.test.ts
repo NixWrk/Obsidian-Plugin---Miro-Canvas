@@ -124,9 +124,11 @@ describe("corner dock", () => {
     expect(byLabel(root, "Вид и масштаб").textContent).toBe("50%");
   });
 
-  it("is one element holding the map, the menus and one row of controls", () => {
+  it("is one element holding the menus and one row of controls, apart from the minimap's own panel", () => {
     const { controls, root } = build();
-    expect(controls.minimapElement).toBe(controls.element);
+    // The minimap is its own panel now, so the two can be dragged apart.
+    expect(controls.minimapElement).not.toBe(controls.element);
+    expect((controls.minimapElement as unknown as FakeElement).className).toBe("miro-canvas-dock__map");
     expect(root.className).toBe("miro-canvas-dock");
     const bar = root.children[root.children.length - 1]!;
     expect(bar.className).toBe("miro-canvas-dock__bar");
@@ -144,9 +146,9 @@ describe("corner dock", () => {
   });
 
   it("shows the zoom and the minimap as they are", () => {
-    const { root, update } = build();
+    const { controls, root, update } = build();
     expect(byLabel(root, "View and zoom").textContent).toBe("50%");
-    const map = descendants(root).find((item) => item.className === "miro-canvas-dock__map")!;
+    const map = controls.minimapElement as unknown as FakeElement;
     expect(map.hidden).toBe(false);
     expect(byLabel(root, "Hide minimap").getAttribute("aria-pressed")).toBe("true");
     update({ minimapVisible: false, zoom: 1.236 });

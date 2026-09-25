@@ -91,3 +91,13 @@ along.
   `times_new_roman`, ...) or a Windows font by name now renders in the real
   font once the matching pack is installed. Nothing is downloaded until you
   press Download.
+- Arrange panels: the board menu's "Arrange panels" item, and a command with
+  no default hotkey, put the board into a mode with a banner across the top.
+  The bottom bar, the corner dock's icon row and the minimap - now its own
+  panel, apart from the icon row - can be dragged to a new corner or edge;
+  each stays inside the view and in place however the window is resized, and
+  turns vertical near a side edge. A tool on the bottom bar can be dragged to
+  reorder it, off the bar into a tray, or back from the tray onto the bar,
+  writing the same Tool bar setting the settings tab edits. Reset puts
+  everything back; Done, Escape or opening another board leaves the mode.
+  The selection toolbar keeps following the selection, as before.

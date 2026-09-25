@@ -52,6 +52,55 @@ export function isNativeToolbarItem(item: ToolbarItem): item is NativeToolbarIte
   return (NATIVE_TOOLBAR_ITEMS as readonly string[]).includes(item);
 }
 
+/**
+ * Pure edits of the bar's own content, shared by the settings list and the
+ * "arrange panels" mode so both write the very same `toolbarItems` and
+ * neither invents a second way to read or change it.
+ */
+
+/**
+ * Puts an item at a given index on the bar, whether it was already there
+ * (a reorder) or came from the tray of items under "+" (an add); either way
+ * it appears exactly once, never duplicated.
+ */
+export function moveToolbarItem(items: readonly ToolbarItem[], item: ToolbarItem, toIndex: number): readonly ToolbarItem[] {
+  const without = items.filter((existing) => existing !== item);
+  const at = Math.min(Math.max(toIndex, 0), without.length);
+  return Object.freeze([...without.slice(0, at), item, ...without.slice(at)]);
+}
+
+/** Takes an item off the bar; it becomes reachable under "+" again, in `ALL_TOOLBAR_ITEMS` order. */
+export function removeToolbarItem(items: readonly ToolbarItem[], item: ToolbarItem): readonly ToolbarItem[] {
+  return Object.freeze(items.filter((existing) => existing !== item));
+}
+
+/** Which toolbar item one of the bar's real elements stands for: its own attribute, the pen's group, or - for the shape popover - its inner button's. */
+function toolbarItemOfElement(node: Element): ToolbarItem | undefined {
+  const native = node.getAttribute("data-native");
+  if (native !== null) return native as ToolbarItem;
+  const tool = node.getAttribute("data-tool");
+  if (tool !== null) return tool as ToolbarItem;
+  if (node.getAttribute("data-tool-group") === "drawing") return "pen";
+  const inner = node.querySelector("[data-tool]");
+  return inner === null ? undefined : (inner.getAttribute("data-tool") as ToolbarItem | undefined);
+}
+
+/**
+ * The bar's real elements, left to right, stopping at the "+" popover: what
+ * the "arrange panels" mode reads to know where each item sits and drags to
+ * reorder, remove or add one.  The settings list edits the same
+ * `toolbarItems` without ever touching this DOM.
+ */
+export function barItemElements(bar: Element): ReadonlyArray<{ readonly item: ToolbarItem; readonly element: Element }> {
+  const entries: { readonly item: ToolbarItem; readonly element: Element }[] = [];
+  for (const child of Array.from(bar.children)) {
+    if (child.classList.contains("miro-canvas-tools__more")) break;
+    const item = toolbarItemOfElement(child);
+    if (item !== undefined) entries.push({ item, element: child });
+  }
+  return entries;
+}
+
 interface ToolIconSpec {
   readonly tool: QuickTool;
   readonly icon: string;
@@ -257,6 +306,8 @@ export const QUICK_TOOL_KEYS: ReadonlyMap<string, QuickTool> = new Map(
 
 export class QuickTools {
   public readonly element: HTMLElement;
+  /** The bar's own row of items, up to the "+" popover - what the arrange mode drags to reorder, remove or add. */
+  public itemsRow!: HTMLElement;
   private readonly document: Document;
   /** Where the session puts native Canvas's own card, note and media buttons, by which one it is. */
   private readonly nativeSlots = new Map<NativeToolbarItem, HTMLElement>();
@@ -383,6 +434,7 @@ export class QuickTools {
     this.sizeNumber = sizeNumber;
     this.sizePreview = sizePreview;
     const bar = root.appendChild(this.make("div", "miro-canvas-toolbar__bar"));
+    this.itemsRow = bar;
     const configured = this.options.toolbarItems ?? DEFAULT_TOOLBAR_ITEMS;
     const onBar = new Set<ToolbarItem>(configured);
     for (const item of configured) this.placeToolbarItem(bar, item, false);

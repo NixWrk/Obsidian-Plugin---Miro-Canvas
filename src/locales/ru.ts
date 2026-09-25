@@ -101,6 +101,7 @@ export const RU: Messages = {
 		zoomReset: "Масштаб 100 %",
 		fitBoard: "Показать всю доску",
 		toggleMinimap: "Показать или скрыть миникарту",
+		arrangePanels: "Настроить панели",
 		navigation: {
 			zoomIn: "Увеличить масштаб",
 			zoomOut: "Уменьшить масштаб",
@@ -166,6 +167,7 @@ export const RU: Messages = {
 		attachmentNames: "Имена вложений",
 		nameOnSelection: "Имя только у выделенного вложения",
 		commands: "Команды",
+		arrangePanels: "Настроить панели",
 		sourceProvenance: "Сведения об источнике",
 		pluginSettings: "Настройки плагина",
 		close: "Закрыть",
@@ -196,6 +198,13 @@ export const RU: Messages = {
 		none: "Нет",
 		noteTruncated: "Только для чтения; показана часть данных.",
 		noteComplete: "Только для чтения; исходные данные остаются в файле Canvas.",
+	},
+	arrange: {
+		bannerText: "Перетаскивайте панели и инструменты",
+		done: "Готово",
+		reset: "Вернуть как было",
+		trayAriaLabel: "Инструменты, убранные с панели",
+		trayHeading: "Убрано с панели",
 	},
 	settings: {
 		pointerBindings: {
@@ -256,6 +265,7 @@ export const RU: Messages = {
 		toolbarDesc: "Появляется над выделенным элементом.",
 		toolBarHeading: "Нижняя панель",
 		toolBarDesc: "Выберите, какие инструменты стоят на нижней панели и в каком порядке; остальные будут в меню «+».",
+		toolBarArrangeHint: "Это не единственный способ: в меню доски есть режим «Настроить панели», в котором панель, док и миникарту можно перетащить прямо на доске.",
 		toolBarReset: "Вернуть по умолчанию",
 		toolBarOnBar: "На панели",
 		toolBarMoveUp: "Переместить выше",

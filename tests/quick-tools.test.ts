@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { setLocale } from "../src/i18n";
 import {
-  ALL_TOOLBAR_ITEMS, QUICK_TOOLS, QUICK_TOOL_KEYS, QuickTools, type NativeToolbarItem, type QuickTool, type ToolbarItem,
+  ALL_TOOLBAR_ITEMS, QUICK_TOOLS, QUICK_TOOL_KEYS, QuickTools,
+  moveToolbarItem, removeToolbarItem,
+  type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "../src/quick-tools";
 
 class FakeElement {
@@ -399,6 +401,33 @@ describe("quick tools", () => {
     expect(panelOf(shapeButton).hidden).toBe(false);
     // More holds the shape button, so closing "every other panel" must spare it.
     expect(panelOf(more).hidden).toBe(false);
+  });
+});
+
+describe("moving items on and off the bar - what the arrange mode and the settings list both write", () => {
+  it("reorders an item already on the bar", () => {
+    const items: readonly ToolbarItem[] = ["select", "text", "sticky"];
+    expect(moveToolbarItem(items, "sticky", 0)).toEqual(["sticky", "select", "text"]);
+    expect(moveToolbarItem(items, "select", 2)).toEqual(["text", "sticky", "select"]);
+  });
+
+  it("adds an item from the tray at a given index, without duplicating it", () => {
+    const items: readonly ToolbarItem[] = ["select", "text"];
+    expect(moveToolbarItem(items, "frame", 1)).toEqual(["select", "frame", "text"]);
+    expect(moveToolbarItem(items, "frame", 0)).toEqual(["frame", "select", "text"]);
+  });
+
+  it("clamps an out-of-range index to the bar's own ends", () => {
+    const items: readonly ToolbarItem[] = ["select", "text"];
+    expect(moveToolbarItem(items, "frame", 99)).toEqual(["select", "text", "frame"]);
+    expect(moveToolbarItem(items, "frame", -5)).toEqual(["frame", "select", "text"]);
+  });
+
+  it("removes an item, sending it back to the tray under More", () => {
+    const items: readonly ToolbarItem[] = ["select", "text", "sticky"];
+    expect(removeToolbarItem(items, "text")).toEqual(["select", "sticky"]);
+    // Removing an item not on the bar changes nothing.
+    expect(removeToolbarItem(items, "frame")).toEqual(items);
   });
 });
 

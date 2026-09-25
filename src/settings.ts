@@ -10,6 +10,7 @@
 
 import { OFFERED_FONT_FAMILIES, isSafeFontFamily } from "./appearance";
 import { words } from "./i18n";
+import { normalizePanelLayout, type PanelLayout } from "./panel-layout";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
 import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, type ToolbarItem } from "./quick-tools";
 import { readAvailableUpdate, type AvailableUpdate } from "./update-check";
@@ -58,6 +59,12 @@ export interface MiroCanvasSettings {
   readonly lineBinding: PointerBinding;
   /** The bottom tool bar's own content, in order; whatever is missing sits under More, in `ALL_TOOLBAR_ITEMS` order. */
   readonly toolbarItems: readonly ToolbarItem[];
+  /**
+   * Where the "arrange panels" mode has moved the tool bar, the dock's icon
+   * row or the minimap; a panel missing here keeps its own CSS default, so
+   * an empty layout is exactly today's places.
+   */
+  readonly panelLayout: PanelLayout;
   /**
    * The warning badge listing what the plugin could not do as asked.  It is
    * for whoever develops or debugs the plugin, so it starts hidden; it is
@@ -137,6 +144,7 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   panBinding: "none",
   lineBinding: "right",
   toolbarItems: DEFAULT_TOOLBAR_ITEMS,
+  panelLayout: Object.freeze({}),
   developerDiagnostics: false,
   commentAuthor: "",
   commentAuthorColors: Object.freeze({}),
@@ -357,6 +365,7 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     panBinding: POINTER_BINDINGS.includes(value.panBinding as PointerBinding) ? value.panBinding as PointerBinding : DEFAULT_SETTINGS.panBinding,
     lineBinding: POINTER_BINDINGS.includes(value.lineBinding as PointerBinding) ? value.lineBinding as PointerBinding : DEFAULT_SETTINGS.lineBinding,
     toolbarItems: readToolbarItems(value.toolbarItems, value.showLassoTool, value.showConnectorTool),
+    panelLayout: normalizePanelLayout(value.panelLayout),
     developerDiagnostics: readBoolean(value, "developerDiagnostics", DEFAULT_SETTINGS.developerDiagnostics),
     commentAuthor: typeof value.commentAuthor === "string" ? value.commentAuthor.trim().slice(0, MAX_AUTHOR_NAME) : DEFAULT_SETTINGS.commentAuthor,
     commentAuthorColors: readAuthorColors(value.commentAuthorColors),
