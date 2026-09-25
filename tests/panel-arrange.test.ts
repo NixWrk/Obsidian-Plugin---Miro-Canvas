@@ -10,6 +10,11 @@ function rect(left: number, top: number, width: number, height: number): Rect {
   return { left, top, right: left + width, bottom: top + height, width, height };
 }
 
+/** A node and everything under it - the flip button now sits inside its own handle, not straight under the panel. */
+function descendants(root: FakeNode): FakeNode[] {
+  return [root, ...root.children.flatMap((child) => descendants(child))];
+}
+
 /** Just enough of a DOM node to drive `PanelArrangeMode`: attributes, a style map, listeners it can fire, and a settable rect. */
 class FakeNode {
   public readonly children: FakeNode[] = [];
@@ -53,6 +58,15 @@ class FakeNode {
     child.parentNode = this;
     this.children.unshift(child);
     return child;
+  }
+
+  /** Only the one position `PanelArrangeMode` actually uses: right after this node, among its own siblings. */
+  public insertAdjacentElement<T extends FakeNode>(position: "afterend", sibling: T): T {
+    const parent = this.parentNode;
+    if (parent === undefined) return sibling;
+    sibling.parentNode = parent;
+    parent.children.splice(parent.children.indexOf(this) + 1, 0, sibling);
+    return sibling;
   }
 
   public get firstChild(): FakeNode | null {
@@ -148,6 +162,8 @@ interface Rig {
   mode: PanelArrangeMode;
   host: PanelArrangeHost;
   items: readonly ToolbarItem[];
+  /** What `panelPosition` reports for each id - empty until a test stores one, as a fresh board keeps every panel at its CSS default. */
+  positions: Partial<Record<PanelId, PanelPosition>>;
   readonly savedPositions: Array<{ readonly id: PanelId; readonly position: PanelPosition }>;
   readonly savedToolbarItems: (readonly ToolbarItem[])[];
   readonly resetLayout: ReturnType<typeof vi.fn>;
@@ -174,6 +190,7 @@ function buildRig(initialItems: readonly ToolbarItem[] = ["select", "text", "sti
   const rig: Rig = {
     document, boardRoot, bar, toolbar, dockBar, minimap,
     items: initialItems,
+    positions: {},
     savedPositions: [],
     savedToolbarItems: [],
     resetLayout: vi.fn(),
@@ -188,7 +205,8 @@ function buildRig(initialItems: readonly ToolbarItem[] = ["select", "text", "sti
     panels: () => ({ toolbar: toolbar as unknown as HTMLElement, dockBar: dockBar as unknown as HTMLElement, minimap: minimap as unknown as HTMLElement }),
     toolbarBar: () => bar as unknown as HTMLElement,
     toolbarItems: () => rig.items,
-    savePanelPosition: (id, position) => rig.savedPositions.push({ id, position }),
+    panelPosition: (id) => rig.positions[id],
+    savePanelPosition: (id, position) => { rig.savedPositions.push({ id, position }); rig.positions = { ...rig.positions, [id]: position }; },
     saveToolbarItems: (next) => { rig.items = next; rig.savedToolbarItems.push(next); },
     resetLayout: rig.resetLayout,
     onExit: rig.onExit,
@@ -322,6 +340,21 @@ describe("PanelArrangeMode: dragging a panel", () => {
     expect(rig.savedPositions).toHaveLength(1);
     expect(rig.savedPositions[0]!.id).toBe("dockBar");
   });
+
+  it("carries a panel's own chosen orientation along, rather than reverting to the new anchor's default", () => {
+    const rig = buildRig();
+    rig.positions.dockBar = { anchor: "bottom-right", dx: 12, dy: 40, orientation: "vertical" };
+    rig.mode.enter();
+    const start = pointerEvent(rig.dockBar, rig.dockBar.rect.left + 5, rig.dockBar.rect.top + 5);
+    rig.document.dispatch("pointerdown", start);
+    // Dropped at the bottom centre - a horizontal anchor by the old default rule.
+    rig.document.dispatch("pointerup", pointerEvent(rig.dockBar, 600, 799));
+    expect(rig.savedPositions).toHaveLength(1);
+    const saved = rig.savedPositions[0]!.position;
+    expect(saved.orientation).toBe("vertical");
+    expect(saved.anchor).not.toBe("left-middle");
+    expect(saved.anchor).not.toBe("right-middle");
+  });
 });
 
 describe("PanelArrangeMode: dragging a bar item", () => {
@@ -357,6 +390,52 @@ describe("PanelArrangeMode: dragging a bar item", () => {
     const dropX = rig.bar.rect.left + 5;
     rig.document.dispatch("pointerup", pointerEvent(frameRow, dropX, rig.bar.rect.top + 5));
     expect(rig.savedToolbarItems).toEqual([["frame", "select", "text"]]);
+  });
+});
+
+describe("PanelArrangeMode: the flip button", () => {
+  it("shows a flip button beside the grip on the tool bar and the dock row, not on the minimap", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    for (const panel of [rig.toolbar, rig.dockBar]) {
+      expect(descendants(panel).some((child) => child.className.includes("flip"))).toBe(true);
+    }
+    expect(descendants(rig.minimap).some((child) => child.className.includes("flip"))).toBe(false);
+  });
+
+  it("flips the panel's orientation at once, on the press alone, without starting a panel drag", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    const flip = descendants(rig.dockBar).find((child) => child.className.includes("flip"))!;
+    rig.document.dispatch("pointerdown", pointerEvent(flip, rig.dockBar.rect.left, rig.dockBar.rect.top));
+    // A drag would wait for pointerup; the flip already saved by itself.
+    expect(rig.savedPositions).toHaveLength(1);
+    expect(rig.savedPositions[0]!.id).toBe("dockBar");
+    expect(rig.savedPositions[0]!.position.orientation).toBe("vertical");
+  });
+
+  it("flips back on a second press, keeping the same anchor and offsets", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    const flip = descendants(rig.dockBar).find((child) => child.className.includes("flip"))!;
+    rig.document.dispatch("pointerdown", pointerEvent(flip, 0, 0));
+    rig.document.dispatch("pointerdown", pointerEvent(flip, 0, 0));
+    expect(rig.savedPositions).toHaveLength(2);
+    const [first, second] = rig.savedPositions;
+    expect(second!.position.orientation).toBe("horizontal");
+    expect(second!.position.anchor).toBe(first!.position.anchor);
+  });
+
+  it("does not swallow the press as a panel drag, so no drag cleanup is left running", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    const flip = descendants(rig.toolbar).find((child) => child.className.includes("flip"))!;
+    const event = pointerEvent(flip, 0, 0);
+    rig.document.dispatch("pointerdown", event);
+    expect(event.prevented).toBe(true);
+    // Releasing the pointer elsewhere must not also move the toolbar, as it would mid-drag.
+    rig.document.dispatch("pointerup", pointerEvent(rig.toolbar, 999, 999));
+    expect(rig.savedPositions).toHaveLength(1);
   });
 });
 

@@ -205,6 +205,7 @@ export const RU: Messages = {
 		reset: "Вернуть как было",
 		trayAriaLabel: "Инструменты, убранные с панели",
 		trayHeading: "Убрано с панели",
+		turnPanel: "Повернуть панель",
 	},
 	settings: {
 		pointerBindings: {

@@ -20,17 +20,27 @@ export type PanelAnchor = (typeof PANEL_ANCHORS)[number];
 export const PANEL_IDS = ["toolbar", "dockBar", "minimap"] as const;
 export type PanelId = (typeof PANEL_IDS)[number];
 
+/** Which way a bar lays out its items: a row or a column. */
+export const PANEL_ORIENTATIONS = ["horizontal", "vertical"] as const;
+export type PanelOrientation = (typeof PANEL_ORIENTATIONS)[number];
+
 /**
  * A panel's stored place: the nearest corner or edge, and an offset from it.
  * For a corner anchor both `dx` and `dy` are inward margins from that
  * corner's two edges.  For a `*-center`/`*-middle` anchor the offset along
  * the centred axis (`dx` for top/bottom, `dy` for left/right) is a signed
  * shift from the centre line; the other offset stays an inward margin.
+ *
+ * `orientation` is a person's own choice, made with the flip button in the
+ * layout mode; left unset, the bar keeps the old rule of turning vertical
+ * only at a side anchor (`isVerticalAnchor`), so an untouched layout looks
+ * exactly as it always did.
  */
 export interface PanelPosition {
   readonly anchor: PanelAnchor;
   readonly dx: number;
   readonly dy: number;
+  readonly orientation?: PanelOrientation;
 }
 
 export interface ViewSize {
@@ -69,6 +79,17 @@ export function resolvePanelRect(position: PanelPosition, view: ViewSize, panel:
 /** True for the two side anchors, where the bar turns vertical and stacks its items in a column. */
 export function isVerticalAnchor(anchor: PanelAnchor): boolean {
   return anchor === "left-middle" || anchor === "right-middle";
+}
+
+/** A position's orientation: a person's own choice, or the old anchor-based default when none was made. */
+export function effectivePanelOrientation(position: PanelPosition): PanelOrientation {
+  return position.orientation ?? (isVerticalAnchor(position.anchor) ? "vertical" : "horizontal");
+}
+
+/** The same place, turned the other way: what the layout mode's flip button writes. */
+export function flipPanelOrientation(position: PanelPosition): PanelPosition {
+  const flipped: PanelOrientation = effectivePanelOrientation(position) === "vertical" ? "horizontal" : "vertical";
+  return Object.freeze({ ...position, orientation: flipped });
 }
 
 function anchorForZone(horizontal: "left" | "center" | "right", vertical: "top" | "middle" | "bottom"): PanelAnchor {
@@ -131,12 +152,20 @@ export function positionFromPoint(
 /** Accepts any stored value and returns a usable position, or nothing for one too broken to trust. */
 export function normalizePanelPosition(value: unknown): PanelPosition | undefined {
   if (typeof value !== "object" || value === null) return undefined;
-  const { anchor, dx, dy } = value as { anchor?: unknown; dx?: unknown; dy?: unknown };
+  const { anchor, dx, dy, orientation } = value as { anchor?: unknown; dx?: unknown; dy?: unknown; orientation?: unknown };
   if (!(PANEL_ANCHORS as readonly string[]).includes(anchor as string)) return undefined;
   if (typeof dx !== "number" || !Number.isFinite(dx)) return undefined;
   if (typeof dy !== "number" || !Number.isFinite(dy)) return undefined;
   const bound = (offset: number): number => Math.min(Math.max(offset, -MAX_OFFSET), MAX_OFFSET);
-  return Object.freeze({ anchor: anchor as PanelAnchor, dx: bound(dx), dy: bound(dy) });
+  // An unrecognised orientation is dropped rather than distrusting the whole
+  // position: the bar just keeps the anchor's own default until chosen again.
+  const validOrientation = (PANEL_ORIENTATIONS as readonly string[]).includes(orientation as string)
+    ? (orientation as PanelOrientation)
+    : undefined;
+  return Object.freeze({
+    anchor: anchor as PanelAnchor, dx: bound(dx), dy: bound(dy),
+    ...(validOrientation === undefined ? {} : { orientation: validOrientation }),
+  });
 }
 
 /**
@@ -166,20 +195,28 @@ export interface StyledElement {
     removeProperty(name: string): void;
   };
   setAttribute(name: string, value: string): void;
+  removeAttribute(name: string): void;
 }
 
 /**
  * Writes (or clears) one panel's inline position.  With no stored position
  * every inline override is removed, so the element falls back to its own
- * CSS default exactly as it always did.  With one, `left`/`top` take over
- * from whatever `right`/`bottom` the stylesheet set, so the two never both
- * apply and stretch the box between them.
+ * CSS default exactly as it always did - the tool bar's own default centres
+ * itself with `left: 50%` plus a `transform: translateX(-50%)`, and that
+ * pairing must stay intact.  With a stored position, `left`/`top` are
+ * already the panel's literal top-left corner (`resolvePanelRect`'s own
+ * contract), so that centring transform would double-shift it - by half the
+ * panel's own width, unnoticed on a narrow vertical bar but enough to run a
+ * wide horizontal one halfway under whatever sits to the view's own left -
+ * and is cleared along with `right`/`bottom`, which take over from `left`/
+ * `top` the same way.
  */
 export function applyPanelPosition(element: StyledElement, position: PanelPosition | undefined, view: ViewSize, panel: ViewSize): void {
   const style = element.style;
   if (position === undefined) {
-    for (const property of ["left", "top", "right", "bottom"]) style.removeProperty(property);
+    for (const property of ["left", "top", "right", "bottom", "transform"]) style.removeProperty(property);
     element.setAttribute("data-miro-canvas-panel-orientation", "horizontal");
+    element.removeAttribute("data-miro-canvas-panel-side");
     return;
   }
   const { left, top } = resolvePanelRect(position, view, panel);
@@ -187,5 +224,53 @@ export function applyPanelPosition(element: StyledElement, position: PanelPositi
   style.setProperty("top", `${top}px`);
   style.setProperty("right", "auto");
   style.setProperty("bottom", "auto");
-  element.setAttribute("data-miro-canvas-panel-orientation", isVerticalAnchor(position.anchor) ? "vertical" : "horizontal");
+  style.setProperty("transform", "none");
+  element.setAttribute("data-miro-canvas-panel-orientation", effectivePanelOrientation(position));
+  // Which half of the view the panel actually landed in, from its resolved
+  // rect rather than the anchor's name, so a vertical bar's popovers know
+  // which way is "towards the middle" whatever anchor put it there.
+  const center = left + panel.width / 2;
+  element.setAttribute("data-miro-canvas-panel-side", view.width > 0 && center > view.width / 2 ? "right" : "left");
+}
+
+/** An element this module can also measure; a real `HTMLElement` satisfies this too. */
+export interface MeasurableElement extends StyledElement {
+  getBoundingClientRect?: () => { readonly width: number; readonly height: number };
+}
+
+/**
+ * `applyPanelPosition`, but safe against a stale size.  The element's own
+ * rendered width/height, read right before a call, may still reflect
+ * whatever orientation it had a moment ago - a fresh mount, or a flip that
+ * just changed the very attribute this function writes - rather than the
+ * one `position` is about to give it.  This applies once, which writes the
+ * orientation attribute and lets the element's own CSS react, then
+ * re-measures; if the size actually changed, it applies again against the
+ * settled size, so the final `left`/`top` are never resolved against the
+ * size the element is leaving rather than the one it lands on.
+ *
+ * `before`, when the caller already has a fresh rect of its own (a drag or
+ * a flip that just measured one), skips the first read.
+ */
+export function applyPanelPositionSettled(
+  element: MeasurableElement,
+  position: PanelPosition | undefined,
+  view: ViewSize,
+  before?: ViewSize,
+): void {
+  const measure = (): ViewSize => {
+    const rect = typeof element.getBoundingClientRect === "function" ? element.getBoundingClientRect() : undefined;
+    return rect === undefined ? { width: 0, height: 0 } : { width: rect.width, height: rect.height };
+  };
+  if (position === undefined) {
+    // Clearing needs no size at all, so there is nothing worth measuring for it.
+    applyPanelPosition(element, undefined, view, { width: 0, height: 0 });
+    return;
+  }
+  const firstSize = before ?? measure();
+  applyPanelPosition(element, position, view, firstSize);
+  const settled = measure();
+  if (settled.width !== firstSize.width || settled.height !== firstSize.height) {
+    applyPanelPosition(element, position, view, settled);
+  }
 }

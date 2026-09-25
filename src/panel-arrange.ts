@@ -15,7 +15,7 @@
  */
 
 import { words } from "./i18n";
-import { applyPanelPosition, positionFromPoint, type PanelId, type PanelPosition } from "./panel-layout";
+import { applyPanelPosition, applyPanelPositionSettled, flipPanelOrientation, positionFromPoint, type PanelId, type PanelPosition } from "./panel-layout";
 import {
   ALL_TOOLBAR_ITEMS, barItemElements, moveToolbarItem, paintToolbarIcon, removeToolbarItem, toolbarItemLabel, type ToolbarItem,
 } from "./quick-tools";
@@ -30,6 +30,8 @@ export interface PanelArrangeHost {
   /** The tool bar's own row of items - not the pen's or the connector's row, and not the "+" popover. */
   readonly toolbarBar: () => HTMLElement | undefined;
   readonly toolbarItems: () => readonly ToolbarItem[];
+  /** A panel's own stored place, or nothing when it still sits at its CSS default. */
+  readonly panelPosition: (id: PanelId) => PanelPosition | undefined;
   /** Saves one panel's new place; a light change the caller need not rebuild anything for. */
   readonly savePanelPosition: (id: PanelId, position: PanelPosition) => void;
   readonly saveToolbarItems: (items: readonly ToolbarItem[]) => void;
@@ -71,8 +73,10 @@ export class PanelArrangeMode {
   private banner: HTMLElement | undefined;
   private tray: HTMLElement | undefined;
   private trayList: HTMLElement | undefined;
-  /** One grip per panel, the mode's own: a packed bar leaves little empty room of its own to drag by. */
-  private readonly grips: HTMLElement[] = [];
+  /** One handle per panel, the mode's own: a packed bar leaves little empty room of its own to drag by. */
+  private readonly handles: HTMLElement[] = [];
+  /** The tool bar's and the dock row's own flip button, by panel id - the minimap keeps no orientation of its own. */
+  private readonly flipButtons = new Map<PanelId, HTMLElement>();
   private readonly documentListeners: Array<() => void> = [];
   private dragCleanup: (() => void) | undefined;
 
@@ -116,14 +120,37 @@ export class PanelArrangeMode {
     this.host.boardRoot.appendChild(this.tray);
     this.renderTray();
 
-    for (const element of Object.values(this.host.panels())) {
+    for (const [key, element] of Object.entries(this.host.panels())) {
       if (element === undefined) continue;
+      const id = key as PanelId;
       element.setAttribute(GRIP_ATTRIBUTE, "true");
-      const grip = document.createElement("span");
+      // The handle floats outside the panel's own box - beside it, never
+      // inside its flow - so a packed bar still has room to drag by, and
+      // the mode's own chrome never grows the panel into a neighbour (the
+      // minimap sits right above the dock's default place).
+      const handle = document.createElement("span");
+      handle.className = "miro-canvas-arrange-handle";
+      element.prepend(handle);
+      this.handles.push(handle);
+      const grip = handle.appendChild(document.createElement("span"));
       grip.className = "miro-canvas-arrange-grip";
       grip.setAttribute("aria-hidden", "true");
-      element.prepend(grip);
-      this.grips.push(grip);
+      // Only the tool bar and the dock's icon row have an orientation of
+      // their own to turn; the minimap always keeps the same shape.
+      if (id !== "toolbar" && id !== "dockBar") continue;
+      const flip = handle.appendChild(document.createElement("button"));
+      flip.type = "button";
+      flip.className = "miro-canvas-arrange-flip";
+      flip.setAttribute("aria-label", labels.turnPanel);
+      let drawn = false;
+      try {
+        this.host.setIcon?.(flip, "rotate-cw");
+        drawn = this.host.setIcon !== undefined;
+      } catch {
+        drawn = false;
+      }
+      if (!drawn) flip.textContent = "⟳";
+      this.flipButtons.set(id, flip);
     }
 
     this.listenDocument("pointerdown", this.onBoardPointerDown as EventListener, true);
@@ -141,7 +168,8 @@ export class PanelArrangeMode {
     this.tray = undefined;
     this.trayList = undefined;
     for (const element of Object.values(this.host.panels())) element?.removeAttribute(GRIP_ATTRIBUTE);
-    for (const grip of this.grips.splice(0)) grip.remove();
+    for (const handle of this.handles.splice(0)) handle.remove();
+    this.flipButtons.clear();
     for (const remove of this.documentListeners.splice(0)) remove();
     this.host.onExit();
   }
@@ -196,6 +224,11 @@ export class PanelArrangeMode {
         if (element === undefined || pressIsOutside(target, [element])) continue;
         event.preventDefault();
         event.stopPropagation();
+        const flip = this.flipButtons.get(id);
+        if (flip !== undefined && !pressIsOutside(target, [flip])) {
+          this.flipPanel(id, element);
+          return;
+        }
         const bar = id === "toolbar" ? this.host.toolbarBar() : undefined;
         const hit = bar === undefined ? undefined : barItemElements(bar).find((entry) => !pressIsOutside(target, [entry.element]));
         if (hit !== undefined) this.startItemDrag(hit.item, "bar", event);
@@ -215,11 +248,18 @@ export class PanelArrangeMode {
     const offsetX = event.clientX - panelRect.left;
     const offsetY = event.clientY - panelRect.top;
     const panelSize = { width: panelRect.width, height: panelRect.height };
-    const pointToPosition = (clientX: number, clientY: number): PanelPosition => positionFromPoint(
-      { left: clientX - boardRect.left - offsetX, top: clientY - boardRect.top - offsetY },
-      { width: boardRect.width, height: boardRect.height },
-      panelSize,
-    );
+    // Moving the panel is a change of place only; a chosen orientation - not
+    // the anchor's own default - rides along untouched, so a vertical bar
+    // dragged to a new corner stays vertical there.
+    const orientation = this.host.panelPosition(id)?.orientation;
+    const pointToPosition = (clientX: number, clientY: number): PanelPosition => {
+      const at = positionFromPoint(
+        { left: clientX - boardRect.left - offsetX, top: clientY - boardRect.top - offsetY },
+        { width: boardRect.width, height: boardRect.height },
+        panelSize,
+      );
+      return orientation === undefined ? at : { ...at, orientation };
+    };
     const move = (moveEvent: PointerEvent): void => {
       applyPanelPosition(element, pointToPosition(moveEvent.clientX, moveEvent.clientY), { width: boardRect.width, height: boardRect.height }, panelSize);
     };
@@ -235,6 +275,30 @@ export class PanelArrangeMode {
     document.addEventListener("pointermove", move as EventListener);
     document.addEventListener("pointerup", finish as EventListener, { once: true });
     this.dragCleanup = cleanup;
+  }
+
+  /**
+   * Flips a panel's orientation at once: turns its bar the other way, then
+   * re-resolves its rect against the panel's new, post-flip size, so it
+   * stays inside the view whichever way it grew - a horizontal bar becomes
+   * tall and narrow, a vertical one wide and short.
+   */
+  private flipPanel(id: PanelId, element: HTMLElement): void {
+    const boardRect = this.host.boardRoot.getBoundingClientRect();
+    const view = { width: boardRect.width, height: boardRect.height };
+    const before = element.getBoundingClientRect();
+    const stored = this.host.panelPosition(id);
+    // A panel still at its CSS default has no stored place of its own yet;
+    // its current, on-screen rect stands in for one so the flip has an
+    // anchor and offsets to turn.
+    const current = stored ?? positionFromPoint(
+      { left: before.left - boardRect.left, top: before.top - boardRect.top },
+      view,
+      { width: before.width, height: before.height },
+    );
+    const flipped = flipPanelOrientation(current);
+    applyPanelPositionSettled(element, flipped, view, { width: before.width, height: before.height });
+    this.host.savePanelPosition(id, flipped);
   }
 
   private startItemDrag(item: ToolbarItem, source: "bar" | "tray", event: PointerEvent): void {

@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   PANEL_ANCHORS,
   applyPanelPosition,
+  applyPanelPositionSettled,
+  effectivePanelOrientation,
+  flipPanelOrientation,
   isVerticalAnchor,
   normalizePanelLayout,
   normalizePanelPosition,
@@ -128,6 +131,41 @@ describe("normalizePanelPosition", () => {
     expect(position?.dx).toBe(100_000);
     expect(position?.dy).toBe(-100_000);
   });
+
+  it("keeps a valid orientation, but only when it is one of the two recognised values", () => {
+    expect(normalizePanelPosition({ anchor: "top-left", dx: 0, dy: 0, orientation: "vertical" }))
+      .toEqual({ anchor: "top-left", dx: 0, dy: 0, orientation: "vertical" });
+    expect(normalizePanelPosition({ anchor: "top-left", dx: 0, dy: 0, orientation: "sideways" }))
+      .toEqual({ anchor: "top-left", dx: 0, dy: 0 });
+    expect(normalizePanelPosition({ anchor: "top-left", dx: 0, dy: 0 }))
+      .toEqual({ anchor: "top-left", dx: 0, dy: 0 });
+  });
+});
+
+describe("effectivePanelOrientation", () => {
+  it("uses a person's own choice over the anchor's default", () => {
+    expect(effectivePanelOrientation({ anchor: "bottom-center", dx: 0, dy: 0, orientation: "vertical" })).toBe("vertical");
+    expect(effectivePanelOrientation({ anchor: "left-middle", dx: 0, dy: 0, orientation: "horizontal" })).toBe("horizontal");
+  });
+
+  it("falls back to the old anchor rule when nothing was chosen", () => {
+    expect(effectivePanelOrientation({ anchor: "left-middle", dx: 0, dy: 0 })).toBe("vertical");
+    expect(effectivePanelOrientation({ anchor: "bottom-center", dx: 0, dy: 0 })).toBe("horizontal");
+  });
+});
+
+describe("flipPanelOrientation", () => {
+  it("turns a horizontal bar vertical and back, keeping its anchor and offsets", () => {
+    const horizontal: PanelPosition = { anchor: "bottom-center", dx: 30, dy: 16 };
+    const vertical = flipPanelOrientation(horizontal);
+    expect(vertical).toEqual({ anchor: "bottom-center", dx: 30, dy: 16, orientation: "vertical" });
+    expect(flipPanelOrientation(vertical)).toEqual({ anchor: "bottom-center", dx: 30, dy: 16, orientation: "horizontal" });
+  });
+
+  it("flips against the anchor's own default when no choice was stored yet", () => {
+    const atLeftEdge: PanelPosition = { anchor: "left-middle", dx: 0, dy: 0 };
+    expect(flipPanelOrientation(atLeftEdge)).toEqual({ anchor: "left-middle", dx: 0, dy: 0, orientation: "horizontal" });
+  });
 });
 
 describe("normalizePanelLayout", () => {
@@ -162,6 +200,7 @@ describe("applyPanelPosition", () => {
         removeProperty: (name: string) => { style.delete(name); },
       },
       setAttribute: (name: string, value: string) => { attributes.set(name, value); },
+      removeAttribute: (name: string) => { attributes.delete(name); },
     };
     return { style, attributes, element };
   }
@@ -185,9 +224,124 @@ describe("applyPanelPosition", () => {
     expect(attributes.get("data-miro-canvas-panel-orientation")).toBe("horizontal");
   });
 
+  it("neutralises the tool bar's own centring transform once a stored place gives left/top a literal meaning", () => {
+    // The default place centres with `left: 50%` plus `transform:
+    // translateX(-50%)`; resolvePanelRect's left/top are already the
+    // panel's literal corner, so that same transform would shift a stored
+    // place by half the panel's own width - unnoticed on a narrow vertical
+    // bar, but enough to run a wide horizontal one under whatever sits to
+    // the view's own left.
+    const { style, element } = fakeElement();
+    applyPanelPosition(element, { anchor: "bottom-center", dx: 0, dy: 16 }, VIEW, PANEL);
+    expect(style.get("transform")).toBe("none");
+  });
+
+  it("gives the transform override back once the panel returns to its own CSS default", () => {
+    const { style, element } = fakeElement();
+    style.set("transform", "none");
+    applyPanelPosition(element, undefined, VIEW, PANEL);
+    expect(style.has("transform")).toBe(false);
+  });
+
   it("marks the orientation vertical for a side anchor", () => {
     const { attributes, element } = fakeElement();
     applyPanelPosition(element, { anchor: "left-middle", dx: 0, dy: 0 }, VIEW, PANEL);
     expect(attributes.get("data-miro-canvas-panel-orientation")).toBe("vertical");
+  });
+
+  it("lets a chosen orientation override the anchor's own default", () => {
+    const { attributes, element } = fakeElement();
+    applyPanelPosition(element, { anchor: "bottom-center", dx: 0, dy: 16, orientation: "vertical" }, VIEW, PANEL);
+    expect(attributes.get("data-miro-canvas-panel-orientation")).toBe("vertical");
+    const { attributes: attributesB, element: elementB } = fakeElement();
+    applyPanelPosition(elementB, { anchor: "left-middle", dx: 0, dy: 0, orientation: "horizontal" }, VIEW, PANEL);
+    expect(attributesB.get("data-miro-canvas-panel-orientation")).toBe("horizontal");
+  });
+
+  it("marks which half of the view the panel actually landed in, for a vertical bar's popovers", () => {
+    const { attributes: left, element: leftElement } = fakeElement();
+    applyPanelPosition(leftElement, { anchor: "left-middle", dx: 0, dy: 0 }, VIEW, PANEL);
+    expect(left.get("data-miro-canvas-panel-side")).toBe("left");
+    const { attributes: right, element: rightElement } = fakeElement();
+    applyPanelPosition(rightElement, { anchor: "right-middle", dx: 0, dy: 0 }, VIEW, PANEL);
+    expect(right.get("data-miro-canvas-panel-side")).toBe("right");
+  });
+
+  it("removes the side attribute along with the rest when the panel has no stored place", () => {
+    const { attributes, element } = fakeElement();
+    attributes.set("data-miro-canvas-panel-side", "right");
+    applyPanelPosition(element, undefined, VIEW, PANEL);
+    expect(attributes.has("data-miro-canvas-panel-side")).toBe(false);
+  });
+});
+
+describe("applyPanelPositionSettled", () => {
+  /** Stands in for a real element: `getBoundingClientRect` reports whatever `renderedSize` currently holds. */
+  function fakeMeasurableElement(renderedSize: { width: number; height: number }) {
+    const style = new Map<string, string>();
+    const attributes = new Map<string, string>();
+    const measureCalls: { width: number; height: number }[] = [];
+    const element = {
+      style: {
+        setProperty: (name: string, value: string) => { style.set(name, value); },
+        removeProperty: (name: string) => { style.delete(name); },
+      },
+      setAttribute: (name: string, value: string) => { attributes.set(name, value); },
+      removeAttribute: (name: string) => { attributes.delete(name); },
+      getBoundingClientRect: () => {
+        measureCalls.push({ ...renderedSize });
+        return { width: renderedSize.width, height: renderedSize.height };
+      },
+    };
+    return { style, attributes, element, measureCalls };
+  }
+
+  it("re-measures and re-applies once the element's own size changed, rather than trusting a stale read", () => {
+    // A panel about to turn vertical, still rendered at its old horizontal
+    // size when this call starts - exactly the gap between a mount or a
+    // flip elsewhere writing the orientation attribute and the element
+    // actually reflowing to it.
+    const renderedSize = { width: 400, height: 32 };
+    const { style, element } = fakeMeasurableElement(renderedSize);
+    // A real element reflows to the new orientation once the attribute
+    // lands; the fake mimics that the moment its size is next read.
+    const position: PanelPosition = { anchor: "bottom-right", dx: 0, dy: 0, orientation: "vertical" };
+    const settleOnNextMeasure = (): void => { renderedSize.width = 32; renderedSize.height = 400; };
+    const originalGetRect = element.getBoundingClientRect;
+    let firstRead = true;
+    element.getBoundingClientRect = () => {
+      const rect = originalGetRect();
+      if (firstRead) { firstRead = false; settleOnNextMeasure(); }
+      return rect;
+    };
+    applyPanelPositionSettled(element, position, VIEW);
+    // Resolved against the settled 32x400 box, not the stale 400x32 one.
+    expect(style.get("left")).toBe(`${VIEW.width - 32}px`);
+    expect(style.get("top")).toBe(`${VIEW.height - 400}px`);
+  });
+
+  it("applies only once when the size was already settled - no pointless extra write", () => {
+    const { element } = fakeMeasurableElement({ width: 32, height: 400 });
+    let applications = 0;
+    const nativeSetProperty = element.style.setProperty;
+    element.style.setProperty = (name, value) => { if (name === "left") applications += 1; nativeSetProperty(name, value); };
+    applyPanelPositionSettled(element, { anchor: "left-middle", dx: 0, dy: 0 }, VIEW);
+    expect(applications).toBe(1);
+  });
+
+  it("uses a caller-supplied size for the first pass, skipping a read it would otherwise do itself", () => {
+    const { element, measureCalls } = fakeMeasurableElement({ width: 32, height: 400 });
+    applyPanelPositionSettled(element, { anchor: "left-middle", dx: 0, dy: 0 }, VIEW, { width: 32, height: 400 });
+    // One measurement only, to check whether the size settled - not two.
+    expect(measureCalls).toHaveLength(1);
+  });
+
+  it("clears the panel the same way plain applyPanelPosition does, and never re-measures for that", () => {
+    const { style, attributes, element, measureCalls } = fakeMeasurableElement({ width: 32, height: 400 });
+    style.set("left", "1px");
+    applyPanelPositionSettled(element, undefined, VIEW);
+    expect(style.size).toBe(0);
+    expect(attributes.get("data-miro-canvas-panel-orientation")).toBe("horizontal");
+    expect(measureCalls).toHaveLength(0);
   });
 });

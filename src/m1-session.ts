@@ -119,7 +119,7 @@ import {
 	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "./quick-tools";
 import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
-import { applyPanelPosition, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
+import { applyPanelPositionSettled, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
 import {
 	blockArrowOutline, bowPoint, lineBoardPoints, lineFromBoard, lineKind, planLine, type LineKindSpec, type LinePoint,
@@ -1606,6 +1606,7 @@ export class M1CanvasSession {
 			panels: () => this.arrangePanels(),
 			toolbarBar: () => this.quickTools?.itemsRow,
 			toolbarItems: () => this.settings.toolbarItems,
+			panelPosition: (id) => this.settings.panelLayout[id],
 			savePanelPosition: (id, position) => this.commitPanelPosition(id, position),
 			saveToolbarItems: (items) => this.options.onToolbarItemsChanged?.(items),
 			resetLayout: () => this.options.onResetPanels?.(),
@@ -1635,6 +1636,14 @@ export class M1CanvasSession {
 	 * ever needs outside a drag - after mounting and after a resize, so a
 	 * panel keeps its place (and stays inside the view) whatever the window
 	 * does.  A panel with no stored place is left to its own CSS default.
+	 *
+	 * `applyPanelPositionSettled`, not the plain `applyPanelPosition`: right
+	 * after mounting, or right after a flip elsewhere changed the stored
+	 * orientation, the element's own rendered size here still reflects
+	 * whichever orientation it had a moment ago, not the one about to be
+	 * applied - a stale size that could resolve the panel partly outside the
+	 * view.  The settled variant re-measures once the orientation attribute
+	 * itself has had a chance to react, and only then commits.
 	 */
 	private updatePanelPositions(): void {
 		const panels = this.arrangePanels();
@@ -1645,14 +1654,7 @@ export class M1CanvasSession {
 			// here is worth doing for it, so it is left alone rather than failing.
 			if (element === undefined || typeof element.style?.setProperty !== "function") continue;
 			const position = this.settings.panelLayout[id];
-			if (position === undefined) {
-				applyPanelPosition(element, undefined, { width: 0, height: 0 }, { width: 0, height: 0 });
-				continue;
-			}
-			const rect = typeof element.getBoundingClientRect === "function"
-				? element.getBoundingClientRect()
-				: { width: 0, height: 0 };
-			applyPanelPosition(element, position, clientSize(this.root), { width: rect.width, height: rect.height });
+			applyPanelPositionSettled(element, position, clientSize(this.root));
 		}
 	}
 

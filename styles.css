@@ -90,10 +90,13 @@
 
 .miro-canvas-dock__map {
   /* Its own top-level panel now, not the icon row's dock: stacked above the
-     bar by default, but free to move apart from it in the arrange mode. */
+     bar by default, but free to move apart from it in the arrange mode.  A
+     clear gap above the dock's own default place, not merely touching it,
+     so the two panels' own outlines - shown while the layout mode is on -
+     never read as one. */
   position: absolute;
   right: 12px;
-  bottom: 76px;
+  bottom: 86px;
   /* One below the dock, whose view and board menus open over the map. */
   z-index: 99;
   padding: 4px;
@@ -852,7 +855,7 @@
 
   .miro-canvas-dock__map {
     right: 10px;
-    bottom: 70px;
+    bottom: 78px;
   }
 
   .miro-canvas-panel__minimap-canvas {
@@ -3823,29 +3826,62 @@
 }
 
 /* A packed bar has little empty room of its own to drag by, so the mode
-   adds its own small handle - first in the panel, so it is easy to find. */
+   adds its own small handle - the grip and, on the tool bar and the dock
+   row, the flip button.  It floats beside the panel's own box rather than
+   inside its flow, so it never grows the panel into a neighbour (the
+   minimap sits right above the dock's default place) and is never squeezed
+   by the panel's own padding.  Beside a horizontal panel it sits to the
+   left by default, or to the right when the panel already hugs the left
+   half of the view (`data-miro-canvas-panel-side`, the same read
+   `applyPanelPosition` gives a vertical bar's own popovers) so the handle
+   never runs off the left edge of the view either.  A vertical panel
+   always takes the handle above instead, whichever side it is on - it is
+   the narrow one there, so above is the side with room to spare. */
+.miro-canvas-arrange-handle {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 4px);
+  left: auto;
+  bottom: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  z-index: 1;
+}
+
+[data-miro-canvas-panel-side="left"] > .miro-canvas-arrange-handle {
+  right: auto;
+  left: calc(100% + 4px);
+}
+
+/* Below the two rules above, so it wins their shared left/right on a tie:
+   a vertical panel is never placed by which side it is on. */
+[data-miro-canvas-panel-orientation="vertical"] > .miro-canvas-arrange-handle {
+  top: auto;
+  right: auto;
+  left: 0;
+  bottom: calc(100% + 4px);
+  width: 100%;
+  height: auto;
+  flex-direction: row;
+}
+
 .miro-canvas-arrange-grip {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 100%;
-  min-height: 20px;
-  margin-right: 2px;
+  width: 18px;
+  height: 18px;
   color: var(--interactive-accent);
   cursor: grab;
 }
 
 .miro-canvas-arrange-grip::before {
   content: "⠿";
-}
-
-[data-miro-canvas-panel-orientation="vertical"] .miro-canvas-arrange-grip {
-  width: 100%;
-  height: 14px;
-  margin-right: 0;
-  margin-bottom: 2px;
 }
 
 /* A panel dragged near a left or right edge turns vertical - this is the
@@ -3875,4 +3911,69 @@
 .miro-canvas-toolbar__bar[data-miro-canvas-arrange-drop="remove"] {
   outline: 1.5px dashed var(--text-error, #e03131);
   outline-offset: 2px;
+}
+
+/* The tool bar's and the dock row's own flip button, beside the grip in the
+   same floating handle: turns the panel between a row and a column at once. */
+.miro-canvas-arrange-flip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--interactive-accent);
+  background: none;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+}
+
+.miro-canvas-arrange-flip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.miro-canvas-arrange-flip svg {
+  width: var(--icon-xs, 14px);
+  height: var(--icon-xs, 14px);
+}
+
+/* A vertical bar sits along an edge, so its own popovers - the More menu, the
+   shape picker - and the pen's and the lines' rows would run off-screen
+   opening the usual way (above the bar); turned, they open sideways instead,
+   towards whichever half of the view the bar is not already hugging.
+   `data-miro-canvas-panel-side` is `applyPanelPosition`'s own read of the
+   panel's resolved rect, so this holds for a side anchor's own default
+   orientation too, not only a chosen one. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-toolbar__panel {
+  top: 0;
+  bottom: auto;
+  left: calc(100% + 8px);
+  right: auto;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="right"] .miro-canvas-toolbar__panel {
+  top: 0;
+  bottom: auto;
+  right: calc(100% + 8px);
+  left: auto;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors {
+  position: absolute;
+  top: 0;
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-tools__drawing,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-tools__connectors {
+  left: calc(100% + 8px);
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="right"] .miro-canvas-tools__drawing,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="right"] .miro-canvas-tools__connectors {
+  right: calc(100% + 8px);
 }

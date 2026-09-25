@@ -206,6 +206,7 @@ export const EN = {
 		reset: "Reset",
 		trayAriaLabel: "Tools left off the bar",
 		trayHeading: "Off the bar",
+		turnPanel: "Turn the panel",
 	},
 	/** The Obsidian settings tab, and the pointer-binding labels `settings.ts` itself owns. */
 	settings: {
