@@ -94,7 +94,8 @@
   position: absolute;
   right: 12px;
   bottom: 76px;
-  z-index: 100;
+  /* One below the dock, whose view and board menus open over the map. */
+  z-index: 99;
   padding: 4px;
   color: var(--text-normal);
   font-size: var(--font-ui-small, 13px);
