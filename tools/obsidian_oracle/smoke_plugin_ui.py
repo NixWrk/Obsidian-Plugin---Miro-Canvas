@@ -112,7 +112,10 @@ def main() -> int:
                   s.connectorLayer.select(['menu-line']);s.refresh();
                 }""")
                 page.evaluate("miroBrowser.runtime.menu.menuEl.replaceChildren()")
+                # Delete lives under the toolbar's More menu, as in Miro.
+                toolbar.get_by_role('button', name='More', exact=True).click()
                 assert toolbar.get_by_role('button', name='Delete selection', exact=True).is_visible(), 'Native menu hid connector actions'
+                toolbar.get_by_role('button', name='More', exact=True).click()
                 assert not page.locator('.miro-board-connector-tools').is_visible()
                 toolbar.get_by_role('button', name='Line color', exact=True).click()
                 toolbar.get_by_label('Custom line color', exact=True).fill('#ff5500')
@@ -165,7 +168,8 @@ def main() -> int:
                 panel.locator('[data-shape="block"]').click()
                 assert panel.get_by_label('New connector width', exact=True).input_value() == '23'
                 panel.locator('[data-shape="arrow"]').click()
-                assert toolbar.get_by_role('button', name='Delete selection', exact=True).is_visible()
+                # The selected line keeps its toolbar while the tool is armed.
+                assert toolbar.get_by_role('button', name='More', exact=True).is_visible()
                 # Drag an existing end while the creation tool is still armed: the
                 # grips are the ones native edges use.
                 before_end = page.evaluate("miroBrowser.runtime.getData().miroCanvas.connectors['menu-line'].from")
@@ -1031,11 +1035,13 @@ def main() -> int:
               miroBrowser.root.dispatchEvent(event);
               document.querySelector('.miro-canvas-toolbar__native > .canvas-menu:not(.miro-canvas-toolbar__native-snapshot)').replaceChildren();
             }""")
-            assert native_snapshot.is_visible(), "Middle-button pan did not preserve the native tool group"
+            # The native tools sit under the toolbar's More menu, closed here:
+            # the snapshot standing in for them is there, not necessarily shown.
+            assert native_snapshot.count() == 1, "Middle-button pan did not preserve the native tool group"
             width_during_pan = selection_toolbar.evaluate("element => element.getBoundingClientRect().width")
             assert abs(width_during_pan - width_before_pan) < 0.5, "Selection toolbar changed width during middle-button pan"
             page.evaluate("document.dispatchEvent(new PointerEvent('pointerup', {button:1, pointerId:17, bubbles:true}))")
-            assert not native_snapshot.is_visible(), "Pan snapshot stayed visible after middle-button release"
+            assert native_snapshot.count() == 0 or not native_snapshot.is_visible(), "Pan snapshot stayed after middle-button release"
             page.evaluate("miroBrowser.session.toggleAttachmentNames()")
             assert page.evaluate("getComputedStyle(miroBrowser.fileLabel).display") == "none", "Native attachment title stayed visible"
             page.evaluate("miroBrowser.session.toggleAttachmentNames()")

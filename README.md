@@ -31,8 +31,12 @@ board does. At the bottom there is a bar of tools: select, text, native
 Canvas's own card, sticky note, shape, pen, lines and arrows, comment, frame,
 native Canvas's note and file from the vault, and more. Settings → Miro
 Canvas → **Tool bar** chooses which of them sit on the bar and in what order;
-the rest stay under **More**. Select something and a toolbar appears above it
-with fonts, colours, borders, shapes and line styles.
+the rest stay under **More**. Select something and a toolbar appears above it,
+laid out the way Miro's own is: shape, font and size, text style with
+alignment, a bullet list and a link, colours, then a comment, a lock and its
+own **More** - layer order, zoom to selection, edit and delete. A line or
+arrow shows its own controls - ends, kind, thickness and colour - in that
+place instead.
 In the corner there is a minimap and a small dock with the zoom and the board's
 settings.
 
@@ -107,7 +111,7 @@ The guide is under Settings → Miro Canvas → **Open the import guide**.
 ## What is on top of what
 
 Cards can be brought to the front, forward, backward and to the back - from
-the **Layer** menu in the selection toolbar, from the card's right-click menu,
+**More** in the selection toolbar, from the card's right-click menu,
 or with commands you can give hotkeys. It works on a whole selection and keeps
 the cards' order among themselves; one step of undo.
 

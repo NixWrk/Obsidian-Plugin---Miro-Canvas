@@ -72,3 +72,10 @@ along.
   Canvas itself; the sticky note now wears its own picture instead of the
   card's. Settings -> Tool bar chooses which tools sit on the bar and in
   what order, the rest staying under More.
+- The selection toolbar is laid out the way Miro's own is: shape, font and
+  size, text style with alignment, a bullet list and a link, colours, then a
+  comment, a lock and its own More - layer order, zoom to selection, edit and
+  delete, kept last as a danger item. A line or arrow shows its own controls
+  in that place instead. New: a bullet list toggle for a card's text, a link
+  field that turns a card's whole text (or a selection of it) into a Markdown
+  link, and a comment button that pins one to the selection directly.

@@ -139,6 +139,8 @@ import { normalizeAnchor, resolveAnchor, type AnchorGeometry, type CanvasAnchor 
 import { shapeOutline } from "./shape-geometry";
 import { frameColors, miroStickyColors, readableInk } from "./miro-palette";
 import { highlightText, isHtmlText, markSelection, unhighlightText } from "./text-highlight";
+import { cardLinkUrl, linkSelection, linkText, unlinkText } from "./text-link";
+import { toggleBulletList } from "./text-list";
 import {
 	CANVAS_CLIPBOARD_TYPE, CLIPBOARD_TYPE, clipboardText, linkedFilePaths, planPaste, readCanvasClipboard, readClipboardRecord,
 	type ClipboardItem,
@@ -1514,6 +1516,9 @@ export class M1CanvasSession {
 			onLock: (locked) => (locked ? this.lockSelection() : this.unlockSelection()),
 			onLayer: (direction) => this.changeLayer(direction),
 			onOpenLink: () => this.openSelectedLink(),
+			onToggleList: () => this.toggleSelectedList(),
+			onSetLink: (url) => this.setSelectedLink(url),
+			onComment: () => this.commentOnSelection(),
 		}, {
 			...(controlDocument === undefined ? {} : { document: controlDocument }),
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
@@ -4700,6 +4705,7 @@ export class M1CanvasSession {
 		const placement = this.selectionPlacement();
 		const kinds = this.selectionKinds();
 		const link = this.selectedLink();
+		const textLink = this.selectedCardLink();
 		return {
 			selectedIds: this.selectedIds,
 			kinds,
@@ -4738,6 +4744,7 @@ export class M1CanvasSession {
 			canEditConnectorLabel: this.selectedIds.length === 1 && kinds.includes("edge"),
 			...(placement === undefined ? {} : { placement }),
 			...(link === undefined ? {} : { link }),
+			...(textLink === undefined ? {} : { textLink }),
 		};
 	}
 
@@ -5358,6 +5365,106 @@ export class M1CanvasSession {
 		}
 		if (changed) this.adapter.requestSave();
 		this.refresh();
+	}
+
+	/**
+	 * The same admission a restyle needs: a selection, out of review mode and
+	 * unlocked.  The toolbar's list, link and comment controls share this
+	 * check with `applyAppearance`, since all four write into a card's own text.
+	 */
+	private guardTextEdit(): boolean {
+		this.readInteractionState();
+		if (this.selectedIds.length === 0) {
+			this.addDiagnostic("Select at least one Canvas element before changing its appearance.");
+			this.refresh();
+			return false;
+		}
+		const decision = decideEditOperation(this.policy, "restyle", this.selectedIds);
+		if (!decision.allowed) {
+			this.addDiagnostic(decision.reason === "review-mode"
+				? "Review mode blocks appearance edits; pan, selection, copy, links, and comments remain available."
+				: decision.reason === "element-locked"
+					? "A locked Canvas element blocks appearance edits. Unlock it explicitly to continue."
+					: `Appearance edit blocked because its capability could not be verified: ${this.interactionBlock ?? "the interaction policy refused the request"}.`);
+			this.refresh();
+			return false;
+		}
+		return true;
+	}
+
+	/** A Markdown bullet added to, or taken off, every non-empty line of the selected cards' own text. */
+	private toggleSelectedList(): void {
+		if (!this.guardTextEdit()) return;
+		let changed = false;
+		for (const node of this.adapter.getNodes() ?? []) {
+			const id = readCanvasElementId(node);
+			if (id === undefined || !this.selectedIds.includes(id)) continue;
+			const text = readRuntime(node, "text");
+			if (typeof text !== "string") continue;
+			const next = toggleBulletList(text);
+			if (next === text || typeof readRuntime(node, "setText") !== "function") continue;
+			callRuntime(node, "setText", next);
+			changed = true;
+		}
+		if (changed) this.adapter.requestSave();
+		this.refresh();
+	}
+
+	/**
+	 * The whole of a selected card's text turned into a Markdown link, or a
+	 * stretch of it being edited; `undefined` takes a whole-text link off
+	 * again.  Written the same way `markSelectedText` writes a highlight.
+	 */
+	private setSelectedLink(url: string | undefined): void {
+		if (!this.guardTextEdit()) return;
+		let changed = false;
+		for (const node of this.adapter.getNodes() ?? []) {
+			const id = readCanvasElementId(node);
+			if (id === undefined || !this.selectedIds.includes(id)) continue;
+			const text = readRuntime(node, "text");
+			if (typeof text !== "string") continue;
+			const child = readRuntime(node, "child");
+			const editor = readRuntime(child, "editor") ?? readRuntime(readRuntime(child, "editMode"), "editor");
+			const selected = readRuntime(node, "isEditing") === true && isObject(editor) ? callRuntime(editor, "getSelection") : undefined;
+			if (url !== undefined && typeof selected === "string" && selected !== "") {
+				callRuntime(editor, "replaceSelection", linkSelection(selected, url));
+				continue;
+			}
+			const next = url === undefined ? unlinkText(text) : linkText(text, url);
+			if (next === text || typeof readRuntime(node, "setText") !== "function") continue;
+			callRuntime(node, "setText", next);
+			changed = true;
+		}
+		if (changed) this.adapter.requestSave();
+		this.refresh();
+	}
+
+	/** The address the one selected card's whole text already links to, if any. */
+	private selectedCardLink(): string | undefined {
+		if (this.selectedIds.length !== 1) return undefined;
+		const nodes = readRuntime(this.currentRawDocument, "nodes");
+		const node = Array.isArray(nodes)
+			? (nodes as readonly unknown[]).find((item) => readRuntime(item, "id") === this.selectedIds[0])
+			: undefined;
+		const text = readRuntime(node, "text");
+		return typeof text === "string" ? cardLinkUrl(text) : undefined;
+	}
+
+	/** A comment pinned to the whole of the current selection - the same result the comment tool gives when clicked there. */
+	private commentOnSelection(): void {
+		const id = this.selectedIds[0];
+		if (id === undefined || this.root === undefined) return;
+		const isEdge = this.selectionKinds().includes("edge");
+		const element = [...(this.adapter.getNodes() ?? []), ...(this.adapter.getEdges() ?? [])]
+			.find((item) => readCanvasElementId(item) === id);
+		const rect = boundingRect(readCanvasElementDom(element) ?? readRuntime(element, "lineGroupEl"));
+		const card = this.ensureCommentCard();
+		if (card === undefined || rect === undefined) return;
+		this.openThread = undefined;
+		this.commentDraft = isEdge ? { type: "edge", edgeId: id, t: 0.5 } : { type: "node", nodeId: id, u: 0.5, v: 0.5 };
+		card.compose(this.commentAuthor().name);
+		const rootRect = this.root.getBoundingClientRect();
+		card.place({ x: (rect.left + rect.right) / 2 - rootRect.left, y: rect.top - rootRect.top }, clientSize(this.root));
 	}
 
 	/** Take native Canvas colour presets off elements, the way its own colour menu does. */

@@ -22,6 +22,8 @@ const SAME_IN_RUSSIAN = new Set<string>([
   // A file name and a line of code: neither is prose.
   "welcome.codeFileName",
   "welcome.codeBody",
+  // An example web address, not a word to translate.
+  "toolbar.linkPlaceholder",
 ]);
 
 type Table = { readonly [key: string]: unknown };

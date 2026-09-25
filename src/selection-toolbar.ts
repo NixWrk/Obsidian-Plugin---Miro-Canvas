@@ -43,7 +43,7 @@ import {
   type ConnectorRoute,
   type ConnectorStroke,
 } from "./connector-style";
-import { LAYER_MENU_ICON, layerActions, type LayerDirection } from "./layer-order";
+import { layerActions, type LayerDirection } from "./layer-order";
 import { words } from "./i18n";
 import {
   SHAPE_CATALOG,
@@ -104,6 +104,8 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
   readonly placement?: SelectionToolbarPlacement;
   /** The web address a single selected link opens; it shows the open button. */
   readonly link?: string;
+  /** The address a selected card's whole text already forms a link to, shown in the link field. */
+  readonly textLink?: string;
 }
 
 /** A style patch never carries the target id: the host owns the selection. */
@@ -119,6 +121,12 @@ export interface SelectionToolbarActions {
   readonly onOpenLink?: () => void;
   /** Moves every card in the selection one layer command's worth. */
   readonly onLayer?: (direction: LayerDirection) => void;
+  /** Toggles a Markdown bullet on every non-empty line of the selected cards' text. */
+  readonly onToggleList?: () => void;
+  /** Turns the selected card's text into a Markdown link, or takes one off with `undefined`. */
+  readonly onSetLink?: (url: string | undefined) => void;
+  /** Pins a new comment to the selection, the way the comment tool does when clicked there. */
+  readonly onComment?: () => void;
 }
 
 export interface SelectionToolbarOptions {
@@ -330,6 +338,17 @@ function finiteNumber(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/** The addresses the link field accepts; everything else is refused quietly. */
+const SAFE_LINK_PROTOCOLS: ReadonlySet<string> = new Set(["http:", "https:", "obsidian:"]);
+
+function isSafeLinkAddress(value: string): boolean {
+  try {
+    return SAFE_LINK_PROTOCOLS.has(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 function empty(element: Element): void {
   while (element.firstChild !== null) element.removeChild(element.firstChild);
 }
@@ -447,23 +466,34 @@ interface ColorRefs {
   readonly recent: HTMLElement;
 }
 
+interface LinkRefs {
+  readonly popover: Popover;
+  readonly input: HTMLInputElement;
+  readonly apply: HTMLButtonElement;
+}
+
 interface ToolbarRefs {
   readonly bar: HTMLElement;
   readonly shape: Popover;
   /** One button per catalogue entry, keyed by the entry's kind. */
   readonly shapeOptions: Readonly<Record<string, HTMLButtonElement>>;
-  readonly textGroup: HTMLElement;
+  /** Miro's second group: a card's font and size. */
+  readonly sizeGroup: HTMLElement;
   readonly font: Popover;
   readonly fontOptions: readonly HTMLButtonElement[];
   readonly fontSize: HTMLInputElement;
   readonly fontSizeDown: HTMLButtonElement;
   readonly fontSizeUp: HTMLButtonElement;
+  /** Miro's third group: how the text is set - style, alignment, list and link. */
+  readonly styleGroup: HTMLElement;
   readonly format: Popover;
   readonly formats: Readonly<Record<string, HTMLButtonElement>>;
   readonly align: Popover;
   readonly alignments: readonly HTMLButtonElement[];
   readonly verticalAlignments: readonly HTMLButtonElement[];
   readonly lineHeight: HTMLInputElement;
+  readonly list: HTMLButtonElement;
+  readonly link: LinkRefs;
   readonly edgeGroup: HTMLElement;
   readonly editConnectorLabel: HTMLButtonElement;
   readonly startCap: Popover;
@@ -481,13 +511,17 @@ interface ToolbarRefs {
   readonly borderStyles: readonly HTMLButtonElement[];
   readonly borderWidth: HTMLInputElement;
   readonly borderWidthValue: HTMLElement;
-  readonly layer: Popover;
-  readonly layerOptions: readonly HTMLButtonElement[];
+  readonly comment: HTMLButtonElement;
   readonly lock: HTMLButtonElement;
-  readonly deleteSelection: HTMLButtonElement;
+  /** Miro's "More": layer order, zoom to selection, edit, open link and delete. */
+  readonly more: Popover;
+  /** Hidden together, as one, when no selected element has a layer to move. */
+  readonly layerSection: HTMLElement;
+  readonly layerOptions: readonly HTMLButtonElement[];
   readonly openLink: HTMLButtonElement;
   /** Where the host puts the native Canvas menu, so a selection has one menu. */
   readonly nativeSlot: HTMLElement;
+  readonly deleteSelection: HTMLButtonElement;
   readonly status: HTMLElement;
 }
 
@@ -615,9 +649,10 @@ export class SelectionToolbar {
       }
     }
 
-    // A node's text: family and size, then how the text is set.
-    const textGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
-    const font = this.makePopover(textGroup, words().toolbar.font, "miro-canvas-toolbar__button--font");
+    // Miro's second group: a card's font and size.  A line's label takes the
+    // same row, since it shares this font.
+    const sizeGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
+    const font = this.makePopover(sizeGroup, words().toolbar.font, "miro-canvas-toolbar__button--font");
     const fontList = this.block(font.panel, undefined, "miro-canvas-toolbar__list");
     const fontOptions = offeredFonts(document).map((family) => {
       const option = append(fontList, makeChoice(document, fontLabel(family), family, "miro-canvas-toolbar__button--font-option"));
@@ -626,7 +661,7 @@ export class SelectionToolbar {
       option.style.setProperty?.("font-family", fontStack(family));
       return option;
     });
-    const stepper = append(textGroup, make(document, "span", "miro-canvas-toolbar__stepper"));
+    const stepper = append(sizeGroup, make(document, "span", "miro-canvas-toolbar__stepper"));
     const fontSize = append(stepper, makeNumber(document, words().toolbar.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE));
     const steps = append(stepper, make(document, "span", "miro-canvas-toolbar__stepper-buttons"));
     const fontSizeUp = append(steps, makeButton(document, words().toolbar.increaseFontSize, "miro-canvas-toolbar__button--step"));
@@ -634,7 +669,10 @@ export class SelectionToolbar {
     this.icon(fontSizeUp, "chevron-up", "⌃");
     this.icon(fontSizeDown, "chevron-down", "⌄");
 
-    const format = this.makePopover(textGroup, words().toolbar.textStyle);
+    // Miro's third group: how the text is set - style, alignment, list, link.
+    // A line shows only its style here; alignment, list and link are a card's own.
+    const styleGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
+    const format = this.makePopover(styleGroup, words().toolbar.textStyle);
     this.icon(format.button, "bold", "B");
     const formatRow = this.block(format.panel, undefined);
     const formats: Record<string, HTMLButtonElement> = {};
@@ -644,7 +682,7 @@ export class SelectionToolbar {
       formats[value] = toggle;
     }
 
-    const align = this.makePopover(textGroup, words().toolbar.alignment);
+    const align = this.makePopover(styleGroup, words().toolbar.alignment);
     this.icon(align.button, ALIGNMENT_ICONS[0]!.icon, "≡");
     const alignRow = this.block(align.panel, undefined);
     const alignments = alignmentChoices().map(({ value, icon, label }) => {
@@ -661,6 +699,22 @@ export class SelectionToolbar {
     const spacingRow = this.block(align.panel, words().toolbar.lineHeight);
     const lineHeight = append(spacingRow, makeNumber(document, words().toolbar.lineHeight, 1, 10));
     lineHeight.step = "0.1";
+
+    // A bullet on every non-empty line of the selected cards' own text.
+    const list = append(styleGroup, makeButton(document, words().toolbar.bulletList));
+    this.icon(list, "list", "•");
+
+    // The selected card's whole text as one Markdown link, or a stretch of it
+    // being edited - a small field, like the web-link tool's own address input.
+    const link = this.makePopover(styleGroup, words().toolbar.link, "miro-canvas-toolbar__button--link");
+    this.icon(link.button, "link", "🔗");
+    const linkRow = this.block(link.panel, undefined, "miro-canvas-toolbar__row");
+    const linkInput = append(linkRow, make(document, "input", "miro-canvas-toolbar__link-input"));
+    linkInput.type = "url";
+    linkInput.placeholder = words().toolbar.linkPlaceholder;
+    linkInput.setAttribute("aria-label", words().toolbar.linkAddress);
+    const linkApply = append(linkRow, makeButton(document, words().toolbar.applyLink, "miro-canvas-toolbar__button--apply"));
+    this.icon(linkApply, "check", "✓");
 
     // A connector: its two ends and the kind of line between them.
     const edgeGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
@@ -736,15 +790,21 @@ export class SelectionToolbar {
     const borderWidth = append(borderWidthRow, makeRange(document, words().toolbar.borderWidth, 0, BORDER_SLIDER_MAX));
     const borderWidthValue = append(borderWidthRow, make(document, "span", "miro-canvas-toolbar__value"));
 
-    // A link card no longer loads its page, so it is opened from here.
-    const openLink = append(bar, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--open-link"));
-    this.icon(openLink, "external-link", "↗");
-    openLink.hidden = true;
+    // Miro's last group: comment, lock and everything under "More".
+    const lastGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
+    const comment = append(lastGroup, makeButton(document, words().toolbar.comment));
+    this.icon(comment, "message-square-plus", "💬");
 
-    // A card's place among the others sharing its area.
-    const layer = this.makePopover(bar, words().layer.menu, "miro-canvas-toolbar__button--layer");
-    this.icon(layer.button, LAYER_MENU_ICON, "≡");
-    const layerRow = this.block(layer.panel, undefined, "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--layer");
+    const lock = append(lastGroup, makeButton(document, words().toolbar.lockSelection, "miro-canvas-toolbar__button--lock"));
+    lock.setAttribute("aria-pressed", "false");
+
+    // "More": a card's place among the others sharing its area, then the
+    // native menu's own extras - zoom to selection, edit, open link and
+    // delete - kept as the native elements the host moves in here.
+    const more = this.makePopover(lastGroup, words().toolbar.more, "miro-canvas-toolbar__button--more");
+    this.icon(more.button, "more-vertical", "⋮");
+    const layerSection = append(more.panel, make(document, "div"));
+    const layerRow = this.block(layerSection, words().layer.menu, "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--layer");
     const layerOptions = layerActions().map(({ direction, label, icon }) => {
       // A command, not a choice that stays pressed.
       const option = append(layerRow, makeButton(document, label));
@@ -752,10 +812,14 @@ export class SelectionToolbar {
       this.icon(option, icon, label.charAt(0));
       return option;
     });
-
-    const lock = append(bar, makeButton(document, words().toolbar.lockSelection, "miro-canvas-toolbar__button--lock"));
-    lock.setAttribute("aria-pressed", "false");
-    const nativeSlot = append(bar, make(document, "span", "miro-canvas-toolbar__native"));
+    // A link card no longer loads its page, so it is opened from here.
+    const openLinkRow = this.block(more.panel, undefined, "miro-canvas-toolbar__row");
+    const openLink = append(openLinkRow, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--open-link"));
+    this.icon(openLink, "external-link", "↗");
+    openLink.hidden = true;
+    // Delete stays last, a danger item; the native elements the host puts
+    // here keep their own order and behaviour, ahead of it.
+    const nativeSlot = append(more.panel, make(document, "span", "miro-canvas-toolbar__native"));
     const deleteSelection = append(nativeSlot, makeButton(document,words().toolbar.deleteSelection,"miro-canvas-toolbar__button--delete"));
     this.icon(deleteSelection,"trash-2","⌫");
     this.listen(deleteSelection,"click",()=>this.actions.onDelete?.());
@@ -767,12 +831,13 @@ export class SelectionToolbar {
 
     const refs: ToolbarRefs = {
       bar, shape, shapeOptions,
-      textGroup, font, fontOptions, fontSize, fontSizeDown, fontSizeUp,
-      format, formats, align, alignments, verticalAlignments, lineHeight,
+      sizeGroup, font, fontOptions, fontSize, fontSizeDown, fontSizeUp,
+      styleGroup, format, formats, align, alignments, verticalAlignments, lineHeight,
+      list, link: { popover: link, input: linkInput, apply: linkApply },
       edgeGroup, editConnectorLabel, startCap, endCap, startCaps, endCaps, swapEnds, line, routes, strokes, lineWidth, lineWidthValue, headSize,
       colors, borderStyles, borderWidth, borderWidthValue,
-      layer, layerOptions,
-      lock, deleteSelection, openLink, nativeSlot, status,
+      comment, lock, more, layerSection, layerOptions,
+      deleteSelection, openLink, nativeSlot, status,
     };
     this.wire(refs);
     return refs;
@@ -815,6 +880,14 @@ export class SelectionToolbar {
       const value = finiteNumber(refs.lineHeight.value);
       if (value !== undefined && value > 0 && value <= 10) {
         this.appearance({ type: APPEARANCE_ACTIONS.setTypography, typography: { lineHeight: value } });
+      }
+    });
+    this.listen(refs.list, "click", () => this.list());
+    this.listen(refs.link.apply, "click", () => this.commitLink());
+    this.listen(refs.link.input, "keydown", (event) => {
+      if ((event as KeyboardEvent).key === "Enter") {
+        (event as KeyboardEvent).preventDefault?.();
+        this.commitLink();
       }
     });
     for (const [key, options] of [["startCap", refs.startCaps], ["endCap", refs.endCaps]] as const) {
@@ -871,6 +944,8 @@ export class SelectionToolbar {
     this.listen(refs.openLink, "click", () => {
       if (this.state?.link !== undefined) this.actions.onOpenLink?.();
     });
+    // Commenting is an annotation, not a board edit, so it stays live throughout.
+    this.listen(refs.comment, "click", () => this.actions.onComment?.());
     for (const option of refs.layerOptions) {
       this.listen(option, "click", () => this.layer(valueOf(option) as LayerDirection));
     }
@@ -919,6 +994,26 @@ export class SelectionToolbar {
     this.closePopovers();
   }
 
+  private list(): void {
+    if (this.state?.editable !== true) return;
+    this.actions.onToggleList?.();
+  }
+
+  /** An empty field takes the link off; anything unsafe is refused quietly. */
+  private commitLink(): void {
+    const refs = this.refs;
+    if (this.state?.editable !== true || refs === undefined) return;
+    const raw = refs.link.input.value.trim();
+    if (raw === "") {
+      this.actions.onSetLink?.(undefined);
+      this.closePopovers();
+      return;
+    }
+    if (!isSafeLinkAddress(raw)) return;
+    this.actions.onSetLink?.(raw);
+    this.closePopovers();
+  }
+
   public update(state: SelectionToolbarState): void {
     this.state = state;
     const refs = this.refs;
@@ -953,8 +1048,11 @@ export class SelectionToolbar {
     // alignment or line height, which only a card's own text wraps enough to need.
     const hasTextNode = state.kinds.some((kind) => kind !== "edge" && kind !== "media");
     refs.shape.host.hidden = !state.kinds.includes("shape");
-    refs.textGroup.hidden = !(hasTextNode || hasEdge);
+    refs.sizeGroup.hidden = !(hasTextNode || hasEdge);
+    refs.styleGroup.hidden = !(hasTextNode || hasEdge);
     refs.align.host.hidden = !hasTextNode;
+    refs.list.hidden = this.actions.onToggleList === undefined || !hasTextNode;
+    refs.link.popover.host.hidden = this.actions.onSetLink === undefined || !hasTextNode;
     refs.edgeGroup.hidden = !hasEdge;
     refs.editConnectorLabel.hidden = state.canEditConnectorLabel !== true;
     for (const slot of COLOR_SLOT_KEYS) {
@@ -985,6 +1083,7 @@ export class SelectionToolbar {
     const alignment = ALIGNMENT_ICONS.find((item) => item.value === typography.alignment) ?? ALIGNMENT_ICONS[0]!;
     this.icon(refs.align.button, alignment.icon, "≡");
     refs.lineHeight.value = typography.lineHeight === undefined ? "" : String(typography.lineHeight);
+    if (this.document?.activeElement !== refs.link.input) refs.link.input.value = state.textLink ?? "";
 
     const { start, end } = this.caps();
     const route = state.connector?.route ?? "curved";
@@ -1026,9 +1125,10 @@ export class SelectionToolbar {
     refs.lock.disabled = state.reviewMode;
     refs.openLink.hidden = state.link === undefined || this.actions.onOpenLink === undefined;
     refs.openLink.setAttribute("aria-label", state.link === undefined ? words().toolbar.openLink : words().toolbar.openLinkWithUrl(state.link));
+    refs.comment.hidden = this.actions.onComment === undefined;
     // A frame or a connector alone has no layer to move; a control that does
     // not apply is removed, not disabled.
-    refs.layer.host.hidden = this.actions.onLayer === undefined || !state.kinds.some((kind) => CARD_KINDS.has(kind));
+    refs.layerSection.hidden = this.actions.onLayer === undefined || !state.kinds.some((kind) => CARD_KINDS.has(kind));
     for (const control of this.controls(refs)) {
       control.disabled = !state.editable;
     }
@@ -1065,7 +1165,7 @@ export class SelectionToolbar {
     return [
       ...Object.values(refs.shapeOptions),
       ...refs.fontOptions, refs.fontSize, refs.fontSizeDown, refs.fontSizeUp,
-      ...Object.values(refs.formats), ...refs.alignments, ...refs.verticalAlignments, refs.lineHeight,
+      ...Object.values(refs.formats), ...refs.alignments, ...refs.verticalAlignments, refs.lineHeight, refs.list, refs.link.input, refs.link.apply,
       refs.editConnectorLabel, ...refs.startCaps, ...refs.endCaps, refs.swapEnds, ...refs.routes, ...refs.strokes, refs.lineWidth, refs.headSize,
       ...Object.values(refs.colors).flatMap((color) => [color.input, color.clear, color.reset]),
       ...refs.borderStyles, refs.borderWidth, ...refs.layerOptions,

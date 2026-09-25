@@ -722,11 +722,23 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
 - Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
   highlight, next and previous.
-- A selection toolbar laid out as Miro's (`FUT-021`): the same groups in the
-  same order - shape | font and size | text style, alignment, list, link |
-  text colour, marker, fill | comment, lock, "More" (order, delete, copy and
-  the rest). Border, order, delete, "zoom to selection" and "edit" now stand
-  as buttons of their own, and list, link and comment are missing.
+- A selection toolbar laid out as Miro's (`FUT-021`). Done in the plugin
+  2026-09-25 (`src/selection-toolbar.ts`, `src/text-list.ts`, `src/text-link.ts`,
+  `src/m1-session.ts`): a card's groups now read shape | font, size | text
+  style, alignment, list, link | text colour, marker, fill, border | comment,
+  lock, "More". A line or arrow shows its own controls (ends, kind, style,
+  width, the label's font) | line colour | comment, lock, "More" instead.
+  "More" holds the layer order items, then the native menu's own extras -
+  zoom to selection, edit, open link when a link preview is selected - kept
+  as the native elements the session moves in, and delete last, a danger
+  item. Three controls are new: a bullet list toggle (`- ` on every non-empty
+  line of the selected cards' text, code fences and tables left alone), a
+  link field that turns a card's whole text - or a selection of it, while
+  editing - into a Markdown link (only http(s) and obsidian:// addresses;
+  anything else is refused quietly, and an existing link shows in the field
+  and is removed with an empty value), and a comment button that pins a new
+  comment straight to the selection, the same result the comment tool gives
+  clicked there. Nothing that existed is lost, only moved.
 - Updates (`FUT-022`). Obsidian's rules forbid a plugin updating itself, so
   updates come as GitHub releases (a version tag with main.js, manifest.json
   and styles.css): before the community catalogue through the BRAT plugin,

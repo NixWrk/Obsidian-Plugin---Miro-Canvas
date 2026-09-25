@@ -151,6 +151,11 @@ function shown(element: FakeElement): boolean {
   return true;
 }
 
+/** Which of these labelled controls are on screen, in the order Miro's own toolbar shows them. */
+function visibleLabelSequence(root: FakeElement, labels: readonly string[]): string[] {
+  return labels.filter((label) => shown(byLabel(root, label)));
+}
+
 const TYPOGRAPHY = {
   fontFamily: "Inter",
   fontSize: 18,
@@ -167,15 +172,27 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   readonly appearance: AppearanceAction[];
   readonly styles: SelectionStylePatch[];
   readonly locks: boolean[];
+  readonly layers: string[];
+  readonly lists: number[];
+  readonly links: Array<string | undefined>;
+  readonly comments: number[];
   readonly update: (patch?: Partial<SelectionToolbarState>) => void;
 } {
   const appearance: AppearanceAction[] = [];
   const styles: SelectionStylePatch[] = [];
   const locks: boolean[] = [];
+  const layers: string[] = [];
+  const lists: number[] = [];
+  const links: Array<string | undefined> = [];
+  const comments: number[] = [];
   const toolbar = new SelectionToolbar({
     onAppearance: (action) => { appearance.push(action); },
     onStyle: (patch) => { styles.push(patch); },
     onLock: (locked) => { locks.push(locked); },
+    onLayer: (direction) => { layers.push(direction); },
+    onToggleList: () => { lists.push(1); },
+    onSetLink: (url) => { links.push(url); },
+    onComment: () => { comments.push(1); },
   }, { document: new FakeDocument() as unknown as Document, ...options });
   const base: SelectionToolbarState = {
     selectedIds: ["n1"],
@@ -192,7 +209,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   };
   const update = (patch: Partial<SelectionToolbarState> = {}): void => toolbar.update({ ...base, ...patch });
   update();
-  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, locks, update };
+  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, locks, layers, lists, links, comments, update };
 }
 
 describe("selection toolbar", () => {
@@ -214,8 +231,8 @@ describe("selection toolbar", () => {
   it("keeps one compact row and hides every popover until it is opened", () => {
     const { root } = build();
     const bar = root.children.find((child) => child.className.includes("__bar"))!;
-    // Shape, the text group, the connector group, the colour group, the link
-    // opener, the layer menu, the lock and the native menu's slot.
+    // Shape, the size group, the style group, the connector group, the
+    // colour group, and the last group (comment, lock, More).
     expect(bar.children.length).toBeLessThanOrEqual(8);
     for (const panel of descendants(root).filter((item) => item.className.includes("__panel"))) {
       expect(panel.hidden).toBe(true);
@@ -223,14 +240,13 @@ describe("selection toolbar", () => {
     expect(byLabel(root, "Shape").getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("keeps a slot for the native Canvas menu right after the lock", () => {
+  it("keeps a slot for the native Canvas menu inside More, last after the layer items and open link", () => {
     const { root, toolbar } = build();
-    const bar = root.children.find((child) => child.className.includes("__bar"))!;
+    const panel = panelOf(root, "More");
     const slot = toolbar.nativeSlot as unknown as FakeElement;
     expect(slot.className).toBe("miro-canvas-toolbar__native");
-    const slotIndex = bar.children.indexOf(slot);
-    expect(bar.children[slotIndex - 1]!.getAttribute("aria-label")).toBe("Lock selection");
-    expect(slotIndex).toBe(bar.children.length - 1);
+    // Layer, then open link, then the native menu with its own delete last.
+    expect(panel.children.indexOf(slot)).toBe(panel.children.length - 1);
   });
 
   it("draws interface icons through the host and falls back to glyphs", () => {
@@ -567,7 +583,7 @@ describe("selection toolbar", () => {
     expect(picker.value).toBe("#6cbf8f");
   });
 
-  it("opens a selected link from its own button, even in review mode", () => {
+  it("opens a selected link from inside More, even in review mode", () => {
     const opened: number[] = [];
     const toolbar = new SelectionToolbar({
       onAppearance: () => undefined,
@@ -581,6 +597,7 @@ describe("selection toolbar", () => {
       typography: TYPOGRAPHY, colors: {}, palette: [], recentColors: [], placement: { x: 0, y: 0 },
     };
     toolbar.update(state);
+    byLabel(root, "More").dispatch("click");
     const open = descendants(root).find((item) => item.className.includes("--open-link"))!;
     expect(shown(open)).toBe(false);
     toolbar.update({ ...state, link: "https://example.test/page" });
@@ -593,9 +610,19 @@ describe("selection toolbar", () => {
     expect(shown(byLabel(root, "Font"))).toBe(false);
   });
 
-  it("shows the layer menu only when onLayer is given and a card is selected", () => {
-    const withoutHandler = build({ kinds: ["shape"] });
-    expect(shown(byLabel(withoutHandler.root, "Layer"))).toBe(false);
+  it("shows the layer items inside More only when onLayer is given and a card is selected", () => {
+    const withoutHandler = new SelectionToolbar({
+      onAppearance: () => undefined,
+      onStyle: () => undefined,
+      onLock: () => undefined,
+    }, { document: new FakeDocument() as unknown as Document });
+    const withoutHandlerRoot = withoutHandler.element as unknown as FakeElement;
+    withoutHandler.update({
+      selectedIds: ["n1"], kinds: ["shape"], editable: true, locked: false, reviewMode: false,
+      typography: TYPOGRAPHY, colors: {}, palette: [], recentColors: [], placement: { x: 0, y: 0 },
+    });
+    byLabel(withoutHandlerRoot, "More").dispatch("click");
+    expect(shown(choice(withoutHandlerRoot, "More", "front"))).toBe(false);
 
     const layers: string[] = [];
     const toolbar = new SelectionToolbar({
@@ -610,15 +637,16 @@ describe("selection toolbar", () => {
       typography: TYPOGRAPHY, colors: {}, palette: [], recentColors: [], placement: { x: 0, y: 0 },
     };
     toolbar.update(state);
+    byLabel(root, "More").dispatch("click");
     // A line or a frame alone has no layer to move.
-    expect(shown(byLabel(root, "Layer"))).toBe(false);
+    expect(shown(choice(root, "More", "front"))).toBe(false);
     toolbar.update({ ...state, kinds: ["frame"] });
-    expect(shown(byLabel(root, "Layer"))).toBe(false);
+    expect(shown(choice(root, "More", "front"))).toBe(false);
     toolbar.update({ ...state, kinds: ["edge", "shape"] });
-    expect(shown(byLabel(root, "Layer"))).toBe(true);
+    expect(shown(choice(root, "More", "front"))).toBe(true);
   });
 
-  it("moves a card with a layer command and closes the popover afterward", () => {
+  it("moves a card with a layer command from inside More and closes it afterward", () => {
     const layers: string[] = [];
     const toolbar = new SelectionToolbar({
       onAppearance: () => undefined,
@@ -631,14 +659,14 @@ describe("selection toolbar", () => {
       selectedIds: ["n1"], kinds: ["shape"], editable: true, locked: false, reviewMode: false,
       typography: TYPOGRAPHY, colors: {}, palette: [], recentColors: [], placement: { x: 0, y: 0 },
     });
-    byLabel(root, "Layer").dispatch("click");
-    expect(panelOf(root, "Layer").hidden).toBe(false);
-    choice(root, "Layer", "forward").dispatch("click");
+    byLabel(root, "More").dispatch("click");
+    expect(panelOf(root, "More").hidden).toBe(false);
+    choice(root, "More", "forward").dispatch("click");
     expect(layers).toEqual(["forward"]);
-    expect(panelOf(root, "Layer").hidden).toBe(true);
+    expect(panelOf(root, "More").hidden).toBe(true);
   });
 
-  it("disables the layer buttons on a selection that cannot be edited", () => {
+  it("disables the layer buttons inside More on a selection that cannot be edited", () => {
     const toolbar = new SelectionToolbar({
       onAppearance: () => undefined,
       onStyle: () => undefined,
@@ -651,9 +679,98 @@ describe("selection toolbar", () => {
       blockedReason: "This selection is locked.",
       typography: TYPOGRAPHY, colors: {}, palette: [], recentColors: [], placement: { x: 0, y: 0 },
     });
+    byLabel(root, "More").dispatch("click");
     for (const value of ["front", "forward", "backward", "back"]) {
-      expect(choice(root, "Layer", value).disabled).toBe(true);
+      expect(choice(root, "More", value).disabled).toBe(true);
     }
+  });
+
+  it("orders a card's groups Miro's way: shape, font and size, style, colours, then comment, lock and more", () => {
+    const { root } = build({ kinds: ["shape"] });
+    const labels = [
+      "Shape", "Font", "Text style", "Alignment", "Bullet list", "Link",
+      "Text color", "Highlight", "Fill color", "Border", "Comment", "Lock selection", "More",
+    ];
+    expect(visibleLabelSequence(root, labels)).toEqual(labels);
+  });
+
+  it("orders a line's groups Miro's way: its label's font and style, its own line controls, colour, then comment, lock and more", () => {
+    const { root } = build({ ...EDGE });
+    const labels = ["Font", "Text style", "Line start", "Swap line ends", "Line end", "Line", "Line color", "Comment", "Lock selection", "More"];
+    expect(visibleLabelSequence(root, labels)).toEqual(labels);
+    // A line has no shape, alignment, list or link of its own.
+    for (const hiddenLabel of ["Shape", "Alignment", "Bullet list", "Link"]) {
+      expect(shown(byLabel(root, hiddenLabel))).toBe(false);
+    }
+  });
+
+  it("removes the list and link controls when no action for them is given", () => {
+    const toolbar = new SelectionToolbar({
+      onAppearance: () => undefined,
+      onStyle: () => undefined,
+      onLock: () => undefined,
+    }, { document: new FakeDocument() as unknown as Document });
+    const root = toolbar.element as unknown as FakeElement;
+    toolbar.update({
+      selectedIds: ["n1"], kinds: ["shape"], editable: true, locked: false, reviewMode: false,
+      typography: TYPOGRAPHY, colors: {}, palette: [], recentColors: [], placement: { x: 0, y: 0 },
+    });
+    expect(shown(byLabel(root, "Bullet list"))).toBe(false);
+    expect(shown(byLabel(root, "Link"))).toBe(false);
+    expect(shown(byLabel(root, "Comment"))).toBe(false);
+  });
+
+  it("toggles a bullet list from its own button, live only while the selection can be edited", () => {
+    const { root, lists, update } = build();
+    byLabel(root, "Bullet list").dispatch("click");
+    expect(lists).toEqual([1]);
+    update({ editable: false, blockedReason: "This selection is locked." });
+    byLabel(root, "Bullet list").dispatch("click");
+    expect(lists).toEqual([1]);
+  });
+
+  it("applies, removes and refuses an unsafe address from the link field", () => {
+    const { root, links } = build();
+    const input = byLabel(root, "Web address");
+    input.value = "https://example.test";
+    byLabel(root, "Apply link").dispatch("click");
+    expect(links).toEqual(["https://example.test"]);
+    // Refused quietly: no new entry, nothing thrown.
+    input.value = "javascript:alert(1)";
+    byLabel(root, "Apply link").dispatch("click");
+    expect(links).toEqual(["https://example.test"]);
+    input.value = "obsidian://open?vault=x";
+    byLabel(root, "Apply link").dispatch("click");
+    expect(links).toEqual(["https://example.test", "obsidian://open?vault=x"]);
+    // An empty field takes the link off again.
+    input.value = "";
+    byLabel(root, "Apply link").dispatch("click");
+    expect(links).toEqual(["https://example.test", "obsidian://open?vault=x", undefined]);
+  });
+
+  it("applies a link on Enter in its field, and stays inert once locked", () => {
+    const { root, links, update } = build();
+    const input = byLabel(root, "Web address");
+    input.value = "https://example.test";
+    input.dispatch("keydown", { key: "Enter" });
+    expect(links).toEqual(["https://example.test"]);
+    update({ editable: false, blockedReason: "This selection is locked." });
+    input.value = "https://example.test/2";
+    input.dispatch("keydown", { key: "Enter" });
+    expect(links).toEqual(["https://example.test"]);
+  });
+
+  it("shows the address a card's whole text already links to, in the link field", () => {
+    const { root, update } = build({ textLink: "obsidian://open?vault=x" });
+    expect(byLabel(root, "Web address").value).toBe("obsidian://open?vault=x");
+    update({ textLink: undefined });
+    expect(byLabel(root, "Web address").value).toBe("");
+  });
+
+  it("pins a comment from its own button, even when the selection cannot be edited", () => {
+    const { root, comments } = build({ editable: false, blockedReason: "This selection is locked." });
+    byLabel(root, "Comment").dispatch("click");
+    expect(comments).toEqual([1]);
   });
 
   it("removes its listeners on dispose", () => {
@@ -675,6 +792,10 @@ describe("selection toolbar in Russian", () => {
     expect(byLabel(root, "Начертание")).toBeDefined();
     expect(byLabel(root, "Выравнивание")).toBeDefined();
     expect(byLabel(root, "Заблокировать")).toBeDefined();
+    expect(byLabel(root, "Маркированный список")).toBeDefined();
+    expect(byLabel(root, "Ссылка")).toBeDefined();
+    expect(byLabel(root, "Комментарий")).toBeDefined();
+    expect(byLabel(root, "Ещё")).toBeDefined();
     const { root: edgeRoot } = build({ ...EDGE });
     expect(byLabel(edgeRoot, "Начало линии")).toBeDefined();
     expect(byLabel(edgeRoot, "Конец линии")).toBeDefined();
