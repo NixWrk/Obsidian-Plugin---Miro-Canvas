@@ -85,7 +85,7 @@ import {
 } from "./minimap-model";
 import { MetadataWriter, type MetadataWriteResult } from "./metadata-writer";
 import { PLUGIN_ROOT_KEYS, parseMiroCanvasMetadata, type MiroCanvasMetadata } from "./metadata";
-import { DEFAULT_SETTINGS, commentAuthorName, obsidianAccountName, panDelta, type MiroCanvasSettings, type PanDirection } from "./settings";
+import { DEFAULT_SETTINGS, commentAuthorName, obsidianAccountName, panDelta, shownFontFamilies, type MiroCanvasSettings, type PanDirection } from "./settings";
 import {
 	DEFAULT_MAX_ZOOM,
 	DEFAULT_MIN_ZOOM,
@@ -172,6 +172,8 @@ export interface M1SessionOptions {
 	 * menu for: the same cut, copy, paste and delete its selection menu has.
 	 */
 	readonly onConnectorMenu?: (event: MouseEvent, run: (action: "cut" | "copy" | "paste" | "delete") => void) => void;
+	/** A card, a label or the toolbar's own font list just named this family; the host reads its faces only now. */
+	readonly onFontUsed?: (family: string) => void;
 }
 
 export type M1SessionStatus = "ready" | "unavailable" | "incompatible";
@@ -1176,8 +1178,13 @@ export class M1CanvasSession {
 		// A label's font: an edited override in full, or, short of one, whatever
 		// the Miro source's own label style set - never Canvas's own default,
 		// which stays untouched until one of the two actually says something.
-		const font = (id: string): Readonly<Record<string, string>> | undefined =>
-			labelFont(this.appearance.localOverrides[id]?.typography, scene.items.get(id)?.css);
+		const font = (id: string): Readonly<Record<string, string>> | undefined => {
+			const override = this.appearance.localOverrides[id]?.typography;
+			const css = scene.items.get(id)?.css;
+			const family = override?.fontFamily ?? css?.["font-family"];
+			if (family !== undefined) this.options.onFontUsed?.(family);
+			return labelFont(override, css);
+		};
 		const items: ConnectorLabel[] = [];
 		const rawEdges = readRuntime(raw, "edges");
 		const byId = new Map((Array.isArray(rawEdges) ? rawEdges as readonly unknown[] : []).map((edge) => [readRuntime(edge, "id"), edge]));
@@ -1483,6 +1490,7 @@ export class M1CanvasSession {
 				return cache !== undefined && cache.document === document ? cache.scene : undefined;
 			},
 			onDeckAction: (deckId, action) => this.runDeckAction(deckId, action),
+			onFontUsed: (family) => options.onFontUsed?.(family),
 		}, renderDocument);
 		const settings = options.settings ?? DEFAULT_SETTINGS;
 		this.settings = settings;
@@ -1519,9 +1527,11 @@ export class M1CanvasSession {
 			onToggleList: () => this.toggleSelectedList(),
 			onSetLink: (url) => this.setSelectedLink(url),
 			onComment: () => this.commentOnSelection(),
+			onFontsWanted: (families) => families.forEach((family) => this.options.onFontUsed?.(family)),
 		}, {
 			...(controlDocument === undefined ? {} : { document: controlDocument }),
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
+			fontPool: shownFontFamilies(settings.fontList),
 		});
 		this.handles = new SelectionHandles({
 			onRotate: (degrees, commit) => this.applyHandleRotation(degrees, commit),
@@ -6301,6 +6311,7 @@ export class M1CanvasSession {
 		this.captureAppearanceDom(element);
 		writeAttribute(element, APPEARANCE_ATTRIBUTE, "true");
 		if (typography !== undefined) {
+			this.options.onFontUsed?.(typography.fontFamily);
 			for (const [property, value] of typographyDeclarations(typography)) {
 				this.setAppearanceStyle(element, property, value);
 			}

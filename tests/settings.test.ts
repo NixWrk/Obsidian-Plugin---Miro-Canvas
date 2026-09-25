@@ -6,14 +6,18 @@ import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS } from "../src/quick-tools";
 import {
   DEFAULT_COMMENT_AUTHOR,
   DEFAULT_SETTINGS,
+  addToFontList,
   commentAuthorName,
+  moveFontListEntry,
   obsidianAccountName,
   navigationCommands,
   pointerBindingLabel,
+  removeFromFontList,
   SETTING_BOUNDS,
   normalizeSettings,
   panDelta,
   shouldAskImportQuestion,
+  shownFontFamilies,
   wheelZooms,
 } from "../src/settings";
 
@@ -207,5 +211,61 @@ describe("plugin settings", () => {
     // A file that already has a tool bar order ignores the old booleans entirely.
     const both = normalizeSettings({ showLassoTool: false, showConnectorTool: false, toolbarItems: ["lasso", "connector"] });
     expect(both.toolbarItems).toEqual(["lasso", "connector"]);
+  });
+
+  it("keeps only safe, de-duplicated font pack ids", () => {
+    expect(DEFAULT_SETTINGS.fontPacks).toEqual([]);
+    expect(normalizeSettings({ fontPacks: ["word", "word", "excalidraw"] }).fontPacks).toEqual(["word", "excalidraw"]);
+    expect(normalizeSettings({ fontPacks: ["../evil", "Not-Lower", "", 7, "miro-cjk"] }).fontPacks).toEqual(["miro-cjk"]);
+    expect(normalizeSettings({ fontPacks: "word" }).fontPacks).toEqual([]);
+  });
+
+  it("keeps only custom fonts with a safe family and a file name that cannot climb out of its folder", () => {
+    expect(DEFAULT_SETTINGS.customFonts).toEqual([]);
+    const stored = normalizeSettings({
+      customFonts: [
+        { family: "My Font", file: "My Font.ttf" },
+        { family: "url(evil)", file: "evil.ttf" },
+        { family: "Other", file: "../../evil.ttf" },
+        { family: "Dup", file: "My Font.ttf" },
+      ],
+    });
+    expect(stored.customFonts).toEqual([{ family: "My Font", file: "My Font.ttf" }]);
+  });
+
+  it("starts the font pool at the base fonts every machine has, all shown", () => {
+    expect(DEFAULT_SETTINGS.fontList).toEqual([
+      { family: "Inter", shown: true },
+      { family: "Source Code Pro", shown: true },
+      { family: "sans-serif", shown: true },
+      { family: "serif", shown: true },
+    ]);
+    expect(shownFontFamilies(DEFAULT_SETTINGS.fontList)).toEqual(["Inter", "Source Code Pro", "sans-serif", "serif"]);
+  });
+
+  it("normalizes a stored font list, dropping an unsafe family and falling back when nothing survives", () => {
+    const stored = normalizeSettings({ fontList: [{ family: "Carlito", shown: false }, { family: "url(evil)", shown: true }, { family: "Carlito", shown: true }] });
+    expect(stored.fontList).toEqual([{ family: "Carlito", shown: false }]);
+    expect(normalizeSettings({ fontList: [{ family: "url(evil)" }] }).fontList).toEqual(DEFAULT_SETTINGS.fontList);
+  });
+
+  it("appends a new pack's or custom font's families to the pool, skipping any already there", () => {
+    const withPack = addToFontList(DEFAULT_SETTINGS.fontList, ["Carlito", "Caladea"]);
+    expect(withPack.map((entry) => entry.family)).toEqual(["Inter", "Source Code Pro", "sans-serif", "serif", "Carlito", "Caladea"]);
+    expect(addToFontList(withPack, ["Carlito"])).toBe(withPack);
+  });
+
+  it("drops a removed pack's or custom font's families from the pool", () => {
+    const withPack = addToFontList(DEFAULT_SETTINGS.fontList, ["Carlito", "Caladea"]);
+    expect(removeFromFontList(withPack, ["Carlito"]).map((entry) => entry.family)).toEqual(["Inter", "Source Code Pro", "sans-serif", "serif", "Caladea"]);
+  });
+
+  it("moves one family up or down the pool, and leaves it be at either end or when it is not in the pool", () => {
+    const pool = [{ family: "A", shown: true }, { family: "B", shown: true }, { family: "C", shown: true }];
+    expect(moveFontListEntry(pool, "B", "up").map((entry) => entry.family)).toEqual(["B", "A", "C"]);
+    expect(moveFontListEntry(pool, "B", "down").map((entry) => entry.family)).toEqual(["A", "C", "B"]);
+    expect(moveFontListEntry(pool, "A", "up")).toBe(pool);
+    expect(moveFontListEntry(pool, "C", "down")).toBe(pool);
+    expect(moveFontListEntry(pool, "Nowhere", "up")).toBe(pool);
   });
 });

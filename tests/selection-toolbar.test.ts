@@ -380,6 +380,22 @@ describe("selection toolbar", () => {
     ]);
   });
 
+  it("offers the base fonts every machine has when no pool is given", () => {
+    const { root } = build();
+    const values = descendants(panelOf(root, "Font"))
+      .filter((item) => item.attributes.has("data-value"))
+      .map((item) => item.attributes.get("data-value"));
+    expect(values).toEqual(["Inter", "Source Code Pro", "sans-serif", "serif"]);
+  });
+
+  it("offers the person's own font pool, in the order they arranged it, when one is given", () => {
+    const { root } = build({}, { fontPool: ["Excalifont", "Carlito", "Inter"] });
+    const values = descendants(panelOf(root, "Font"))
+      .filter((item) => item.attributes.has("data-value"))
+      .map((item) => item.attributes.get("data-value"));
+    expect(values).toEqual(["Excalifont", "Carlito", "Inter"]);
+  });
+
   it("reflects the selected element state", () => {
     const { root } = build({ shape: "hexagon", borderStyle: "dashed", borderWidth: 4 });
     expect(byLabel(root, "Font size").value).toBe("18");

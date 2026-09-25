@@ -16,6 +16,7 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 - [Exporting to PDF and PowerPoint](#exporting-to-pdf-and-powerpoint)
 - [The file stays a Canvas](#the-file-stays-a-canvas)
 - [Reference](#reference)
+- [Fonts](#fonts)
 - [Languages](#languages)
 - [Limits](#limits)
 - [Network use](#network-use)
@@ -219,6 +220,26 @@ so nothing is taken from Obsidian or other plugins.
 
 </details>
 
+## Fonts
+
+Cards, sticky notes and lines already offer the fonts every machine has, plus
+Obsidian's own theme fonts. Settings → Miro Canvas → **Fonts** adds more:
+
+- **Font packs** - Miro's own font list, its Japanese and Korean fonts, open
+  fonts drawn to the metrics of Word's Calibri, Cambria, Arial, Times New
+  Roman, Courier New and Georgia, and the fonts Excalidraw draws with.
+  Download installs one, Remove takes it out again, both with their progress
+  shown. A board imported from Miro, or one drawn with Excalidraw, may already
+  name these fonts; installing the matching pack is what renders it in them.
+- **A font file of your own** - "Add a font file" copies a `.ttf`, `.otf`,
+  `.woff` or `.woff2` file into the plugin's own folder; its name is editable,
+  and Remove takes the file out again.
+- **The font list** - which fonts the toolbar's font popover offers, and in
+  what order; a switch takes one out of the list without removing it.
+
+See [Network use](#network-use): nothing is downloaded until you press
+Download.
+
 ## Languages
 
 The plugin speaks English and Russian. It takes the language Obsidian itself
@@ -241,6 +262,11 @@ of this plugin's latest release, so a newer one can show in the status bar
 with its notes. Nothing else is sent, nothing is downloaded, and the plugin
 never updates itself. Turn it off under Settings → Miro Canvas → Updates;
 the **Check** button there asks on demand.
+
+Font packs (see [Fonts](#fonts)) come from a release of this plugin's own
+repository on GitHub. Nothing is downloaded until you press Download in
+Settings → Miro Canvas → Fonts, and removing a pack only deletes files this
+plugin wrote.
 
 ## Installing
 

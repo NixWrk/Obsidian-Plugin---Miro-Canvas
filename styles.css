@@ -3587,6 +3587,14 @@
   height: 16px;
 }
 
+/* The "Fonts" settings section: a pack's own download/install status line
+   under its description. */
+.miro-canvas-fontpack-status {
+  margin-top: 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
 .miro-canvas-import-guide__step-title {
   color: var(--text-normal);
 }

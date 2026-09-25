@@ -444,9 +444,11 @@ describe("fonts", () => {
   it("gives a missing font a stand-in of its own kind, never the browser's default serif", () => {
     expect(fontStack("Roboto")).toBe('"Roboto", Inter, sans-serif');
     expect(fontStack("Open Sans")).toBe('"Open Sans", Inter, sans-serif');
-    expect(fontStack("Georgia")).toBe('"Georgia", serif');
+    // "Georgia" and "Courier New" are also a downloadable pack's alias for a
+    // stand-in font, so both now name it too, and still end in their own kind.
+    expect(fontStack("Georgia")).toBe('"Georgia", "Gelasio", serif');
     expect(fontStack("PT Serif")).toBe('"PT Serif", serif');
-    expect(fontStack("Courier New")).toBe('"Courier New", "Source Code Pro", monospace');
+    expect(fontStack("Courier New")).toBe('"Courier New", "Cousine", "Source Code Pro", monospace');
     expect(fontStack("Inter")).toBe('"Inter", sans-serif');
   });
 
@@ -454,6 +456,20 @@ describe("fonts", () => {
     expect(fontStack("serif")).toBe("serif");
     expect(fontStack("sans-serif")).toBe("sans-serif");
     expect(fontStack("Inter, sans-serif")).toBe("Inter, sans-serif");
+  });
+
+  it("puts a Miro id or a common alias first, then the family a pack stands in for it with", () => {
+    // Miro's REST API writes these lower-case; the id-shaped name stays a
+    // single, readable string until a pack is installed.
+    expect(fontStack("open_sans")).toBe('"open_sans", "Open Sans", Inter, sans-serif');
+    expect(fontStack("noto_sans")).toBe('"noto_sans", "Noto Sans", Inter, sans-serif');
+    expect(fontStack("times_new_roman")).toBe('"times_new_roman", "Tinos", serif');
+    expect(fontStack("arial")).toBe('"arial", "Arimo", Inter, sans-serif');
+    // A board may also name a Windows font directly rather than by id.
+    expect(fontStack("Calibri")).toBe('"Calibri", "Carlito", Inter, sans-serif');
+    expect(fontLabel("open_sans")).toBe("Open Sans");
+    expect(fontLabel("noto_sans_japanese")).toBe("Noto Sans JP");
+    expect(fontLabel("Roboto")).toBe("Roboto");
   });
 
   it("offers only fonts every machine shows as themselves, named in the language in use", () => {

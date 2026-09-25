@@ -814,6 +814,28 @@ export const EN = {
 		mobileNotice: (version: string) => `Miro Canvas ${version} is out: Settings → Miro Canvas → Updates.`,
 	},
 	/**
+	 * The "Fonts" settings section: downloadable packs, a font file added by
+	 * hand, and the pool the toolbar's font list offers.
+	 */
+	fonts: {
+		heading: "Fonts",
+		networkLine: "Packs come from a release of this plugin's own repository on GitHub. Nothing is downloaded until you press Download.",
+		downloadButton: "Download",
+		removeButton: "Remove",
+		sizeMB: (megabytes: string) => `(${megabytes} MB)`,
+		downloading: "Downloading…",
+		installing: "Installing…",
+		failed: "Could not install this pack.",
+		notPublishedYet: "This pack is not published yet.",
+		integrityMismatch: "The download did not match; try again.",
+		invalidPack: "This pack could not be installed.",
+		addCustomFontButton: "Add a font file",
+		removeCustomFontTooltip: "Remove this font",
+		poolHeading: "Font list",
+		poolDesc: "Which fonts the toolbar's font list offers, and in what order.",
+		shownTooltip: "In the list",
+	},
+	/**
 	 * The optional welcome board (welcome-board.ts): its file name, its frame
 	 * titles in reading order and the few words it carries - most frames show
 	 * rather than tell.  A frame title gets its number on the board.

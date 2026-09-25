@@ -127,6 +127,8 @@ export interface SelectionToolbarActions {
   readonly onSetLink?: (url: string | undefined) => void;
   /** Pins a new comment to the selection, the way the comment tool does when clicked there. */
   readonly onComment?: () => void;
+  /** The font popover just opened: these families (the pool) are worth reading now. */
+  readonly onFontsWanted?: (families: readonly string[]) => void;
 }
 
 export interface SelectionToolbarOptions {
@@ -135,6 +137,8 @@ export interface SelectionToolbarOptions {
   readonly title?: string;
   /** Draws a named Obsidian icon into an element; without it buttons fall back to glyphs. */
   readonly setIcon?: (element: HTMLElement, icon: string) => void;
+  /** The person's own font pool, shown families in order; the base fonts everywhere by default. */
+  readonly fontPool?: readonly string[];
 }
 
 const MIN_FONT_SIZE = 6;
@@ -248,8 +252,14 @@ function highlightPalette(): readonly PaletteColor[] {
   ].map(([id, label, color]) => Object.freeze({ id: `highlight-${id!}`, label: label!, color: color!, source: "miro" as const }));
 }
 
-/** The fonts the list offers: those Obsidian's own settings name first, then the ones every machine has. */
-function offeredFonts(document: Document): readonly string[] {
+/**
+ * The fonts the list offers: those Obsidian's own settings name first, then
+ * the person's own pool - the base fonts every machine has, plus whatever a
+ * downloaded pack or a custom font file has added, in the order they arranged
+ * it.  `pool` is already the shown families in order; a family whose pack has
+ * since gone is the caller's job to leave out before it gets here.
+ */
+function offeredFonts(document: Document, pool: readonly string[] = OFFERED_FONT_FAMILIES): readonly string[] {
   const fromObsidian: string[] = [];
   try {
     const style = document.defaultView?.getComputedStyle?.(document.body);
@@ -260,7 +270,7 @@ function offeredFonts(document: Document): readonly string[] {
   } catch {
     // A document without styles offers the fonts every machine has.
   }
-  return [...new Set([...fromObsidian, ...OFFERED_FONT_FAMILIES])];
+  return [...new Set([...fromObsidian, ...pool])];
 }
 
 function hasDocument(value: unknown): value is Document {
@@ -530,6 +540,7 @@ export class SelectionToolbar {
   private readonly document: Document | undefined;
   private readonly actions: SelectionToolbarActions;
   private readonly setIcon: SelectionToolbarOptions["setIcon"];
+  private readonly fontPool: readonly string[];
   private readonly refs: ToolbarRefs | undefined;
   private readonly listeners: Array<() => void> = [];
   private readonly popovers: Popover[] = [];
@@ -539,6 +550,7 @@ export class SelectionToolbar {
   public constructor(actions: SelectionToolbarActions, options: SelectionToolbarOptions = {}) {
     this.actions = actions;
     this.setIcon = options.setIcon;
+    this.fontPool = options.fontPool ?? OFFERED_FONT_FAMILIES;
     this.document = options.document ?? (typeof document !== "undefined" ? document : undefined);
     if (!hasDocument(this.document)) {
       this.element = {} as HTMLElement;
@@ -573,8 +585,13 @@ export class SelectionToolbar {
     element.textContent = glyph;
   }
 
-  /** A popover is a button plus a panel that only this toolbar can open. */
-  private makePopover(parent: HTMLElement, title: string, className = ""): Popover {
+  /**
+   * A popover is a button plus a panel that only this toolbar can open.
+   * `onOpen`, when given, fires exactly on the press that opens it - never
+   * on the one that closes it, and never merely because another popover
+   * closed as this one opened.
+   */
+  private makePopover(parent: HTMLElement, title: string, className = "", onOpen?: () => void): Popover {
     const document = this.document!;
     const host = append(parent, make(document, "span", "miro-canvas-toolbar__popover"));
     const button = append(host, makeButton(document, title, className));
@@ -583,7 +600,10 @@ export class SelectionToolbar {
     const panel = append(host, make(document, "div", "miro-canvas-toolbar__panel"));
     panel.hidden = true;
     const popover: Popover = { host, button, panel };
-    this.listen(button, "click", () => this.togglePopover(popover));
+    this.listen(button, "click", () => {
+      if (popover.panel.hidden && onOpen !== undefined) onOpen();
+      this.togglePopover(popover);
+    });
     this.popovers.push(popover);
     return popover;
   }
@@ -652,9 +672,10 @@ export class SelectionToolbar {
     // Miro's second group: a card's font and size.  A line's label takes the
     // same row, since it shares this font.
     const sizeGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
-    const font = this.makePopover(sizeGroup, words().toolbar.font, "miro-canvas-toolbar__button--font");
+    const font = this.makePopover(sizeGroup, words().toolbar.font, "miro-canvas-toolbar__button--font",
+      () => this.actions.onFontsWanted?.(this.fontPool));
     const fontList = this.block(font.panel, undefined, "miro-canvas-toolbar__list");
-    const fontOptions = offeredFonts(document).map((family) => {
+    const fontOptions = offeredFonts(document, this.fontPool).map((family) => {
       const option = append(fontList, makeChoice(document, fontLabel(family), family, "miro-canvas-toolbar__button--font-option"));
       option.textContent = fontLabel(family);
       // Each family is shown in its own face, so the list is its own preview.

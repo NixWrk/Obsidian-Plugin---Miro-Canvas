@@ -10,7 +10,7 @@ import {
 
 const typography: TypographySettings = {
   ...DEFAULT_TYPOGRAPHY,
-  fontFamily: "Georgia",
+  fontFamily: "Merriweather",
   fontSize: 28,
   format: { bold: true, italic: true, underline: true, strike: false },
   alignment: "center",
@@ -27,7 +27,7 @@ describe("buildEditorAppearanceRules", () => {
     expect(rules).toHaveLength(1);
     expect(rules[0]!.selector).toBe(".markdown-source-view.mod-cm6 .cm-content");
     expect(rules[0]!.declarations).toEqual([
-      ["font-family", "\"Georgia\", serif"],
+      ["font-family", "\"Merriweather\", serif"],
       ["font-size", "28px"],
       ["font-weight", "700"],
       ["font-style", "italic"],
@@ -168,7 +168,7 @@ describe("applyEditorAppearanceToFrame", () => {
     expect(style).not.toBeNull();
     expect(style!.sheet.cssRules).toHaveLength(1);
     expect(style!.sheet.cssRules[0]!.selectorText).toBe(".markdown-source-view.mod-cm6 .cm-content");
-    expect(style!.sheet.cssRules[0]!.style.props.get("font-family")).toBe("\"Georgia\", serif !important");
+    expect(style!.sheet.cssRules[0]!.style.props.get("font-family")).toBe("\"Merriweather\", serif !important");
     expect(style!.sheet.cssRules[0]!.style.props.get("color")).toBe("#4262ff !important");
   });
 

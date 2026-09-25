@@ -82,3 +82,12 @@ along.
   in that place instead. New: a bullet list toggle for a card's text, a link
   field that turns a card's whole text (or a selection of it) into a Markdown
   link, and a comment button that pins one to the selection directly.
+- Font packs: Settings -> Fonts offers downloadable font packs (Miro's own
+  list, its Japanese and Korean fonts, open fonts drawn to Word's Calibri,
+  Cambria, Arial, Times New Roman, Courier New and Georgia, and the fonts
+  Excalidraw draws with), a font file of your own to add, and the font
+  list's own pool - which families the toolbar's font popover offers, and in
+  what order. A board naming one of Miro's font ids (`open_sans`,
+  `times_new_roman`, ...) or a Windows font by name now renders in the real
+  font once the matching pack is installed. Nothing is downloaded until you
+  press Download.

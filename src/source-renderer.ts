@@ -29,6 +29,8 @@ export interface SourceRendererHost {
   getSelectionMovePreviewIds?(): readonly string[] | undefined;
   /** A presentation's own buttons: show its slides, or bring them all into view. */
   onDeckAction?(deckId: string, action: DeckAction): void;
+  /** A node's own CSS just named this font family; the host reads its faces only now. */
+  onFontUsed?(family: string): void;
 }
 
 export type DeckAction = "present" | "fit" | "export";
@@ -676,6 +678,7 @@ function applyNodeCss(
   content: DomElementLike,
   layer: DomElementLike | undefined,
   patches: RestorePatch[],
+  onFontUsed?: (family: string) => void,
 ): void {
   // Native Canvas draws a card's border on its container, inside the shell.
   // The border's style and width go there too: on the shell they drew a
@@ -685,6 +688,7 @@ function applyNodeCss(
   for (const [property, value] of Object.entries(descriptor.css)) {
     if (TYPOGRAPHY_CSS.has(property)) {
       // A family the machine lacks falls back to a face of its own kind.
+      if (property === "font-family") onFontUsed?.(value);
       patchStyle(content, property, property === "font-family" ? fontStack(value) : value, patches);
     } else if (BOX_CSS.has(property)) {
       if (layer !== undefined) {
@@ -1463,6 +1467,7 @@ function applyNode(
   size?: { readonly width: number; readonly height: number },
   previewRotation?: number,
   onDeckAction?: (deckId: string, action: DeckAction) => void,
+  onFontUsed?: (family: string) => void,
 ): RenderedItem | undefined {
   const nodeEl = elementFor(runtime, ["nodeEl"]);
   const containerEl = elementFor(runtime, ["containerEl"]);
@@ -1680,7 +1685,7 @@ function applyNode(
       patchStyle(content, "padding", reserve.map((value) => `${Math.round(value * 10) / 10}px`).join(" "), patches);
     }
   }
-  applyNodeCss(descriptor, shell, content, layer, patches);
+  applyNodeCss(descriptor, shell, content, layer, patches, onFontUsed);
   if (layer !== undefined && descriptor.kind === "shape") {
     // Remove the native rectangular paint only after a real contour exists.
     // The node shell is not the only painted surface: native Canvas fills and
@@ -1970,6 +1975,9 @@ export class SourceRenderer {
             this.host.onDeckAction === undefined
               ? undefined
               : (deckId, action) => this.host.onDeckAction?.(deckId, action),
+            this.host.onFontUsed === undefined
+              ? undefined
+              : (family) => this.host.onFontUsed?.(family),
           );
           if (item !== undefined) rendered.push(item);
         }

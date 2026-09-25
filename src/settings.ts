@@ -8,11 +8,25 @@
  * rejected, because a bad preference must never stop a board from opening.
  */
 
+import { OFFERED_FONT_FAMILIES, isSafeFontFamily } from "./appearance";
 import { words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
 import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, type ToolbarItem } from "./quick-tools";
 import { readAvailableUpdate, type AvailableUpdate } from "./update-check";
 export type WheelZoomModifier = "none" | "ctrl" | "shift" | "alt";
+
+/** A font file added by hand, kept under the plugin's own `fonts/custom` folder. */
+export interface CustomFontFile {
+  readonly family: string;
+  /** The file's own name under `fonts/custom/`; never a path, so it cannot climb out of that folder. */
+  readonly file: string;
+}
+
+/** One family in the person's pool: whether the toolbar's font list offers it, and where. */
+export interface FontListEntry {
+  readonly family: string;
+  readonly shown: boolean;
+}
 
 export interface MiroCanvasSettings {
   /** Multiplier applied per zoom step. */
@@ -68,6 +82,16 @@ export interface MiroCanvasSettings {
   readonly lastUpdateCheck: number;
   /** A newer release the last check found, shown until it is installed. */
   readonly availableUpdate: AvailableUpdate | undefined;
+  /** Downloaded font packs' ids, verified against disk at load: a folder that has gone missing drops its id quietly. */
+  readonly fontPacks: readonly string[];
+  /** Font files added by hand, kept under the plugin's own folder. */
+  readonly customFonts: readonly CustomFontFile[];
+  /**
+   * The person's own pool: which families the toolbar's font list offers,
+   * and in what order.  Installing a pack or adding a custom font appends
+   * its families here; removing one drops them again.
+   */
+  readonly fontList: readonly FontListEntry[];
 }
 
 interface NumberBound {
@@ -120,6 +144,9 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   checkUpdatesAutomatically: true,
   lastUpdateCheck: 0,
   availableUpdate: undefined,
+  fontPacks: Object.freeze([]),
+  customFonts: Object.freeze([]),
+  fontList: Object.freeze(OFFERED_FONT_FAMILIES.map((family) => Object.freeze({ family, shown: true }))),
 });
 
 /** The longest name a comment is signed with, and the most authors given colours. */
@@ -204,6 +231,100 @@ function readToolbarItems(value: unknown, legacyShowLasso: unknown, legacyShowCo
   }));
 }
 
+/** The pack ids `tools/build_font_packs.py` mints: lower-case words joined by hyphens. */
+const SAFE_FONT_PACK_ID = /^[a-z][a-z0-9-]{0,63}$/u;
+/** A custom font's own file name under `fonts/custom/`: no path, so it cannot climb out of that folder. */
+const SAFE_CUSTOM_FONT_FILE = /^[^/\\:*?"<>|\u0000-\u001f]{1,180}$/u;
+const MAX_FONT_PACKS = 32;
+const MAX_CUSTOM_FONTS = 200;
+const MAX_FONT_LIST_ENTRIES = 500;
+
+function readFontPacks(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_SETTINGS.fontPacks;
+  }
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const item of value.slice(0, MAX_FONT_PACKS)) {
+    if (typeof item !== "string") continue;
+    const id = item.trim();
+    if (id === "" || !SAFE_FONT_PACK_ID.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return Object.freeze(ids);
+}
+
+function readCustomFonts(value: unknown): readonly CustomFontFile[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_SETTINGS.customFonts;
+  }
+  const seenFiles = new Set<string>();
+  const fonts: CustomFontFile[] = [];
+  for (const item of value.slice(0, MAX_CUSTOM_FONTS)) {
+    if (!isRecord(item)) continue;
+    const family = item.family;
+    const file = item.file;
+    if (!isSafeFontFamily(family) || typeof file !== "string") continue;
+    const trimmedFile = file.trim();
+    if (!SAFE_CUSTOM_FONT_FILE.test(trimmedFile) || trimmedFile === "." || trimmedFile === ".." || seenFiles.has(trimmedFile)) continue;
+    seenFiles.add(trimmedFile);
+    fonts.push(Object.freeze({ family: family.trim(), file: trimmedFile }));
+  }
+  return Object.freeze(fonts);
+}
+
+function readFontList(value: unknown): readonly FontListEntry[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_SETTINGS.fontList;
+  }
+  const seen = new Set<string>();
+  const entries: FontListEntry[] = [];
+  for (const item of value.slice(0, MAX_FONT_LIST_ENTRIES)) {
+    if (!isRecord(item)) continue;
+    const family = item.family;
+    if (!isSafeFontFamily(family) || seen.has(family.trim())) continue;
+    seen.add(family.trim());
+    entries.push(Object.freeze({ family: family.trim(), shown: typeof item.shown === "boolean" ? item.shown : true }));
+  }
+  // An empty or unusable list would leave the toolbar with no font of its
+  // own to offer beyond Obsidian's; the default pool is a safer fallback
+  // than a font list nobody can see or reach.
+  return entries.length === 0 ? DEFAULT_SETTINGS.fontList : Object.freeze(entries);
+}
+
+/** The pool's shown families, in the order the person arranged them. */
+export function shownFontFamilies(fontList: readonly FontListEntry[]): readonly string[] {
+  return Object.freeze(fontList.filter((entry) => entry.shown).map((entry) => entry.family));
+}
+
+export type FontListDirection = "up" | "down";
+
+/** Move one family one place up or down the pool; a family at the end already, or not in it, is unchanged. */
+export function moveFontListEntry(fontList: readonly FontListEntry[], family: string, direction: FontListDirection): readonly FontListEntry[] {
+  const index = fontList.findIndex((entry) => entry.family === family);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (index === -1 || target < 0 || target >= fontList.length) {
+    return fontList;
+  }
+  const next = [...fontList];
+  [next[index], next[target]] = [next[target]!, next[index]!];
+  return Object.freeze(next);
+}
+
+/** Append families a newly installed pack or a newly added custom font offers, skipping any already in the pool. */
+export function addToFontList(fontList: readonly FontListEntry[], families: readonly string[]): readonly FontListEntry[] {
+  const known = new Set(fontList.map((entry) => entry.family));
+  const additions = families.filter((family) => !known.has(family)).map((family) => Object.freeze({ family, shown: true }));
+  return additions.length === 0 ? fontList : Object.freeze([...fontList, ...additions]);
+}
+
+/** Drop families a removed pack or a removed custom font contributed. */
+export function removeFromFontList(fontList: readonly FontListEntry[], families: readonly string[]): readonly FontListEntry[] {
+  const dropped = new Set(families);
+  return Object.freeze(fontList.filter((entry) => !dropped.has(entry.family)));
+}
+
 /** Accepts any stored value and always returns usable settings. */
 export function normalizeSettings(value: unknown): MiroCanvasSettings {
   if (!isRecord(value)) {
@@ -244,6 +365,9 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     lastUpdateCheck: typeof value.lastUpdateCheck === "number" && Number.isFinite(value.lastUpdateCheck) && value.lastUpdateCheck >= 0
       ? value.lastUpdateCheck : DEFAULT_SETTINGS.lastUpdateCheck,
     availableUpdate: readAvailableUpdate(value.availableUpdate),
+    fontPacks: readFontPacks(value.fontPacks),
+    customFonts: readCustomFonts(value.customFonts),
+    fontList: readFontList(value.fontList),
   });
 }
 

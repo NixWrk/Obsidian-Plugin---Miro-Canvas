@@ -8,8 +8,11 @@
 
 import { PluginSettingTab, Setting, setIcon, type App, type Plugin } from "obsidian";
 
+import { fontStack } from "./appearance";
 import { authorColor } from "./comment-thread";
-import { words } from "./i18n";
+import type { FontPackCatalogueEntry } from "./font-pack-catalogue";
+import type { FontPackProgress } from "./font-packs";
+import { currentLocale, words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
 import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, paintToolbarIcon, toolbarItemLabel, type ToolbarItem } from "./quick-tools";
 import type { UpdateCheck } from "./update-check";
@@ -18,6 +21,7 @@ import {
   SETTING_BOUNDS,
   WHEEL_ZOOM_MODIFIERS,
   pointerBindingLabel,
+  type FontListDirection,
   type MiroCanvasSettings,
   type WheelZoomModifier,
 } from "./settings";
@@ -37,6 +41,19 @@ export interface SettingsTabHost {
   readonly pluginVersion: string;
   /** Asks GitHub for the latest release; called only on the button's press. */
   readonly checkForUpdate: () => Promise<UpdateCheck>;
+  /** The downloadable font packs' names, sizes and checksums; embedded, so listing them asks nobody. */
+  readonly fontPackCatalogue: readonly FontPackCatalogueEntry[];
+  /** Downloads and installs one pack, reporting its progress as it goes; called only on the button's press. */
+  readonly downloadFontPack: (id: string, onProgress: (stage: FontPackProgress, detail?: string) => void) => Promise<void>;
+  readonly removeFontPack: (id: string) => Promise<void>;
+  /** Opens a file picker and copies the chosen font into the plugin's own folder. */
+  readonly addCustomFont: () => Promise<void>;
+  readonly removeCustomFont: (file: string) => Promise<void>;
+  readonly renameCustomFont: (file: string, family: string) => Promise<void>;
+  readonly setFontShown: (family: string, shown: boolean) => Promise<void>;
+  readonly moveFontInList: (family: string, direction: FontListDirection) => Promise<void>;
+  /** Asks for these families' faces to be read, so the pool's own names show in their own font. */
+  readonly wantFonts: (families: readonly string[]) => void;
 }
 
 export class MiroCanvasSettingTab extends PluginSettingTab {
@@ -178,6 +195,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         .setButtonText(importLabels.openGuideButton)
         .onClick(() => this.host.openImportGuide()));
 
+    this.fonts(containerEl);
     this.updates(containerEl);
 
     new Setting(containerEl)
@@ -186,6 +204,93 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
       .addToggle((toggle) => toggle
         .setValue(this.host.settings.developerDiagnostics)
         .onChange((value) => void this.host.saveSettings({ developerDiagnostics: value })));
+  }
+
+  /**
+   * "Fonts": downloadable packs with Download/Remove and progress, a custom
+   * font file, and the person's own pool - which families the toolbar's
+   * font list offers, and in what order.  Nothing here is downloaded
+   * without a press (QUAL-003); the line under the heading says so.
+   */
+  private fonts(containerEl: HTMLElement): void {
+    const labels = words().fonts;
+    new Setting(containerEl).setName(labels.heading).setDesc(labels.networkLine).setHeading();
+
+    const locale = currentLocale();
+    for (const pack of this.host.fontPackCatalogue) {
+      const installed = this.host.settings.fontPacks.includes(pack.id);
+      const megabytes = (pack.bytes / (1024 * 1024)).toFixed(1);
+      const setting = new Setting(containerEl)
+        .setName(pack.title[locale] ?? pack.title.en)
+        .setDesc(`${pack.description[locale] ?? pack.description.en} ${labels.sizeMB(megabytes)}`);
+      const status = setting.descEl.createDiv({ cls: "miro-canvas-fontpack-status" });
+      setting.addButton((button) => {
+        button.setButtonText(installed ? labels.removeButton : labels.downloadButton);
+        if (installed) {
+          button.setWarning();
+          button.onClick(() => {
+            button.setDisabled(true);
+            void this.host.removeFontPack(pack.id).then(() => this.redisplayInPlace());
+          });
+          return;
+        }
+        button.onClick(() => {
+          button.setDisabled(true);
+          void this.host.downloadFontPack(pack.id, (stage, detail) => {
+            if (stage === "downloading") {
+              status.setText(labels.downloading);
+            } else if (stage === "installing") {
+              status.setText(labels.installing);
+            } else if (stage === "done") {
+              this.redisplayInPlace();
+            } else {
+              button.setDisabled(false);
+              status.setText(detail ?? labels.failed);
+            }
+          });
+        });
+      });
+    }
+
+    new Setting(containerEl)
+      .addButton((button) => button
+        .setButtonText(labels.addCustomFontButton)
+        .onClick(() => void this.host.addCustomFont().then(() => this.redisplayInPlace())));
+    for (const custom of this.host.settings.customFonts) {
+      new Setting(containerEl)
+        .setName(custom.file)
+        .addText((text) => text
+          .setValue(custom.family)
+          .onChange((value) => void this.host.renameCustomFont(custom.file, value)))
+        .addExtraButton((extra) => extra
+          .setIcon("trash-2")
+          .setTooltip(labels.removeCustomFontTooltip)
+          .onClick(() => void this.host.removeCustomFont(custom.file).then(() => this.redisplayInPlace())));
+    }
+
+    new Setting(containerEl).setName(labels.poolHeading).setDesc(labels.poolDesc);
+    const pool = this.host.settings.fontList;
+    // Each row writes its family's name in that family's own face.
+    this.host.wantFonts(pool.map((entry) => entry.family));
+    pool.forEach((entry, index) => {
+      const setting = new Setting(containerEl).setName(entry.family);
+      setting.nameEl.style.setProperty("font-family", fontStack(entry.family));
+      setting
+        .addToggle((toggle) => toggle
+          .setTooltip(labels.shownTooltip)
+          .setValue(entry.shown)
+          .onChange((value) => void this.host.setFontShown(entry.family, value)))
+        .addExtraButton((extra) => extra
+          .setIcon("arrow-up")
+          .setTooltip(words().settings.toolBarMoveUp)
+          .setDisabled(index === 0)
+          .onClick(() => void this.host.moveFontInList(entry.family, "up").then(() => this.redisplayInPlace())))
+        .addExtraButton((extra) => extra
+          .setIcon("arrow-down")
+          .setTooltip(words().settings.toolBarMoveDown)
+          .setDisabled(index === pool.length - 1)
+          .onClick(() => void this.host.moveFontInList(entry.family, "down").then(() => this.redisplayInPlace())));
+    });
   }
 
   /** "Check for updates": the installed version, and on a press what GitHub has. */

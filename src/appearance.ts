@@ -565,14 +565,45 @@ const GENERIC_FONT_FAMILIES = new Set(["serif", "sans-serif", "monospace", "syst
  */
 export const OFFERED_FONT_FAMILIES = Object.freeze(["Inter", "Source Code Pro", "sans-serif", "serif"] as const);
 
-/** How a font is named in the toolbar: a generic family by what it looks like, any other by its own name. */
+/**
+ * The name a board may carry for a font it does not itself embed: Miro's own
+ * ids (`open_sans`, `noto_sans`, `pt_sans`, `plex_sans`, `times_new_roman`,
+ * `arial`, ...) as its REST API writes them, and the common Windows names
+ * Miro sometimes writes directly (`Calibri`, `Arial`, `Georgia`, ...) for a
+ * board that used a system font instead of one from its list.  Each maps to
+ * the family a downloadable pack carries under that font's own metrics or
+ * name, drawn from `tools/build_font_packs.py`'s own alias tables so the two
+ * stay in step.  Keys are matched exactly as Miro writes them, case included.
+ */
+export const MIRO_FONT_IDS: Readonly<Record<string, string>> = Object.freeze({
+  abril_fatface: "Abril Fatface", bangers: "Bangers", caveat: "Caveat",
+  eb_garamond: "EB Garamond", fredoka_one: "Fredoka", "Fredoka One": "Fredoka",
+  graduate: "Graduate", gravitas_one: "Gravitas One", nixie_one: "Nixie One",
+  noto_sans: "Noto Sans", open_sans: "Open Sans", OpenSans: "Open Sans",
+  permanent_marker: "Permanent Marker", pt_sans: "PT Sans", pt_sans_narrow: "PT Sans Narrow",
+  pt_serif: "PT Serif", rammetto_one: "Rammetto One", roboto: "Roboto",
+  roboto_condensed: "Roboto Condensed", roboto_mono: "Roboto Mono", roboto_slab: "Roboto Slab",
+  titan_one: "Titan One", plex_sans: "IBM Plex Sans", plex_serif: "IBM Plex Serif",
+  plex_mono: "IBM Plex Mono",
+  gamja_flower: "Gamja Flower", gowun_batang: "Gowun Batang", klee_one: "Klee One",
+  m_plus_rounded_1c: "M PLUS Rounded 1c", mochiy_pop_p_one: "Mochiy Pop P One",
+  nanum_brush_script: "Nanum Brush Script", noto_sans_japanese: "Noto Sans JP",
+  noto_sans_korean: "Noto Sans KR", noto_serif_japanese: "Noto Serif JP", noto_serif_korean: "Noto Serif KR",
+  Calibri: "Carlito", Cambria: "Caladea", Arial: "Arimo", arial: "Arimo",
+  "Times New Roman": "Tinos", times_new_roman: "Tinos", "Courier New": "Cousine",
+  Georgia: "Gelasio", georgia: "Gelasio",
+  Excalidraw: "Excalifont",
+});
+
+/** How a font is named in the toolbar: a generic family by what it looks like, a known id by its family's name, any other by its own name. */
 export function fontLabel(family: string): string {
   const names = words().toolbar;
-  const key = family.trim().toLowerCase();
+  const trimmed = family.trim();
+  const key = trimmed.toLowerCase();
   if (key === "sans-serif") return names.systemSans;
   if (key === "serif") return names.systemSerif;
   if (key === "monospace") return names.systemMono;
-  return family.trim();
+  return MIRO_FONT_IDS[trimmed] ?? trimmed;
 }
 
 /**
@@ -580,17 +611,27 @@ export function fontLabel(family: string): string {
  * machine that lacks it.  Without one the browser falls back to its default
  * serif face, so a missing sans-serif font looked like Times New Roman.
  * The kind is read from the name: monospace, serif, or sans-serif otherwise.
+ *
+ * A Miro id or alias (`open_sans`, `Calibri`, ...) is put first exactly as
+ * the board wrote it, then the family it stands for, so an imported board
+ * renders in that real font wherever the system or a downloaded pack has it,
+ * before falling through to the same generic chain.
  */
 export function fontStack(family: string): string {
   const trimmed = family.trim();
   const key = trimmed.toLowerCase();
   if (trimmed.includes(",") || GENERIC_FONT_FAMILIES.has(key)) return trimmed;
+  const resolved = MIRO_FONT_IDS[trimmed];
+  // The kind - monospace, serif, or sans-serif otherwise - is read from
+  // whichever of the id and its family gives one away, so a resolved id
+  // such as `times_new_roman` still ends in `serif`, not the sans default.
+  const kindKey = resolved === undefined ? key : `${key} ${resolved.toLowerCase()}`;
   // A validated family has no quotes of its own, so quoting it is safe and
   // keeps a name that starts with a digit a single family.
-  const named = `"${trimmed}"`;
-  if (/mono|code|courier|consol/u.test(key)) return `${named}, "Source Code Pro", monospace`;
-  if (/serif|georgia|times|garamond|slab|playfair|merriweather|lora|literata/u.test(key) && !/sans/u.test(key)) return `${named}, serif`;
-  return key === "inter" ? `${named}, sans-serif` : `${named}, Inter, sans-serif`;
+  const named = resolved === undefined ? `"${trimmed}"` : `"${trimmed}", "${resolved}"`;
+  if (/mono|code|courier|consol/u.test(kindKey)) return `${named}, "Source Code Pro", monospace`;
+  if (/serif|georgia|times|garamond|slab|playfair|merriweather|lora|literata/u.test(kindKey) && !/sans/u.test(kindKey)) return `${named}, serif`;
+  return kindKey === "inter" ? `${named}, sans-serif` : `${named}, Inter, sans-serif`;
 }
 
 function validFontFamily(value: unknown): value is string {

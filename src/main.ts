@@ -1,6 +1,7 @@
 import * as obsidian from "obsidian";
 import { MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
+import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily } from "./appearance";
 import {
   inspectAdvancedCanvas,
   inspectCanvasView,
@@ -16,11 +17,25 @@ import { M1CanvasSession } from "./m1-session";
 import { M2CanvasTools, type InitialCommentTarget } from "./m2-tools";
 import { createObsidianDocumentHost } from "./obsidian-document-host";
 import { buildImportGuide, openExternalLink, vaultFolderPath, type ImportGuideActions } from "./import-guide";
+import { FONT_PACK_CATALOGUE } from "./font-pack-catalogue";
+import {
+  FontFaceRegistry,
+  FontPackDownloadError,
+  downloadFontPack,
+  readInstalledPackManifest,
+  type CustomFontDefinition,
+  type FontFacePackDefinition,
+  type FontPackManifest,
+  type FontPackProgress,
+} from "./font-packs";
 import {
   DEFAULT_SETTINGS,
+  addToFontList,
+  moveFontListEntry,
   navigationCommands,
   normalizeSettings,
   obsidianAccountName,
+  removeFromFontList,
   shouldAskImportQuestion,
   type MiroCanvasSettings,
   type PanDirection,
@@ -33,6 +48,24 @@ import { createWelcomeBoard } from "./welcome-board";
 import { automaticCheckDue, checkForUpdate, isNewerVersion, type ReleaseRequest, type UpdateCheck } from "./update-check";
 
 const NATIVE_CANVAS_VIEW_TYPE = "canvas";
+
+/** A font file's own name, safe on every filesystem the plugin's vaults run on. */
+function sanitizeFontFileName(name: string): string {
+  const cleaned = name.replace(/[/\\:*?"<>|\u0000-\u001f]/gu, "_").trim();
+  return cleaned === "" ? "font" : cleaned.slice(0, 180);
+}
+
+/** The chosen name, or the same name with a counter where it is already taken. */
+function uniqueFontFileName(name: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(name)) return name;
+  const dot = name.lastIndexOf(".");
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : "";
+  for (let index = 2; ; index += 1) {
+    const candidate = `${stem} (${index})${extension}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
 
 /**
  * The language Obsidian shows itself in.  `getLanguage` arrived in Obsidian
@@ -108,6 +141,10 @@ export default class MiroCanvasPlugin extends Plugin {
   private updateIndicator: HTMLElement | undefined;
   private initializationRetry: ReturnType<typeof setTimeout> | null = null;
   public canvasSettings: MiroCanvasSettings = DEFAULT_SETTINGS;
+  /** The `<style>` this plugin owns in every window's head; loads a family's faces lazily, only once something wants it. */
+  private readonly fontFaces = new FontFaceRegistry();
+  /** The installed packs' manifests, kept for the font-face catalog and for what a removal drops from the pool. */
+  private installedFontPackManifests: readonly FontPackManifest[] = [];
 
   override async onload(): Promise<void> {
     // Every word below, command names included, is in Obsidian's own language.
@@ -119,6 +156,14 @@ export default class MiroCanvasPlugin extends Plugin {
     // so it is normalized rather than trusted.
     this.canvasSettings = normalizeSettings(await this.loadData());
     setAuthorColors(this.canvasSettings.commentAuthorColors);
+    // Every window that can show a Canvas gets the plugin's own font-face
+    // sheet; a popout gets one as it opens, and loses it as it closes.  A
+    // face's bytes are read only once something wants that family.
+    this.fontFaces.setFileReader((path) => this.app.vault.adapter.readBinary(path));
+    this.fontFaces.attach(document);
+    this.registerEvent(this.app.workspace.on("window-open", (_win, openedWindow) => this.fontFaces.attach(openedWindow.document)));
+    this.registerEvent(this.app.workspace.on("window-close", (_win, closedWindow) => this.fontFaces.detach(closedWindow.document)));
+    await this.loadFontPacks();
     this.addSettingTab(new MiroCanvasSettingTab(this.app, this, {
       get settings(): MiroCanvasSettings { return self.canvasSettings; },
       saveSettings: (patch) => this.saveCanvasSettings(patch),
@@ -128,6 +173,19 @@ export default class MiroCanvasPlugin extends Plugin {
       createWelcomeBoard: () => this.openWelcomeBoard(),
       pluginVersion: this.manifest.version,
       checkForUpdate: () => this.checkForUpdates(),
+      fontPackCatalogue: FONT_PACK_CATALOGUE,
+      downloadFontPack: (id, onProgress) => this.downloadFontPackAction(id, onProgress),
+      removeFontPack: (id) => this.removeFontPackAction(id),
+      addCustomFont: () => this.addCustomFontAction(),
+      removeCustomFont: (file) => this.removeCustomFontAction(file),
+      renameCustomFont: (file, family) => this.renameCustomFontAction(file, family),
+      setFontShown: (family, shown) => this.saveCanvasSettings({
+        fontList: this.canvasSettings.fontList.map((entry) => (entry.family === family ? { ...entry, shown } : entry)),
+      }),
+      moveFontInList: (family, direction) => this.saveCanvasSettings({
+        fontList: moveFontListEntry(this.canvasSettings.fontList, family, direction),
+      }),
+      wantFonts: (families) => this.fontFaces.want(families),
     }));
     // Advanced Canvas is optional.  Its adapter fails closed, so this probe
     // cannot prevent the native Canvas shell from loading.
@@ -357,6 +415,7 @@ export default class MiroCanvasPlugin extends Plugin {
 
   override onunload(): void {
     this.disposeShell();
+    this.fontFaces.dispose();
   }
 
   private readonly handleActiveLeafChange = (
@@ -412,6 +471,9 @@ export default class MiroCanvasPlugin extends Plugin {
         const session = this.activeM1Session();
         if (session !== null) this.openLocalTools(session, { threadId, origin });
       },
+      // A card, a label or the toolbar's own font list naming a family is
+      // the one signal that family's bytes are worth reading.
+      onFontUsed: (family) => this.fontFaces.want([family]),
       settings: this.canvasSettings,
       ...(this.metadataStoreProbe?.store !== undefined ? {} : {
         persistenceProblem: this.metadataStoreProbe?.diagnostics
@@ -761,6 +823,196 @@ export default class MiroCanvasPlugin extends Plugin {
     // maintainers do; only the fallback sentence is translated.
     const reason = result.diagnostics[0]?.message ?? words().shell.transactionRejected;
     new Notice(words().shell.actionRejected(reason));
+  }
+
+  /** Where downloaded and custom fonts live: a subfolder of the plugin's own folder. */
+  private fontsDir(): string {
+    return normalizePath(`${this.manifest.dir}/fonts`);
+  }
+
+  /** Verify every installed pack still has its folder; one that has gone missing drops quietly, id and families both. */
+  private async loadFontPacks(): Promise<void> {
+    const adapter = this.app.vault.adapter;
+    const dir = this.fontsDir();
+    const survivingIds: string[] = [];
+    const manifests: FontPackManifest[] = [];
+    for (const id of this.canvasSettings.fontPacks) {
+      try {
+        const path = `${dir}/${id}/pack.json`;
+        if (!(await adapter.exists(path))) continue;
+        const manifest = readInstalledPackManifest(JSON.parse(await adapter.read(path)) as unknown);
+        if (manifest === undefined || manifest.id !== id) continue;
+        survivingIds.push(id);
+        manifests.push(manifest);
+      } catch {
+        // A folder that cannot be read is treated as gone.
+      }
+    }
+    this.installedFontPackManifests = manifests;
+    const known = new Set<string>([
+      ...OFFERED_FONT_FAMILIES,
+      ...manifests.flatMap((manifest) => manifest.families.map((family) => family.family)),
+      ...this.canvasSettings.customFonts.map((font) => font.family),
+    ]);
+    const prunedFontList = this.canvasSettings.fontList.filter((entry) => known.has(entry.family));
+    if (survivingIds.length !== this.canvasSettings.fontPacks.length || prunedFontList.length !== this.canvasSettings.fontList.length) {
+  this.canvasSettings = normalizeSettings({
+        ...this.canvasSettings,
+        fontPacks: survivingIds,
+        fontList: prunedFontList.length > 0 ? prunedFontList : this.canvasSettings.fontList,
+      });
+      await this.saveData(this.canvasSettings);
+    }
+    this.syncFontCatalog();
+  }
+
+  /**
+   * Tell the font-face registry which packs and custom fonts exist and
+   * where their files live.  This reads no bytes and inserts no rule: a
+   * family's own faces are read only once something actually asks for it
+   * through `FontFaceRegistry.want` - the toolbar's font popover opening,
+   * a card or label naming it, or the settings' own font list drawing its
+   * names.  Call this after any change to the installed packs or custom
+   * fonts; a family whose pack is gone has its rule and blob revoked by
+   * `configure` itself.
+   */
+  private syncFontCatalog(): void {
+    const dir = this.fontsDir();
+    const packs: FontFacePackDefinition[] = this.installedFontPackManifests.map((manifest) => ({
+      id: manifest.id, dir: `${dir}/${manifest.id}`, families: manifest.families, aliases: manifest.aliases,
+    }));
+    const customFonts: CustomFontDefinition[] = this.canvasSettings.customFonts.map((font) => ({
+      family: font.family, file: font.file,
+    }));
+    this.fontFaces.configure(packs, customFonts, `${dir}/custom`);
+  }
+
+  /** The message a failed download shows, in the language in use. */
+  private fontPackFailureMessage(error: unknown): string {
+    const labels = words().fonts;
+    if (!(error instanceof FontPackDownloadError)) return labels.failed;
+    switch (error.reason) {
+      case "not-published": return labels.notPublishedYet;
+      case "integrity": return labels.integrityMismatch;
+      case "invalid": return labels.invalidPack;
+      case "network": return labels.failed;
+    }
+  }
+
+  /** Download, verify and unpack one catalogue pack on a press; a failure leaves nothing behind. */
+  private async downloadFontPackAction(id: string, onProgress: (stage: FontPackProgress, detail?: string) => void): Promise<void> {
+    const entry = FONT_PACK_CATALOGUE.find((item) => item.id === id);
+    const dir = this.fontsDir();
+    const adapter = this.app.vault.adapter;
+    if (entry === undefined) {
+      onProgress("failed", words().fonts.failed);
+      return;
+    }
+    try {
+      const manifest = await downloadFontPack(entry, {
+        fetch: async (url) => {
+          const response = await requestUrl({ url, throw: false });
+          return { status: response.status, arrayBuffer: response.arrayBuffer };
+        },
+        digest: (data) => crypto.subtle.digest("SHA-256", data),
+        writer: {
+          mkdir: (path) => adapter.mkdir(path),
+          writeBinary: (path, data) => adapter.writeBinary(path, data),
+          write: (path, data) => adapter.write(path, data),
+        },
+      }, `${dir}/${id}`, (stage) => onProgress(stage));
+      this.installedFontPackManifests = [...this.installedFontPackManifests.filter((existing) => existing.id !== id), manifest];
+      await this.saveCanvasSettings({
+        fontPacks: [...this.canvasSettings.fontPacks.filter((existing) => existing !== id), id],
+        fontList: addToFontList(this.canvasSettings.fontList, manifest.families.map((family) => family.family)),
+      });
+      this.syncFontCatalog();
+      onProgress("done");
+    } catch (error) {
+      await adapter.rmdir(`${dir}/${id}`, true).catch(() => undefined);
+      onProgress("failed", this.fontPackFailureMessage(error));
+    }
+  }
+
+  /** Remove a pack's folder and drop its families from the pool, unless something else still needs them. */
+  private async removeFontPackAction(id: string): Promise<void> {
+    const dir = this.fontsDir();
+    const manifest = this.installedFontPackManifests.find((item) => item.id === id);
+    await this.app.vault.adapter.rmdir(`${dir}/${id}`, true).catch(() => undefined);
+    this.installedFontPackManifests = this.installedFontPackManifests.filter((item) => item.id !== id);
+    const stillNeeded = new Set<string>([
+      ...OFFERED_FONT_FAMILIES,
+      ...this.canvasSettings.customFonts.map((font) => font.family),
+      ...this.installedFontPackManifests.flatMap((item) => item.families.map((family) => family.family)),
+    ]);
+    const dropped = (manifest?.families.map((family) => family.family) ?? []).filter((family) => !stillNeeded.has(family));
+    await this.saveCanvasSettings({
+      fontPacks: this.canvasSettings.fontPacks.filter((existing) => existing !== id),
+      fontList: removeFromFontList(this.canvasSettings.fontList, dropped),
+    });
+    this.syncFontCatalog();
+  }
+
+  /** A file picker for one font file; resolves to undefined where nothing was chosen. */
+  private pickFontFile(): Promise<File | undefined> {
+    return new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".ttf,.otf,.woff,.woff2";
+      input.style.display = "none";
+      input.addEventListener("change", () => {
+        resolve(input.files?.[0] ?? undefined);
+        input.remove();
+      }, { once: true });
+      document.body.appendChild(input);
+      input.click();
+    });
+  }
+
+  /** "Add a font file": copy the chosen file into the plugin's own folder and add it to the pool. */
+  private async addCustomFontAction(): Promise<void> {
+    const file = await this.pickFontFile();
+    if (file === undefined) return;
+    const dir = this.fontsDir();
+    const adapter = this.app.vault.adapter;
+    const taken = new Set(this.canvasSettings.customFonts.map((font) => font.file));
+    const fileName = uniqueFontFileName(sanitizeFontFileName(file.name), taken);
+    await adapter.mkdir(`${dir}/custom`);
+    await adapter.writeBinary(`${dir}/custom/${fileName}`, await file.arrayBuffer());
+    const family = normalizeFontFamily(file.name.replace(/\.[^./]+$/u, ""));
+    await this.saveCanvasSettings({
+      customFonts: [...this.canvasSettings.customFonts, { family, file: fileName }],
+      fontList: addToFontList(this.canvasSettings.fontList, [family]),
+    });
+    this.syncFontCatalog();
+  }
+
+  /** Remove a custom font's file, and its family from the pool unless something else still needs it. */
+  private async removeCustomFontAction(file: string): Promise<void> {
+    const custom = this.canvasSettings.customFonts.find((font) => font.file === file);
+    await this.app.vault.adapter.remove(`${this.fontsDir()}/custom/${file}`).catch(() => undefined);
+    const remaining = this.canvasSettings.customFonts.filter((font) => font.file !== file);
+    const stillNeeded = new Set<string>([
+      ...OFFERED_FONT_FAMILIES,
+      ...this.installedFontPackManifests.flatMap((item) => item.families.map((family) => family.family)),
+      ...remaining.map((font) => font.family),
+    ]);
+    const dropped = custom !== undefined && !stillNeeded.has(custom.family) ? [custom.family] : [];
+    await this.saveCanvasSettings({ customFonts: remaining, fontList: removeFromFontList(this.canvasSettings.fontList, dropped) });
+    this.syncFontCatalog();
+  }
+
+  /** Rename a custom font's family; its row in the pool keeps its place. */
+  private async renameCustomFontAction(file: string, family: string): Promise<void> {
+    const current = this.canvasSettings.customFonts.find((font) => font.file === file);
+    if (current === undefined) return;
+    const safe = normalizeFontFamily(family, current.family || DEFAULT_FONT_FAMILY);
+    if (safe === current.family) return;
+    await this.saveCanvasSettings({
+      customFonts: this.canvasSettings.customFonts.map((font) => (font.file === file ? { ...font, family: safe } : font)),
+      fontList: this.canvasSettings.fontList.map((entry) => (entry.family === current.family ? { ...entry, family: safe } : entry)),
+    });
+    this.syncFontCatalog();
   }
 
   private disposeShell(): void {

@@ -12,8 +12,8 @@ describe("a connector label's font", () => {
   });
 
   it("takes only the properties the Miro source's own label style set", () => {
-    expect(labelFont(undefined, { "font-family": "Georgia", "font-size": "22px" })).toEqual({
-      "font-family": "\"Georgia\", serif",
+    expect(labelFont(undefined, { "font-family": "Merriweather", "font-size": "22px" })).toEqual({
+      "font-family": "\"Merriweather\", serif",
       "font-size": "22px",
     });
     // A weight or style the import never named stays clear, so Canvas's own default keeps painting it.

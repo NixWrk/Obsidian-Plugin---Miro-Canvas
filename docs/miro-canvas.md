@@ -697,6 +697,26 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   Apache or MIT only); a download happens only on a press and shows its size,
   and the README names it as the one place the plugin goes to the network. A
   font is loaded into memory only when something is written in it.
+  Plugin side done 2026-09-25 (`src/font-packs.ts`, `src/font-pack-catalogue.ts`,
+  `tools/build_font_packs.py --write-catalogue`, `src/settings.ts`,
+  `src/settings-tab.ts`, `src/selection-toolbar.ts`, `src/appearance.ts`,
+  `src/main.ts`): a stored-ZIP reader and manifest validator with no network
+  dependency of their own; a download on a press verifies the archive's
+  SHA-256 against the embedded catalogue before unpacking it into the
+  plugin's own folder, with progress shown in its settings row. One
+  `<style>` element per window - the main one and every popout - carries the
+  installed packs' and any custom fonts' `@font-face` rules; an alias (a
+  Word font's name, Excalidraw's own) tries the system's own font first,
+  the pack's stand-in second. Settings → Fonts lists every pack with
+  Download/Remove and progress, "Add a font file", and the person's own
+  font-list pool with a switch and up/down. `MIRO_FONT_IDS` maps Miro's REST
+  ids and the common Windows names it sometimes writes directly
+  (`open_sans`, `times_new_roman`, `arial`, `Calibri`, ...) to the family a
+  pack stands in for, so `fontStack` and `fontLabel` render and name them
+  once the matching pack, or the real font, is present. The GitHub release
+  (tag `fonts-1`) that actually carries the pack ZIPs is not published yet;
+  until it is, a download answers with a plain "this pack is not published
+  yet" message rather than an error.
 - Check every kind of link and formula inside the plugin (`FUT-017`): wiki and
   Markdown links to notes, headings and blocks, web addresses, embeds
   (`![[...]]`) of notes, pictures, PDFs and other canvases, links from Miro
