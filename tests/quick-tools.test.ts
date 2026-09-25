@@ -2,10 +2,18 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { setLocale } from "../src/i18n";
 import {
-  ALL_TOOLBAR_ITEMS, QUICK_TOOLS, QUICK_TOOL_KEYS, QuickTools,
-  moveToolbarItem, removeToolbarItem,
+  ALL_TOOLBAR_ITEMS, DRAG_CREATE_TOOLS, QUICK_TOOLS, QUICK_TOOL_KEYS, QuickTools,
+  isDragCreateTool, moveToolbarItem, removeToolbarItem,
   type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "../src/quick-tools";
+
+/** A plain inline-style stand-in: `setProperty`/`removeProperty` alongside ordinary named properties, as a real `CSSStyleDeclaration` allows both. */
+function fakeStyle(): Record<string, string> & { setProperty: (name: string, value: string) => void; removeProperty: (name: string) => void } {
+  const style = {} as Record<string, string> & { setProperty: (name: string, value: string) => void; removeProperty: (name: string) => void };
+  style.setProperty = (name, value) => { style[name] = value; };
+  style.removeProperty = (name) => { delete style[name]; };
+  return style;
+}
 
 class FakeElement {
   public readonly nodeType = 1;
@@ -17,6 +25,7 @@ class FakeElement {
     remove: (name: string) => { this.classes.delete(name); },
     contains: (name: string) => this.classes.has(name),
   };
+  public readonly style = fakeStyle();
   public readonly listeners = new Map<string, Array<(event: unknown) => void>>();
   public parentNode: FakeElement | undefined;
   public textContent = "";
@@ -98,6 +107,10 @@ class FakeElement {
 }
 
 class FakeDocument {
+  /** Where a dragged tool's ghost mounts, clear of the bar's own layout. */
+  public readonly body = new FakeElement("body");
+  private readonly listeners = new Map<string, Array<(event: unknown) => void>>();
+
   public createElement(tagName: string): FakeElement {
     return new FakeElement(tagName);
   }
@@ -106,6 +119,22 @@ class FakeDocument {
   // need a real SVG namespace to stand in for one.
   public createElementNS(_namespace: string, tagName: string): FakeElement {
     return new FakeElement(tagName);
+  }
+
+  // A drag off the bar listens for Escape at the document, the way the
+  // board's own tools do.
+  public addEventListener(name: string, listener: (event: unknown) => void): void {
+    const listeners = this.listeners.get(name) ?? [];
+    listeners.push(listener);
+    this.listeners.set(name, listeners);
+  }
+
+  public removeEventListener(name: string, listener: (event: unknown) => void): void {
+    this.listeners.set(name, (this.listeners.get(name) ?? []).filter((item) => item !== listener));
+  }
+
+  public dispatch(name: string, props: Record<string, unknown> = {}): void {
+    for (const listener of [...(this.listeners.get(name) ?? [])]) listener({ type: name, ...props });
   }
 }
 
@@ -401,6 +430,116 @@ describe("quick tools", () => {
     expect(panelOf(shapeButton).hidden).toBe(false);
     // More holds the shape button, so closing "every other panel" must spare it.
     expect(panelOf(more).hidden).toBe(false);
+  });
+});
+
+describe("dragging a tool off the bar to create it", () => {
+  it("lists exactly the tools that make one item with a single drop", () => {
+    expect(DRAG_CREATE_TOOLS).toEqual(["text", "sticky", "shape", "comment", "frame", "code", "table", "link"]);
+    for (const tool of QUICK_TOOLS) {
+      expect(isDragCreateTool(tool)).toBe((DRAG_CREATE_TOOLS as readonly QuickTool[]).includes(tool));
+    }
+  });
+
+  it("still arms the tool on a plain press and release, with no movement at all", () => {
+    const { root, calls } = build();
+    const button = toolButton(root, "text");
+    button.dispatch("pointerdown", { pointerId: 1, clientX: 10, clientY: 10, button: 0, pointerType: "mouse" });
+    button.dispatch("pointerup", { pointerId: 1, clientX: 10, clientY: 10 });
+    button.dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "text" }]);
+  });
+
+  it("stays a click below the drag threshold", () => {
+    const { root, calls } = build();
+    const button = toolButton(root, "sticky");
+    button.dispatch("pointerdown", { pointerId: 1, clientX: 100, clientY: 100, button: 0, pointerType: "mouse" });
+    button.dispatch("pointermove", { pointerId: 1, clientX: 103, clientY: 100 });
+    button.dispatch("pointerup", { pointerId: 1, clientX: 103, clientY: 100 });
+    button.dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "sticky" }]);
+  });
+
+  it("starts a drag past the threshold, drops through onDragCreate at the release point, and never arms it", () => {
+    const dragged: Array<{ tool: QuickTool; point: { x: number; y: number } }> = [];
+    const tools = new QuickTools(
+      {
+        onArm: () => { throw new Error("a dragged-and-dropped tool must not also arm"); },
+        onShape: () => {}, onPen: () => {},
+        onDragCreate: (tool, point) => dragged.push({ tool, point }),
+      },
+      { document: new FakeDocument() as unknown as Document },
+    );
+    const root = tools.element as unknown as FakeElement;
+    const document = (tools as unknown as { document: FakeDocument }).document;
+    const button = toolButton(root, "frame");
+    button.dispatch("pointerdown", { pointerId: 7, clientX: 50, clientY: 50, button: 0, pointerType: "mouse" });
+    // 10 screen px down: past DRAG_THRESHOLD (4px), so the ghost appears.
+    button.dispatch("pointermove", { pointerId: 7, clientX: 50, clientY: 60 });
+    expect(document.body.children.some((child) => child.className.includes("miro-canvas-bar-ghost"))).toBe(true);
+    button.dispatch("pointerup", { pointerId: 7, clientX: 200, clientY: 300 });
+    expect(dragged).toEqual([{ tool: "frame", point: { x: 200, y: 300 } }]);
+    // The ghost is gone, and the click that follows the drop does not arm it.
+    expect(document.body.children.some((child) => child.className.includes("miro-canvas-bar-ghost"))).toBe(false);
+    expect(() => button.dispatch("click")).not.toThrow();
+  });
+
+  it("cancels on Escape while dragging: no drop, and the eventual release makes nothing either", () => {
+    const dragged: unknown[] = [];
+    const tools = new QuickTools(
+      { onArm: () => {}, onShape: () => {}, onPen: () => {}, onDragCreate: (tool, point) => dragged.push({ tool, point }) },
+      { document: new FakeDocument() as unknown as Document },
+    );
+    const root = tools.element as unknown as FakeElement;
+    const document = (tools as unknown as { document: FakeDocument }).document;
+    const button = toolButton(root, "table");
+    button.dispatch("pointerdown", { pointerId: 3, clientX: 0, clientY: 0, button: 0, pointerType: "mouse" });
+    button.dispatch("pointermove", { pointerId: 3, clientX: 0, clientY: 20 });
+    document.dispatch("keydown", { key: "Escape" });
+    expect(document.body.children.some((child) => child.className.includes("miro-canvas-bar-ghost"))).toBe(false);
+    // The pointer is physically still down until this release; Escape already tore the gesture down.
+    button.dispatch("pointerup", { pointerId: 3, clientX: 0, clientY: 300 });
+    expect(dragged).toEqual([]);
+  });
+
+  it("forgets an Escape-cancelled drag on the next press, so that press's click still arms", () => {
+    const { tools, root, calls } = build();
+    const document = (tools as unknown as { document: FakeDocument }).document;
+    const table = toolButton(root, "table");
+    table.dispatch("pointerdown", { pointerId: 3, clientX: 0, clientY: 0, button: 0, pointerType: "mouse" });
+    table.dispatch("pointermove", { pointerId: 3, clientX: 0, clientY: 20 });
+    document.dispatch("keydown", { key: "Escape" });
+    // The release lands off the button, so no click ever consumes the drag's suppression.
+    const select = toolButton(root, "select");
+    root.dispatch("pointerdown", { pointerId: 4, stopPropagation: () => {} });
+    select.dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "select" }]);
+  });
+
+  it("scales the ghost by the board's own zoom, read once the drag starts", () => {
+    const tools = new QuickTools(
+      { onArm: () => {}, onShape: () => {}, onPen: () => {}, dragZoom: () => 2 },
+      { document: new FakeDocument() as unknown as Document },
+    );
+    const root = tools.element as unknown as FakeElement;
+    const document = (tools as unknown as { document: FakeDocument }).document;
+    const button = toolButton(root, "code");
+    button.dispatch("pointerdown", { pointerId: 1, clientX: 0, clientY: 0, button: 0, pointerType: "mouse" });
+    button.dispatch("pointermove", { pointerId: 1, clientX: 0, clientY: 20 });
+    const ghost = document.body.children.find((child) => child.className.includes("miro-canvas-bar-ghost"))!;
+    // code's own default box is 480x120; at zoom 2 the ghost is twice that.
+    expect((ghost as unknown as HTMLElement).style.width).toBe("960px");
+    expect((ghost as unknown as HTMLElement).style.height).toBe("240px");
+  });
+
+  it("does not drag the tools left off this list - select stays a plain click", () => {
+    const { root, calls } = build();
+    const button = toolButton(root, "select");
+    button.dispatch("pointerdown", { pointerId: 1, clientX: 0, clientY: 0, button: 0, pointerType: "mouse" });
+    button.dispatch("pointermove", { pointerId: 1, clientX: 0, clientY: 50 });
+    button.dispatch("pointerup", { pointerId: 1, clientX: 0, clientY: 50 });
+    button.dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "select" }]);
   });
 });
 

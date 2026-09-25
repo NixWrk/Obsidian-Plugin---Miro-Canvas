@@ -1372,6 +1372,35 @@
   stroke: rgb(127 127 127 / 22%);
 }
 
+/* A tool dragged off the bar or the "+" menu: the outline it will make,
+   following the pointer until it is dropped on the board.  Fixed to the
+   viewport, moved only by `transform`, so a drag never triggers a layout
+   read of its own on the way. */
+.miro-canvas-bar-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10000;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--interactive-accent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.miro-canvas-bar-ghost--sticky {
+  background: rgb(255 247 161 / 35%);
+}
+
+.miro-canvas-bar-ghost--shape {
+  border: none;
+}
+
+.miro-canvas-bar-ghost--shape svg {
+  width: 100%;
+  height: 100%;
+  color: var(--interactive-accent);
+}
+
 /* The pointer says what a press will do: a circle for a pen or an eraser,
    a cross for anything a press places.  Touch drawing needs the browser to
    leave the gesture alone. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nativeToolbarItemOf, resolveSelectionToolbarPresentation } from "../src/m1-session";
+import { nativeToolbarItemOf, pointLandsOnBoard, resolveSelectionToolbarPresentation } from "../src/m1-session";
 
 /** A native card-menu button stands in for the real element: only its icon class matters here. */
 function nativeButton(iconClass: string | undefined): Element {
@@ -80,5 +80,40 @@ describe("effective selection toolbar presentation", () => {
       .toMatchObject({ startCap: "filled_triangle", endCap: "filled_triangle" });
     expect(resolveSelectionToolbarPresentation(document, "bare").style.connector).toMatchObject({ startCap: "none", endCap: "none" });
     expect(resolveSelectionToolbarPresentation(document, "a").style.connector).toBeUndefined();
+  });
+});
+
+/** A board root standing in for `M1Session`'s own: a fixed view rect, and one element `elementFromPoint` reports underneath it. */
+function boardRoot(rect: { left: number; top: number; right: number; bottom: number }, hit: { closest: (selector: string) => unknown } | null) {
+  return {
+    getBoundingClientRect: () => rect,
+    ownerDocument: { elementFromPoint: () => hit },
+  };
+}
+
+describe("where a tool dragged off the bar may create something", () => {
+  const rect = { left: 0, top: 0, right: 800, bottom: 600 };
+
+  it("is true for a point inside the view that lands on nothing a panel selector matches", () => {
+    const bare = boardRoot(rect, { closest: () => null });
+    expect(pointLandsOnBoard({ x: 400, y: 300 }, bare)).toBe(true);
+  });
+
+  it("is false outside the root's own view, even where nothing else is in the way", () => {
+    const bare = boardRoot(rect, { closest: () => null });
+    expect(pointLandsOnBoard({ x: -1, y: 300 }, bare)).toBe(false);
+    expect(pointLandsOnBoard({ x: 801, y: 300 }, bare)).toBe(false);
+    expect(pointLandsOnBoard({ x: 400, y: -1 }, bare)).toBe(false);
+    expect(pointLandsOnBoard({ x: 400, y: 601 }, bare)).toBe(false);
+  });
+
+  it("is false over a panel - the bar, the dock, a thread - even inside the view", () => {
+    const overToolbar = boardRoot(rect, { closest: (selector) => (selector.includes("miro-canvas-toolbar") ? {} : null) });
+    expect(pointLandsOnBoard({ x: 400, y: 590 }, overToolbar)).toBe(false);
+  });
+
+  it("is false when nothing is under the point at all", () => {
+    const nothing = boardRoot(rect, null);
+    expect(pointLandsOnBoard({ x: 400, y: 300 }, nothing)).toBe(false);
   });
 });

@@ -16,6 +16,7 @@ import { LINE_KINDS, lineKind, lineLabel, type LineKindSpec } from "./free-line"
 import { validHeadSize } from "./connector-style";
 import { defaultPalette } from "./appearance";
 import { miroStickyColors } from "./miro-palette";
+import { LOCAL_ITEM_SIZES } from "./local-items";
 import { BAR_TOOLTIP_DELAY, PICTURE_TOOLTIP_DELAY } from "./tooltips";
 
 export const QUICK_TOOLS = [
@@ -23,6 +24,41 @@ export const QUICK_TOOLS = [
   "connector", "comment", "frame", "code", "table", "link",
 ] as const;
 export type QuickTool = (typeof QUICK_TOOLS)[number];
+
+/**
+ * The tools that make one item, so pressing their button and dragging onto
+ * the board creates it there, the way Canvas's own card, note and file
+ * buttons already do.  Select and the lasso only choose; the pen's tools
+ * draw a stroke of their own shape; a connector needs two ends, not a drop
+ * point - none of those fit a single drag-and-drop.
+ */
+export const DRAG_CREATE_TOOLS: readonly QuickTool[] = ["text", "sticky", "shape", "comment", "frame", "code", "table", "link"];
+
+export function isDragCreateTool(tool: QuickTool): boolean {
+  return DRAG_CREATE_TOOLS.includes(tool);
+}
+
+/** Screen pixels a press must move before it counts as a drag rather than a click. */
+const DRAG_THRESHOLD = 4;
+
+/**
+ * The ghost's size at zoom 1: the same box the tool would make with a plain
+ * click, so the drag previews truthfully.  Shared with `finishToolGesture`
+ * (`m1-session.ts`) only through `LOCAL_ITEM_SIZES` and these two numbers of
+ * its own - link and comment are not a `LocalItemType`, so they keep the
+ * sizes their own creation path already uses (`promptLink`'s box, the
+ * comment pin's CSS size).
+ */
+const DRAG_GHOST_SIZE: Readonly<Partial<Record<QuickTool, { readonly width: number; readonly height: number }>>> = {
+  text: LOCAL_ITEM_SIZES.text,
+  sticky: LOCAL_ITEM_SIZES.sticky_note,
+  shape: { width: 200, height: 200 },
+  comment: { width: 32, height: 32 },
+  frame: LOCAL_ITEM_SIZES.frame,
+  code: LOCAL_ITEM_SIZES.code,
+  table: LOCAL_ITEM_SIZES.table,
+  link: { width: 400, height: 240 },
+};
 
 /** Native Canvas's own three card-menu buttons, moved into this bar rather than built by it. */
 export const NATIVE_TOOLBAR_ITEMS = ["card", "note", "media"] as const;
@@ -219,6 +255,10 @@ export interface QuickToolsActions {
   readonly onArm: (tool: QuickTool) => void;
   readonly onShape: (shape: string) => void;
   readonly onPen: (settings: { readonly color?: string; readonly width?: number; readonly eraserSize?: number }) => void;
+  /** A tool dragged off the bar and dropped at a screen point: the host creates it there, or does nothing if the drop missed the board. */
+  readonly onDragCreate?: (tool: QuickTool, point: { readonly x: number; readonly y: number }) => void;
+  /** The board's current zoom, read once a drag starts, so the ghost previews at the size the item would really appear. */
+  readonly dragZoom?: () => number;
 }
 
 /** What Miro keeps in a pen preset: its own colours and three thicknesses. */
@@ -335,6 +375,8 @@ export class QuickTools {
   private connectorRange: HTMLInputElement;
   private connectorPreview: HTMLElement;
   private readonly connectorColors=new Map<string,HTMLButtonElement>();
+  /** True right after a button's press turned into a drag: the click that follows must not also arm or open it. */
+  private justDragged = false;
 
   public constructor(private readonly actions: QuickToolsActions, private readonly options: QuickToolsOptions = {}) {
     const document = options.document ?? globalThis.document;
@@ -444,8 +486,13 @@ export class QuickTools {
     for (const item of ALL_TOOLBAR_ITEMS) {
       if (!onBar.has(item)) this.placeToolbarItem(morePanel, item, true);
     }
-    // The board must not start a drag or a selection under the bar.
-    this.listen(root, "pointerdown", (event) => event.stopPropagation());
+    // The board must not start a drag or a selection under the bar.  A fresh
+    // press also forgets a drag that Escape cancelled before its own click
+    // could consume the suppression, so that click is never swallowed later.
+    this.listen(root, "pointerdown", (event) => {
+      this.justDragged = false;
+      event.stopPropagation();
+    });
     this.listen(root, "keydown", (event) => {
       if ((event as KeyboardEvent).key === "Escape") this.closePanels();
     });
@@ -644,7 +691,13 @@ export class QuickTools {
       button.classList.add("miro-canvas-tools__item");
       button.appendChild(this.make("span", "miro-canvas-tools__item-label", spec.label));
     }
-    if (spec.tool !== "shape") this.listen(button, "click", () => this.actions.onArm(spec.tool));
+    if (spec.tool !== "shape") {
+      this.listen(button, "click", () => {
+        if (this.consumeDragSuppression()) return;
+        this.actions.onArm(spec.tool);
+      });
+    }
+    if (isDragCreateTool(spec.tool)) this.installDragCreate(button, spec.tool);
     this.buttons.set(spec.tool, button);
     return button;
   }
@@ -675,6 +728,7 @@ export class QuickTools {
     button.setAttribute("aria-haspopup", "true");
     button.setAttribute("aria-expanded", "false");
     this.listen(button, "click", () => {
+      if (this.consumeDragSuppression()) return;
       const open = panel.hidden;
       if (open) onOpen?.();
       // Keep an ancestor open: this button may be a shape picker moved under
@@ -686,6 +740,110 @@ export class QuickTools {
     });
     this.panels.push({ button, panel });
     return panel;
+  }
+
+  /** Consumes a pending drag-click suppression; true only the once, right after the drag it guards against. */
+  private consumeDragSuppression(): boolean {
+    if (!this.justDragged) return false;
+    this.justDragged = false;
+    return true;
+  }
+
+  /**
+   * Turns a button for one of `DRAG_CREATE_TOOLS` into a drag source: a
+   * press that moves more than `DRAG_THRESHOLD` screen pixels shows a ghost
+   * of the item that follows the pointer, and dropping it hands the point to
+   * `onDragCreate`; releasing with no such move leaves the button's own
+   * click to arm the tool (or open its picker) exactly as before.  Pointer
+   * capture keeps the drag going over other elements - the board, other
+   * panels - and Escape cancels it with nothing made.
+   */
+  private installDragCreate(button: HTMLButtonElement, tool: QuickTool): void {
+    let pointerId: number | undefined;
+    let start: { readonly x: number; readonly y: number } | undefined;
+    let dragging = false;
+    let ghost: HTMLElement | undefined;
+    const document = this.document;
+
+    const place = (x: number, y: number): void => {
+      ghost?.style.setProperty("transform", `translate(${x}px, ${y}px) translate(-50%, -50%)`);
+    };
+    const cleanup = (): void => {
+      if (pointerId !== undefined) {
+        try {
+          button.releasePointerCapture(pointerId);
+        } catch {
+          // Already released - the gesture ended some other way first.
+        }
+      }
+      pointerId = undefined;
+      start = undefined;
+      dragging = false;
+      ghost?.remove();
+      ghost = undefined;
+      button.removeEventListener("pointermove", onMove);
+      button.removeEventListener("pointerup", onUp);
+      button.removeEventListener("pointercancel", onCancel);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape" && dragging) cleanup();
+    };
+    const onMove = (event: PointerEvent): void => {
+      if (event.pointerId !== pointerId || start === undefined) return;
+      if (!dragging) {
+        if (Math.hypot(event.clientX - start.x, event.clientY - start.y) <= DRAG_THRESHOLD) return;
+        dragging = true;
+        this.justDragged = true;
+        ghost = this.makeDragGhost(tool);
+        document.body.appendChild(ghost);
+      }
+      place(event.clientX, event.clientY);
+    };
+    const onUp = (event: PointerEvent): void => {
+      if (event.pointerId !== pointerId) return;
+      const wasDragging = dragging;
+      const point = { x: event.clientX, y: event.clientY };
+      cleanup();
+      if (wasDragging) this.actions.onDragCreate?.(tool, point);
+    };
+    const onCancel = (event: PointerEvent): void => {
+      if (event.pointerId === pointerId) cleanup();
+    };
+    this.listen(button, "pointerdown", (event) => {
+      const pointer = event as PointerEvent;
+      // A right- or middle-button mouse press stays whatever it already
+      // does; a touch or a pen always reports button 0 and is welcome here.
+      if (pointer.pointerType === "mouse" && pointer.button !== 0) return;
+      pointerId = pointer.pointerId;
+      start = { x: pointer.clientX, y: pointer.clientY };
+      try {
+        button.setPointerCapture(pointerId);
+      } catch {
+        // No capture in this environment (a test's fake pointer, say); the
+        // drag still works as long as the pointer stays over the button.
+      }
+      button.addEventListener("pointermove", onMove);
+      button.addEventListener("pointerup", onUp);
+      button.addEventListener("pointercancel", onCancel);
+      document.addEventListener("keydown", onKeyDown, true);
+    });
+  }
+
+  /** The dragged item's outline: the tool's default box at the board's zoom, in the look `DRAG_GHOST_SIZE` and the tool call for. */
+  private makeDragGhost(tool: QuickTool): HTMLElement {
+    const zoom = this.actions.dragZoom?.() ?? 1;
+    const size = DRAG_GHOST_SIZE[tool] ?? { width: 200, height: 200 };
+    const ghost = this.make("div", `miro-canvas-bar-ghost miro-canvas-bar-ghost--${tool}`);
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.style.width = `${size.width * zoom}px`;
+    ghost.style.height = `${size.height * zoom}px`;
+    if (tool === "shape") {
+      const entry = shapeCatalogEntry(this.shownShape) ?? SHAPE_CATALOG[0];
+      const picture = entry === undefined ? undefined : shapePicture(this.document, entry);
+      if (picture !== undefined) ghost.appendChild(picture);
+    }
+    return ghost;
   }
 
   private make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {

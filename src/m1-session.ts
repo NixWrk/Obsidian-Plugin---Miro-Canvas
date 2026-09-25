@@ -245,6 +245,26 @@ const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.
 	+ ".miro-board-connector,.miro-canvas-connector-labels,input,textarea,[contenteditable=true]";
 const PANEL_SELECTOR = ".miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
 	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray";
+
+/**
+ * Whether a screen point lands on the board itself, so a tool dragged off
+ * the bar and dropped there may create something: inside the root's own
+ * view, and not over a panel - the bar, the dock, a thread, anything
+ * `PANEL_SELECTOR` already keeps a plain press off of.
+ */
+export function pointLandsOnBoard(
+	point: { readonly x: number; readonly y: number },
+	root: {
+		readonly getBoundingClientRect: () => { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number };
+		readonly ownerDocument: { readonly elementFromPoint: (x: number, y: number) => { readonly closest: (selector: string) => unknown } | null };
+	},
+): boolean {
+	const rect = root.getBoundingClientRect();
+	if (point.x < rect.left || point.x > rect.right || point.y < rect.top || point.y > rect.bottom) return false;
+	const target = root.ownerDocument.elementFromPoint(point.x, point.y);
+	return target !== null && target.closest(PANEL_SELECTOR) === null;
+}
+
 const DEFAULT_TOOLBAR_FONT = "Inter";
 const DEFAULT_TOOLBAR_FONT_SIZE = 16;
 const REFRESH_INTERVAL_MS = 750;
@@ -1594,6 +1614,8 @@ export class M1CanvasSession {
 				if (settings.eraserSize !== undefined) this.eraserSize = settings.eraserSize;
 				this.updateQuickTools();
 			},
+			onDragCreate: (tool, point) => this.createFromBarDrag(tool, point),
+			dragZoom: () => this.zoom(),
 		}, {
 			document: controlDocument,
 			toolbarItems: settings.toolbarItems,
@@ -3714,6 +3736,19 @@ export class M1CanvasSession {
 		// Only a tool that really took over puts an open comment away.
 		if (this.armedTool !== "select") this.closeCommentThread();
 		this.updateQuickTools();
+	}
+
+	/**
+	 * A tool dragged off the bar (or the "+" menu) and released at a screen
+	 * point: creates through the very same path a click with that tool armed
+	 * takes - `finishToolGesture` with the drop point standing in for both
+	 * ends of the gesture, so it reads as a click, not a drag-out rectangle.
+	 * A drop that missed the board makes nothing.
+	 */
+	private createFromBarDrag(tool: QuickTool, point: { readonly x: number; readonly y: number }): void {
+		const root = this.root;
+		if (root === undefined || !pointLandsOnBoard(point, root)) return;
+		this.finishToolGesture(tool, point, point, undefined);
 	}
 
 	/** Letters arm tools on the active board, never while text is being written. */
