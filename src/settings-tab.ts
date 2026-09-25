@@ -232,7 +232,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .addButton((button) => button
         .setButtonText(labels.toolBarReset)
-        .onClick(() => void this.host.saveSettings({ toolbarItems: DEFAULT_TOOLBAR_ITEMS }).then(() => this.display())));
+        .onClick(() => void this.host.saveSettings({ toolbarItems: DEFAULT_TOOLBAR_ITEMS }).then(() => this.redisplayInPlace())));
     const current = this.host.settings.toolbarItems;
     const onBar = new Set(current);
     const listed: readonly ToolbarItem[] = [...current, ...ALL_TOOLBAR_ITEMS.filter((item) => !onBar.has(item))];
@@ -248,7 +248,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .setValue(position !== -1)
           .onChange((value) => {
             const next = value ? [...current, item] : current.filter((existing) => existing !== item);
-            void this.host.saveSettings({ toolbarItems: next }).then(() => this.display());
+            void this.host.saveSettings({ toolbarItems: next }).then(() => this.redisplayInPlace());
           }))
         .addExtraButton((extra) => extra
           .setIcon("arrow-up")
@@ -257,7 +257,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .onClick(() => {
             const next = [...current];
             [next[position - 1], next[position]] = [next[position]!, next[position - 1]!];
-            void this.host.saveSettings({ toolbarItems: next }).then(() => this.display());
+            void this.host.saveSettings({ toolbarItems: next }).then(() => this.redisplayInPlace());
           }))
         .addExtraButton((extra) => extra
           .setIcon("arrow-down")
@@ -266,9 +266,20 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .onClick(() => {
             const next = [...current];
             [next[position], next[position + 1]] = [next[position + 1]!, next[position]!];
-            void this.host.saveSettings({ toolbarItems: next }).then(() => this.display());
+            void this.host.saveSettings({ toolbarItems: next }).then(() => this.redisplayInPlace());
           }));
     }
+  }
+
+  /**
+   * Draw the tab again without moving it: a change in a list far down the
+   * page (the tool bar, the authors' colours) otherwise sent the reader back
+   * to the top after every click.
+   */
+  private redisplayInPlace(): void {
+    const top = this.containerEl.scrollTop;
+    this.display();
+    this.containerEl.scrollTop = top;
   }
 
   /** Who signs the comments written here, and the colour each author's pins wear. */
@@ -305,7 +316,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .setDisabled(colors[author] === undefined)
           .onClick(() => {
             const { [author]: _dropped, ...rest } = this.host.settings.commentAuthorColors;
-            void this.host.saveSettings({ commentAuthorColors: rest }).then(() => this.display());
+            void this.host.saveSettings({ commentAuthorColors: rest }).then(() => this.redisplayInPlace());
           }));
     }
   }

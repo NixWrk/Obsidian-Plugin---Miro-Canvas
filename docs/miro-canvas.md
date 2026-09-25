@@ -713,12 +713,18 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   `toolbarItems` (migrated from the old `showLassoTool` / `showConnectorTool`
   booleans) decides the bar's own content; native Canvas's three buttons move
   as the same elements, never copies, so their own drag-to-add and click
-  keep working wherever they land; the sticky tool now draws its own small
-  yellow note instead of the lucide picture native Canvas's card used too;
+  keep working wherever they land; the sticky tool is a plain square and
+  the shape tool Miro's square-and-circle picture (native Canvas's card
+  keeps its note icon), all in the icons' own colour;
   Settings → Tool bar lists every item with a toggle and up/down buttons, and
   a reset to default.
-- Movable panels (`FUT-019`): the tool bar and the corner dock (minimap, zoom,
-  board settings) can be dragged anywhere on screen; the place is remembered.
+- Arranging the board's panels on the board itself (`FUT-019`, extended
+  2026-09-25 at the user's request): a layout mode, entered from the dock,
+  in which the tool bar, the dock, the minimap and the selection toolbar
+  can be dragged anywhere on screen, and the items inside the tool bar can
+  be dragged to a new place, dropped off it, or added from a tray of the
+  tools not on it - instead of the settings list, which also stays. Places
+  are remembered.
 - Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
   highlight, next and previous.

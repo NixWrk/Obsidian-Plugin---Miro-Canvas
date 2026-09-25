@@ -355,18 +355,22 @@ describe("quick tools", () => {
     expect(barOrder(root)).toEqual(["card", "sticky", "note", "media"]);
   });
 
-  it("gives the sticky tool its own picture, never a lucide icon that could be native Canvas's card", () => {
+  it("draws the sticky note as a plain square and the shape tool as Miro's square and circle", () => {
     const setIconCalls: string[] = [];
     const tools = new QuickTools(
       { onArm: () => {}, onShape: () => {}, onPen: () => {} },
       { document: new FakeDocument() as unknown as Document, setIcon: (_element, icon) => { setIconCalls.push(icon); } },
     );
     const root = tools.element as unknown as FakeElement;
-    const sticky = toolButton(root, "sticky");
-    const picture = sticky.children.find((child) => (child.attributes.get("class") ?? "").includes("miro-canvas-sticky-icon"));
-    expect(picture).toBeDefined();
-    // Nothing asked Obsidian to draw the "sticky-note" lucide picture - native Canvas's own card icon.
+    // A plain square, in the icons' own colour: never native Canvas's card icon ("sticky-note").
+    expect(setIconCalls).toContain("square");
     expect(setIconCalls).not.toContain("sticky-note");
+    const shape = toolButton(root, "shape");
+    const picture = shape.children.find((child) => (child.attributes.get("class") ?? "").includes("miro-canvas-shapes-icon"));
+    expect(picture).toBeDefined();
+    // Choosing a shape leaves the picture as it is.
+    tools.update({ ...STATE, shape: "circle" });
+    expect(shape.children).toContain(picture);
   });
 
   it("moves native Canvas's own buttons - the very elements, never copies - into their configured slot", () => {

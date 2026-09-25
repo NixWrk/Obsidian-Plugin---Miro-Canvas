@@ -69,9 +69,12 @@ along.
   notes. Settings -> Updates has the switch and a button to check now.
 - The bottom tool bar has native Canvas's own card, note from the vault and
   file from the vault back in quick access, draggable onto the board as in
-  Canvas itself; the sticky note now wears its own picture instead of the
-  card's. Settings -> Tool bar chooses which tools sit on the bar and in
-  what order, the rest staying under More.
+  Canvas itself. The sticky note is a plain square and the shape tool
+  Miro's square-and-circle picture, both in the icons' own colour; the
+  card keeps Canvas's note icon. Settings -> Tool bar chooses which tools
+  sit on the bar and in what order, the rest staying under More, and the
+  settings page keeps its place while the list changes.
+- The comment button looks the same on both toolbars.
 - The selection toolbar is laid out the way Miro's own is: shape, font and
   size, text style with alignment, a bullet list and a link, colours, then a
   comment, a lock and its own More - layer order, zoom to selection, edit and

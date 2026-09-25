@@ -70,9 +70,8 @@ const TOOLBAR_TOOL_ICONS: readonly ToolIconSpec[] = [
   // Next to Select: it is a way of selecting large parts of a board.
   { tool: "lasso", icon: "lasso", glyph: "◌" },
   { tool: "text", icon: "type", glyph: "T", key: "T" },
-  // Never drawn from this icon: stickyToolButton paints the plugin's own
-  // picture instead, so it reads as unlike native Canvas's card button.
-  { tool: "sticky", icon: "sticky-note", glyph: "▢", key: "N" },
+  // A plain square: native Canvas's card button already wears the note icon.
+  { tool: "sticky", icon: "square", glyph: "▢", key: "N" },
   { tool: "shape", icon: "shapes", glyph: "◇", key: "S" },
   { tool: "pen", icon: "pen", glyph: "✎", key: "P" },
   { tool: "connector", icon: "move-up-right", glyph: "↗", key: "L" },
@@ -130,8 +129,8 @@ function withLabels(specs: readonly ToolIconSpec[]): readonly ToolSpec[] {
 export function paintToolbarIcon(
   target: HTMLElement, item: ToolbarItem, document: Document, setIcon?: (element: HTMLElement, icon: string) => void,
 ): void {
-  if (item === "sticky") {
-    const picture = stickyPicture(document);
+  if (item === "shape") {
+    const picture = shapesPicture(document);
     if (picture !== undefined) {
       target.appendChild(picture);
       return;
@@ -213,25 +212,22 @@ function linePicture(document: Document, spec: LineKindSpec): SVGSVGElement | un
 }
 
 /**
- * The plugin's own sticky note: a small filled square in Miro's yellow with
- * a folded corner, drawn the way `linePicture` draws its own course - unlike
- * native Canvas's card button, an outline that used the same lucide picture
- * the sticky tool used to.
+ * The shape tool's picture, as Miro draws it: a square and a circle
+ * overlapping, in the line style of the other icons.  It stays the same
+ * whichever shape is chosen; the chosen one is marked in its menu.
  */
-function stickyPicture(document: Document): SVGSVGElement | undefined {
+function shapesPicture(document: Document): SVGSVGElement | undefined {
   if (typeof document.createElementNS !== "function") return undefined;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("class", "miro-canvas-sticky-icon");
+  svg.setAttribute("class", "svg-icon miro-canvas-shapes-icon");
   svg.setAttribute("aria-hidden", "true");
-  const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  body.setAttribute("class", "miro-canvas-sticky-icon__body");
-  body.setAttribute("d", "M4 4H15L20 9V20H4Z");
-  svg.appendChild(body);
-  const fold = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  fold.setAttribute("class", "miro-canvas-sticky-icon__fold");
-  fold.setAttribute("d", "M15 4V9H20Z");
-  svg.appendChild(fold);
+  const square = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  for (const [name, value] of [["x", "3"], ["y", "3"], ["width", "11"], ["height", "11"], ["rx", "1.5"]]) square.setAttribute(name, value);
+  svg.appendChild(square);
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  for (const [name, value] of [["cx", "15.5"], ["cy", "15.5"], ["r", "5.5"]]) circle.setAttribute(name, value);
+  svg.appendChild(circle);
   return svg;
 }
 
@@ -462,15 +458,17 @@ export class QuickTools {
     }
     const entry = shapeCatalogEntry(state.shape);
     const line = lineKind(state.shape);
-    const shapeButton = this.buttons.get(line === undefined ? "shape" : "connector");
-    if ((entry !== undefined || line !== undefined) && shapeButton !== undefined && this.shownShape !== state.shape) {
-      // The button shows the shape or the line it will make.
-      const picture = line !== undefined ? linePicture(this.document, line) : shapePicture(this.document, entry!);
-      if (picture !== undefined) {
-        while (shapeButton.firstChild !== null) shapeButton.removeChild(shapeButton.firstChild);
-        shapeButton.appendChild(picture);
-        this.shownShape = state.shape;
+    if ((entry !== undefined || line !== undefined) && this.shownShape !== state.shape) {
+      // The lines button shows the line it will draw; the shape button keeps
+      // Miro's picture of shapes whichever shape is chosen - the chosen one
+      // is marked in its menu.
+      const lineButton = this.buttons.get("connector");
+      const picture = line !== undefined ? linePicture(this.document, line) : undefined;
+      if (lineButton !== undefined && picture !== undefined) {
+        while (lineButton.firstChild !== null) lineButton.removeChild(lineButton.firstChild);
+        lineButton.appendChild(picture);
       }
+      this.shownShape = state.shape;
     }
     if (!state.editable) this.closePanels();
   }
@@ -524,7 +522,7 @@ export class QuickTools {
       this.placePenButton(host, spec, withLabel);
       return;
     }
-    const button = host.appendChild(item === "sticky" ? this.stickyToolButton(spec, withLabel) : this.toolButton(spec, withLabel));
+    const button = host.appendChild(this.toolButton(spec, withLabel));
     if (withLabel) this.listen(button, "click", () => this.closePanels());
   }
 
@@ -532,6 +530,11 @@ export class QuickTools {
   private placeShapeButton(host: HTMLElement, spec: ToolSpec, withLabel: boolean): void {
     const shapeHost = host.appendChild(this.make("span", "miro-canvas-toolbar__popover"));
     const button = shapeHost.appendChild(this.toolButton(spec, withLabel));
+    const picture = shapesPicture(this.document);
+    if (picture !== undefined) {
+      button.querySelector?.("svg")?.remove();
+      button.prepend(picture);
+    }
     const panel = shapeHost.appendChild(this.panel(button, "miro-canvas-toolbar__panel--shapes", () => {
       if (lineKind(this.shownShape)) this.actions.onShape("rectangle");
       this.actions.onArm("shape");
@@ -578,28 +581,6 @@ export class QuickTools {
       if (withLabel) this.closePanels();
     });
     this.penButton = button;
-  }
-
-  /** The sticky note: the plugin's own picture, never native Canvas's card icon. */
-  private stickyToolButton(spec: ToolSpec, withLabel: boolean): HTMLButtonElement {
-    const label = spec.key === undefined ? spec.label : `${spec.label}\n${spec.key}`;
-    const button = this.make("button", "miro-canvas-toolbar__button");
-    button.type = "button";
-    button.setAttribute("aria-label", label);
-    button.setAttribute("data-tooltip-position", "top");
-    button.setAttribute("data-tooltip-delay", BAR_TOOLTIP_DELAY);
-    button.setAttribute("data-tool", spec.tool);
-    button.setAttribute("aria-pressed", "false");
-    const picture = stickyPicture(this.document);
-    if (picture !== undefined) button.appendChild(picture);
-    else button.textContent = spec.glyph;
-    if (withLabel) {
-      button.classList.add("miro-canvas-tools__item");
-      button.appendChild(this.make("span", "miro-canvas-tools__item-label", spec.label));
-    }
-    this.listen(button, "click", () => this.actions.onArm(spec.tool));
-    this.buttons.set(spec.tool, button);
-    return button;
   }
 
   private toolButton(spec: ToolSpec, withLabel = false): HTMLButtonElement {

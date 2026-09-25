@@ -1665,26 +1665,13 @@
 .miro-canvas-shape-icon--wide { width: 22px; height: 15px; }
 .miro-canvas-shape-icon--tall { width: 13px; height: 20px; }
 
-/* The sticky tool's own picture: a small filled note in Miro's yellow with a
-   folded corner, fixed colours so it reads the same in both themes and
-   never looks like native Canvas's outline card icon. */
-.miro-canvas-sticky-icon {
-  width: 18px;
-  height: 18px;
-  overflow: visible;
-}
-
-.miro-canvas-sticky-icon__body {
-  fill: #ffd02f;
-  stroke: rgb(0 0 0 / 35%);
-  stroke-width: 1;
-  stroke-linejoin: round;
-}
-
-.miro-canvas-sticky-icon__fold {
-  fill: #e0ad00;
-  stroke: rgb(0 0 0 / 35%);
-  stroke-width: 1;
+/* The shape tool's picture, Miro's square and circle, drawn in the same
+   line as the lucide icons beside it. */
+.miro-canvas-shapes-icon {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
   stroke-linejoin: round;
 }
 
@@ -3595,8 +3582,7 @@
   flex-shrink: 0;
 }
 
-.miro-canvas-settings-tool-icon .svg-icon,
-.miro-canvas-settings-tool-icon .miro-canvas-sticky-icon {
+.miro-canvas-settings-tool-icon .svg-icon {
   width: 16px;
   height: 16px;
 }

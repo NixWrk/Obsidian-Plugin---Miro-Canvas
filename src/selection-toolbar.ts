@@ -793,7 +793,7 @@ export class SelectionToolbar {
     // Miro's last group: comment, lock and everything under "More".
     const lastGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
     const comment = append(lastGroup, makeButton(document, words().toolbar.comment));
-    this.icon(comment, "message-square-plus", "💬");
+    this.icon(comment, "message-circle", "💬");
 
     const lock = append(lastGroup, makeButton(document, words().toolbar.lockSelection, "miro-canvas-toolbar__button--lock"));
     lock.setAttribute("aria-pressed", "false");
