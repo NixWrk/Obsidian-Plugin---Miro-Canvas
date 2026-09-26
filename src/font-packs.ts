@@ -666,7 +666,7 @@ export class FontFaceRegistry {
 // --- Downloading a pack ------------------------------------------------------
 
 /** A release of this repository's own tag, separate from plugin releases so packs are not re-uploaded each one. */
-export const FONT_PACKS_RELEASE_BASE = "https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/fonts-2/";
+export const FONT_PACKS_RELEASE_BASE = "https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/fonts-0.0.3/";
 
 /**
  * The address a download starts from: the real release, unless a harness's

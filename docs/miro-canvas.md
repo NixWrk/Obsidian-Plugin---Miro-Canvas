@@ -714,13 +714,16 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   (`open_sans`, `times_new_roman`, `arial`, `Calibri`, ...) to the family a
   pack stands in for, so `fontStack` and `fontLabel` render and name them
   once the matching pack, or the real font, is present. The pack ZIPs live
-  in the GitHub release `fonts-2`, built and published by
-  `.github/workflows/fonts.yml` from a `fonts-*` tag only when the build
-  reproduces `src/font-pack-catalogue.ts` exactly. It is a pre-release:
-  GitHub's latest release, which the update check reads, and BRAT, which
-  would read `fonts-2` as version 2.0.0, both pass over it. A pack missing
-  from the release answers with a plain "this pack is not published yet"
-  message rather than an error.
+  in the GitHub pre-release `fonts-0.0.3`, built and published by
+  `.github/workflows/fonts.yml` from a `fonts-0.0.N` tag only when the
+  build reproduces `src/font-pack-catalogue.ts` exactly. GitHub's latest
+  release, which the update check reads, passes over a pre-release. BRAT
+  reads a tag's first number as its version and, while adding or updating
+  a plugin, tries pre-releases first: the earlier `fonts-2`, read as 2.0.0,
+  outranked the plugin and made it report a missing `manifest.json` before
+  it fell back to the real release; a tag read as 0.0.N always ranks below
+  the plugin's own releases. A pack missing from the release answers with a
+  plain "this pack is not published yet" message rather than an error.
 - Check every kind of link and formula inside the plugin (`FUT-017`): wiki and
   Markdown links to notes, headings and blocks, web addresses, embeds
   (`![[...]]`) of notes, pictures, PDFs and other canvases, links from Miro

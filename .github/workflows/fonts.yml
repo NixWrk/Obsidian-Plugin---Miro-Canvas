@@ -1,7 +1,7 @@
 name: Font packs
 
-# A "fonts-N" tag builds the downloadable font packs and publishes them as
-# that tag's release. The plugin checks every pack against the SHA-256 in
+# A "fonts-0.0.N" tag builds the downloadable font packs and publishes them
+# as that tag's release. The plugin checks every pack against the SHA-256 in
 # src/font-pack-catalogue.ts, so this build must reproduce that catalogue
 # exactly; if an upstream font has changed since, the job fails and nothing
 # is published - rebuild the packs locally, commit the new catalogue and
@@ -32,11 +32,16 @@ jobs:
             echo "::error title=The packs differ from the catalogue::$(git diff -U0 -- src/font-pack-catalogue.ts | grep -E '^[-+] +(file|bytes|sha256)' | tr '\n' ' ')"
             exit 1
           fi
+      # BRAT reads a tag's first number as its version and, adding or
+      # updating a plugin, tries pre-releases first: "fonts-2" read as 2.0.0
+      # outranked the plugin and made BRAT report "no manifest.json". A tag
+      # read as 0.0.N always ranks below the plugin's own releases.
+      - name: The tag ranks below every plugin version
+        run: echo "${GITHUB_REF_NAME}" | grep -Eq '^fonts-0\.0\.[0-9]+$'
       - name: The plugin downloads from this tag
         run: grep -q "releases/download/${GITHUB_REF_NAME}/" src/font-packs.ts
       # A pre-release: GitHub's "latest release", which the plugin's update
-      # check reads, and BRAT, which reads a tag like "fonts-2" as version
-      # 2.0.0, both pass over it.
+      # check reads, passes over it.
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

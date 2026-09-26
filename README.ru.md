@@ -421,20 +421,29 @@ Obsidian, а для остальных языков - английский.
 его и получать обновления через **BRAT** - плагин, который ставит другие
 плагины прямо из их выпусков на GitHub:
 
-1. В Obsidian откройте Настройки → Сторонние плагины → Обзор, найдите
-   **BRAT** (Obsidian42 - BRAT), установите и включите его.
-2. Откройте палитру команд (Ctrl+P, на Mac - Cmd+P) и выполните
-   **BRAT: Add a beta plugin for testing**.
-3. Вставьте `NixWrk/Obsidian-Plugin---Miro-Canvas` как репозиторий,
-   оставьте последнюю версию и нажмите **Add Plugin**.
-4. Включите **Miro Canvas** в Настройки → Сторонние плагины, если BRAT не
-   сделал этого сам.
+1. В Obsidian откройте Настройки → Сторонние плагины. В хранилище, где их
+   ещё не было, сначала нажмите **Выйти из ограниченного режима**.
+2. Нажмите **Обзор**, найдите **BRAT** и выберите тот, у которого автор
+   **TfTHacker**, - у других плагинов похожие названия, - затем нажмите
+   **Установить** и **Включить**.
+3. Откройте палитру команд (Ctrl+P, на Mac - Cmd+P), наберите
+   `add a beta plugin` и выполните **BRAT: Plugins: Add a beta plugin for
+   testing (with or without version)**.
+4. Вставьте `NixWrk/Obsidian-Plugin---Miro-Canvas` в поле **Repository** и
+   нажмите Tab. В списке **Select a version** выберите **Latest version** -
+   строки `fonts-…` там хранят наборы шрифтов, а не плагин, - оставьте
+   включённым **Enable after installing the plugin** и нажмите
+   **Add plugin**.
 
-Если в настройках самого BRAT включено обновление при запуске, он ставит
-каждый новый выпуск, когда запускается Obsidian; команда **BRAT: Check for
-updates to all beta plugins and UPDATE** делает это по запросу. Собственная
-проверка обновлений плагина (см. [Сеть](#сеть)) только сообщает, что вышла
-новая версия; с BRAT она приходит сама.
+У BRAT с самого начала включено **Auto-update plugins at startup**, так что
+каждый новый выпуск приходит при следующем запуске Obsidian; команда
+**BRAT: Plugins: Check for updates to all beta plugins and UPDATE** делает
+это по запросу. Собственная проверка обновлений плагина (см. [Сеть](#сеть))
+только сообщает, что вышла новая версия; с BRAT она приходит сама.
+
+BRAT спрашивает GitHub о выпусках, а без токена GitHub отвечает на 60 таких
+вопросов в час с одной сети. Если BRAT пишет, что лимит превышен (rate limit
+exceeded), подождите названное им число минут и попробуйте снова.
 
 **Вручную**: скачайте `main.js`, `manifest.json` и `styles.css` из
 [последнего выпуска](../../releases/latest), положите их в
@@ -457,7 +466,7 @@ npm run schema:check   # закреплённая копия схемы совп
 и miro2obsidian (`pip install -r requirements-dev.txt`, затем
 `python -m playwright install chromium` и
 `python -m tools.obsidian_oracle.smoke_plugin_ui`). Наборы шрифтов собирает
-`tools/build_font_packs.py`, а выпускает метка `fonts-N`. Агентам, работающим с
+`tools/build_font_packs.py`, а выпускает метка `fonts-0.0.N`. Агентам, работающим с
 этим репозиторием, - начинать с [AGENTS.md](AGENTS.md); заметки об устройстве и
 список задач - в [docs/miro-canvas.ru.md](docs/miro-canvas.ru.md).
 

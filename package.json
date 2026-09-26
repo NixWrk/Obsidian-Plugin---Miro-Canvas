@@ -1,6 +1,6 @@
 {
   "name": "miro-canvas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Miro's look and Miro's tools on Obsidian's own Canvas.",
   "main": "main.js",

@@ -403,20 +403,27 @@ The plugin is not in Obsidian's community catalogue yet. The easiest way to
 install it and keep it up to date is **BRAT**, a plugin that installs other
 plugins straight from their GitHub releases:
 
-1. In Obsidian, open Settings → Community plugins → Browse, find **BRAT**
-   (Obsidian42 - BRAT), install it and enable it.
-2. Open the command palette (Ctrl+P, or Cmd+P on a Mac) and run
-   **BRAT: Add a beta plugin for testing**.
-3. Paste `NixWrk/Obsidian-Plugin---Miro-Canvas` as the repository, keep the
-   latest version, and press **Add Plugin**.
-4. Enable **Miro Canvas** in Settings → Community plugins, if BRAT has not
-   done so already.
+1. In Obsidian, open Settings → Community plugins. In a vault that has
+   never had one, press **Turn on community plugins** first.
+2. Press **Browse**, search for **BRAT** and pick the one by **TfTHacker** -
+   other plugins have similar names - then press **Install** and **Enable**.
+3. Open the command palette (Ctrl+P, or Cmd+P on a Mac), type
+   `add a beta plugin` and run **BRAT: Plugins: Add a beta plugin for testing
+   (with or without version)**.
+4. Paste `NixWrk/Obsidian-Plugin---Miro-Canvas` into **Repository** and press
+   Tab. Under **Select a version** choose **Latest version** - the
+   `fonts-…` entries there hold font packs, not the plugin - leave
+   **Enable after installing the plugin** on, and press **Add plugin**.
 
-With updating at start-up turned on in BRAT's own settings, BRAT installs
-each new release when Obsidian starts; **BRAT: Check for updates to all beta
-plugins and UPDATE** does it on demand. The plugin's own update check (see
-[Network use](#network-use)) only tells you that a new version is out; with
-BRAT it arrives by itself.
+BRAT's **Auto-update plugins at startup** is on from the start, so each new
+release arrives the next time Obsidian starts; **BRAT: Plugins: Check for
+updates to all beta plugins and UPDATE** does it on demand. The plugin's own
+update check (see [Network use](#network-use)) only tells you that a new
+version is out; with BRAT it arrives by itself.
+
+BRAT asks GitHub about releases, and without a GitHub token GitHub answers
+60 such questions an hour from one network. If BRAT says the rate limit is
+exceeded, wait the minutes it names and try again.
 
 **By hand**: download `main.js`, `manifest.json` and `styles.css` from the
 [latest release](../../releases/latest) and put them into
@@ -439,7 +446,7 @@ host and the scripts for testing in a real Obsidian vault; they need Python,
 Playwright and miro2obsidian (`pip install -r requirements-dev.txt`, then
 `python -m playwright install chromium` and
 `python -m tools.obsidian_oracle.smoke_plugin_ui`). The font packs are built by
-`tools/build_font_packs.py` and published from a `fonts-N` tag. Agents working
+`tools/build_font_packs.py` and published from a `fonts-0.0.N` tag. Agents working
 on this repository start with [AGENTS.md](AGENTS.md); the design notes and the
 task list live in [docs/miro-canvas.md](docs/miro-canvas.md).
 

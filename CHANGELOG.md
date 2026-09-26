@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.1 - 2026-09-26
+
+- The welcome window's buttons wrap onto a second line instead of running
+  off its edge, and so do the export panel's.
+- Font packs now come from the pre-release `fonts-0.0.3`. BRAT read the
+  earlier `fonts-2` as version 2.0.0 and, while installing the plugin,
+  first reported that the repository had no `manifest.json`.
+- The README installs through BRAT step by step, as checked in a fresh
+  vault, and describes every feature, with a table of what comes from Miro
+  and what from Obsidian's Canvas.
+
 ## 0.1.0 - 2026-09-26
 
 The plugin's first home of its own; before this it lived inside
