@@ -32,6 +32,7 @@ import io
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -177,13 +178,34 @@ class Fetcher:
             if path.exists():
                 data = path.read_bytes()
                 return data.decode("utf-8") if text else data
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(request, timeout=60) as response:
-            data = response.read()
+        data = self.download(url)
         if self.cache is not None:
             self.cache.mkdir(parents=True, exist_ok=True)
             (self.cache / hashlib.sha256(url.encode("utf-8")).hexdigest()).write_bytes(data)
         return data.decode("utf-8") if text else data
+
+    @staticmethod
+    def download(url: str) -> bytes:
+        """One GET, tried again after a pause when the network or the server stumbles.
+
+        A missing file (404) is an answer, not a stumble, and is not retried:
+        licences are found by trying their usual names in turn.
+        """
+        pauses = (5, 20, 60)
+        for attempt in range(len(pauses) + 1):
+            try:
+                request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    return response.read()
+            except urllib.error.HTTPError as error:
+                if (error.code != 429 and error.code < 500) or attempt == len(pauses):
+                    raise
+            except (urllib.error.URLError, TimeoutError, ConnectionError):
+                if attempt == len(pauses):
+                    raise
+            print(f"retrying {url} in {pauses[attempt]} s", file=sys.stderr)
+            time.sleep(pauses[attempt])
+        raise AssertionError("unreachable")
 
 
 @dataclass

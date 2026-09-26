@@ -714,7 +714,7 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   (`open_sans`, `times_new_roman`, `arial`, `Calibri`, ...) to the family a
   pack stands in for, so `fontStack` and `fontLabel` render and name them
   once the matching pack, or the real font, is present. The pack ZIPs live
-  in the GitHub pre-release `fonts-0.0.3`, built and published by
+  in the GitHub pre-release `fonts-0.0.4`, built and published by
   `.github/workflows/fonts.yml` from a `fonts-0.0.N` tag only when the
   build reproduces `src/font-pack-catalogue.ts` exactly. GitHub's latest
   release, which the update check reads, passes over a pre-release. BRAT

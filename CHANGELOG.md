@@ -4,7 +4,7 @@
 
 - The welcome window's buttons wrap onto a second line instead of running
   off its edge, and so do the export panel's.
-- Font packs now come from the pre-release `fonts-0.0.3`. BRAT read the
+- Font packs now come from the pre-release `fonts-0.0.4`. BRAT read the
   earlier `fonts-2` as version 2.0.0 and, while installing the plugin,
   first reported that the repository had no `manifest.json`.
 - The README installs through BRAT step by step, as checked in a fresh

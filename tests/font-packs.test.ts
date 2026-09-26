@@ -505,7 +505,7 @@ describe("FontFaceRegistry", () => {
 describe("fontPackDownloadUrl", () => {
   it("starts from the real release by default, and only from a harness's own test override", () => {
     expect(fontPackDownloadUrl("fonts-word.zip")).toBe(
-      "https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/fonts-0.0.3/fonts-word.zip",
+      "https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/fonts-0.0.4/fonts-word.zip",
     );
     const testGlobal = globalThis as { __miroCanvasFontPacksTestBaseUrl?: string };
     testGlobal.__miroCanvasFontPacksTestBaseUrl = "http://127.0.0.1:8199/";

@@ -23,9 +23,13 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install fonttools==4.61.1 brotli==1.1.0
-      - name: Build the packs
-        run: python tools/build_font_packs.py --out dist/fonts --write-catalogue src/font-pack-catalogue.ts
       # A run's log needs a sign-in; an annotation can be read without one.
+      - name: Build the packs
+        run: |
+          if ! python tools/build_font_packs.py --out dist/fonts --write-catalogue src/font-pack-catalogue.ts 2> build-errors.txt; then
+            echo "::error title=The packs did not build::$(tail -c 900 build-errors.txt | tr '\n' ' ')"
+            exit 1
+          fi
       - name: The packs are the ones the plugin expects
         run: |
           if ! git diff --quiet -- src/font-pack-catalogue.ts; then
