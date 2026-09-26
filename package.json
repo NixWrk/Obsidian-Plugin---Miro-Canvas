@@ -14,7 +14,7 @@
     "schema:sync": "node scripts/sync-schema.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.13.10",
+    "@types/node": "^26.6.2",
     "esbuild": "^0.25.0",
     "obsidian": "^1.8.7",
     "typescript": "^5.7.3",
