@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 - 2026-09-26
 
 The plugin's first home of its own; before this it lived inside
 [miro2obsidian](https://github.com/NixWrk/Miro_2_Obsidian), and its history came

@@ -3,7 +3,8 @@ name: Release
 # The tag is the version without a "v": the Obsidian catalogue asks for that.
 on:
   push:
-    tags: ["*"]
+    # "fonts-N" tags publish font packs instead: fonts.yml.
+    tags: ["*", "!fonts-*"]
 
 permissions:
   contents: write

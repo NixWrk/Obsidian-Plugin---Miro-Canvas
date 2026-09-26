@@ -293,12 +293,29 @@ plugin wrote.
 
 ## Installing
 
+The plugin is not in Obsidian's community catalogue yet. The easiest way to
+install it and keep it up to date is **BRAT**, a plugin that installs other
+plugins straight from their GitHub releases:
+
+1. In Obsidian, open Settings → Community plugins → Browse, find **BRAT**
+   (Obsidian42 - BRAT), install it and enable it.
+2. Open the command palette (Ctrl+P, or Cmd+P on a Mac) and run
+   **BRAT: Add a beta plugin for testing**.
+3. Paste `NixWrk/Obsidian-Plugin---Miro-Canvas` as the repository, keep the
+   latest version, and press **Add Plugin**.
+4. Enable **Miro Canvas** in Settings → Community plugins, if BRAT has not
+   done so already.
+
+With updating at start-up turned on in BRAT's own settings, BRAT installs
+each new release when Obsidian starts; **BRAT: Check for updates to all beta
+plugins and UPDATE** does it on demand. The plugin's own update check (see
+[Network use](#network-use)) only tells you that a new version is out; with
+BRAT it arrives by itself.
+
 **By hand**: download `main.js`, `manifest.json` and `styles.css` from the
 [latest release](../../releases/latest) and put them into
 `<vault>/.obsidian/plugins/miro-canvas/`, then enable **Miro Canvas** in
-Settings → Community plugins.
-
-The plugin is not in the community catalogue yet.
+Settings → Community plugins. A new version is installed the same way.
 
 ## Development
 
