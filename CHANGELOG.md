@@ -113,3 +113,7 @@ along.
   it centred where you dropped it, selected afterward, as one undo step.
   Releasing over a panel or outside the view, or pressing Escape, makes
   nothing; a plain click still just arms the tool.
+- The dock's menus open inside the view wherever the dock sits: above or
+  below its row, or beside it when it stands as a column. A moved panel no
+  longer lands in the wrong place, partly off the board, when the plugin is
+  turned on or updated.

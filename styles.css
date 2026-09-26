@@ -193,10 +193,17 @@
   font-size: var(--font-ui-smaller, 11px);
 }
 
-/* Menus open over the map, right-aligned with the bar. */
+/* Menus open over the map, right-aligned with the bar.  Out of the dock's
+   own flow, so an open menu never grows a moved dock past the view's edge;
+   `placeDockMenu` (m1-controls.ts) puts it inside the view on opening, and
+   this place above the row is only where it starts. */
 .miro-canvas-dock__menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
   display: flex;
   flex-direction: column;
+  width: max-content;
   min-width: 232px;
   max-width: min(320px, calc(100vw - 32px));
   max-height: min(420px, calc(100vh - 120px));

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { APPEARANCE_ACTIONS, normalizeAppearanceState } from "../src/appearance";
 import { setLocale } from "../src/i18n";
-import { M1Controls, type M1ControlsActions, type M1ControlsState, type M1NavigationAction } from "../src/m1-controls";
+import { M1Controls, placeDockMenu, type M1ControlsActions, type M1ControlsState, type M1NavigationAction } from "../src/m1-controls";
 
 class FakeElement {
   public readonly nodeType = 1;
@@ -276,5 +276,39 @@ describe("corner dock", () => {
     controls.openCommandModal([]);
     controls.dispose();
     expect(document.body.children).toHaveLength(0);
+  });
+});
+
+describe("where the dock opens its menus", () => {
+  const view = { left: 0, top: 0, right: 1200, bottom: 800 };
+  const menu = { width: 260, height: 300 };
+
+  it("opens above a row at its default place, right-aligned with it", () => {
+    const bar = { left: 900, top: 700, right: 1150, bottom: 734 };
+    expect(placeDockMenu(bar, menu, view, false)).toEqual({ left: 890, top: 394 });
+  });
+
+  it("opens below a row moved to the top, and never past the view's left edge", () => {
+    const bar = { left: 2, top: 20, right: 252, bottom: 54 };
+    expect(placeDockMenu(bar, menu, view, false)).toEqual({ left: 8, top: 60 });
+  });
+
+  it("keeps a row's menu inside the view when the row hugs the right edge", () => {
+    const bar = { left: 1100, top: 700, right: 1198, bottom: 734 };
+    // Right-aligned with the row it would end at 1198; the view's margin pulls it in.
+    expect(placeDockMenu(bar, { width: 320, height: 300 }, view, false).left).toBe(1200 - 8 - 320);
+  });
+
+  it("opens a column's menu towards the board's middle, level with the column", () => {
+    const right = { left: 1150, top: 200, right: 1190, bottom: 600 };
+    expect(placeDockMenu(right, menu, view, true)).toEqual({ left: 884, top: 200 });
+    const left = { left: 10, top: 300, right: 50, bottom: 700 };
+    expect(placeDockMenu(left, menu, view, true)).toEqual({ left: 56, top: 400 });
+  });
+
+  it("shortens a menu taller than the view", () => {
+    const bar = { left: 900, top: 450, right: 1150, bottom: 484 };
+    expect(placeDockMenu(bar, { width: 260, height: 900 }, { left: 0, top: 0, right: 1200, bottom: 500 }, false))
+      .toEqual({ left: 890, top: 8, maxHeight: 484 });
   });
 });

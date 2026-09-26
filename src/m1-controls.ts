@@ -90,6 +90,52 @@ interface Menu {
 	readonly panel: HTMLElement;
 }
 
+/** A box in screen pixels. */
+export interface ScreenRect {
+	readonly left: number;
+	readonly top: number;
+	readonly right: number;
+	readonly bottom: number;
+}
+
+/** Room kept between a menu and its row, and between a menu and the view's edge. */
+const MENU_GAP = 6;
+const MENU_MARGIN = 8;
+
+/**
+ * Where one of the dock's menus opens, in screen pixels.  A row opens it
+ * above itself, right-aligned with it, as it always has - or below when
+ * there is more room there; a column opens it to the side facing the
+ * board's middle.  Either way the menu is kept inside the view, wherever
+ * the dock was moved to; `maxHeight` comes back only when the view is too
+ * short for the whole menu.
+ */
+export function placeDockMenu(
+	bar: ScreenRect,
+	menu: { readonly width: number; readonly height: number },
+	view: ScreenRect,
+	vertical: boolean,
+): { readonly left: number; readonly top: number; readonly maxHeight?: number } {
+	const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(value, max));
+	const height = Math.min(menu.height, Math.max(0, view.bottom - view.top - 2 * MENU_MARGIN));
+	let left: number;
+	let top: number;
+	if (vertical) {
+		const towardsLeft = (bar.left + bar.right) / 2 > (view.left + view.right) / 2;
+		left = towardsLeft ? bar.left - MENU_GAP - menu.width : bar.right + MENU_GAP;
+		const lowerHalf = (bar.top + bar.bottom) / 2 > (view.top + view.bottom) / 2;
+		top = lowerHalf ? bar.bottom - height : bar.top;
+	} else {
+		const above = bar.top - MENU_GAP - (view.top + MENU_MARGIN);
+		const below = view.bottom - MENU_MARGIN - (bar.bottom + MENU_GAP);
+		top = height <= above || above >= below ? bar.top - MENU_GAP - height : bar.bottom + MENU_GAP;
+		left = bar.right - menu.width;
+	}
+	left = clamp(left, view.left + MENU_MARGIN, view.right - MENU_MARGIN - menu.width);
+	top = clamp(top, view.top + MENU_MARGIN, view.bottom - MENU_MARGIN - height);
+	return height < menu.height ? { left, top, maxHeight: height } : { left, top };
+}
+
 interface ControlRefs {
 	readonly minimapCanvas: HTMLCanvasElement;
 	/** The minimap's own panel: no longer nested in the icon row's dock, so the two can be dragged apart. */
@@ -292,6 +338,29 @@ export class M1Controls {
 		if (!open) return;
 		refs.menus[name].panel.hidden = false;
 		refs.menus[name].button.setAttribute("aria-expanded", "true");
+		this.placeMenu(refs.menus[name].panel, refs.bar);
+	}
+
+	/**
+	 * Puts an open menu where `placeDockMenu` says, relative to the dock it
+	 * sits in.  With no real layout to measure (a test's fake element, say)
+	 * the stylesheet's own place - above the row, right-aligned - stands.
+	 */
+	private placeMenu(panel: HTMLElement, bar: HTMLElement): void {
+		const dock = this.element;
+		const board = dock.offsetParent ?? dock.parentElement ?? undefined;
+		if (typeof panel.getBoundingClientRect !== "function" || typeof bar.getBoundingClientRect !== "function"
+			|| typeof dock.getBoundingClientRect !== "function" || typeof board?.getBoundingClientRect !== "function") return;
+		panel.style.removeProperty("max-height");
+		const size = panel.getBoundingClientRect();
+		const vertical = dock.getAttribute("data-miro-canvas-panel-orientation") === "vertical";
+		const place = placeDockMenu(bar.getBoundingClientRect(), { width: size.width, height: size.height }, board.getBoundingClientRect(), vertical);
+		const origin = dock.getBoundingClientRect();
+		panel.style.setProperty("left", `${place.left - origin.left}px`);
+		panel.style.setProperty("top", `${place.top - origin.top}px`);
+		panel.style.setProperty("right", "auto");
+		panel.style.setProperty("bottom", "auto");
+		if (place.maxHeight !== undefined) panel.style.setProperty("max-height", `${place.maxHeight}px`);
 	}
 
 	private closeMenus(): void {

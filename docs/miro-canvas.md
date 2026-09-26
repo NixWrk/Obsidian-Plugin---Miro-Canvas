@@ -769,6 +769,13 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   it is actually made. A vertical bar's own popovers - the More menu, the
   shape picker - and its pen and lines rows now open sideways, towards the
   board's middle, instead of off the edge they no longer have room for.
+  The dock's own menus are out of its flow and placed each time one opens
+  (`placeDockMenu`, `src/m1-controls.ts`): above or below a row, beside a
+  column facing the board's middle, always inside the view, so a moved
+  dock no longer grows off the edge when a menu opens. Every panel is also
+  placed again, on the next frame, whenever its own size changes: a place
+  resolved before the stylesheet arrived - on turning the plugin on or
+  updating it - was measured on an unstyled panel as wide as the board.
   Canvas's own card, note and file buttons already create by dragging;
   the plugin's own creating tools (text, sticky note, shape, comment,
   frame, code block, table, link) now do too: pressing one of their

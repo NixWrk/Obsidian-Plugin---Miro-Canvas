@@ -1414,6 +1414,10 @@ export class M1CanvasSession {
 	private lastToolbarState: SelectionToolbarState | undefined;
 	/** Until when a click is the tail of a reshape drag rather than a click of its own. */
 	private swallowClickUntil = 0;
+	/** Watches each panel's own size; see `schedulePanelPositions`. */
+	private panelSizeObserver: { readonly observe: (target: HTMLElement) => void } | undefined;
+	private readonly watchedPanels = new WeakSet<HTMLElement>();
+	private panelFrame: number | undefined;
 	/** The node a resize gesture is changing, and the box to put back if it is cancelled. */
 	private resizeGesture: {
 		readonly id: string;
@@ -1677,7 +1681,31 @@ export class M1CanvasSession {
 			if (element === undefined || typeof element.style?.setProperty !== "function") continue;
 			const position = this.settings.panelLayout[id];
 			applyPanelPositionSettled(element, position, clientSize(this.root));
+			// Once per element: observing it again would report it again, and
+			// that report would bring the panels back here, frame after frame.
+			if (this.panelSizeObserver !== undefined && !this.watchedPanels.has(element)) {
+				this.watchedPanels.add(element);
+				this.panelSizeObserver.observe(element);
+			}
 		}
+	}
+
+	/**
+	 * A panel changed size: puts every panel back in its place on the next
+	 * frame.  A place resolved before the stylesheet arrived - right after the
+	 * plugin is turned on or updated - was measured on an unstyled panel as
+	 * wide as the board, and a bar that grows, the pen's row opening, must
+	 * stay inside the view as well.  Not during the layout mode, whose own
+	 * drags place the panels, nor after the session is gone.
+	 */
+	private schedulePanelPositions(): void {
+		const view = ownerDocument(this.root)?.defaultView;
+		if (this.panelFrame !== undefined || typeof view?.requestAnimationFrame !== "function") return;
+		this.panelFrame = view.requestAnimationFrame(() => {
+			this.panelFrame = undefined;
+			if (this.root === undefined || this.panelSizeObserver === undefined || this.arrangeMode?.active === true) return;
+			this.updatePanelPositions();
+		});
 	}
 
 	/** Whether "arrange panels" is on; the dock's board menu and the plugin's command both toggle it. */
@@ -7154,12 +7182,21 @@ export class M1CanvasSession {
 		const ResizeObserverConstructor = readRuntime(globalThis, "ResizeObserver");
 		if (typeof ResizeObserverConstructor === "function") {
 			try {
-				const observer = new (ResizeObserverConstructor as new (callback: () => void) => { observe: (target: HTMLElement) => void; disconnect: () => void })((() => {
+				type Observer = { observe: (target: HTMLElement) => void; disconnect: () => void };
+				const Construct = ResizeObserverConstructor as new (callback: () => void) => Observer;
+				const observer = new Construct((() => {
 					this.refresh();
 					this.updatePanelPositions();
 				}) as () => void);
 				observer.observe(this.root);
 				this.disposers.push(() => observer.disconnect());
+				// The panels' own sizes too: `updatePanelPositions` starts watching each.
+				const panels = new Construct(() => this.schedulePanelPositions());
+				this.panelSizeObserver = panels;
+				this.disposers.push(() => {
+					panels.disconnect();
+					this.panelSizeObserver = undefined;
+				});
 				return;
 			} catch {
 				this.addDiagnostic("Canvas resize observation is unavailable; minimap updates on explicit navigation only.");
