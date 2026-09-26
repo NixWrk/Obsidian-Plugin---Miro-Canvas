@@ -3495,6 +3495,7 @@
 
 .miro-canvas-export__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -3566,8 +3567,11 @@
   width: min(420px, calc(100vw - 48px));
 }
 
+/* Wraps rather than running off the window: the Russian labels are wider
+   than the window's own width allows in one row. */
 .miro-canvas-import-question__buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
