@@ -370,6 +370,10 @@ def build(pack: Pack, fetcher: Fetcher, metadata: dict | None, out: Path) -> tup
         def put(name: str, data: bytes) -> None:
             info = zipfile.ZipInfo(name, date_time=stamp)
             info.compress_type = zipfile.ZIP_STORED
+            # zipfile records the system that made the archive - 0 on
+            # Windows, 3 elsewhere - which would give a CI runner other
+            # bytes, and so another SHA-256, than a Windows machine.
+            info.create_system = 0
             bundle.writestr(info, data)
         put("pack.json", json.dumps(manifest, ensure_ascii=False, indent=1).encode("utf-8"))
         for face in faces:
