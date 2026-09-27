@@ -81,6 +81,11 @@ export async function evaluate(send, expression) {
     returnByValue: true,
     userGesture: true,
   });
+  // A reload under a running evaluation ("Execution context was destroyed")
+  // comes back as a protocol error, not an exception; report it the same way.
+  if (result.error) {
+    return { error: result.error.message ?? JSON.stringify(result.error) };
+  }
   if (result.result?.exceptionDetails) {
     return { error: result.result.exceptionDetails.exception?.description ?? result.result.exceptionDetails.text };
   }

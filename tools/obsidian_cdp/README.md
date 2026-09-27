@@ -51,25 +51,55 @@ python tools/obsidian_cdp/launch.py --port 9336 --lang ru --fresh
 
 Options: `--work <dir>` (default `tools/obsidian_cdp/.out/obsidian-cdp`),
 `--port <n>` (default 9333 - pass 9336), `--lang en|ru`, `--width`/`--height`
-(default 1280x800), `--fresh` (wipe and recreate the vault and its profile).
+(default 1280x800), `--fresh` (wipe and recreate the vault and its profile),
+`--no-welcome-board` (leave the first-run question alone).
 
 What it does, in order: finds Obsidian's executable and its config directory
 for this OS (see "Where Obsidian lives" below); copies the already-downloaded
 `obsidian-<version>.asar` into an isolated profile directory so this harness
 never has to fetch an app package itself; copies the built plugin
 (`main.js`, `manifest.json`, `styles.css`) into a fresh, isolated vault and
-lists it in `community-plugins.json`; launches Obsidian with
-`--user-data-dir=<profile> --remote-debugging-port=<port>`; waits for its CDP
-page target to appear; turns community plugins on
-(`app.plugins.setEnable(true)` - a fresh vault starts in restricted mode) and
-enables `miro-canvas` (`app.plugins.enablePluginAndSave("miro-canvas")`); sets
-Obsidian's interface language (`localStorage.setItem('language', ...)` then
-reloads, since the language only takes effect after a reload) when it is not
-already the requested one; resizes the window; and answers the plugin's
-first-run "Welcome to Miro Canvas" modal by clicking its "Open the welcome
-board" button, which both dismisses the modal and opens the welcome board -
-so every recording starts from the same board. It prints the port, the vault
-path, the profile path and the launched process's pid.
+lists it in `community-plugins.json`; writes `"language": "<lang>"` into the
+profile's `obsidian.json`; launches Obsidian with
+`--user-data-dir=<profile> --remote-debugging-port=<port> --lang=<lang>`;
+waits for its CDP page target and for the workspace to be ready; sets the
+interface language (below); turns community plugins on
+(`app.plugins.setEnable(true)` - a fresh vault starts in restricted mode),
+enables `miro-canvas` (`app.plugins.enablePluginAndSave("miro-canvas")`) and
+closes Obsidian's own "Do you trust the author of this vault?" dialog, which
+that switch has already answered; resizes the window; and opens the welcome
+board (below), so every recording starts from the same board. It prints how
+the welcome board was opened, the port, the vault path, the profile path and
+the launched process's pid.
+
+**The interface language.** Obsidian reads `localStorage.language` (origin
+`app://obsidian.md`) once, as its window loads, and falls back to
+`navigator.language` - the operating system's language - when it is unset,
+as it is in a brand-new profile. So `launch.py` sets the language three ways:
+`--lang=<lang>` on the command line (Chromium's locale, which is what
+`navigator.language` reports, so the very first load is already right), the
+profile's `obsidian.json` (Obsidian's main process reads it for its own
+menus), and `localStorage.setItem('language', ...)` over CDP (so a reused
+profile, the plugin's `getLanguage()` and a scenario's `s.lang` all agree).
+It then compares the language the window actually shows (`i18next.language`)
+with `--lang` and reloads the window only when they differ - which happens
+when a reused profile last ran in the other language. The language is set
+before the plugin is enabled, so on a fresh vault the plugin starts once,
+already in that language (the plugin follows Obsidian's language), and no
+reload ever tears down its first-run question.
+
+**The welcome board.** On a fresh vault the plugin asks its first-run
+question. `launch.py` waits for that modal by its class
+(`.miro-canvas-import-question-modal`, never by its translated text), presses
+its call-to-action button (`.miro-canvas-import-question__buttons
+button.mod-cta`), and presses again if a press did not take, until a Canvas
+view is active. If the question never appears (up to 20 seconds), or was
+already answered - a reused profile - it opens the board through the plugin
+itself: a `miro-canvas:open-welcome-board` command if the plugin registers
+one, otherwise the plugin's own `openWelcomeBoard()`, which is what the
+question's button calls. The printed `welcome board:` line says which route
+was taken: `opened-via-first-run-modal`, `opened-via-command`,
+`opened-via-plugin`, or `welcome-board-not-opened`.
 
 **Determinism**: without `--fresh`, a vault is reused as-is (only the
 plugin's three built files and the two config files that enable it are
@@ -171,7 +201,8 @@ A scenario is a `.mjs` file whose default export is `async function (s) { ... }`
 `s` is:
 
 - `s.lang` - `"en"` or `"ru"`, read from the running Obsidian
-  (`localStorage.getItem('language')`, default `"en"`). Use it for anything
+  (`localStorage.getItem('language')`, which `launch.py` always sets;
+  default `"en"`). Use it for anything
   a caption-only helper does not already cover.
 - `s.caption(text)` - shows a banner at the top of the *recorded* window.
   `text` is a plain string, or `{ en: "...", ru: "..." }` to pick by
@@ -255,6 +286,16 @@ scenario never touches it directly.
 
 - **"Missing built plugin file(s)"** - run `npm run build` first.
   `launch.py` never builds the plugin itself.
+- **Obsidian comes up in the operating system's language, not `--lang`** -
+  check the running window with
+  `CDP_PORT=9336 node tools/obsidian_cdp/cdp.mjs eval "return [localStorage.getItem('language'), navigator.language, window.i18next.language];"`
+  (`i18next.language` is unset for English, Obsidian's built-in default).
+  `launch.py` fails with "Obsidian still shows ..." if a reload did not
+  bring the window to `--lang`; see "The interface language" above.
+- **`welcome board: welcome-board-not-opened`** - neither the first-run
+  question nor the plugin's own route opened a Canvas view within 20
+  seconds; check that `miro-canvas` actually loaded
+  (`return !!app.plugins.plugins['miro-canvas'];`).
 - **A fresh vault shows "community plugins are disabled"** - `launch.py`
   already calls `app.plugins.setEnable(true)`; if you are driving CDP by
   hand instead, that restricted-mode master switch is separate from

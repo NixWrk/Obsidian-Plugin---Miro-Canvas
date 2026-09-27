@@ -163,8 +163,48 @@ def seed_profile(profile_dir: Path, vault_dir: Path, asar_source: Path) -> None:
     })
 
 
-def launch_obsidian(executable: Path, profile_dir: Path, port: int) -> subprocess.Popen:
-    args = [str(executable), f"--user-data-dir={profile_dir}", f"--remote-debugging-port={port}"]
+def with_profile_language(config: Any, lang: str) -> dict[str, Any]:
+    """`obsidian.json` with its `language` set to `lang`, every other key kept.
+
+    Obsidian's main process reads this key at startup for its own menus and
+    dialogs (the window's interface reads local storage instead - see
+    `apply_interface_language`).
+    """
+
+    updated = dict(config) if isinstance(config, dict) else {}
+    updated["language"] = lang
+    return updated
+
+
+def set_profile_language(profile_dir: Path, lang: str) -> None:
+    config_path = profile_dir / "obsidian.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        config = {}
+    write_json(config_path, with_profile_language(config, lang))
+
+
+def obsidian_arguments(executable: Path, profile_dir: Path, port: int, lang: str) -> list[str]:
+    """The command line for the isolated instance.
+
+    `--lang` sets Chromium's locale, which is what `navigator.language`
+    reports.  Obsidian falls back to that when local storage holds no
+    `language`, as in a brand-new profile - so without it a fresh profile
+    comes up in the operating system's language, whatever `--lang` this tool
+    was given.
+    """
+
+    return [
+        str(executable),
+        f"--user-data-dir={profile_dir}",
+        f"--remote-debugging-port={port}",
+        f"--lang={lang}",
+    ]
+
+
+def launch_obsidian(executable: Path, profile_dir: Path, port: int, lang: str) -> subprocess.Popen:
+    args = obsidian_arguments(executable, profile_dir, port, lang)
     # Obsidian is a normal GUI app; detach stdio so this script does not block on its output.
     return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -193,6 +233,25 @@ def node_executable() -> str:
     return node
 
 
+def parse_eval_output(stdout: str) -> tuple[Any, str | None]:
+    """Splits what `cdp.mjs eval` printed into (value, error).
+
+    cdp.mjs exits 0 even when the expression threw, or when the page was
+    reloading under it: it prints `{"error": ...}` instead.  That object is
+    truthy, so taking it as a value would make every "is it ready yet?" poll
+    below answer yes while Obsidian is still starting.
+    """
+
+    text = stdout.strip()
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        return text, None
+    if isinstance(value, dict) and set(value) == {"error"}:
+        return None, str(value["error"])
+    return value, None
+
+
 def cdp_eval(port: int, expression: str, *, timeout: float = 30.0, retry_for: float = 0.0) -> Any:
     """Runs `expression` in the main window via cdp.mjs, retrying while the app is mid-reload."""
 
@@ -201,16 +260,22 @@ def cdp_eval(port: int, expression: str, *, timeout: float = 30.0, retry_for: fl
     deadline = time.monotonic() + retry_for
     last_error: str | None = None
     while True:
-        result = subprocess.run(
-            [node, str(CDP_MJS), "eval", expression],
-            env=env, capture_output=True, text=True, timeout=timeout,
-        )
-        if result.returncode == 0:
-            try:
-                return json.loads(result.stdout)
-            except json.JSONDecodeError:
-                return result.stdout.strip()
-        last_error = result.stderr.strip() or result.stdout.strip()
+        try:
+            result = subprocess.run(
+                [node, str(CDP_MJS), "eval", expression],
+                env=env, capture_output=True, text=True, timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            result = None
+        if result is None:
+            last_error = f"cdp.mjs did not answer within {timeout}s"
+        elif result.returncode == 0:
+            value, error = parse_eval_output(result.stdout)
+            if error is None:
+                return value
+            last_error = error
+        else:
+            last_error = result.stderr.strip() or result.stdout.strip()
         if time.monotonic() >= deadline:
             raise LaunchError(f"cdp.mjs eval failed: {last_error}\nexpression: {expression}")
         time.sleep(0.5)
@@ -219,6 +284,16 @@ def cdp_eval(port: int, expression: str, *, timeout: float = 30.0, retry_for: fl
 _ENABLE_PLUGIN_JS = """
   if (app.plugins.setEnable) await app.plugins.setEnable(true);
   await app.plugins.enablePluginAndSave("miro-canvas");
+  // A fresh vault that lists a plugin opens Obsidian's own "Do you trust the
+  // author of this vault?" dialog; the switch above has already answered it,
+  // so close it rather than leave it dimming the board.  Its close control
+  // only closes it (the dialog's own buttons would open Settings, or say no);
+  // Obsidian 1.13 calls that control `.modal-header-button`, older versions
+  // `.modal-close-button`.
+  for (const dialog of document.querySelectorAll(".modal.mod-trust-folder")) {
+    const close = dialog.querySelector(":scope > .modal-header-button, :scope > .modal-close-button");
+    if (close) close.click();
+  }
   return !!app.plugins.plugins["miro-canvas"];
 """
 
@@ -236,47 +311,103 @@ def ensure_plugin_loaded(port: int, *, timeout: float = 20.0) -> None:
     deadline = time.monotonic() + timeout
     while True:
         loaded = cdp_eval(port, _ENABLE_PLUGIN_JS, retry_for=5)
-        if loaded:
+        if loaded is True:
             return
         if time.monotonic() >= deadline:
             raise LaunchError("miro-canvas never finished loading (app.plugins.plugins['miro-canvas'] stayed falsy)")
         time.sleep(0.5)
 
 
-def wait_for_workspace_ready(port: int, *, timeout: float = 20.0) -> None:
+# Set on the window just before this tool reloads it, so a poll that still
+# reaches the old page (the reload is not instant) is not taken for the new one.
+_STALE_PAGE_FLAG = "__miroCanvasCdpStalePage"
+
+_WORKSPACE_READY_JS = f"""
+  if (window.{_STALE_PAGE_FLAG}) return false;
+  if (typeof app === "undefined" || !app.workspace) return false;
+  return !!app.workspace.layoutReady;
+"""
+
+
+def wait_for_workspace_ready(port: int, *, timeout: float = 30.0) -> None:
     """`app` exists as soon as the page target does, but the vault/workspace can still be a beat from ready - touching plugins before `layoutReady` is what makes the enable step flaky."""
 
     deadline = time.monotonic() + timeout
     while True:
-        ready = cdp_eval(port, "return !!(app && app.workspace && app.workspace.layoutReady);", retry_for=5)
-        if ready:
+        ready = cdp_eval(port, _WORKSPACE_READY_JS, retry_for=10)
+        if ready is True:
             return
         if time.monotonic() >= deadline:
             raise LaunchError("Obsidian's workspace never became ready (app.workspace.layoutReady stayed falsy)")
         time.sleep(0.3)
 
 
+def interface_language_js(lang: str) -> str:
+    """Stores `lang` as Obsidian's interface language and reports the one the window actually shows.
+
+    Obsidian reads local storage's `language` once, as the window loads
+    (falling back to `navigator.language`), and loads that translation into
+    `i18next`; English is its built-in default, so `i18next.language` may be
+    unset then.  Storing the choice as well - not only relying on `--lang` -
+    is what makes a reused profile, and the plugin's own `getLanguage()`, and
+    `record.mjs`'s `s.lang`, all agree with it.
+    """
+
+    return f"""
+      localStorage.setItem("language", {json.dumps(lang)});
+      const shown = window.i18next && window.i18next.language;
+      return shown || "en";
+    """
+
+
+_RELOAD_JS = f"""
+  window.{_STALE_PAGE_FLAG} = true;
+  // Reloaded a beat later, so this evaluation returns before its page goes.
+  setTimeout(() => app.commands.executeCommandById("app:reload"), 100);
+  return "reloading";
+"""
+
+
+def language_matches(shown: Any, lang: str) -> bool:
+    """Whether the language the window shows (`i18next.language`, e.g. "ru" or "en-US") is `lang`."""
+
+    if not isinstance(shown, str) or not shown:
+        return False
+    return shown.lower().split("-")[0] == lang
+
+
+def apply_interface_language(port: int, lang: str, *, attempts: int = 2) -> None:
+    """Makes the window show `lang`, reloading it when a stored choice from an earlier run says otherwise.
+
+    A fresh profile already starts in `lang` (`--lang` and `obsidian.json`),
+    so this reloads only a reused profile whose stored language differs.
+    """
+
+    shown = cdp_eval(port, interface_language_js(lang), retry_for=10)
+    for _ in range(attempts):
+        if language_matches(shown, lang):
+            return
+        cdp_eval(port, _RELOAD_JS, retry_for=10)
+        wait_for_workspace_ready(port)
+        shown = cdp_eval(port, interface_language_js(lang), retry_for=10)
+    if not language_matches(shown, lang):
+        raise LaunchError(f"Obsidian still shows {shown!r} after reloading for --lang {lang}")
+
+
 def apply_runtime_settings(port: int, lang: str) -> None:
-    """Turns on community plugins, enables miro-canvas, and sets Obsidian's interface language."""
+    """Sets Obsidian's interface language, then turns on community plugins and enables miro-canvas.
+
+    The language comes first: on a fresh vault the plugin is not loaded yet
+    (restricted mode is on), so it starts once, already in `lang`, and its
+    first-run question is never torn down by a reload for the language.
+    """
 
     wait_for_workspace_ready(port)
+    apply_interface_language(port, lang)
+    # A reload restarts the plugin from a clean `onload`, so the two switches
+    # are asserted after it - a reused vault may have started with the
+    # plugin disabled.
     ensure_plugin_loaded(port)
-
-    current_language = cdp_eval(port, "return localStorage.getItem('language') || 'en';", retry_for=10) or "en"
-    if current_language != lang:
-        cdp_eval(port, f"""
-          localStorage.setItem('language', {json.dumps(lang)});
-          app.commands.executeCommandById('app:reload');
-          return "reloading";
-        """, retry_for=10)
-        # The reload tears down and rebuilds the renderer's JS context; give it
-        # a moment before the next eval, which itself retries while it settles.
-        time.sleep(2)
-        cdp_eval(port, "return !!(app && app.plugins && app.workspace);", retry_for=30)
-        # A reload restarts the plugin from a clean `onload`, so re-assert both
-        # switches - a fresh vault would already have them, but a reused one
-        # (no --fresh) might have started this run with the plugin disabled.
-        ensure_plugin_loaded(port)
 
 
 def resize_window(port: int, width: int, height: int) -> None:
@@ -286,48 +417,118 @@ def resize_window(port: int, width: int, height: int) -> None:
     """, retry_for=10)
 
 
-# The first-run modal's own literal English/Russian strings (src/locales/en.ts
-# and ru.ts, `importGuide.settingsHeading`) - used only to find the settings
-# tab's fallback button below if the modal was already answered by a reused,
-# non---fresh profile.  Keep these two lines in sync if that heading changes.
-SETTINGS_HEADING_EN = "Getting started"
-SETTINGS_HEADING_RU = "Начало работы"
+# The plugin's first-run question (src/main.ts, `openImportQuestion`): a modal
+# tagged with this class, whose one call-to-action button opens the welcome
+# board.  Found by class, never by its (translated) text.
+WELCOME_MODAL_SELECTOR = ".miro-canvas-import-question-modal"
+WELCOME_BUTTON_SELECTOR = f"{WELCOME_MODAL_SELECTOR} .miro-canvas-import-question__buttons button.mod-cta"
+
+# A command that opens the welcome board, used first by the fallback below if
+# the plugin ever registers one; miro-canvas 0.1.1 has none, so the fallback
+# calls the same plugin method the first-run question's button calls.
+WELCOME_BOARD_COMMAND_ID = f"{PLUGIN_ID}:open-welcome-board"
+
+_WELCOME_STATE_JS = f"""
+  const plugin = app.plugins.plugins[{json.dumps(PLUGIN_ID)}];
+  const settings = plugin ? plugin.canvasSettings : null;
+  const leaf = app.workspace.activeLeaf;
+  const viewType = leaf && leaf.view && leaf.view.getViewType ? leaf.view.getViewType() : null;
+  return {{
+    pluginLoaded: !!plugin,
+    modalOpen: !!document.querySelector({json.dumps(WELCOME_MODAL_SELECTOR)}),
+    questionAnswered: !!(settings && settings.importQuestionAnswered),
+    boardOpen: viewType === "canvas",
+  }};
+"""
+
+_CLICK_WELCOME_BUTTON_JS = f"""
+  const button = document.querySelector({json.dumps(WELCOME_BUTTON_SELECTOR)});
+  if (!button) return false;
+  button.click();
+  return true;
+"""
+
+_OPEN_WELCOME_BOARD_FALLBACK_JS = f"""
+  if (app.commands.commands[{json.dumps(WELCOME_BOARD_COMMAND_ID)}]) {{
+    app.commands.executeCommandById({json.dumps(WELCOME_BOARD_COMMAND_ID)});
+    return "command";
+  }}
+  const plugin = app.plugins.plugins[{json.dumps(PLUGIN_ID)}];
+  if (plugin && typeof plugin.openWelcomeBoard === "function") {{
+    plugin.openWelcomeBoard();
+    return "plugin";
+  }}
+  return "none";
+"""
 
 
-def open_welcome_board(port: int) -> str:
-    """Answers the first-run modal (which itself opens the welcome board), or falls back to the settings tab's own button for a reused profile that already answered it."""
+def welcome_state(port: int) -> dict[str, bool]:
+    state = cdp_eval(port, _WELCOME_STATE_JS, retry_for=10)
+    if not isinstance(state, dict):
+        raise LaunchError(f"unexpected answer while looking for the first-run question: {state!r}")
+    return state
 
-    return cdp_eval(port, f"""
-      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      let modal = document.querySelector('.miro-canvas-import-question-modal');
-      for (let i = 0; i < 25 && !modal; i += 1) {{
-        await sleep(300);
-        modal = document.querySelector('.miro-canvas-import-question-modal');
-      }}
-      if (modal) {{
-        const cta = modal.querySelector('.miro-canvas-import-question__buttons .mod-cta');
-        if (cta) {{ cta.click(); await sleep(600); return "opened-via-first-run-modal"; }}
-      }}
-      const setting = app.setting;
-      setting.open();
-      setting.openTabById('{PLUGIN_ID}');
-      await sleep(500);
-      const doc = setting.win ? setting.win.document : document;
-      const headings = Array.from(doc.querySelectorAll('.setting-item-name'));
-      const heading = headings.find((el) => el.textContent === {json.dumps(SETTINGS_HEADING_EN)} || el.textContent === {json.dumps(SETTINGS_HEADING_RU)});
-      const row = heading ? heading.closest('.setting-item').nextElementSibling : null;
-      const button = row ? row.querySelector('button.mod-cta') : null;
-      if (button) {{ button.click(); await sleep(600); setting.close(); return "opened-via-settings-tab"; }}
-      setting.close();
-      return "welcome-board-not-opened";
-    """, retry_for=5)
+
+def wait_for_welcome_question(port: int, timeout: float) -> dict[str, bool]:
+    """Waits for the first-run question to appear, or for a sign it never will (already answered)."""
+
+    deadline = time.monotonic() + timeout
+    while True:
+        state = welcome_state(port)
+        if state["modalOpen"] or state["questionAnswered"]:
+            return state
+        if time.monotonic() >= deadline:
+            return state
+        time.sleep(0.3)
+
+
+def answer_welcome_question(port: int, timeout: float) -> bool:
+    """Presses the question's welcome-board button - again, if a press did not take - until the board is open."""
+
+    deadline = time.monotonic() + timeout
+    while True:
+        state = welcome_state(port)
+        if state["boardOpen"] and not state["modalOpen"]:
+            return True
+        if state["modalOpen"]:
+            cdp_eval(port, _CLICK_WELCOME_BUTTON_JS, retry_for=5)
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.5)
+
+
+def wait_for_board(port: int, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while True:
+        if welcome_state(port)["boardOpen"]:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.5)
+
+
+def open_welcome_board(port: int, *, question_timeout: float = 20.0, board_timeout: float = 20.0) -> str:
+    """Answers the first-run question (which itself opens the welcome board); failing that, opens the board through the plugin.
+
+    The fallback covers a reused profile that answered the question on an
+    earlier run, and a question that never showed within `question_timeout`.
+    """
+
+    state = wait_for_welcome_question(port, question_timeout)
+    if state["modalOpen"] and answer_welcome_question(port, board_timeout):
+        return "opened-via-first-run-modal"
+
+    route = cdp_eval(port, _OPEN_WELCOME_BOARD_FALLBACK_JS, retry_for=5)
+    if route in ("command", "plugin") and wait_for_board(port, board_timeout):
+        return f"opened-via-{route}"
+    return "welcome-board-not-opened"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--work", type=Path, default=TOOL_DIR / ".out" / "obsidian-cdp", help="Isolated profile+vault root (default: %(default)s).")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="CDP debugging port (default: %(default)s). Use 9336 for this tool's own instance; never 9333-9335 or the user's own Obsidian.")
-    parser.add_argument("--lang", choices=["en", "ru"], default="en", help="Obsidian interface language (default: %(default)s).")
+    parser.add_argument("--lang", choices=["en", "ru"], default="en", help="Obsidian's interface language, and so the plugin's (default: %(default)s).")
     parser.add_argument("--width", type=int, default=DEFAULT_WIDTH)
     parser.add_argument("--height", type=int, default=DEFAULT_HEIGHT)
     parser.add_argument("--fresh", action="store_true", help="Recreate the vault (and its profile) from scratch.")
@@ -360,8 +561,12 @@ def main(argv: list[str] | None = None) -> int:
     seed_vault(vault_dir, REPO_ROOT)
     if not profile_dir.exists():
         seed_profile(profile_dir, vault_dir, asar_source)
+    # Set before the window loads, as is `--lang` on the command line: a
+    # brand-new profile has no stored language, and Obsidian would otherwise
+    # come up in the operating system's.
+    set_profile_language(profile_dir, args.lang)
 
-    process = launch_obsidian(executable, profile_dir, args.port)
+    process = launch_obsidian(executable, profile_dir, args.port, args.lang)
     try:
         wait_for_port(args.port, timeout=30)
         apply_runtime_settings(args.port, args.lang)
