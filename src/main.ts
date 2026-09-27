@@ -46,6 +46,7 @@ import { setAuthorColors } from "./comment-thread";
 import { layerActions } from "./layer-order";
 import { localeFor, setLocale, words } from "./i18n";
 import { createWelcomeBoard } from "./welcome-board";
+import { canImportFile, importIntoBoard, showImportPreview } from "./import-command";
 import { automaticCheckDue, checkForUpdate, isNewerVersion, type ReleaseRequest, type UpdateCheck } from "./update-check";
 
 const NATIVE_CANVAS_VIEW_TYPE = "canvas";
@@ -394,6 +395,31 @@ export default class MiroCanvasPlugin extends Plugin {
       checkCallback: (checking) => this.runM1Command(checking, (session) => session.toggleArrangeMode()),
     });
 
+    // Import from another plugin's file into a new board: offered for the
+    // open file and in a file's own menu, and only for files an importer
+    // might read.  No default hotkey: an import is a deliberate step.
+    this.addCommand({
+      id: "import-into-board",
+      name: words().commands.importIntoBoard,
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (file === null || !canImportFile(this.app, file)) {
+          return false;
+        }
+        if (!checking) {
+          this.importIntoBoard(file);
+        }
+        return true;
+      },
+    });
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+      if (!(file instanceof TFile) || !canImportFile(this.app, file)) return;
+      menu.addItem((item) => item
+        .setTitle(words().commands.importIntoBoard)
+        .setIcon("import")
+        .onClick(() => this.importIntoBoard(file)));
+    }));
+
     this.registerEvent(
       this.app.workspace.on(
         "active-leaf-change",
@@ -691,6 +717,21 @@ export default class MiroCanvasPlugin extends Plugin {
     void createWelcomeBoard({ app: this.app, isFile: (value): value is TFile => value instanceof TFile, normalizePath }).catch(
       () => new Notice(words().importGuide.createWelcomeBoardFailed),
     );
+  }
+
+  /** A new board from another plugin's file; the file itself is only read. */
+  private importIntoBoard(file: TFile): void {
+    void importIntoBoard({
+      app: this.app,
+      isFile: (value): value is TFile => value instanceof TFile,
+      normalizePath,
+      pluginVersion: this.manifest.version,
+      notice: (message) => new Notice(message),
+      confirm: (preview) => showImportPreview(new Modal(this.app), preview),
+    }, file).catch((error: unknown) => {
+      console.error("[miro-canvas] import failed", error);
+      new Notice(words().importer.failed);
+    });
   }
 
   /** The same guide the first-run question and the settings tab's button open. */

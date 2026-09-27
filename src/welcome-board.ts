@@ -35,6 +35,7 @@ import { readBoardConnector, nativeEdgeOf, fitsNativeEdge, type BoardConnector }
 import type { CanvasShapeDescriptor } from "./canvas-authoring";
 import { exportRecord, pageAround, paperRatio, type ExportPageRecord, type ExportState } from "./export-pages";
 import { words } from "./i18n";
+import { idFactory } from "./importers/board-builder";
 import { readLocalItem, type LocalItem } from "./local-items";
 import { addLocalComment, addReply } from "./local-comments";
 import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata } from "./metadata";
@@ -161,18 +162,6 @@ const PAPER = {
 
 /** A fixed moment, so a comment's timestamp never makes two builds differ. */
 const FIXED_TIMESTAMP = "2026-01-01T00:00:00.000Z";
-
-/** An id as native Canvas makes one: sixteen hex digits, drawn from a seed so builds compare equal. */
-function idFactory(seed: number): () => string {
-	let state = (seed >>> 0) || 0x2f6e2b1;
-	const next32 = (): number => {
-		state ^= state << 13; state >>>= 0;
-		state ^= state >>> 17;
-		state ^= state << 5; state >>>= 0;
-		return state >>> 0;
-	};
-	return () => `${next32().toString(16).padStart(8, "0")}${next32().toString(16).padStart(8, "0")}`;
-}
 
 function frameRect(frame: FrameName): Rect {
 	const index = FRAMES.indexOf(frame);
