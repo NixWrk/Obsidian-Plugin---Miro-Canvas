@@ -119,7 +119,7 @@ import {
 	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "./quick-tools";
 import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
-import { applyPanelPositionSettled, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
+import { applyPanelPositionSettled, defaultPanelsFit, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
 import {
 	blockArrowOutline, bowPoint, lineBoardPoints, lineFromBoard, lineKind, planLine, type LineKindSpec, type LinePoint,
@@ -240,6 +240,8 @@ function nativeSideOf(anchor: CanvasAnchor | undefined, fallback: ConnectorSide)
 const SETTLE_FRAMES = 20;
 /** How often, in milliseconds, the minimap follows cards being dragged. */
 const MINIMAP_DRAG_INTERVAL = 200;
+/** The tool bar's own gap from the board's foot in styles.css, for a host that cannot measure the board. */
+const DEFAULT_TOOLBAR_BOTTOM = 16;
 /** What a press starts no rectangle selection on: the things it would select, and text. */
 const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.miro-canvas-mixed-selection-frame,"
 	+ ".miro-board-connector,.miro-canvas-connector-labels,input,textarea,[contenteditable=true]";
@@ -1688,6 +1690,69 @@ export class M1CanvasSession {
 				this.panelSizeObserver.observe(element);
 			}
 		}
+		this.updateCrowding(panels);
+	}
+
+	/**
+	 * On a narrow board the tool bar's centred default place can run under
+	 * the corner dock's icon row (seen in real Obsidian around 680px, file
+	 * sidebar open). Only the *default* layout is at risk: a person who
+	 * moved either panel already chose where it sits, and that choice is
+	 * left exactly as they set it, so this reads the stored layout first
+	 * and does nothing once either panel has an entry of its own.
+	 *
+	 * The natural widths it measures come right after the loop above
+	 * cleared any inline override for an unmoved panel, so a stale
+	 * left-over width from a previous crowded frame never feeds back into
+	 * this frame's own reading - `defaultPanelsFit`'s inputs (width) never
+	 * depend on the very positioning (left/bottom) this then writes.
+	 */
+	private updateCrowding(panels: Readonly<Partial<Record<PanelId, HTMLElement>>>): void {
+		const root = this.root;
+		if (root === undefined || typeof root.style?.setProperty !== "function") return;
+		const toolbarElement = panels.toolbar;
+		const dockElement = panels.dockBar;
+		const layout = this.settings.panelLayout;
+		const clear = (): void => {
+			root.removeAttribute("data-miro-canvas-crowded");
+			root.style.removeProperty("--miro-canvas-crowded-toolbar-reach");
+		};
+		if (layout.toolbar !== undefined || layout.dockBar !== undefined || toolbarElement === undefined || dockElement === undefined) {
+			clear();
+			return;
+		}
+		const toolbarRect = boundingRect(toolbarElement);
+		const dockRect = boundingRect(dockElement);
+		if (toolbarRect === undefined || dockRect === undefined) {
+			clear();
+			return;
+		}
+		const fit = defaultPanelsFit(clientSize(root).width, toolbarRect.right - toolbarRect.left, dockRect.right - dockRect.left);
+		if (fit === "apart") {
+			clear();
+			return;
+		}
+		root.setAttribute("data-miro-canvas-crowded", fit);
+		if (fit === "stacked") {
+			root.style.setProperty("--miro-canvas-crowded-toolbar-reach", `${this.toolbarReach(toolbarRect)}px`);
+		} else {
+			root.style.removeProperty("--miro-canvas-crowded-toolbar-reach");
+		}
+	}
+
+	/**
+	 * How far up from the board's foot the tool bar's top edge sits, which
+	 * is what the dock has to clear. It is measured, not assumed: a narrow
+	 * window's own rule already lifts the bar off its usual 16px, and the
+	 * crowding only ever moves the bar sideways, so this reading never
+	 * depends on what it is used to write.
+	 */
+	private toolbarReach(toolbarRect: { readonly top: number; readonly bottom: number }): number {
+		const boardRect = boundingRect(this.root);
+		if (boardRect === undefined) {
+			return DEFAULT_TOOLBAR_BOTTOM + toolbarRect.bottom - toolbarRect.top;
+		}
+		return Math.max(0, boardRect.bottom - toolbarRect.top);
 	}
 
 	/**

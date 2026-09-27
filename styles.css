@@ -1138,6 +1138,37 @@
   }
 }
 
+/* On a narrow board the tool bar's centred default place can run under the
+   corner dock's icon row - seen in real Obsidian around 680px with a
+   sidebar open, well above the 900px the two media queries above react to,
+   because those track the window rather than the board itself.
+   `M1CanvasSession.updateCrowding` measures the bar's and the dock's own
+   natural widths against the board and marks the root with
+   `data-miro-canvas-crowded`, but only while neither panel has a place of
+   its own - a person's stored layout is left exactly as they set it.  Each
+   selector below pairs the attribute with the very class the width-based
+   rules above already carry, so it outranks them on specificity alone and
+   wins whichever way the two disagree, window narrow or wide. */
+[data-miro-canvas-crowded="toolbar-left"] .miro-canvas-toolbar.miro-canvas-tools,
+[data-miro-canvas-crowded="stacked"] .miro-canvas-toolbar.miro-canvas-tools {
+  left: 12px;
+  transform: none;
+}
+
+/* Lifted clear of the bar itself, not of the dock's own default place: the
+   session measures how far up from the board's foot the bar's top edge
+   sits - wherever a narrow window's own rule has put the bar - and the dock
+   keeps the same 8px gap `defaultPanelsFit` reasoned with above that. */
+[data-miro-canvas-crowded="stacked"] .miro-canvas-dock {
+  bottom: calc(8px + var(--miro-canvas-crowded-toolbar-reach, 58px));
+}
+
+/* Moved up by that very same amount, so the 50px gap between the dock's and
+   the map's own default bottoms (86px less 36px) survives the lift. */
+[data-miro-canvas-crowded="stacked"] .miro-canvas-dock__map {
+  bottom: calc(58px + var(--miro-canvas-crowded-toolbar-reach, 58px));
+}
+
 /* A drawing is only its stroke: the node that carries it shows nothing of its
    own, and the stroke scales with the node. */
 .miro-source-drawing,

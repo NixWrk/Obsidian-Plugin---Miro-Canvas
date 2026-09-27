@@ -4,6 +4,7 @@ import {
   PANEL_ANCHORS,
   applyPanelPosition,
   applyPanelPositionSettled,
+  defaultPanelsFit,
   effectivePanelOrientation,
   flipPanelOrientation,
   isVerticalAnchor,
@@ -67,6 +68,44 @@ describe("isVerticalAnchor", () => {
     for (const anchor of PANEL_ANCHORS) {
       expect(isVerticalAnchor(anchor)).toBe(anchor === "left-middle" || anchor === "right-middle");
     }
+  });
+});
+
+describe("defaultPanelsFit", () => {
+  // toolbarWidth 200, dockWidth 100, margin 12, gap 8 throughout: the boards
+  // below sit right at (or one pixel off) the two thresholds those numbers
+  // produce - W=440 for apart/toolbar-left, W=332 for toolbar-left/stacked.
+  const TOOLBAR = 200;
+  const DOCK = 100;
+
+  it("is apart on a board wide enough for the centred bar and the dock to clear each other with room over", () => {
+    expect(defaultPanelsFit(1200, TOOLBAR, DOCK)).toBe("apart");
+  });
+
+  it("stays apart exactly at the boundary, where the gap between them is exactly the required 8px", () => {
+    expect(defaultPanelsFit(440, TOOLBAR, DOCK)).toBe("apart");
+  });
+
+  it("moves to toolbar-left one pixel narrower than that boundary", () => {
+    expect(defaultPanelsFit(439, TOOLBAR, DOCK)).toBe("toolbar-left");
+  });
+
+  it("stays toolbar-left exactly at its own boundary with the dock", () => {
+    expect(defaultPanelsFit(332, TOOLBAR, DOCK)).toBe("toolbar-left");
+  });
+
+  it("stacks one pixel narrower than the toolbar-left boundary", () => {
+    expect(defaultPanelsFit(331, TOOLBAR, DOCK)).toBe("stacked");
+  });
+
+  it("stays stacked on a board too narrow for either panel to move clear of the other", () => {
+    expect(defaultPanelsFit(200, TOOLBAR, DOCK)).toBe("stacked");
+  });
+
+  it("scales with the panels' own widths rather than a fixed board size", () => {
+    // A wider bar needs a wider board for the same "apart" outcome.
+    expect(defaultPanelsFit(440, TOOLBAR, DOCK)).toBe("apart");
+    expect(defaultPanelsFit(440, TOOLBAR + 40, DOCK)).not.toBe("apart");
   });
 });
 

@@ -188,6 +188,39 @@ export function normalizePanelLayout(value: unknown): PanelLayout {
   return Object.freeze(layout);
 }
 
+/**
+ * How the tool bar and the dock's icon row sit *before* either has ever been
+ * moved: the bar centred with a translate transform, the dock hugging the
+ * board's right edge. On a narrow board the two defaults can overlap - the
+ * bar's own margin never widens the way the dock's `right: 12px` does -
+ * hidden on any board wide enough to give both their natural width plus a
+ * gap. "apart" is that ordinary case; "toolbar-left" moves the bar to the
+ * board's own left edge, its usual margin, once that alone clears the dock;
+ * "stacked" lifts the dock above the bar when even the left edge is too
+ * tight for both in one row. Once a person moves either panel, this stops
+ * applying to that pair - a stored place is never second-guessed by it.
+ */
+export type DefaultPanelsFit = "apart" | "toolbar-left" | "stacked";
+
+/** The dock's own `right: 12px`; the bar's left-edge margin matches it once moved off-centre. */
+const DEFAULT_PANEL_MARGIN = 12;
+
+/** The clearance a person can still tell apart from a bare touch, kept between the bar and the dock. */
+const DEFAULT_PANEL_GAP = 8;
+
+/**
+ * Reads the same natural widths the CSS defaults would render at - never a
+ * stored position's resolved rect - so it can be measured up front and left
+ * untouched by whichever outcome it reports.
+ */
+export function defaultPanelsFit(boardWidth: number, toolbarWidth: number, dockWidth: number): DefaultPanelsFit {
+  const centeredBarRight = (boardWidth + toolbarWidth) / 2;
+  const dockLeft = boardWidth - DEFAULT_PANEL_MARGIN - dockWidth;
+  if (centeredBarRight + DEFAULT_PANEL_GAP <= dockLeft) return "apart";
+  if (DEFAULT_PANEL_MARGIN + toolbarWidth + DEFAULT_PANEL_GAP <= dockLeft) return "toolbar-left";
+  return "stacked";
+}
+
 /** An element whose inline position this module may write; a real `HTMLElement` satisfies it. */
 export interface StyledElement {
   readonly style: {

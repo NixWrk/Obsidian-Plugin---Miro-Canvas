@@ -240,6 +240,12 @@ mode with a banner across the top:
 another board leaves the mode. The selection toolbar always keeps following
 the selection.
 
+Until you move them, the bottom bar and the corner dock make room for each
+other on a narrow board - with a sidebar open, say: the bar moves to the
+left edge, and when even that is too tight the dock and the minimap rise
+above it. Once you have placed either of them yourself, it stays exactly
+where you put it.
+
 ## Bringing boards over from Miro
 
 Importing is done by a separate free program,

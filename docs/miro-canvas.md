@@ -793,7 +793,14 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   takes - one undo step, selected afterwards, exactly as a click leaves
   it. Releasing over a panel or outside the view, or pressing Escape,
   makes nothing; a plain press with no real movement still just arms the
-  tool.
+  tool. On a narrow board the two default places could overlap (seen at a
+  680px board with a sidebar open): while neither the bar nor the dock's
+  icon row has a `panelLayout` entry, `defaultPanelsFit`
+  (`src/panel-layout.ts`) compares their natural widths with the board's and
+  `M1CanvasSession.updateCrowding` marks the root
+  `data-miro-canvas-crowded` - "toolbar-left" puts the bar at the left
+  edge, "stacked" lifts the dock and the minimap above it; a stored place
+  turns this off.
 - Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
   highlight, next and previous.

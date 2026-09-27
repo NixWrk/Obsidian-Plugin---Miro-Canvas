@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- On a narrow board - a small window or an open sidebar - the bottom bar no
+  longer runs under the corner dock: until either has been moved, the bar
+  goes to the left edge, and when that is still too tight the dock and the
+  minimap rise above it. A place you chose yourself is left as it is.
+
 ## 0.1.1 - 2026-09-26
 
 - The welcome window's buttons wrap onto a second line instead of running
