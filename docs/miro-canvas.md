@@ -823,8 +823,9 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   day at start, unless turned off in the settings, and on the settings'
   "Check" button, the plugin asks GitHub for the latest release's number; a
   newer release shows in the status bar, and a click opens its notes, a link
-  and how to update. Nothing is downloaded. Left: the first release and BRAT
-  in the README.
+  and how to update. Nothing is downloaded. Released 2026-09-26 as 0.1.0 and
+  0.1.1; the README installs through BRAT step by step, checked in a fresh
+  vault.
 
 ### Future: ecosystem migration
 

@@ -4,15 +4,17 @@
 
 `miro-canvas` is an Obsidian plugin that gives native Obsidian Canvas Miro's
 look and Miro's tools. It extends the Canvas view; it never replaces it. A
-board stays a valid JSON Canvas file that opens without the plugin, and the
-plugin never goes to the network.
+board stays a valid JSON Canvas file that opens without the plugin. The plugin
+goes to the network for two things only: a daily check for a new release on
+GitHub (which a person can turn off) and a font pack downloaded on a press.
 
 ## Start here
 
 1. Run `git status -sb` and preserve unrelated changes.
-2. Read `README.md` for what the plugin does, and `docs/miro-canvas.md` for the
-   design notes, the Obsidian runtime facts the code relies on and the task
-   list.
+2. Read `README.md` for what the plugin does - its section "Working on this
+   repository with an AI agent" covers the workflow, releases, font packs and
+   the visual guide task - and `docs/miro-canvas.md` for the design notes, the
+   Obsidian runtime facts the code relies on and the task list.
 3. `npm ci` once; then work with the commands below.
 
 ## Commands
@@ -52,8 +54,10 @@ python -m pytest -q tools/obsidian_oracle/tests
   stay in English.
 - **Minimal HTML.** Items the tools create are plain text, Markdown fences and
   Markdown tables.
-- **No network, no installs.** The plugin never downloads, installs or runs
-  anything (Obsidian's directory rules); links open in the browser on a press.
+- **No installs.** The plugin never installs or runs anything (Obsidian's
+  directory rules), and downloads nothing but a font pack on a press; its only
+  other request is the update check it discloses. Links open in the browser on
+  a press.
 - **Large boards** (thousands of cards) must stay responsive: no work per card
   per frame, memoize on the board's identity.
 - **Code style.** One statement per line, descriptive names, short comments in
@@ -92,3 +96,8 @@ python -m pytest -q tools/obsidian_oracle/tests
 the plugin; `python tools/obsidian_oracle/check_environment.py` checks it. The
 scripts refuse arbitrary vault paths and link/reparse points, and never register
 or open a vault in an Obsidian window by themselves.
+
+To see and drive the plugin in a real Obsidian - checks with real input,
+screenshots, the GIFs of the visual guide - use `tools/obsidian_cdp`
+([its README](tools/obsidian_cdp/README.md)): it starts an isolated Obsidian
+with its own profile and a fresh vault, never the person's own.

@@ -6,6 +6,7 @@ coverage/
 __pycache__/
 .pytest_cache/
 tools/obsidian_oracle/.out/
+tools/obsidian_cdp/.out/
 # Font packs built by tools/build_font_packs.py, and its download cache.
 dist/
 .cache/
