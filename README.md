@@ -403,11 +403,13 @@ Each item has its number and its details in
   shapes, tables, line labels and comments, and file names; jump to each match
   with a highlight, next and previous.
 - **Boards from other plugins** (`FUT-009`, `MIGRATE-001`) - Excalidraw
-  drawings, mind maps and other local formats brought into Canvas with this
-  plugin's look, the original file left untouched.
-- **An MCP server** (`FUT-007`) - AI agents read, check and edit boards through
-  the same steps the plugin itself takes. A light skill that describes the
-  format and checks it against the schema exists already.
+  drawings, mind maps (the notes of the Enhancing Mindmap and Markmind
+  plugins), Advanced Canvas boards and other local formats brought into Canvas
+  with this plugin's look, the original file left untouched.
+- **An MCP server in this repository** (`FUT-007`) - AI agents read, check and
+  edit boards through the same steps the plugin itself takes. The light skill
+  that describes the format and checks it against the schema moves here from
+  miro2obsidian with it.
 - **Obsidian's community catalogue** - once the plugin is listed there,
   updates come through Obsidian itself, without BRAT.
 

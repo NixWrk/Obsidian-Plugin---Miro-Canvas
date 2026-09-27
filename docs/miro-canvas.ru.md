@@ -15,7 +15,8 @@ OAuth или интернетом.
 
 ## Текущий статус реализации
 
-Repository-level фундамент M0 реализован в `plugins/miro-canvas/`. Он включает
+Фундамент M0 реализован в корне этого репозитория (до 2026-09-24 плагин жил в
+`plugins/miro-canvas/` репозитория miro2obsidian; сюда его перенёс `FUT-002`). Он включает
 plugin shell, версионированную проверку `miroCanvas` schema и in-memory
 migrations, read-only native/Advanced Canvas adapters, explicit metadata writer
 с защищённым atomic compare-and-swap (CAS) bridge, а также детерминированную
@@ -45,8 +46,8 @@ native Ctrl+Z/redo для metadata actions и реальная визуальн�
 
 Текущий этап включает интерфейс M1: навигацию, кликабельную minimap,
 типографику, темы доски, цвета, блокировки/review mode и видимость названий
-вложений. Native zoom безопасно ограничен диапазоном 6,25%–200%; снятие этого
-ограничения не реализовано. DOM smoke в Chromium проверяет интерфейс M1 с
+вложений. Диапазон масштаба задаётся в Настройки → Навигация (по умолчанию
+6,25%–1600%, от 1% до 6400%). DOM smoke в Chromium проверяет интерфейс M1 с
 синтетическим native host, а не настоящий runtime Obsidian.
 
 Контекстная панель форматирования появляется над выделением, когда native DOM
@@ -143,12 +144,11 @@ inspector. Он показывает bounded counts по типам, completenes
 diagnostics, selection и paths/types неизвестных полей. Raw values остаются
 только в Canvas-файле, а доска не получает служебных nodes.
 
-Текущие проверки плагина из корня репозитория:
+Текущие проверки плагина, из корня репозитория:
 
 ```powershell
-cd plugins\miro-canvas
 npm ci
-npm run typecheck
+npm run check
 npm test
 npm run build
 ```
@@ -157,12 +157,10 @@ npm run build
 корня репозитория:
 
 ```powershell
-cd plugins\miro-canvas
 npm ci
-npm run typecheck
+npm run check
 npm test
 npm run build
-cd ..\..
 python tools\obsidian_oracle\setup_m0_vault.py
 python tools\obsidian_oracle\check_environment.py
 ```
@@ -294,7 +292,7 @@ metadata persistence commands выключаются с diagnostic status. По�
 | Названия вложений | Глобальный default и отдельный toggle для каждой file/document node |
 | Obsidian | Сохраняются hotkeys, Markdown, wikilinks, обычные ссылки, embeds, drag/drop, undo/redo и context menu |
 | Offline | Вся работа, comments, settings и assets остаются в vault; сеть не нужна |
-| Рисование | Пока используется Excalidraw; встроенное свободное рисование остаётся в roadmap |
+| Рисование | Сделано в 0.1.0: перо, маркер, умное рисование, ластики, нажим стилуса; файлы Excalidraw остаются обычными файловыми карточками Canvas |
 
 ## Главные правила
 
@@ -344,10 +342,12 @@ layer, а доска и собственные функции `miro-canvas` пр
   `CanvasAdapter`; Advanced Canvas integration не должна растекаться по features.
 - [ ] `ARCH-008` `P1 P` Читать Advanced JSON Canvas metadata, когда она есть, но
   реализовать необходимое отображение этого metadata и без Advanced Canvas.
-- [x] `ARCH-009` `P0 P` Размещать исходники в `plugins/miro-canvas/` этого repo,
+- [x] `ARCH-009` `P0 P` Размещать исходники в корне репозитория плагина (до
+  2026-09-24 - `plugins/miro-canvas/` в miro2obsidian),
   собирать TypeScript через esbuild и не добавлять UI framework/runtime dependency.
-- [ ] `ARCH-010` `P1 P` Выносить plugin в отдельный repository только перед
-  независимыми releases/community publication, когда граница кода стабилизируется.
+- [x] `ARCH-010` `P1 P` Выносить plugin в отдельный repository только перед
+  независимыми releases/community publication, когда граница кода стабилизируется
+  (сделано 2026-09-24: этот репозиторий, `FUT-002`).
 - [ ] `ARCH-011` `P0 P` Несовместимость optional integration не должна блокировать
   startup, чтение, редактирование или сохранение обычной Canvas-доски.
 
@@ -928,18 +928,31 @@ Python, и тесты плагина, а список известных пла�
 - [ ] `TABLE-006` `P3 P` Проверять, что `table_text` не дублируется поверх
   родительской таблицы.
 
-## Рисование: будущий план
+## Рисование
+
+Свободное рисование вышло в 0.1.0: перо, маркер, умное рисование (набросок
+становится ровной фигурой) и ластики, с нажимом стилуса (`src/drawing.ts`,
+`src/m1-session.ts`, `tests/drawing.test.ts`). Штрих хранится в
+`localOverrides` своей карточки (`src/local-items.ts`).
 
 - [ ] `DRAW-001` `P0 P` В V1 сохранить полноценную работу с Excalidraw file node:
-  create/open/edit/reveal через установленный Excalidraw plugin.
-- [ ] `DRAW-002` `P0 P` Не создавать собственный drawing engine, пока Excalidraw
-  закрывает задачу лучше и уже хранит рисунок как Obsidian file.
-- [ ] `DRAW-003` `P3 P` В будущем оценить встроенные pencil, highlighter, eraser и
-  pressure-sensitive strokes прямо на Canvas.
+  create/open/edit/reveal через установленный Excalidraw plugin. Плагин не
+  трогает файловые карточки; осталось: проверка с установленным Excalidraw в
+  настоящем Obsidian (как и в `NATIVE-009`).
+- [ ] ~~`DRAW-002` `P0 P` Не создавать собственный drawing engine, пока Excalidraw
+  закрывает задачу лучше и уже хранит рисунок как Obsidian file.~~ Устарело:
+  рисование сделано в самом плагине и вышло в 0.1.0.
+- [x] `DRAW-003` `P3 P` В будущем оценить встроенные pencil, highlighter, eraser и
+  pressure-sensitive strokes прямо на Canvas (сделано: перо, маркер, умное
+  рисование, ластики, нажим стилуса - `src/drawing.ts`, `src/m1-session.ts`,
+  выпуск 0.1.0).
 - [ ] `DRAW-004` `P3 P` Будущий stroke format должен иметь plugin-off fallback и
-  экспорт в PNG/SVG или Excalidraw.
+  экспорт в PNG/SVG или Excalidraw. Без плагина карточка рисунка стоит на своём
+  месте, но пустая. Осталось: штрих, видимый без плагина, и экспорт рисунка в
+  SVG или Excalidraw.
 - [ ] `DRAW-005` `P3 S` Импортировать Miro freehand strokes только после появления
-  source geometry, а не по приблизительному bbox.
+  source geometry, а не по приблизительному bbox. Осталось: экспорт Miro пока не
+  отдаёт геометрию штрихов (`stroke` в таблице ограничений ниже).
 
 ## Будущие задачи продукта (заданы 2026-09-23)
 
@@ -960,7 +973,7 @@ Python, и тесты плагина, а список известных пла�
   (сборка под эту ОС, или ИИ-агент со скиллом `miro2obsidian-import` и готовым
   запросом, своё приложение Miro, экспорт в формате miro-canvas в это
   хранилище с путём для копирования, открыть доску, потом программу можно
-  удалить); в настройках - кнопка «Открыть руководство по импорту». Плагин сам
+  удалить); в настройках - кнопка «Открыть руководство по импорту». Гид сам
   в сеть не ходит: ссылки открываются по нажатию.
   При первой настройке спрашивать, нужен ли импорт из Miro; если да — предложить
   скачать сборку экспортёра на Python под его ОС либо поручить настройку агенту
@@ -973,7 +986,8 @@ Python, и тесты плагина, а список известных пла�
   `--self-test`, `miro2obsidian validate`) и workflow Build под все три ОС с
   выпуском по тегу `v*`. Сборка под Windows проверена; сборки под macOS и Linux
   ждут первого запуска workflow. В сборки пока не входит локальный сервер Web
-  SDK для максимального экспорта.
+  SDK для максимального экспорта. Осталось (в miro2obsidian): сборки под macOS
+  и Linux.
 - [x] `FUT-015` `P1 P` Ручная настройка слоёв (сделано 2026-09-24). Слои есть
   только у карточек (текст, файл, ссылка). Рамки лежат под всем, большая под
   меньшей, как их ставит сам Canvas; у линий и стрелок слоёв нет. «Bring to
@@ -994,7 +1008,9 @@ Python, и тесты плагина, а список известных пла�
   MCP-сервер — в фазе 6.
 - [ ] `FUT-004` `P1 P` Пройти полный путь пользователя на чистой машине:
   установка, первая настройка, приложение Miro, экспорт, конвертация, открытие и
-  правка доски — и исправить всё найденное.
+  правка доски — и исправить всё найденное. Осталось: сам проход на чистой
+  Windows; он ждёт, пока другой агент доделает автоматизацию miro2obsidian
+  (решено 2026-09-28).
 - [x] `FUT-005` `P1 S` miro2obsidian не обязывает пользоваться плагином
   (сделано 2026-09-24): `--format` и меню «Format» в окне выбирают Advanced
   Canvas (по умолчанию, как раньше), обычный Canvas (Markdown без HTML, только
@@ -1006,9 +1022,11 @@ Python, и тесты плагина, а список известных пла�
 - [ ] `FUT-007` `P2 P` Скилл или MCP-сервер, чтобы агенты работали с форматом
   плагина так же естественно, как с обычным Canvas: читать, проверять и менять
   доски (ноды, линии, комментарии, overrides) через те же транзакции, что и
-  плагин. Лёгкий скилл сделан 2026-09-24 (`.agents/skills/miro-canvas-format`:
-  формат по полям, проверка по схеме v1, правила безопасной правки);
-  MCP-сервер — в фазе 6.
+  плагин. Лёгкий скилл `miro-canvas-format` сделан 2026-09-24 в miro2obsidian
+  (`.agents/skills/miro-canvas-format` там: формат по полям, проверка по схеме
+  v1, правила безопасной правки); в этом репозитории его нет. 2026-09-28
+  владелец решил: MCP-сервер живёт в этом репозитории, и скилл переезжает сюда
+  вместе с ним. Осталось: MCP-сервер и перенос скилла.
 - [x] `FUT-008` `P1 P` Экспорт в PDF/PPTX (сделано 2026-09-24). В меню доски —
   «Export to PDF or PowerPoint»: страницы отмечаются на доске прямоугольниками
   одного формата бумаги (A4, A3, Letter, 16:9, 4:3 или свободный, альбомная или
@@ -1030,9 +1048,12 @@ Python, и тесты плагина, а список известных пла�
   ребра по умолчанию и дробную геометрию), сразу принимает записи метаданных —
   то, что Canvas опускает значение по умолчанию или округляет координаты,
   считается сохранением доски, а не изменением.
-- [ ] `FUT-009` `P2 P` Импорт из форматов других плагинов (см. раздел ниже).
+- [ ] `FUT-009` `P2 P` Импорт из форматов других плагинов (см. раздел ниже):
+  по выбору владельца 2026-09-28 - Excalidraw, интеллект-карты (заметки
+  Enhancing Mindmap и Markmind) и Advanced Canvas. Осталось: всё, кода пока нет.
 - [ ] `FUT-010` `P2 P` Настройки и раскладки под другие ОС, смартфоны и
-  планшеты, с проверкой по матрице устройств.
+  планшеты, с проверкой по матрице устройств. Осталось: раскладки и проверка на
+  устройствах.
 - [x] `FUT-011` `P1 P` Ознакомительная доска, которую пользователь получает по
   желанию при первой настройке или из настроек. Сделано 2026-09-24:
   `src/welcome-board.ts` строит двенадцать рамок - знакомство, текст, цвета,
@@ -1048,7 +1069,9 @@ Python, и тесты плагина, а список известных пла�
   `src/welcome-samples.ts`, собираются и проверяются
   `tools/make_welcome_samples.py`.
 - [ ] `FUT-012` `P1 P` Нормальное визуализированное описание функций плагина и
-  порядка его настройки, со снимками экрана.
+  порядка его настройки, со снимками экрана. Задача расписана в README
+  («Задача: наглядное руководство»), `tools/obsidian_cdp` записывает GIF в
+  отдельном Obsidian. Осталось: сами GIF, пока не записано ни одного.
 - [x] `FUT-016` `P1 P` Шрифты (наборы выпущены 2026-09-26). База сделана 2026-09-24: в списке только
   шрифты, которые видны на любой машине (Inter и Source Code Pro из Obsidian,
   системные без засечек и с засечками), и шрифты из настроек оформления
@@ -1071,9 +1094,9 @@ Python, и тесты плагина, а список известных пла�
 
   Наборы лежат в выпусках этого репозитория вместе с лицензиями (только OFL,
   Apache, MIT). Скачивание - только по нажатию, с размером набора; README
-  говорит, что это единственное место, где плагин ходит в сеть. Файлы хранятся
-  у плагина и подключаются так, что шрифт попадает в память, только когда им
-  что-то написано.
+  называет его вместе с проверкой обновлений как единственные обращения плагина
+  к сети. Файлы хранятся у плагина и подключаются так, что шрифт попадает в
+  память, только когда им что-то написано.
 
   Сделано в плагине 2026-09-25 (`src/font-packs.ts`,
   `src/font-pack-catalogue.ts`, `tools/build_font_packs.py
@@ -1222,7 +1245,7 @@ Python, и тесты плагина, а список известных пла�
   скачивается. Выпущено 2026-09-26 как 0.1.0 и 0.1.1; README ведёт через
   установку BRAT по шагам, проверенным в чистом хранилище.
 
-### Порядок выполнения (согласован 2026-09-23)
+### Порядок выполнения (согласован 2026-09-23, изменён 2026-09-28)
 
 0. **Доделать начатое:** экспорт в PDF/PPTX (`FUT-008`); ручная настройка слоёв
    в основном интерфейсе (`FUT-015`). Сделано.
@@ -1251,11 +1274,42 @@ Python, и тесты плагина, а список известных пла�
    (`FUT-020`), ускорение перетаскивания на огромных досках, остальные мелкие
    ограничения.
 
+**Изменение плана (согласовано 2026-09-28).** Этапы 0-4 сделаны, кроме
+наглядного руководства (`FUT-012`) и, в miro2obsidian, сборок экспортёра под
+macOS и Linux (`FUT-013`). Этап 6 (экосистема) теперь идёт раньше этапа 5
+(проверка на людях): проход на чистой машине (`FUT-004`) ждёт, пока другой
+агент доделает автоматизацию miro2obsidian. Перемещаемые панели (`FUT-019`)
+сделаны и из списка выходят. Этап 6 теперь такой:
+
+1. MCP-сервер в этом репозитории (`FUT-007`), и скилл `miro-canvas-format`
+   переезжает сюда из miro2obsidian;
+2. импорт из Excalidraw, интеллект-карт (форматы заметок Enhancing Mindmap и
+   Markmind) и Advanced Canvas (`FUT-009`, `MIGRATE-001..003`);
+3. поиск по доске (`FUT-020`);
+4. ускорение перетаскивания на огромных досках (около 35 мс работы плагина на
+   кадр перетаскивания на доске из 2000 карточек, замер 2026-09-23);
+5. остальные мелкие ограничения: таблицы из Miro приходят с пустыми ячейками
+   (в экспорте Miro нет текста ячеек); линии, прикреплённые к другим линиям,
+   пока экспериментальные и по умолчанию выключены; свободным соединителям
+   нужен плагин, чтобы их было видно; вставка из буфера одних нативных рёбер без
+   их карточек не поддерживается; форматирование смешанного выделения из
+   нативных и свободных линий пока не один шаг отмены; экспорту в PDF и
+   PowerPoint нужен Obsidian на компьютере.
+
+Затем проверка на людях: проход на чистой машине (`FUT-004`), все виды ссылок и
+формул (`FUT-017`), другие ОС, телефоны и планшеты (`FUT-010`).
+
 ## Миграция из форматов других плагинов: будущий план
 
+Форматы выбраны владельцем 2026-09-28: рисунки Excalidraw, интеллект-карты
+(форматы заметок плагинов Enhancing Mindmap и Markmind - читаются их файлы, код
+не копируется) и доски Advanced Canvas. Это этап 6 (`FUT-009`); ничего пока не
+сделано.
+
 - [ ] `MIGRATE-001` `P1 P` Добавить явный недеструктивный импорт Excalidraw,
-  common mind-map plugins и других распространённых локальных форматов в native
-  Canvas + versioned `miroCanvas`, сохраняя исходный файл без изменений.
+  интеллект-карт (Enhancing Mindmap, Markmind), Advanced Canvas и других
+  распространённых локальных форматов в native Canvas + versioned
+  `miroCanvas`, сохраняя исходный файл без изменений.
 - [ ] `MIGRATE-002` `P1 P` Для каждого импортёра хранить provenance, список
   преобразованных сущностей и unsupported fields; не обещать эквивалентность,
   когда исходный plugin format не раскрывает нужные данные.
@@ -1283,170 +1337,267 @@ Python, и тесты плагина, а список известных пла�
 | live cursors, presence, timers, voting, permissions, history | Не являются snapshot board item data | Не воспроизводятся |
 | `board`, `board_member` | Metadata, не визуальные items | Только inspector |
 
-- [ ] `LIMIT-001` `P0 P` Ни один unknown type не должен исчезать молча.
+- [x] `LIMIT-001` `P0 P` Ни один unknown type не должен исчезать молча (сделано:
+  диагностика `source-type-unsupported` в `src/source-model.ts`, счётчик в
+  инспекторе, `tests/source-model.test.ts`).
 - [ ] `LIMIT-002` `P0 P` Diagnostics различает `unsupported`, `source-limited`,
-  `missing asset`, `invalid source` и `plugin unsupported`.
+  `missing asset`, `invalid source` и `plugin unsupported`. Сейчас различаются
+  неподдерживаемый тип, ограниченный источником (`source-mindmap-legacy-limited`)
+  и испорченные данные (`source-item-malformed` и подобные). Осталось: один
+  словарь из пяти видов, отдельно - недостающее вложение и неподдержанное
+  плагином.
 - [x] `LIMIT-003` `P1 P` Default view не засоряется большими placeholders;
   используются маленькие badges и отдельная panel.
 - [ ] `LIMIT-004` `P1 P` Inspector всегда показывает полный raw object без
-  сокращения ключей.
+  сокращения ключей. Сейчас инспектор намеренно ограничен: счётчики, пути и типы
+  неизвестных полей, без сырых значений (`src/source-inspector.ts`, M4).
+  Осталось: решить, нужен ли полный объект, и если да - показать его.
 - [ ] `LIMIT-005` `P2 P` Экспортируемый diagnostics report содержит counts, IDs,
-  types, причины и provenance.
+  types, причины и provenance. Осталось: всё, отчёта пока нет.
 
 ## Пользовательское поведение
 
-- [ ] `UX-001` `P0 P` Общие authoring/review tools доступны на любой Canvas;
-  Miro-specific renderer автоматически включается только при `miroSource`.
+- [x] `UX-001` `P0 P` Общие authoring/review tools доступны на любой Canvas;
+  Miro-specific renderer автоматически включается только при `miroSource`
+  (сделано: элементы Miro читаются только из `miroSource`, `src/source-model.ts`;
+  инструменты работают на любой доске).
 - [ ] `UX-002` `P0 P` Custom layers не ломают select, multi-select, drag, resize,
-  pan, zoom, context menu, undo/redo и edge editing.
+  pan, zoom, context menu, undo/redo и edge editing. Проверено на синтетическом
+  хосте (три набора smoke-тестов). Осталось: проверка в настоящем Obsidian.
 - [ ] `UX-003` `P1 P` Добавить локальные context actions: inspect source, copy
   source ID, reveal local asset и copy original URL без автоматического открытия.
+  Инспектор источника есть (меню доски и команда). Осталось: копировать ID
+  источника, показать вложение, копировать исходный адрес.
 - [ ] `UX-004` `P1 P` Дать независимые toggles для shapes, text, connectors,
-  comments, diagnostics и presentation.
-- [ ] `UX-005` `P1 P` Сохранять настройки как plugin settings, не в canonical
-  source.
-- [ ] `UX-006` `P1 P` Поддерживать light/dark UI chrome, не перекрашивая board
-  content.
+  comments, diagnostics и presentation. Есть переключатели миникарты, панели
+  форматирования, инструментов нижней панели и диагностики. Осталось:
+  отдельный показ и скрытие фигур, текста, соединителей, комментариев и
+  презентации.
+- [x] `UX-005` `P1 P` Сохранять настройки как plugin settings, не в canonical
+  source (сделано: `src/settings.ts`, данные плагина через `saveData`).
+- [x] `UX-006` `P1 P` Поддерживать light/dark UI chrome, не перекрашивая board
+  content (сделано: панели плагина берут цвета темы Obsidian в `styles.css`;
+  тема самой доски отдельная, `src/appearance.ts`).
 - [ ] `UX-007` `P1 P` Добавить keyboard navigation, focus states, ARIA labels и
-  reduced-motion behavior.
+  reduced-motion behavior. Подписи ARIA у кнопок панелей и видимый фокус у
+  части элементов есть. Осталось: reduced motion и проверка клавиатурой и
+  программой чтения с экрана в настоящем Obsidian.
 - [ ] `UX-008` `P2 P` Показывать краткий status: exact, approximated,
-  source-limited для выбранного элемента.
-- [ ] `UX-009` `P1 P` Рассматривать lasso как настраиваемый selection gesture,
+  source-limited для выбранного элемента. Осталось: всё, такой метки пока нет.
+- [x] `UX-009` `P1 P` Рассматривать lasso как настраиваемый selection gesture,
   разрешить назначать select/pan/lasso/line/connector на mouse buttons и
-  modifiers и независимо скрывать их toolbar buttons, не забирая global hotkeys.
+  modifiers и независимо скрывать их toolbar buttons, не забирая global hotkeys
+  (сделано: `src/pointer-bindings.ts`, настройки жестов лассо, панорамы и
+  линии, состав нижней панели `toolbarItems`).
 
 ## Совместимость с Obsidian
 
-- [ ] `NATIVE-001` `P0 P` Расширять существующий Canvas view, не заменяя его
-  отдельным редактором.
+- [x] `NATIVE-001` `P0 P` Расширять существующий Canvas view, не заменяя его
+  отдельным редактором (сделано: сессия плагина садится на нативный вид
+  Canvas, `src/canvas-adapter.ts`, `src/m1-session.ts`).
 - [ ] `NATIVE-002` `P0 P` Не перехватывать глобальные hotkeys; команды плагина
-  работают только в активном Canvas и полностью переназначаются.
-- [ ] `NATIVE-003` `P0 P` Сохранять Markdown, wikilinks, block links, embeds,
-  external URLs и click behavior Obsidian.
-- [ ] `NATIVE-004` `P0 P` Сохранять drag/drop файлов, paste, attachment paths и
-  native file rename/link updates.
-- [ ] `NATIVE-005` `P0 P` Сохранять selection, multi-selection, context menu,
-  copy/paste, duplicate, delete и undo/redo.
-- [ ] `NATIVE-006` `P0 P` Сохранять open link, open file, open in new pane и
-  reveal-in-navigation actions.
+  работают только в активном Canvas и полностью переназначаются. Команды
+  проверяют активный Canvas и не имеют клавиш по умолчанию; буквы инструментов
+  действуют только на активной доске и без модификаторов. Осталось: эти буквы
+  нельзя переназначить в редакторе горячих клавиш Obsidian.
+- [x] `NATIVE-003` `P0 P` Сохранять Markdown, wikilinks, block links, embeds,
+  external URLs и click behavior Obsidian (сделано: текст карточек остаётся
+  нативным Markdown, плагин только добавляет оформление, `src/source-renderer.ts`).
+- [x] `NATIVE-004` `P0 P` Сохранять drag/drop файлов, paste, attachment paths и
+  native file rename/link updates (сделано: файлы, картинки, текст и ссылки
+  вставляет сам Canvas, `src/board-clipboard.ts`; файловые карточки нативные).
+- [x] `NATIVE-005` `P0 P` Сохранять selection, multi-selection, context menu,
+  copy/paste, duplicate, delete и undo/redo (сделано: нативные меню остаются,
+  правки идут одной записью нативной истории, `tests/board-selection.test.ts`,
+  `tests/board-clipboard.test.ts`, `tests/canvas-session.test.ts`).
+- [x] `NATIVE-006` `P0 P` Сохранять open link, open file, open in new pane и
+  reveal-in-navigation actions (сделано: пункты нативного меню переносятся в
+  «Ещё» панели выделения теми же элементами, `src/selection-toolbar.ts`).
 - [ ] `NATIVE-007` `P1 P` Не ломать backlinks/search для native notes и files;
-  custom decoration не должна скрывать их реальные links.
-- [ ] `NATIVE-008` `P1 P` Уважать Obsidian themes и CSS snippets для UI chrome,
-  сохраняя явные board colors.
+  custom decoration не должна скрывать их реальные links. Ссылки остаются в
+  нативных полях карточек. Осталось: проверка в настоящем Obsidian.
+- [x] `NATIVE-008` `P1 P` Уважать Obsidian themes и CSS snippets для UI chrome,
+  сохраняя явные board colors (сделано: панели плагина на переменных темы
+  Obsidian в `styles.css`, цвета доски - в её данных).
 - [ ] `NATIVE-009` `P0 P` Совместимость с Advanced Canvas и Excalidraw проверять
   как обязательную; Advanced Canvas остаётся optional, с остальными plugins -
-  через graceful fallback.
+  через graceful fallback. Advanced Canvas: `src/advanced-canvas-adapter.ts`,
+  матрица из четырёх профилей. Осталось: совместная работа с Excalidraw и
+  проверка обоих в настоящем Obsidian.
 - [ ] `NATIVE-010` `P2 P` Проверить desktop и mobile/touch отдельно; отсутствие
-  mobile patch не должно ломать стандартный mobile Canvas.
+  mobile patch не должно ломать стандартный mobile Canvas. Осталось: проверка на
+  устройстве.
 - [ ] `NATIVE-011` `P1 P` Прогнать документированную матрицу Windows/macOS/Linux
   (или репрезентативных VM), разных размеров окна и device-pixel-ratio, а также
   Obsidian desktop/mobile на mouse, trackpad, pen tablet/stylus и touch screen.
+  Осталось: проверка на каждом устройстве.
 
 ## Надёжность, производительность и безопасность
 
-- [ ] `QUAL-001` `P0 P` Не использовать `eval`, inline scripts или непроверенные
-  URL schemes из Miro payload.
-- [ ] `QUAL-002` `P0 P` Санитизировать source HTML и создавать SVG/DOM через
-  безопасные APIs.
-- [ ] `QUAL-003` `P0 P` Не обращаться к сети автоматически ни при открытии, ни
-  при редактировании, preview, comments или diagnostics.
-- [ ] `QUAL-004` `P0 P` Namespace CSS и DOM markers, чтобы не менять обычные
-  Canvas files.
+- [x] `QUAL-001` `P0 P` Не использовать `eval`, inline scripts или непроверенные
+  URL schemes из Miro payload (сделано: `eval` и `new Function` в `src/` нет;
+  ссылка из панели выделения принимает только http(s) и obsidian://,
+  `src/text-link.ts`; адреса из Miro сами не открываются).
+- [x] `QUAL-002` `P0 P` Санитизировать source HTML и создавать SVG/DOM через
+  безопасные APIs (сделано: `innerHTML` и `insertAdjacentHTML` в `src/` нет,
+  элементы создаются через DOM API; HTML из Miro не выполняется).
+- [x] `QUAL-003` `P0 P` Обращаться к сети только в двух случаях, названных в
+  README: проверка нового выпуска на GitHub раз в день при запуске Obsidian
+  (её можно выключить) и скачивание набора шрифтов по нажатию. При открытии и
+  правке доски, в превью, комментариях и диагностике - никогда (сделано:
+  единственные запросы - `requestUrl` в `src/main.ts` для
+  `src/update-check.ts` и `src/font-packs.ts`; `fetch` и `XMLHttpRequest` в
+  `src/` нет). Прежняя формулировка «не обращаться к сети автоматически ни при
+  открытии» заменена 2026-09-28 правилом из AGENTS.md.
+- [x] `QUAL-004` `P0 P` Namespace CSS и DOM markers, чтобы не менять обычные
+  Canvas files (сделано: классы и атрибуты плагина начинаются с `miro-canvas-`,
+  `miro-` и `data-miro-`; данные плагина - только под `miroCanvas`).
 - [ ] `QUAL-005` `P0 P` Изолировать обращения к private Obsidian Canvas API в
   одном adapter; Advanced Canvas получает отдельный optional integration layer.
-- [ ] `QUAL-006` `P0 P` При несовместимой версии отключать patch и показывать
-  понятную ошибку, не ломая Canvas.
-- [ ] `QUAL-007` `P1 P` Строить source indexes за `O(n)` и не сканировать весь DOM
-  на каждое изменение.
+  Advanced Canvas отдельно (`src/advanced-canvas-adapter.ts`); закрытый API
+  Canvas читается в `src/canvas-adapter.ts`, `src/canvas-authoring.ts` и
+  `src/obsidian-metadata-store.ts`, и каждый отключается при несовместимости.
+  Осталось: свести их в один адаптер или записать, что трёх достаточно.
+- [x] `QUAL-006` `P0 P` При несовместимой версии отключать patch и показывать
+  понятную ошибку, не ломая Canvas (сделано: состояния `unavailable` и
+  `incompatible`, `tests/canvas-adapter.test.ts`,
+  `tests/obsidian-metadata-store.test.ts`, `tests/advanced-canvas-adapter.test.ts`).
+- [x] `QUAL-007` `P1 P` Строить source indexes за `O(n)` и не сканировать весь DOM
+  на каждое изменение (сделано: `miroSource` индексируется за один проход,
+  `src/source-model.ts`; доска перечитывается только при сохранении Canvas,
+  замер 2026-09-23).
 - [ ] `QUAL-008` `P1 P` Debounce наблюдение за Canvas и перерисовывать только
-  изменившиеся items.
-- [ ] `QUAL-009` `P1 P` Освобождать observers, event handlers, object URLs и caches
-  при закрытии view.
-- [ ] `QUAL-010` `P1 P` Не добавлять runtime dependency, пока platform/Obsidian API
-  решает задачу приемлемо.
-- [ ] `QUAL-011` `P1 P` Не хранить tokens, OAuth credentials или remote session в
-  plugin settings.
+  изменившиеся items. Перерисовываются только изменившиеся соединители,
+  метаданные разбираются один раз на объект. Осталось: перетаскивание на
+  огромной доске (около 35 мс на кадр), этап 6.
+- [x] `QUAL-009` `P1 P` Освобождать observers, event handlers, object URLs и caches
+  при закрытии view (сделано: каждая сессия снимает свои обработчики через
+  `disposers` в `src/m1-session.ts`).
+- [x] `QUAL-010` `P1 P` Не добавлять runtime dependency, пока platform/Obsidian API
+  решает задачу приемлемо (сделано: в `package.json` только devDependencies).
+- [x] `QUAL-011` `P1 P` Не хранить tokens, OAuth credentials или remote session в
+  plugin settings (сделано: в `src/settings.ts` таких полей нет).
 - [ ] `QUAL-012` `P2 P` Показывать понятный compatibility report для версий
-  Obsidian, Advanced Canvas и schema.
+  Obsidian, Advanced Canvas и schema. Команда «Показать состояние плагина» показывает
+  состояние адаптера, метаданных, записи и Advanced Canvas. Осталось: номера
+  версий Obsidian, Advanced Canvas и схемы.
 - [ ] `QUAL-013` `P0 P` Проверять release bundle на remote URLs, telemetry SDK и
-  случайные network-capable dependencies.
+  случайные network-capable dependencies. Зависимостей времени выполнения нет.
+  Осталось: шаг в CI, который проверяет собранный `main.js`.
 
 ## Тестирование и критерии готовности
 
 - [ ] `TEST-001` Для каждого поддерживаемого Miro type создать минимальный
-  fixture с одним ожидаемым расхождением.
+  fixture с одним ожидаемым расхождением. Есть четыре эталонные доски схемы
+  (`tests/schema-fixtures.test.ts`). Осталось: по доске на каждый тип Miro.
 - [ ] `TEST-002` Для всех 45 shape subtypes сделать renderer snapshot и проверку
-  path/bbox/rotation.
+  path/bbox/rotation. Контур каждой фигуры проверяется
+  (`tests/shape-geometry.test.ts`, `tests/shape-catalog.test.ts`). Осталось:
+  снимок по каждому типу и проверка поворота.
 - [ ] `TEST-003` Для 3 connector shapes и 16 caps проверить path, anchors,
-  captions, style и hitbox.
+  captions, style и hitbox. Есть тесты маршрутов и концов
+  (`tests/connector-route.test.ts`, `tests/connector-style.test.ts`). Осталось:
+  полный перебор трёх форм и 16 концов.
 - [ ] `TEST-004` Проверять light/dark, plugin enabled/disabled и минимум два zoom
-  уровня в настоящем Obsidian.
-- [ ] `TEST-005` Использовать существующий `tools/obsidian_oracle`; diagnostic
-  web-renderer не является финальным визуальным oracle.
+  уровня в настоящем Obsidian. Осталось: проверка в настоящем Obsidian.
+- [x] `TEST-005` Использовать существующий `tools/obsidian_oracle`; diagnostic
+  web-renderer не является финальным визуальным oracle (сделано: smoke-тесты и
+  подготовка хранилища идут через `tools/obsidian_oracle`; настоящий Obsidian
+  ведёт `tools/obsidian_cdp`).
 - [ ] `TEST-006` На `TEST_BOARD` учесть каждый из 479 items и 1 comment как
   rendered, structural, metadata-only или source-limited; неизвестных причин 0.
+  Осталось: прогон на `TEST_BOARD`, он живёт в miro2obsidian.
 - [ ] `TEST-007` На `TEST_BOARD` точно отобразить 45 shape subtypes, 3 rotated
-  items, 29 source connectors и все обязательные local assets.
+  items, 29 source connectors и все обязательные local assets. Осталось: прогон
+  на `TEST_BOARD`, он живёт в miro2obsidian.
 - [ ] `TEST-008` Сохранить 0 broken file refs, 0 duplicate IDs и 0 dangling
-  Canvas edges.
+  Canvas edges. Плагин сообщает о дублях и оборванных связях
+  (`source-id-duplicate`, `canvas-id-duplicate`, `binding-dangling`). Осталось:
+  прогон на `TEST_BOARD`, он живёт в miro2obsidian.
 - [ ] `TEST-009` Выполнить fresh production conversion и visual run по всем
-  доступным тестовым доскам из явно выбранного локального списка.
-- [ ] `TEST-010` Unknown/new item type не вызывает crash и попадает в diagnostics
-  с полным raw payload.
+  доступным тестовым доскам из явно выбранного локального списка. Осталось:
+  прогон в miro2obsidian и проверка в настоящем Obsidian.
+- [ ] `TEST-010` Unknown/new item type не вызывает crash и попадает в
+  diagnostics с полным raw payload. Неизвестный тип попадает в диагностику без
+  сбоя (`tests/source-model.test.ts`). Осталось: полный исходный объект (см.
+  `LIMIT-004`).
 - [ ] `TEST-011` Открытие, pan, zoom, selection и закрытие `TEST_BOARD` не дают
   заметных stalls или накопления listeners/memory между повторными открытиями.
+  Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-012` Plugin-off screenshot подтверждает сохранение обычного JSON
-  Canvas fallback.
+  Canvas fallback. Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-013` Plugin-on screenshot сравнивается с реальным Miro по bbox,
   rotation, z-order, shape path, text metrics, connector path и visible assets.
+  Осталось: сравнение с Miro в настоящем Obsidian.
 - [ ] `TEST-014` Source-limited элементы не считаются renderer defect, если их
-  raw records доступны и причина явно показана.
+  raw records доступны и причина явно показана. Причина видна в счётчиках
+  диагностики инспектора. Осталось: исходные записи в инспекторе (см.
+  `LIMIT-004`).
 - [ ] `TEST-015` Полный Python test suite, lint, compile, JS smoke и Obsidian
-  visual oracle проходят перед каждым release.
+  visual oracle проходят перед каждым release. В CI идут `npm run check`,
+  `npm test`, `npm run build`, сверка схемы и smoke-тесты. Осталось: прогон в
+  настоящем Obsidian перед выпуском.
 - [ ] `TEST-016` Обычная Canvas-доска без `miroSource` проходит native feature
-  regression с включённым и выключенным плагином.
+  regression с включённым и выключенным плагином. Четыре профиля проверяются без
+  Obsidian (`tools/obsidian_oracle`). Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-017` Font family/size меняются через UI, переживают reload и не
-  добавляют inline HTML styles.
-- [ ] `TEST-018` Local comment проходит create/edit/reply/resolve/delete для
-  point, node, edge и image-relative anchors.
-- [ ] `TEST-019` Lock блокирует все изменения, сохраняя zoom, links, navigation и
-  comments в review mode.
+  добавляют inline HTML styles. Шрифт и размер хранятся в `localOverrides`, а не
+  в тексте карточки (`tests/appearance.test.ts`). Осталось: смена через панель и
+  перезагрузка в настоящем Obsidian.
+- [x] `TEST-018` Local comment проходит create/edit/reply/resolve/delete для
+  point, node, edge и image-relative anchors (сделано:
+  `tests/local-comments.test.ts`, `tests/anchors.test.ts`).
+- [ ] `TEST-019` Lock блокирует все изменения, сохраняя zoom, links, navigation
+  и comments в review mode. Есть `tests/m1-session-locking.test.ts`,
+  `tests/interaction-policy.test.ts`. Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-020` Free и image-relative edge anchors переживают move, resize,
-  reload и plugin-off fallback.
+  reload и plugin-off fallback. Есть `tests/anchors.test.ts`,
+  `tests/connector-endpoints.test.ts`. Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-021` Theme switch, colors и attachment-title toggle не меняют
-  geometry, links или selection.
+  geometry, links или selection. Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-022` Hotkeys, Markdown, wikilinks, embeds, file actions и undo/redo
-  проходят real-Obsidian smoke test.
+  проходят real-Obsidian smoke test. Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-023` Прогнать compatibility matrix: native only, `miro-canvas` only,
-  Advanced Canvas only и оба plugins; сравнить данные, UI controls и console errors.
+  Advanced Canvas only и оба plugins; сравнить данные, UI controls и console
+  errors. Матрица без Obsidian готова (`tools/obsidian_oracle`). Осталось:
+  проверка в настоящем Obsidian.
 - [ ] `TEST-024` Minimap показывает все content bounds и точный viewport на
-  отрицательных coordinates, большой доске и после resize sidebar/window.
+  отрицательных coordinates, большой доске и после resize sidebar/window. Есть
+  `tests/minimap-model.test.ts`. Осталось: проверка в настоящем Obsidian.
 - [ ] `TEST-025` Click и drag minimap перемещают камеру в ожидаемую coordinate,
-  сохраняют zoom и не изменяют selection или content.
-- [ ] `TEST-026` При simulated adapter incompatibility Canvas открывается и
-  сохраняется, а отключаются только minimap/Advanced integration capabilities.
+  сохраняют zoom и не изменяют selection или content. Есть
+  `tests/minimap-model.test.ts`. Осталось: проверка в настоящем Obsidian.
+- [x] `TEST-026` При simulated adapter incompatibility Canvas открывается и
+  сохраняется, а отключаются только minimap/Advanced integration capabilities
+  (сделано: `tests/canvas-adapter.test.ts`,
+  `tests/advanced-canvas-adapter.test.ts`,
+  `tests/obsidian-metadata-store.test.ts`).
 - [ ] `TEST-027` На нескольких viewport sizes/DPI проверить dock, toolbar,
   minimap, comment cards, selection handles и чёткость текста повёрнутых nodes
-  при focus/blur окна.
+  при focus/blur окна. Осталось: проверка на устройстве.
 - [ ] `TEST-028` На tablet/stylus/touch проверить pressure, palm rejection,
-  lasso, pan, straight-line Shift equivalent и отмену pointer gesture.
+  lasso, pan, straight-line Shift equivalent и отмену pointer gesture. Осталось:
+  проверка на устройстве.
 
 ## Порядок реализации
 
-| Этап | Содержание | Результат |
-|---|---|---|
-| M0 | Plugin shell в `plugins/miro-canvas`, schema, Canvas adapter, optional Advanced adapter, compatibility matrix | Плагин самостоятельно работает поверх native Canvas и ничего не ломает |
-| M1 | Minimap, font/size UI без HTML, zoom, theme switch, colors, locks, attachment-title toggle | Ежедневная работа с обычным Canvas уже заметно удобнее |
-| M2 | Local comments, advanced arrows/anchors, node/shape authoring, documents | Закрыто пользовательское ядро первой версии |
-| M3 | Rotation, z-order, Miro shapes/text/connectors, sticky, frames, slides, media/cards | Импортированные доски отображаются существенно ближе к Miro |
-| M4 | Tables и unsupported widgets | Только после появления доказанного source payload |
-| M5 | Встроенное свободное рисование | Только если Excalidraw-интеграции реально недостаточно |
-| M6 | Импорт форматов других plugins и platform/device matrix | Недеструктивная миграция с provenance и проверенная работа на разных OS, экранах и input devices |
+| Этап | Содержание | Результат | Состояние (2026-09-28) |
+|---|---|---|---|
+| M0 | Plugin shell (тогда в `plugins/miro-canvas` miro2obsidian, теперь - этот репозиторий), schema, Canvas adapter, optional Advanced adapter, compatibility matrix | Плагин самостоятельно работает поверх native Canvas и ничего не ломает | Сделано; осталось: проверка в настоящем Obsidian |
+| M1 | Minimap, font/size UI без HTML, zoom, theme switch, colors, locks, attachment-title toggle | Ежедневная работа с обычным Canvas уже заметно удобнее | Сделано; осталось: работа с клавиатуры, ускорение перетаскивания на огромных досках, проверка в настоящем Obsidian |
+| M2 | Local comments, advanced arrows/anchors, node/shape authoring, documents | Закрыто пользовательское ядро первой версии | Сделано |
+| M3 | Rotation, z-order, Miro shapes/text/connectors, sticky, frames, slides, media/cards | Импортированные доски отображаются существенно ближе к Miro | Сделано |
+| M4 | Tables и unsupported widgets | Только после появления доказанного source payload | Ждёт источника: экспорт Miro не отдаёт текст ячеек (`LIMIT`) |
+| M5 | Встроенное свободное рисование | Сначала - только если Excalidraw-интеграции недостаточно | Сделано в 0.1.0 (`src/drawing.ts`); осталось: `DRAW-001`, `DRAW-004`, `DRAW-005` |
+| M6 | Импорт форматов других plugins и platform/device matrix | Недеструктивная миграция с provenance и проверенная работа на разных OS, экранах и input devices | Импорт - этап 6 (`FUT-009`, `MIGRATE-001..003`); матрица устройств - этап 5 (`FUT-010`, `NATIVE-011`) |
 
 Самый короткий полезный release - обычный Canvas с typography controls, zoom,
 темами, цветами, lock, attachment-title toggle и сохранением всех нативных
 возможностей Obsidian. Затем добавляются comments, свободные anchors и формы.
 Miro sync не входит в проект; собственный drawing engine не блокирует V1.
+В английской версии этапы разбиты иначе (M4 - структурное содержимое,
+M5 - подготовка к выпуску); её пункты с отметками - в
+[miro-canvas.md](miro-canvas.md), раздел «Implementation order».
 
 ## Definition of done
 

@@ -15,8 +15,9 @@ from the plugin.
 
 ## Current implementation status
 
-The repository-level M0 foundation is implemented under
-`plugins/miro-canvas/`. It includes the plugin shell, versioned `miroCanvas`
+The M0 foundation is implemented at the root of this repository (until
+2026-09-24 the plugin lived under `plugins/miro-canvas/` in miro2obsidian;
+`FUT-002` moved it here). It includes the plugin shell, versioned `miroCanvas`
 schema validation and in-memory migrations, read-only native/Advanced Canvas
 adapters, an explicit metadata writer with a guarded atomic compare-and-swap
 (CAS) bridge, and a deterministic four-profile compatibility matrix with a
@@ -47,9 +48,9 @@ verification have not been claimed.
 
 The current development checkpoint includes M1 navigation controls, a clickable
 minimap, typography, board themes, colors, locks/review mode, and attachment
-title visibility. Native zoom is safely limited to 6.25%–200%; unrestricted zoom
-is not implemented. The Chromium DOM smoke covers the M1 controls against a
-synthetic native host, not the real Obsidian runtime.
+title visibility. The zoom range is chosen under Settings → Navigation
+(6.25%–1600% by default, from 1% up to 6400%). The Chromium DOM smoke covers
+the M1 controls against a synthetic native host, not the real Obsidian runtime.
 
 A contextual formatting toolbar floats above the current selection whenever the
 native DOM can be measured, and disappears as soon as the selection is cleared.
@@ -144,25 +145,23 @@ inspector. It shows bounded source-type, completeness, provenance, diagnostic,
 selection, and unknown-field summaries. Raw source values remain only in the
 Canvas file and no inspector content is added to the board.
 
-To run the plugin checks from the repository root:
+To run the plugin checks, from the repository root:
 
 ```powershell
-cd plugins\miro-canvas
 npm ci
-npm run typecheck
+npm run check
 npm test
 npm run build
 ```
 
-To build and deploy the local runtime into the guarded M0 test vault:
+To build and deploy the local runtime into the guarded M0 test vault, also from
+the repository root:
 
 ```powershell
-cd plugins\miro-canvas
 npm ci
-npm run typecheck
+npm run check
 npm test
 npm run build
-cd ..\..
 python tools\obsidian_oracle\setup_m0_vault.py
 python tools\obsidian_oracle\check_environment.py
 ```
@@ -282,9 +281,13 @@ unit tests, not yet by a real Obsidian session.
 
 ## Product boundary
 
-- The plugin works entirely offline after installation.
+- The plugin works offline after installation. It goes to the network for two
+  things only, both disclosed in the README: a daily check for a new release on
+  GitHub, which a person can turn off (`src/update-check.ts`), and a font pack
+  downloaded on a press (`src/font-packs.ts`). Opening or editing a board never
+  reaches the network.
 - It does not contain a Miro API client, OAuth, synchronization, upload,
-  telemetry, remote fonts, or background network requests.
+  telemetry, or fonts loaded from the web while a board is drawn.
 - Native Obsidian Canvas is the only required runtime.
 - Advanced Canvas is an optional neighbor, not a dependency.
 - The same `.canvas` file remains valid and useful without `miro-canvas`.
@@ -297,9 +300,9 @@ unit tests, not yet by a real Obsidian session.
 - Opening a board is read-only; metadata changes only after an explicit user
   action and participates in undo/redo.
 
-The plugin will initially live under `plugins/miro-canvas/` in this repository.
-It should move to a separate repository only when its API and release boundary
-are stable enough for independent publication.
+The plugin has its own repository - this one - since 2026-09-24 (`FUT-002`);
+before that it lived under `plugins/miro-canvas/` in miro2obsidian. The two stay
+tied by the board schema pinned in `schema/v1`.
 
 ## Architecture decision
 
@@ -346,9 +349,13 @@ Compatibility modes:
 | Attachment labels | Global default plus per-file and per-document visibility toggle |
 | Offline operation | Comments, settings, overrides, anchors, and required assets stay in the vault |
 
-Freehand drawing remains a future item because Excalidraw already covers the
-workflow. It should be added only after the editing and compatibility core is
-stable.
+Freehand drawing shipped in 0.1.0: pen, highlighter, smart drawing (a rough
+shape becomes a clean one) and erasers, with stylus pressure (`src/drawing.ts`,
+`src/m1-session.ts`, `tests/drawing.test.ts`). A stroke is kept in its card's
+`localOverrides` (`src/local-items.ts`); without the plugin that card shows
+empty. Left: a stroke visible without the plugin, export of a drawing to SVG or
+Excalidraw, and Miro's own freehand strokes once its export carries their
+geometry.
 
 ## Data contract
 
@@ -462,7 +469,8 @@ selected card, it also covers that card's outline and resize handles.
 - Keep Markdown and wikilinks editable as text.
 - Expose font family, numeric size, weight, style, decoration, alignment, line
   height, and vertical alignment without raw HTML editing.
-- Use local/system fonts and explicit fallback maps; never fetch remote fonts.
+- Use local/system fonts and explicit fallback maps; never fetch remote fonts
+  while drawing (a font pack is downloaded only on a press, then read locally).
 - Keep board appearance independent from the Obsidian application theme when
   the user selects an explicit board theme.
 - Include theme-aware defaults, recent colors, hex input, and an accessible
@@ -577,7 +585,8 @@ Repository-level M0 status: the scaffold, schema boundary, read-only adapters,
 explicit CAS writer, and four offline compatibility fixtures are implemented
 and covered by automated tests.
 
-- [x] Create the minimal plugin scaffold under `plugins/miro-canvas/`.
+- [x] Create the minimal plugin scaffold (then under `plugins/miro-canvas/` in
+  miro2obsidian; now the root of this repository).
 - [x] Isolate native and optional Advanced Canvas access behind adapters.
 - [x] Read and validate `miroCanvas.schemaVersion` without writing on open.
 - [x] Add explicit whole-document CAS metadata writes with detached snapshots,
@@ -586,20 +595,32 @@ and covered by automated tests.
   offline fixtures with guarded activation/check scripts.
 - [ ] Open the project vault in real Obsidian and verify visual/interaction
   behavior, including native Ctrl+Z/Ctrl+Y replay and the final screenshots.
+  Left: a check in a real Obsidian (`tools/obsidian_cdp` can now drive one).
 
 ### M1: daily Canvas tools
 
-- Integrate the zoom-unlock behavior.
-- Add the clickable minimap and viewport rectangle.
-- Add element locking and board review mode.
-- Add typography controls, themes, expanded colors, and attachment-name toggles.
-- Verify large-board performance and keyboard accessibility.
+- [x] Integrate the zoom-unlock behavior (done: minimum and maximum zoom under
+  Settings → Navigation, `src/viewport-controller.ts`).
+- [x] Add the clickable minimap and viewport rectangle (done:
+  `src/minimap-model.ts`, `src/m1-controls.ts`).
+- [x] Add element locking and board review mode (done: `src/m1-session.ts`,
+  `tests/m1-session-locking.test.ts`).
+- [x] Add typography controls, themes, expanded colors, and attachment-name
+  toggles (done: `src/appearance.ts`, `src/selection-toolbar.ts`,
+  `src/attachment-labels.ts`).
+- [ ] Verify large-board performance and keyboard accessibility. Large boards
+  are measured in the synthetic harness (see "Standard edges, one label editor,
+  large boards" below). Left: faster dragging on huge boards (stage 6), a
+  keyboard pass, and both checked in a real Obsidian.
 
 ### M2: editing fundamentals
 
-- Add local comments and anchors.
-- Add local shape creation with standard Canvas fallbacks.
-- Add safe local document viewing and open-original controls.
+- [x] Add local comments and anchors (done: `src/local-comments.ts`,
+  `src/comment-markers.ts`, `src/anchors.ts`).
+- [x] Add local shape creation with standard Canvas fallbacks (done:
+  `src/m2-tools.ts`, `src/canvas-authoring.ts`, `src/shape-catalog.ts`).
+- [x] Add safe local document viewing and open-original controls (done:
+  `src/document-viewer.ts`, `src/document-controls.ts`).
 
 ### M3: geometry fidelity
 
@@ -621,12 +642,17 @@ and covered by automated tests.
 - [x] Add source-backed `mindmap_node` root/branch styling and distinguish its
   generated hierarchy edges from Miro connectors; report legacy `mindmap` as
   source-limited.
-- Add slide, document, and image renderers where source data is available.
-- For mind-map editing, evaluate the MIT-licensed
+- [ ] Add slide, document, and image renderers where source data is available.
+  A Miro presentation's slides are read and shown (`src/source-model.ts`,
+  `src/slide-show.ts`); documents and pictures stay native file cards with
+  `src/document-viewer.ts`. Left: renderers for Miro's own document and image
+  data.
+- [ ] For mind-map editing, evaluate the MIT-licensed
   [`obsidian-enhancing-mindmap`](https://github.com/MarkMindCkm/obsidian-enhancing-mindmap)
   tree model and interactions before writing new layout code. Candidate behavior
   includes child/sibling insertion, drag reparenting, collapse/expand, keyboard
-  navigation, and Markdown view switching.
+  navigation, and Markdown view switching. Left: the evaluation; importing
+  these plugins' notes is `MIGRATE-001`.
 - Treat the current
   [`obsidian-markmind`](https://github.com/MarkMindCkm/obsidian-markmind) only as
   a UX reference: its README says it is not open source, so its implementation
@@ -646,11 +672,35 @@ ecosystem - is recorded in the [ROADMAP](https://github.com/NixWrk/Miro_2_Obsidi
 in Python and is offered as a per-OS build or set up by an agent through a
 miro2obsidian skill or MCP server; the plugin never installs it by itself.
 
-- Choose the settings and interface language automatically from Obsidian's own
+**Change of plan (agreed 2026-09-28).** Stages 0-4 are done except the visual
+guide (`FUT-012`) and, in miro2obsidian, the macOS and Linux builds of the
+exporter (`FUT-013`). The ecosystem stage (6) now goes before the checks with
+people (5): the clean-machine walk (`FUT-004`) waits until miro2obsidian's
+automation, which another agent is finishing, is done. Movable panels
+(`FUT-019`) are done and leave the list. The ecosystem stage is now:
+
+1. an MCP server in this repository (`FUT-007`), with the
+   `miro-canvas-format` skill moved here from miro2obsidian;
+2. import from Excalidraw, mind maps (the note formats of Enhancing Mindmap and
+   Markmind) and Advanced Canvas (`FUT-009`, `MIGRATE-001..003`);
+3. search on the board (`FUT-020`);
+4. faster dragging on huge boards (about 35 ms of the plugin's work per dragged
+   frame on the 2,000-card board measured 2026-09-23);
+5. the remaining small limitations: tables from Miro arrive with empty cells
+   (Miro's export has no cell text); lines attached to other lines are still
+   experimental and off by default; independent connectors need the plugin to
+   show; a clipboard paste of native edges without their end cards is not
+   supported; formatting a mixed native/independent selection is not yet one
+   undo step; PDF and PowerPoint export needs Obsidian on a desktop computer.
+
+Then the checks with people: the clean-machine walk (`FUT-004`), every kind of
+link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
+
+- [x] `FUT-001` Choose the settings and interface language automatically from Obsidian's own
   language, falling back to English; English and Russian (done 2026-09-24: every
   word in `src/locales/`, the Russian table must have exactly the English keys,
   a test finds untranslated entries; maintainers' diagnostics stay English).
-- Offer an optional onboarding board on first setup (and from settings) that
+- [x] `FUT-011` Offer an optional onboarding board on first setup (and from settings) that
   shows every tool on real items (done 2026-09-24: `src/welcome-board.ts`
   builds twelve frames - welcome, text, colours, sticky notes, shapes and
   flowcharts, lines, drawing, layers and locking, comments, code and tables,
@@ -663,24 +713,40 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   that small sample folder beside it, on the same press, writing only what
   is missing; the binaries live as base64 in `src/welcome-samples.ts`, built
   and checked by `tools/make_welcome_samples.py`).
-- Write a visual guide to the plugin's features and the order of its settings,
-  with screenshots, for users and for the release page.
-- PDF/PPTX export: slides as a deck and marked board areas as pages (done
+- [ ] `FUT-012` Write a visual guide to the plugin's features and the order of its settings,
+  with screenshots, for users and for the release page. The task is written
+  out in the README ("Task: the visual guide"); `tools/obsidian_cdp` records
+  the GIFs in an isolated Obsidian. Left: the GIFs themselves, none recorded yet.
+- [x] `FUT-008` PDF/PPTX export: slides as a deck and marked board areas as pages (done
   2026-09-24, see Export to PDF and PowerPoint).
-- Move the plugin into its own repository tied to miro2obsidian by a shared
+- [x] `FUT-002` Move the plugin into its own repository tied to miro2obsidian by a shared
   schema and fixtures (done 2026-09-24: this repository, with `schema/v1`
-  pinned by `schema/pin.json` and checked in CI); offer a guided Miro import from first setup and from
+  pinned by `schema/pin.json` and checked in CI).
+- [x] `FUT-003`, `FUT-014` Offer a guided Miro import from first setup and from
   settings, offering the exporter for download or an agent to set it up, and
   letting the user remove it afterwards (the import question and its six-step
-  guide are done 2026-09-24; the plugin never goes to the network itself, links
-  open on a press); walk the full user journey on a clean machine (see
+  guide are done 2026-09-24, `src/import-guide.ts`; the guide itself never goes
+  to the network, links open on a press; the `miro2obsidian-import` skill is in
+  miro2obsidian).
+- [ ] `FUT-004` Walk the full user journey on a clean machine (see
   [ROADMAP](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/ROADMAP.md)).
-- Provide a skill or an MCP server so agents can work with miro-canvas boards as
-  natively as with Canvas files (the light skill is done:
-  `.agents/skills/miro-canvas-format`; the MCP server comes in phase 6).
-- Tune settings and layouts for other operating systems, phones and tablets
-  (see M5 below).
-- Fonts (`FUT-016`). The base is done 2026-09-24: the list offers only fonts
+  Left: the walk on a clean Windows machine; it waits until miro2obsidian's
+  automation is finished (2026-09-28).
+- [x] In miro2obsidian, the converter as a product of its own: plain Canvas,
+  Advanced Canvas, miro-canvas or raw JSON output (`FUT-005`) and SHA-256
+  attachment de-duplication (`FUT-006`) are done 2026-09-24 there.
+- [ ] `FUT-013` In miro2obsidian, exporter builds for Windows, macOS and Linux.
+  Left: the macOS and Linux builds (the Windows one is checked).
+- [ ] `FUT-007` Provide a skill or an MCP server so agents can work with miro-canvas boards as
+  natively as with Canvas files. The light skill `miro-canvas-format` (the
+  format by fields, a check against schema v1, rules for safe edits) was made
+  2026-09-24 in miro2obsidian (`.agents/skills/miro-canvas-format` there); it is
+  not in this repository. The owner decided on 2026-09-28 that the MCP server
+  lives in this repository and the skill moves here with it. Left: the MCP
+  server and the move of the skill.
+- [ ] `FUT-010` Tune settings and layouts for other operating systems, phones and tablets
+  (see M5 below). Left: the layouts, and a check on a device matrix.
+- [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts
   every machine shows as themselves (Inter and Source Code Pro from Obsidian,
   the system's sans-serif and serif) and the fonts set in Obsidian's own
   appearance settings; a font the machine lacks (on older boards or from Miro)
@@ -695,7 +761,7 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   and a list of one's own: keep what is used, remove the rest, set the order.
   Packs are assets of this repository's releases with their licences (OFL,
   Apache or MIT only); a download happens only on a press and shows its size,
-  and the README names it as the one place the plugin goes to the network. A
+  and the README names it beside the update check as the only network use. A
   font is loaded into memory only when something is written in it.
   Plugin side done 2026-09-25 (`src/font-packs.ts`, `src/font-pack-catalogue.ts`,
   `tools/build_font_packs.py --write-catalogue`, `src/settings.ts`,
@@ -724,13 +790,13 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   it fell back to the real release; a tag read as 0.0.N always ranks below
   the plugin's own releases. A pack missing from the release answers with a
   plain "this pack is not published yet" message rather than an error.
-- Check every kind of link and formula inside the plugin (`FUT-017`): wiki and
+- [ ] Check every kind of link and formula inside the plugin (`FUT-017`): wiki and
   Markdown links to notes, headings and blocks, web addresses, embeds
   (`![[...]]`) of notes, pictures, PDFs and other canvases, links from Miro
   boards, inline and block LaTeX - in a shown card, while editing, in sticky
   notes, shapes, tables, line labels, comments and in the PDF and PowerPoint
   export; fix what is found.
-- The bottom tool bar (`FUT-018`): bring Canvas's own card, note from the
+- [x] The bottom tool bar (`FUT-018`): bring Canvas's own card, note from the
   vault and file from the vault back into quick access, draggable onto the
   board as in Canvas itself (they are now hidden under More and cannot be
   dragged); give the sticky note an icon unlike the card's; let people choose
@@ -745,7 +811,7 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   keeps its note icon), all in the icons' own colour;
   Settings → Tool bar lists every item with a toggle and up/down buttons, and
   a reset to default.
-- Arranging the board's panels on the board itself (`FUT-019`, extended
+- [x] Arranging the board's panels on the board itself (`FUT-019`, extended
   twice on 2026-09-25 at the user's request). Done in the plugin 2026-09-25
   (`src/panel-layout.ts`, `src/panel-arrange.ts`, `src/settings.ts`,
   `src/m1-controls.ts`, `src/m1-session.ts`, `src/main.ts`): "Arrange panels"
@@ -801,10 +867,10 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   `data-miro-canvas-crowded` - "toolbar-left" puts the bar at the left
   edge, "stacked" lifts the dock and the minimap above it; a stored place
   turns this off.
-- Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
+- [ ] Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
   highlight, next and previous.
-- A selection toolbar laid out as Miro's (`FUT-021`). Done in the plugin
+- [x] A selection toolbar laid out as Miro's (`FUT-021`). Done in the plugin
   2026-09-25 (`src/selection-toolbar.ts`, `src/text-list.ts`, `src/text-link.ts`,
   `src/m1-session.ts`): a card's groups now read shape | font, size | text
   style, alignment, list, link | text colour, marker, fill, border | comment,
@@ -821,7 +887,7 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
   and is removed with an empty value), and a comment button that pins a new
   comment straight to the selection, the same result the comment tool gives
   clicked there. Nothing that existed is lost, only moved.
-- Updates (`FUT-022`). Obsidian's rules forbid a plugin updating itself, so
+- [x] Updates (`FUT-022`). Obsidian's rules forbid a plugin updating itself, so
   updates come as GitHub releases (a version tag with main.js, manifest.json
   and styles.css): before the community catalogue through the BRAT plugin,
   which installs and updates a plugin from this repository's releases
@@ -836,27 +902,42 @@ miro2obsidian skill or MCP server; the plugin never installs it by itself.
 
 ### Future: ecosystem migration
 
-- Add explicit, non-destructive import adapters for common local plugin formats,
-  beginning with Excalidraw drawings and mind-map plugins. Convert recoverable
-  structure into native Canvas plus versioned `miroCanvas` metadata while
-  preserving the original file and recording provenance and unsupported fields.
-- Keep adapters format-specific and optional; never make another plugin a
-  runtime dependency or silently rewrite its files.
+The formats, chosen by the owner on 2026-09-28: Excalidraw drawings, mind maps
+(the note formats of the Enhancing Mindmap and Markmind plugins - their files
+are read, their code is not copied) and Advanced Canvas boards. This is stage 6
+(`FUT-009`); nothing is built yet.
+
+- [ ] `MIGRATE-001` Add explicit, non-destructive import adapters for these
+  formats. Convert recoverable structure into native Canvas plus versioned
+  `miroCanvas` metadata while preserving the original file unchanged.
+- [ ] `MIGRATE-002` For each importer record provenance, the list of converted
+  items and the unsupported fields; promise no equivalence where the other
+  plugin's format does not carry the data.
+- [ ] `MIGRATE-003` Keep adapters format-specific and optional; never make
+  another plugin a runtime dependency or silently rewrite its files. An import
+  runs only on an explicit action, with a preview of the result.
 
 ### M5: release hardening
 
-- Test network-denied operation.
-- Test large boards and migrations.
-- Test native Canvas, Advanced Canvas, and both plugins together.
-- Add real-Obsidian visual baselines and accessibility checks.
-- Run a documented platform/display matrix on Windows, macOS, and Linux (or
+- [ ] Test network-denied operation. Left: a run with the network denied; in
+  code, the only requests are the update check and a font pack download.
+- [ ] Test large boards and migrations. A 2,000-card board is measured in the
+  synthetic harness and the legacy line-to-connector migration has tests. Left:
+  both in a real Obsidian.
+- [ ] Test native Canvas, Advanced Canvas, and both plugins together. The
+  four-profile matrix is checked offline (`tools/obsidian_oracle`). Left: a
+  check in a real Obsidian.
+- [ ] Add real-Obsidian visual baselines and accessibility checks. Left: a
+  check in a real Obsidian.
+- [ ] Run a documented platform/display matrix on Windows, macOS, and Linux (or
   representative virtual machines), multiple viewport sizes and device-pixel
-  ratios, and Obsidian desktop and mobile/touch where available.
-- Exercise mouse, trackpad, pen tablet/stylus, touch-screen, and phone/tablet
+  ratios, and Obsidian desktop and mobile/touch where available. Left: a check
+  on each device.
+- [ ] Exercise mouse, trackpad, pen tablet/stylus, touch-screen, and phone/tablet
   drawing and selection gestures, including palm rejection and window-focus
-  changes for rotated text rendering.
-- Extract the plugin to its own repository only if the stable release boundary
-  justifies it.
+  changes for rotated text rendering. Left: a check on each device.
+- [x] Extract the plugin to its own repository only if the stable release boundary
+  justifies it (done 2026-09-24: this repository, `FUT-002`).
 
 ## Definition of done
 
