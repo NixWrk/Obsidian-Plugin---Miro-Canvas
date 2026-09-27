@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 // their own copies, which must not run twice or against the wrong sources.
 export default defineConfig({
 	test: {
-		include: ["tests/**/*.test.ts"],
+		include: ["tests/**/*.test.ts", "mcp/tests/**/*.test.ts"],
 		exclude: ["**/node_modules/**", ".claude/**"],
 	},
 });

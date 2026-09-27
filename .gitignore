@@ -7,6 +7,8 @@ __pycache__/
 .pytest_cache/
 tools/obsidian_oracle/.out/
 tools/obsidian_cdp/.out/
+# The MCP server bundle, built by `npm run mcp:build`.
+mcp/dist/
 # Font packs built by tools/build_font_packs.py, and its download cache.
 dist/
 .cache/

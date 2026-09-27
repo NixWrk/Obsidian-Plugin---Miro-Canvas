@@ -120,6 +120,22 @@ export interface UpdateItemInput {
 }
 
 /**
+ * A card's own native fields to change: its text, its box, its Canvas color.
+ * A field left out stays as it is; `color: null` takes the color away.
+ */
+export interface UpdateNodeInput {
+	readonly id: string;
+	/** Only a text card has text of its own. */
+	readonly text?: string;
+	readonly x?: number;
+	readonly y?: number;
+	readonly width?: number;
+	readonly height?: number;
+	/** A Canvas preset "1".."6" or "#rrggbb"; null removes it. */
+	readonly color?: string | null;
+}
+
+/**
  * Nodes and connectors to add as they are, with the plugin's record of each:
  * what a paste brings.  Ids must be new to the board; a connector may end on
  * a node already there or on one added with it.
@@ -286,6 +302,8 @@ const MAX_IDENTIFIER_LENGTH = 512;
 const MAX_ID_ATTEMPTS = 10_000;
 const SAFE_GENERATED_ID_PREFIX = "miro-canvas-node";
 const DANGEROUS_IDENTIFIER_NAMES = new Set(["__proto__", "prototype", "constructor"]);
+/** JSON Canvas colors: a preset "1".."6" or a hex color. */
+const NATIVE_COLOR = /^(?:[1-6]|#[0-9a-fA-F]{6})$/;
 
 function isObject(value: unknown): value is AnyRecord {
 	return (typeof value === "object" && value !== null) || typeof value === "function";
@@ -589,6 +607,30 @@ function structurallyEqual(left: unknown, right: unknown): boolean {
 function readRequiredString(record: UnknownRecord, key: string): string | undefined {
 	const value = safeRead(record, key);
 	return value.ok && isSafeIdentifier(value.value) ? value.value : undefined;
+}
+
+/** A board's cards and lines as read, or why the file is not a board that can be edited. */
+export type CanvasGraphRead =
+	| {
+		readonly ok: true;
+		readonly document: Readonly<Record<string, unknown>>;
+		readonly nodes: readonly Readonly<Record<string, unknown>>[];
+		readonly edges: readonly Readonly<Record<string, unknown>>[];
+	}
+	| { readonly ok: false; readonly message: string };
+
+/**
+ * Read a board the way every authoring change does: nodes and edges arrays of
+ * objects, every id safe and used once across both.  The result is a copy.
+ */
+export function readCanvasGraph(value: unknown): CanvasGraphRead {
+	try {
+		const snapshot = validateGraphDocument(value);
+		return { ok: true, document: snapshot.document, nodes: snapshot.nodes, edges: snapshot.edges };
+	} catch (error) {
+		const message = error instanceof SnapshotError ? error.message : "The Canvas document could not be read.";
+		return { ok: false, message };
+	}
 }
 
 function validateGraphDocument(value: unknown): InternalSnapshot {
@@ -1280,9 +1322,9 @@ function hasGraphElement(snapshot: InternalSnapshot, id: string): boolean {
 
 function policyAllowsGraphEdit(
 	document: UnknownRecord,
-	operation: "rotate" | "edit",
+	operation: "rotate" | "edit" | NodeUpdateOperation,
 	id: string,
-	code: "rotation" | "z-order" | "element-style",
+	code: "rotation" | "z-order" | "element-style" | "update-node",
 	diagnostics: CanvasAuthoringDiagnostic[],
 ): boolean {
 	const decision = decideEditOperation(document, operation, id);
@@ -1302,6 +1344,57 @@ function policyAllowsGraphEdit(
 		return false;
 	}
 	return true;
+}
+
+type NodeUpdateOperation = "edit-text" | "move" | "resize" | "restyle";
+
+interface NodeFieldUpdate {
+	readonly key: string;
+	/** null takes the field away. */
+	readonly value: string | number | null;
+	readonly operation: NodeUpdateOperation;
+}
+
+/** The fields one card update sets, each with the operation the lock policy judges it as. */
+function readNodeUpdate(
+	input: unknown,
+	node: AnyRecord,
+	diagnostics: CanvasAuthoringDiagnostic[],
+): readonly NodeFieldUpdate[] | undefined {
+	const fields: NodeFieldUpdate[] = [];
+	const text = actionProperty(input, "text");
+	if (text.ok && text.value !== undefined) {
+		const type = safeRead(node, "type");
+		if (!type.ok || type.value !== "text") {
+			addDiagnostic(diagnostics, "update-node-text-unsupported", "error", "Only a text card has text to change.");
+			return undefined;
+		}
+		if (typeof text.value !== "string" || text.value.length > MAX_TEXT_LENGTH) {
+			addDiagnostic(diagnostics, "update-node-text-invalid", "error", "A card's text must be a string of a reasonable length.");
+			return undefined;
+		}
+		fields.push({ key: "text", value: text.value, operation: "edit-text" });
+	}
+	for (const key of ["x", "y", "width", "height"] as const) {
+		const value = actionProperty(input, key);
+		if (!value.ok || value.value === undefined) continue;
+		const size = key === "width" || key === "height";
+		if (!isFiniteNumber(value.value) || (size && value.value <= 0)) {
+			addDiagnostic(diagnostics, "update-node-geometry-invalid", "error", "A card's place must be finite and its size above zero.");
+			return undefined;
+		}
+		fields.push({ key, value: value.value, operation: size ? "resize" : "move" });
+	}
+	const color = actionProperty(input, "color");
+	if (color.ok && color.value !== undefined) {
+		const valid = color.value === null || (typeof color.value === "string" && NATIVE_COLOR.test(color.value));
+		if (!valid) {
+			addDiagnostic(diagnostics, "update-node-color-invalid", "error", "A card's color must be a Canvas preset 1-6 or #rrggbb.");
+			return undefined;
+		}
+		fields.push({ key: "color", value: color.value as string | null, operation: "restyle" });
+	}
+	return fields;
 }
 
 function normalizeRotation(rotation: number): number {
@@ -2401,6 +2494,83 @@ export class CanvasAuthoring {
 		});
 		if (!isPlainObject(edge)) return reject();
 		setOwn(edge, "label", label);
+		const verified = this.commitDocument(before, document, diagnostics);
+		return verified === undefined ? reject() : { ok: true, status: "applied", document: verified.document, diagnostics };
+	}
+
+	/**
+	 * Change cards' own native fields - text, box, Canvas color - in one native
+	 * history step.  Each change is checked against the lock policy as what it
+	 * is: new text is an edit of text, a new place a move, a new size a resize,
+	 * a new color a restyle.  Lines held by a card follow it as native Canvas
+	 * draws them; nothing else on the board is touched.
+	 */
+	public updateNodes(inputs: readonly UpdateNodeInput[], expected?: CanvasAuthoringExpected): CanvasGraphResult {
+		const diagnostics: CanvasAuthoringDiagnostic[] = [];
+		const reject = (): CanvasGraphResult => ({ ok: false, status: "rejected", diagnostics });
+		if (this.disposed || this.host === undefined) return reject();
+		if (!Array.isArray(inputs) || inputs.length === 0) {
+			addDiagnostic(diagnostics, "update-node-empty", "error", "Updating cards needs at least one change.");
+			return reject();
+		}
+		const before = readSnapshotFromHost(this.host, diagnostics);
+		if (before === undefined) return reject();
+		if (expected !== undefined) {
+			const snapshot = makeSnapshot(extractExpectedDocument(expected), diagnostics);
+			if (snapshot === undefined || !structurallyEqual(snapshot.document, before.document)) {
+				addDiagnostic(diagnostics, "stale-node-update", "error", "The board changed before the cards were updated.");
+				return reject();
+			}
+		}
+		const document = cloneRecord(before.document);
+		const nodes = safeRead(document, "nodes");
+		if (!nodes.ok || !Array.isArray(nodes.value)) return reject();
+		const seen = new Set<string>();
+		let changed = false;
+		for (const input of inputs) {
+			const id = readGraphActionId(input, diagnostics, "update-node");
+			if (id === undefined) return reject();
+			if (seen.has(id)) {
+				addDiagnostic(diagnostics, "update-node-duplicate", "error", "A card may be named once in one update.");
+				return reject();
+			}
+			seen.add(id);
+			const node = nodes.value.find((item) => {
+				const key = safeRead(item, "id");
+				return isPlainObject(item) && key.ok && key.value === id;
+			});
+			if (!isPlainObject(node)) {
+				addDiagnostic(diagnostics, "update-node-missing", "error", "The card to update is not on the board.");
+				return reject();
+			}
+			const fields = readNodeUpdate(input, node, diagnostics);
+			if (fields === undefined) return reject();
+			if (fields.length === 0) {
+				addDiagnostic(diagnostics, "update-node-no-fields", "error", "A card update must change its text, box or color.");
+				return reject();
+			}
+			for (const field of fields) {
+				if (!policyAllowsGraphEdit(before.document, field.operation, id, "update-node", diagnostics)) return reject();
+			}
+			for (const field of fields) {
+				const current = safeRead(node, field.key);
+				const unchanged = field.value === null
+					? !current.ok || current.value === undefined
+					: current.ok && current.value === field.value;
+				if (unchanged) continue;
+				if (field.value === null) {
+					deleteOwn(node, field.key);
+				} else {
+					setOwn(node, field.key, field.value);
+				}
+				changed = true;
+			}
+		}
+		// Asking for what the cards already are is no change, and no history step.
+		if (!changed) {
+			addDiagnostic(diagnostics, "update-node-unchanged", "info", "The cards already had these values.");
+			return { ok: true, status: "applied", document: before.document, diagnostics };
+		}
 		const verified = this.commitDocument(before, document, diagnostics);
 		return verified === undefined ? reject() : { ok: true, status: "applied", document: verified.document, diagnostics };
 	}

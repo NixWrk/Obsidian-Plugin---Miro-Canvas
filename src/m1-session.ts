@@ -33,6 +33,8 @@ import {
 	type CanvasScene,
 } from "./canvas-adapter";
 import { CANVAS_SHAPE_KINDS, createCanvasAuthoring, type CanvasAuthoring, type ConnectorSide } from "./canvas-authoring";
+import { newCanvasId } from "./canvas-ids";
+import { planBoardConnectors } from "./board-connector-writes";
 import type { LayerDirection } from "./layer-order";
 import {
 	boardConnectors, connectorEndCap, fitsNativeEdge, heldByNode, nativeEdgeOf, readBoardConnector,
@@ -341,13 +343,6 @@ async function saveExportFile(view: Window | null | undefined, name: string, kin
 	if (choice.canceled || choice.filePath === undefined || choice.filePath === "") return undefined;
 	await fs.promises.writeFile(choice.filePath, bytes);
 	return choice.filePath;
-}
-
-/** A node or connector id as native Canvas makes one: sixteen hex digits. */
-function newCanvasId(): string {
-	const bytes = new Uint8Array(8);
-	globalThis.crypto.getRandomValues(bytes);
-	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** Call a method a host object may or may not have; what it throws is swallowed. */
@@ -1291,48 +1286,15 @@ export class M1CanvasSession {
 			}
 		}
 		if (!this.editAllowed("edit", [...items.map((connector) => connector.id), ...remove])) return false;
-		const old = boardConnectors(this.currentRawDocument);
-		const next = old.filter((connector) => !remove.includes(connector.id) && !items.some((item) => item.id === connector.id)).concat(items);
-		const geometry = buildCanvasAnchorGeometry(this.currentRawDocument);
-		const freed = (anchor: CanvasAnchor, point: { x: number; y: number } | undefined): CanvasAnchor =>
-			anchor.type === "edge" && remove.includes(anchor.edgeId) && point !== undefined ? { type: "free", x: point.x, y: point.y } : anchor;
-		const detached = next.map((connector) => {
-			const route = geometry.edges?.[connector.id];
-			return { ...connector, from: freed(connector.from, route?.start), to: freed(connector.to, route?.end) };
-		});
-		const changed = detached.filter((connector) => JSON.stringify(connector) !== JSON.stringify(old.find((item) => item.id === connector.id)));
-		if (changed.length > 0 && !this.editAllowed("edit", changed.map((connector) => connector.id))) return false;
-		const metadata = readRuntime(this.currentRawDocument, "miroCanvas");
-		const overrides = { ...(isRecord(metadata) && isRecord(metadata.localOverrides) ? metadata.localOverrides : {}) };
-		// Native edges that held on to a connector taken away keep their end too.
-		for (const [id, value] of Object.entries(overrides)) {
-			if (!isRecord(value) || !isRecord(value.connectorAnchors)) continue;
-			const anchors = { ...value.connectorAnchors };
-			let edited = false;
-			for (const end of ["from", "to"] as const) {
-				const anchor = anchors[end];
-				const route = geometry.edges?.[id];
-				const point = end === "from" ? route?.start : route?.end;
-				if (!isRecord(anchor) || anchor.type !== "edge" || !remove.includes(anchor.edgeId as string)) continue;
-				if (point === undefined || !this.editAllowed("edit", [id])) return false;
-				anchors[end] = { type: "free", x: point.x, y: point.y };
-				edited = true;
-			}
-			if (edited) overrides[id] = { ...value, connectorAnchors: anchors };
-		}
-		const connectors = Object.fromEntries(detached.map((connector) => [connector.id, connector]));
-		const proposed = {
-			...(isRecord(this.currentRawDocument) ? this.currentRawDocument : {}),
-			miroCanvas: { ...(isRecord(metadata) ? metadata : {}), connectors, localOverrides: overrides },
-		};
-		const nextGeometry = buildCanvasAnchorGeometry(proposed);
-		if (detached.some((connector) => nextGeometry.edges?.[connector.id] === undefined)) {
-			this.options.onNotice?.(words().session.connectorTargetInvalid);
+		const plan = planBoardConnectors(this.currentRawDocument, items, remove, (ids) => this.editAllowed("edit", ids));
+		if (!plan.ok) {
+			// A locked line has said so already; an end that cannot be told is refused quietly.
+			if (plan.reason === "target-invalid") this.options.onNotice?.(words().session.connectorTargetInvalid);
 			return false;
 		}
 		return this.writeMetadata("board-connectors", (draft) => {
-			draft.connectors = connectors;
-			draft.localOverrides = overrides;
+			draft.connectors = plan.connectors;
+			draft.localOverrides = plan.localOverrides;
 		})?.ok === true;
 	}
 
