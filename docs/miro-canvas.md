@@ -422,6 +422,50 @@ and the plugin's tests both run those fixtures, and the plugin's list of known
 fields are allowed wherever the plugin keeps fields from newer versions. Check
 a board with `python -m miro2obsidian.validate <file.canvas>`.
 
+### Agents: the MCP server
+
+`mcp/` holds an MCP server (done 2026-09-28, `FUT-007`) through which an AI
+agent reads, checks and edits the boards of one vault without Obsidian open:
+`node mcp/dist/miro-canvas-mcp.mjs --vault <absolute path> [--read-only]`,
+built by `npm run mcp:build` into one file for Node 20 that carries ajv and
+the pinned schema, so running it needs no install. The agent's MCP client
+starts it; the plugin never does, and `main.js` contains nothing of it. It
+speaks JSON-RPC 2.0 over stdio, one message per line (written by hand; the MCP
+SDK would bring a web server along), and opens no network connection. The
+skill `miro-canvas-format` in `.agents/skills/` tells an agent how to use it
+and how the format works; [mcp/README.md](../mcp/README.md) lists the tools.
+
+- **Reuse.** The server imports the plugin's pure modules from `src/` and never
+  the other way round; nothing it bundles imports `obsidian` (the build fails
+  if anything does). Edits go through `CanvasAuthoring` over a
+  `FileCanvasRuntime` (`getData`/`importData` on a copy in memory,
+  `requestSave` the checked save) and through `MetadataWriter` over a
+  `FileMetadataStore`, so every guard of the plugin holds: locks and review
+  mode, `miroSource` compared before every commit, verification and rollback,
+  unknown fields kept, ids as native Canvas makes them (`src/canvas-ids.ts`).
+  A line between two cards is a native edge, as in the plugin; its own
+  connectors go through `planBoardConnectors`, like the session's.
+- **Revision and compare-and-swap.** A board's revision is the SHA-256 of its
+  raw bytes. An edit handed an `expectedRevision` that is not the file's is
+  refused (`stale-board`) before any work. Every save re-reads the file and
+  compares; the file is written once per call: a temporary file
+  `.<name>.<pid>.<random>.mcp-tmp` in the same folder (created exclusively,
+  flushed with fsync), checked once more, renamed over the board, and deleted
+  on any failure. JSON is written as Obsidian writes it (tab-indented) and a
+  byte order mark is kept. A save that lands between the last check and the
+  rename cannot be seen - a window of milliseconds. A board holding whole
+  numbers beyond 2^53 is not edited, since writing it back would round them.
+  When `.obsidian/workspace.json` shows the board open in a tab, the answer
+  warns `open-in-obsidian`: Obsidian reloads a board changed on disk, but its
+  own unsaved edits can still be saved over the change.
+- **Vault guard.** `--vault` must be an absolute folder holding `.obsidian`,
+  reached through no link. A board is named by a relative path ending in
+  `.canvas`; `..`, drive letters, `:` (alternate streams), device names, names
+  ending in a dot or a space and anything under `.obsidian` or `.trash` are
+  refused; every folder on the way is checked not to be a link or junction,
+  and the real path must be the path as written, inside the vault. Boards over
+  64 MB are refused; `list_boards` never follows a link.
+
 ## Rendering requirements
 
 ### Geometry and layers
@@ -680,7 +724,7 @@ automation, which another agent is finishing, is done. Movable panels
 (`FUT-019`) are done and leave the list. The ecosystem stage is now:
 
 1. an MCP server in this repository (`FUT-007`), with the
-   `miro-canvas-format` skill moved here from miro2obsidian;
+   `miro-canvas-format` skill moved here from miro2obsidian (done 2026-09-28);
 2. import from Excalidraw, mind maps (the note formats of Enhancing Mindmap and
    Markmind) and Advanced Canvas (`FUT-009`, `MIGRATE-001..003`);
 3. search on the board (`FUT-020`);
@@ -737,13 +781,14 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   attachment de-duplication (`FUT-006`) are done 2026-09-24 there.
 - [ ] `FUT-013` In miro2obsidian, exporter builds for Windows, macOS and Linux.
   Left: the macOS and Linux builds (the Windows one is checked).
-- [ ] `FUT-007` Provide a skill or an MCP server so agents can work with miro-canvas boards as
+- [x] `FUT-007` Provide a skill or an MCP server so agents can work with miro-canvas boards as
   natively as with Canvas files. The light skill `miro-canvas-format` (the
   format by fields, a check against schema v1, rules for safe edits) was made
-  2026-09-24 in miro2obsidian (`.agents/skills/miro-canvas-format` there); it is
-  not in this repository. The owner decided on 2026-09-28 that the MCP server
-  lives in this repository and the skill moves here with it. Left: the MCP
-  server and the move of the skill.
+  2026-09-24 in miro2obsidian. The owner decided on 2026-09-28 that the MCP
+  server lives in this repository and the skill moves here with it. Done
+  2026-09-28: the server in `mcp/` (reading, checking and editing tools; see
+  "Agents: the MCP server" under the data contract) and the skill in
+  `.agents/skills/miro-canvas-format`, which now points to the server first.
 - [ ] `FUT-010` Tune settings and layouts for other operating systems, phones and tablets
   (see M5 below). Left: the layouts, and a check on a device matrix.
 - [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts

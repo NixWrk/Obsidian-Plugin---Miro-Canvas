@@ -189,7 +189,7 @@ export class McpServer {
 			return {
 				content: [{ type: "text", text: JSON.stringify(structured) }],
 				structuredContent: structured,
-				isError: false,
+				isError: tool.failed?.(structured) === true,
 			};
 		} catch (error) {
 			// A file that cannot be read and a mistake of the server's alike are the call's failure.

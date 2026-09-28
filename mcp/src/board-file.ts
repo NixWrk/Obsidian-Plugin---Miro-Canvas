@@ -5,11 +5,21 @@
  * with the board and hands it back with a change; any save in between -
  * Obsidian's, a sync tool's, another agent's - changes the bytes and so the
  * revision, and the change is refused instead of writing over it.
+ *
+ * An edit works on a copy of the board in memory, through the same
+ * runtime and store the plugin's own writers use inside Obsidian: a
+ * FileCanvasRuntime stands in for the Canvas view, a FileMetadataStore for
+ * the store of the plugin's record.  Every save they are asked for first
+ * reads the file again and compares its revision; the file itself is
+ * written once, at the end of the call, through a temporary file in the same
+ * folder renamed over the board.
  */
 
-import { createHash } from "node:crypto";
-import { lstatSync, readFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
+import path from "node:path";
 
+import type { MetadataDocumentStore } from "../../src/metadata-writer";
 import { ToolError, type Vault } from "./vault";
 
 /** Larger boards are refused: reading one whole would stall the agent and the server. */
@@ -99,4 +109,240 @@ export function readBoardFile(vault: Vault, relative: unknown): BoardFile {
 		document: parseBoardText(text),
 		hasUnsafeIntegers: hasUnsafeIntegers(text),
 	};
+}
+
+/** Whether two JSON values are the same, whatever the order of their keys. */
+export function sameJson(left: unknown, right: unknown): boolean {
+	if (Object.is(left, right)) return true;
+	if (left === null || right === null || typeof left !== "object" || typeof right !== "object") return false;
+	if (Array.isArray(left) !== Array.isArray(right)) return false;
+	if (Array.isArray(left) && Array.isArray(right)) {
+		if (left.length !== right.length) return false;
+		return left.every((value, index) => sameJson(value, right[index]));
+	}
+	const leftRecord = left as Record<string, unknown>;
+	const rightRecord = right as Record<string, unknown>;
+	const leftKeys = Object.keys(leftRecord);
+	if (leftKeys.length !== Object.keys(rightRecord).length) return false;
+	return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(rightRecord, key) && sameJson(leftRecord[key], rightRecord[key]));
+}
+
+/** Refused because the file changed since the agent read it, or since this call did. */
+export const STALE_BOARD = "stale-board";
+
+/** What the file holds now: its revision, or undefined when it is gone or unreadable. */
+function revisionOnDisk(absolutePath: string): string | undefined {
+	try {
+		return revisionOf(readFileSync(absolutePath));
+	} catch {
+		return undefined;
+	}
+}
+
+/** The bytes a board is written as: tab-indented JSON, as Obsidian writes it, with the byte order mark it had. */
+export function serializeBoard(document: Readonly<Record<string, unknown>>, withBom: boolean): Buffer {
+	const text = JSON.stringify(document, null, "\t");
+	return Buffer.from(`${withBom ? UTF8_BOM : ""}${text}`, "utf8");
+}
+
+export interface BoardEditOptions {
+	/** Work the change out and check it, but leave the file as it is. */
+	readonly dryRun?: boolean;
+	/** Called just before the file is written; tests change the board here to see a save refused. */
+	readonly beforeWrite?: (absolutePath: string) => void;
+}
+
+/** What a finished edit left on disk. */
+export interface BoardWriteResult {
+	/** Whether the file was written. */
+	readonly written: boolean;
+	/** The revision of the file as it is now (or would be, after a dry run). */
+	readonly revision: string;
+	readonly bytes: number;
+}
+
+/**
+ * One tool call's work on one board.  It holds two documents: the working
+ * one, which the Canvas runtime imports into and reads from, and the saved
+ * one, which every accepted save moves forward.  Only the saved document is
+ * ever written to the file, and only once, by `write`.
+ */
+export class BoardEdit {
+	public readonly vault: Vault;
+	public readonly file: BoardFile;
+	private readonly options: BoardEditOptions;
+	private working: Record<string, unknown>;
+	private saved: Record<string, unknown>;
+	private stale = false;
+
+	public constructor(vault: Vault, file: BoardFile, options: BoardEditOptions = {}) {
+		this.vault = vault;
+		this.file = file;
+		this.options = options;
+		this.working = structuredClone(file.document);
+		this.saved = structuredClone(file.document);
+	}
+
+	/** Whether a save was refused because the file changed under this call. */
+	public get staleDetected(): boolean {
+		return this.stale;
+	}
+
+	/** The board as the last accepted save left it. */
+	public get savedDocument(): Record<string, unknown> {
+		return this.saved;
+	}
+
+	/** Whether the saves so far changed the board. */
+	public get changed(): boolean {
+		return !sameJson(this.saved, this.file.document);
+	}
+
+	public readWorking(): Record<string, unknown> {
+		return structuredClone(this.working);
+	}
+
+	public importWorking(document: Record<string, unknown>): void {
+		this.working = structuredClone(document);
+	}
+
+	/**
+	 * Accept a save when the file still holds the bytes this call read.  The
+	 * file itself is not written here.
+	 */
+	public save(document: Record<string, unknown>): boolean {
+		if (revisionOnDisk(this.file.absolutePath) !== this.file.revision) {
+			this.stale = true;
+			return false;
+		}
+		this.saved = structuredClone(document);
+		this.working = structuredClone(document);
+		return true;
+	}
+
+	/**
+	 * Write the saved board over the file: a temporary file in the same folder,
+	 * flushed to disk, renamed over the board.  The file's revision is checked
+	 * once more just before the rename; a save that lands between that check
+	 * and the rename itself cannot be seen - a window of a few milliseconds.
+	 */
+	public write(): BoardWriteResult {
+		if (!this.changed) {
+			return { written: false, revision: this.file.revision, bytes: this.file.bytes };
+		}
+		return this.replaceFile(serializeBoard(this.saved, this.file.hasBom));
+	}
+
+	/**
+	 * Put exact bytes back over the board - an undo gives back the file as it
+	 * was, byte for byte - with the same checks and the same atomic write.
+	 */
+	public writeBytes(bytes: Buffer): BoardWriteResult {
+		return this.replaceFile(bytes);
+	}
+
+	private replaceFile(bytes: Buffer): BoardWriteResult {
+		const revision = revisionOf(bytes);
+		if (this.options.dryRun === true) {
+			this.refuseIfChanged(this.file.absolutePath);
+			return { written: false, revision, bytes: bytes.byteLength };
+		}
+		// The path is checked again: a folder on the way may have become a link since the read.
+		const target = this.vault.resolveExisting(this.file.path, "board");
+		const temporary = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${randomBytes(6).toString("hex")}.mcp-tmp`);
+		try {
+			const descriptor = openSync(temporary, "wx");
+			try {
+				writeSync(descriptor, bytes);
+				fsyncSync(descriptor);
+			} finally {
+				closeSync(descriptor);
+			}
+			this.options.beforeWrite?.(target);
+			this.refuseIfChanged(target);
+			renameSync(temporary, target);
+		} catch (error) {
+			removeQuietly(temporary);
+			if (error instanceof ToolError) throw error;
+			const detail = error instanceof Error ? error.message : String(error);
+			throw new ToolError("write-failed", `The board could not be written: ${detail}`);
+		}
+		return { written: true, revision, bytes: bytes.byteLength };
+	}
+
+	private refuseIfChanged(target: string): void {
+		if (revisionOnDisk(target) === this.file.revision) return;
+		this.stale = true;
+		throw new ToolError(STALE_BOARD, "The board changed on disk since it was read; nothing was written. Read it again and redo the change.");
+	}
+}
+
+function removeQuietly(file: string): void {
+	try {
+		if (existsSync(file)) unlinkSync(file);
+	} catch {
+		// Nothing more can be done; the name starts with a dot, so Obsidian ignores it.
+	}
+}
+
+/**
+ * The Canvas view as CanvasAuthoring expects it, over a board file:
+ * getData and importData work on the copy in memory, requestSave is the save
+ * that checks the file.  CanvasAuthoring's own guards - locks, miroSource,
+ * verification, rollback - run exactly as they do inside Obsidian.
+ */
+export class FileCanvasRuntime {
+	public readonly readonly = false;
+	private readonly edit: BoardEdit;
+
+	public constructor(edit: BoardEdit) {
+		this.edit = edit;
+	}
+
+	public getData(): Record<string, unknown> {
+		return this.edit.readWorking();
+	}
+
+	public importData(document: Record<string, unknown>, _clear?: boolean): void {
+		this.edit.importWorking(document);
+	}
+
+	public requestSave(_immediate?: boolean): boolean {
+		return this.edit.save(this.edit.readWorking());
+	}
+}
+
+/**
+ * The store MetadataWriter writes the plugin's record through: a save is
+ * accepted only when the board is still the one the writer read, in memory
+ * and on disk.
+ */
+export class FileMetadataStore implements MetadataDocumentStore {
+	private readonly edit: BoardEdit;
+	private failure: string | undefined;
+
+	public constructor(edit: BoardEdit) {
+		this.edit = edit;
+	}
+
+	public readDocument(): unknown {
+		return structuredClone(this.edit.savedDocument);
+	}
+
+	public commitDocument(nextDocument: Readonly<Record<string, unknown>>, expectedDocument: Readonly<Record<string, unknown>>): boolean {
+		if (!sameJson(this.edit.savedDocument, expectedDocument)) {
+			this.failure = "the board changed during the call";
+			return false;
+		}
+		if (!this.edit.save(structuredClone(nextDocument) as Record<string, unknown>)) {
+			this.failure = STALE_BOARD;
+			return false;
+		}
+		this.failure = undefined;
+		return true;
+	}
+
+	public describeLastCommitFailure(): string | undefined {
+		return this.failure;
+	}
 }

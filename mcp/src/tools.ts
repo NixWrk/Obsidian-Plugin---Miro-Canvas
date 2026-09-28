@@ -24,6 +24,12 @@ export interface ToolDefinition {
 	readonly annotations?: Readonly<Record<string, unknown>>;
 	/** Runs with arguments the input schema has accepted; a ToolError is a refusal. */
 	readonly run: (args: Record<string, unknown>) => Record<string, unknown>;
+	/**
+	 * Whether an answer reports a refusal - an edit the board's rules or a
+	 * newer save turned down - which the agent should see as a failed call
+	 * while still reading why.
+	 */
+	readonly failed?: (result: Record<string, unknown>) => boolean;
 }
 
 export interface ToolContext {
@@ -37,14 +43,14 @@ const ITEM_LIMIT_MAX = 2000;
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
-const boardPathSchema = {
+export const boardPathSchema = {
 	type: "string",
 	minLength: 1,
 	description: "The board's path inside the vault, with forward slashes, ending in .canvas.",
 };
 
 /** Warnings every read of a board may carry. */
-function readWarnings(file: BoardFile): { code: string; message: string }[] {
+export function readWarnings(file: BoardFile): { code: string; message: string }[] {
 	const warnings: { code: string; message: string }[] = [];
 	if (file.hasUnsafeIntegers) {
 		warnings.push({

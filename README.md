@@ -330,8 +330,12 @@ plugin reads it and never changes it.
 
 The format is written down as a versioned JSON Schema owned by miro2obsidian;
 this repository keeps a pinned copy in [`schema/v1`](schema/v1) and its tests
-run every example board of it. Agents can read and edit boards safely with
-miro2obsidian's `miro-canvas-format` skill.
+run every example board of it. AI agents read, check and edit boards safely
+with this repository's `miro-canvas-format` skill
+([`.agents/skills/miro-canvas-format`](.agents/skills/miro-canvas-format/SKILL.md))
+and its MCP server ([`mcp/`](mcp/README.md)), which works on the file through
+the plugin's own code: locks hold, `miroSource` stays as it was, and a board
+saved since the agent read it is never written over.
 
 ## Reference
 
@@ -428,10 +432,6 @@ Each item has its number and its details in
   drawings, mind maps (the notes of the Enhancing Mindmap and Markmind
   plugins), Advanced Canvas boards and other local formats brought into Canvas
   with this plugin's look, the original file left untouched.
-- **An MCP server in this repository** (`FUT-007`) - AI agents read, check and
-  edit boards through the same steps the plugin itself takes. The light skill
-  that describes the format and checks it against the schema moves here from
-  miro2obsidian with it.
 - **Obsidian's community catalogue** - once the plugin is listed there,
   updates come through Obsidian itself, without BRAT.
 
@@ -471,6 +471,11 @@ Font packs (see [Fonts](#fonts)) come from a release of this plugin's own
 repository on GitHub. Nothing is downloaded until you press Download in
 Settings → Miro Canvas → Fonts, and removing a pack only deletes files this
 plugin wrote.
+
+The MCP server for AI agents ([`mcp/`](mcp/README.md)) opens no network
+connection at all: it talks to the agent over stdin and stdout and works on
+files in one vault. The plugin never starts it; an agent's MCP client runs it
+when a person has set that up.
 
 ## Installing
 
@@ -514,6 +519,7 @@ npm run build          # production build into the repository root
 npm test               # unit tests
 npm run check          # tsc --noEmit
 npm run schema:check   # the pinned schema copy still matches miro2obsidian
+npm run mcp:build      # the MCP server for agents: mcp/dist/miro-canvas-mcp.mjs
 ```
 
 `tools/obsidian_oracle` holds browser smoke tests against a synthetic Canvas
@@ -552,7 +558,15 @@ This section is written so that a task can be handed to an AI coding agent
 - **Gates** before every commit: `npm run check`, `npm test`,
   `npm run build`, `git diff --check`, and the three smoke suites
   (`python -m tools.obsidian_oracle.smoke_plugin_ui`, with `--interactions`
-  and with `--controls`).
+  and with `--controls`). A change under `mcp/` also runs `npm run mcp:build`.
+- **The MCP server.** `mcp/` holds a server that lets agents read, check and
+  edit boards through the plugin's own code (see [mcp/README.md](mcp/README.md)).
+  Build it with `npm run mcp:build`; run it with
+  `node mcp/dist/miro-canvas-mcp.mjs --vault <absolute vault path> [--read-only]`.
+  `mcp/` may import the plugin's pure modules from `src/` (none that touches
+  Obsidian), never the other way round; it speaks stdio only. To read or edit
+  a board as an agent, use the `miro-canvas-format` skill in
+  [`.agents/skills`](.agents/skills/miro-canvas-format/SKILL.md).
 - **A real Obsidian.** Behaviour a person sees is checked in a real Obsidian
   with real input, not only in tests:
   [`tools/obsidian_cdp`](tools/obsidian_cdp/README.md) starts an isolated

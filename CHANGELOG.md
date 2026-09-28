@@ -14,6 +14,16 @@
   longer runs under the corner dock: until either has been moved, the bar
   goes to the left edge, and when that is still too tight the dock and the
   minimap rise above it. A place you chose yourself is left as it is.
+- AI agents can work with boards without Obsidian open: an MCP server in
+  `mcp/` (`npm run mcp:build`, then run by the agent's MCP client) lists,
+  reads and checks the boards of one vault, and adds cards, items, shapes,
+  lines and comments, moves, restyles, rotates, layers, locks and deletes,
+  through the plugin's own code - locks hold, the Miro import is never
+  touched, and a board saved since the agent read it is never written over.
+  `--read-only` leaves only reading and checking. It opens no network
+  connection, and the plugin never starts it. The `miro-canvas-format` skill
+  that explains the format to agents now lives in this repository
+  (`.agents/skills/`) and points to the server first.
 
 ## 0.1.1 - 2026-09-26
 

@@ -24,6 +24,10 @@ npm run check          # tsc --noEmit
 npm test               # vitest unit tests
 npm run build          # main.js next to manifest.json and styles.css
 npm run schema:check   # schema/v1 still equals miro2obsidian's pinned schema
+npm run mcp:build      # the MCP server: mcp/dist/miro-canvas-mcp.mjs
+
+# Run the MCP server against a vault (agents' MCP clients start it this way)
+node mcp/dist/miro-canvas-mcp.mjs --vault <absolute vault path> [--read-only]
 
 # Browser smoke tests against a synthetic Canvas host (Python + Playwright)
 pip install -r requirements-dev.txt
@@ -60,6 +64,13 @@ python -m pytest -q tools/obsidian_oracle/tests
   a press.
 - **Large boards** (thousands of cards) must stay responsive: no work per card
   per frame, memoize on the board's identity.
+- **The MCP server** (`mcp/`, see [mcp/README.md](mcp/README.md)) is optional:
+  the plugin never starts it and `main.js` holds nothing of it. `mcp/` may
+  import the plugin's pure `src/` modules (none that imports `obsidian`);
+  `src/` never imports `mcp/`. It speaks stdio only - no network module, no
+  listening socket - and every edit goes through the plugin's own writers
+  (CanvasAuthoring, MetadataWriter), never around them. To read or edit a
+  board as an agent, use the `miro-canvas-format` skill in `.agents/skills/`.
 - **Code style.** One statement per line, descriptive names, short comments in
   the board's own words (cards, lines, the board).
 

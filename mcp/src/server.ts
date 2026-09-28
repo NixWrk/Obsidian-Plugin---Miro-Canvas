@@ -1,6 +1,7 @@
 /**
- * miro-canvas MCP server: lets an AI agent read and check miro-canvas boards
- * in one Obsidian vault, through the plugin's own code.
+ * miro-canvas MCP server: lets an AI agent read, check and change
+ * miro-canvas boards in one Obsidian vault, through the plugin's own code.
+ * With --read-only it only reads and checks.
  *
  *   node mcp/dist/miro-canvas-mcp.mjs --vault <absolute path to the vault> [--read-only]
  *
@@ -11,7 +12,7 @@
 
 import packageJson from "../../package.json";
 import { McpServer, serveLines } from "./json-rpc";
-import { createReadTools } from "./tools";
+import { createServerTools } from "./tools-edit";
 import { ToolError, Vault } from "./vault";
 
 const USAGE = "usage: node miro-canvas-mcp.mjs --vault <absolute path to an Obsidian vault> [--read-only]";
@@ -56,14 +57,19 @@ async function main(): Promise<void> {
 		process.exitCode = 2;
 		return;
 	}
-	// Only reading tools exist so far; --read-only is accepted for the edit tools to come.
+	// With --read-only the tools that change boards do not exist at all.
+	const tools = createServerTools({ vault, readOnly: settings.readOnly });
+	const editing = settings.readOnly
+		? ""
+		: " Change one with the edit tools, handing back the revision read_board gave as expectedRevision: a board saved "
+			+ "since is refused (stale-board) instead of written over. dryRun checks a change without writing it.";
 	const server = new McpServer({
 		name: "miro-canvas",
 		version: packageJson.version,
-		tools: createReadTools({ vault }),
+		tools,
 		instructions: "Boards are .canvas files in the vault, named by their path inside it. Read one with read_board "
-			+ "(summary first, then items in pages) and check one with validate_board. miroSource is the Miro import: "
-			+ "evidence, never to be changed.",
+			+ "(summary first, then items in pages) and check one with validate_board." + editing + " miroSource is the Miro "
+			+ "import: evidence, never to be changed.",
 	});
 	process.stderr.write(`miro-canvas-mcp ${packageJson.version}: vault ${vault.realRoot}${settings.readOnly ? " (read-only)" : ""}\n`);
 	await serveLines(server, process.stdin, process.stdout);

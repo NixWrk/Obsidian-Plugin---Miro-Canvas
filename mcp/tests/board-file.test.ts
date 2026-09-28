@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { hasUnsafeIntegers, readBoardFile, revisionOf } from "../src/board-file";
+import { BoardEdit, FileCanvasRuntime, FileMetadataStore, hasUnsafeIntegers, readBoardFile, revisionOf } from "../src/board-file";
 import { ToolError, Vault } from "../src/vault";
 import { makeFixtureVault, makeVault, removeVaults } from "./helpers";
 
@@ -68,6 +68,61 @@ describe("readBoardFile", () => {
 		const before = readdirSync(path.join(root, "boards")).sort();
 		readBoardFile(Vault.open(root), "boards/converter-board.canvas");
 		expect(readdirSync(path.join(root, "boards")).sort()).toEqual(before);
+	});
+});
+
+describe("editing a board file", () => {
+	it("accepts a save from the Canvas runtime while the file is unchanged, and writes once", () => {
+		const root = makeFixtureVault();
+		const vault = Vault.open(root);
+		const file = readBoardFile(vault, "boards/native-board.canvas");
+		const edit = new BoardEdit(vault, file);
+		const runtime = new FileCanvasRuntime(edit);
+		const next = { ...runtime.getData(), nodes: [] };
+		runtime.importData(next, true);
+		expect(runtime.requestSave(true)).toBe(true);
+		expect(readBoardFile(vault, "boards/native-board.canvas").revision).toBe(file.revision);
+		const written = edit.write();
+		expect(written.written).toBe(true);
+		expect(readFileSync(path.join(root, "boards", "native-board.canvas"), "utf8")).toBe(JSON.stringify(next, null, "\t"));
+		expect(written.revision).toBe(readBoardFile(vault, "boards/native-board.canvas").revision);
+	});
+
+	it("refuses a runtime save and a metadata commit once the file changed", () => {
+		const root = makeFixtureVault();
+		const vault = Vault.open(root);
+		const file = readBoardFile(vault, "boards/native-board.canvas");
+		const edit = new BoardEdit(vault, file);
+		const runtime = new FileCanvasRuntime(edit);
+		const store = new FileMetadataStore(edit);
+		writeFileSync(path.join(root, "boards", "native-board.canvas"), "{\"nodes\":[],\"edges\":[]}");
+		runtime.importData({ nodes: [], edges: [] }, true);
+		expect(runtime.requestSave(true)).toBe(false);
+		const current = store.readDocument() as Record<string, unknown>;
+		expect(store.commitDocument({ ...current, miroCanvas: { schemaVersion: 1 } }, current)).toBe(false);
+		expect(store.describeLastCommitFailure()).toBe("stale-board");
+		expect(edit.staleDetected).toBe(true);
+		expect(edit.changed).toBe(false);
+	});
+
+	it("refuses a metadata commit made against another document", () => {
+		const root = makeFixtureVault();
+		const vault = Vault.open(root);
+		const store = new FileMetadataStore(new BoardEdit(vault, readBoardFile(vault, "boards/native-board.canvas")));
+		expect(store.commitDocument({ nodes: [], edges: [] }, { nodes: [{ id: "other" }], edges: [] })).toBe(false);
+	});
+
+	it("leaves no temporary file when the write is refused", () => {
+		const root = makeFixtureVault();
+		const vault = Vault.open(root);
+		const target = path.join(root, "boards", "native-board.canvas");
+		const edit = new BoardEdit(vault, readBoardFile(vault, "boards/native-board.canvas"), {
+			beforeWrite: () => writeFileSync(target, "{}"),
+		});
+		expect(edit.save({ nodes: [], edges: [] })).toBe(true);
+		expect(refusal(() => edit.write())).toBe("stale-board");
+		expect(readFileSync(target, "utf8")).toBe("{}");
+		expect(readdirSync(path.join(root, "boards")).filter((name) => name.endsWith(".mcp-tmp"))).toEqual([]);
 	});
 });
 
