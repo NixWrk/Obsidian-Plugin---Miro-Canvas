@@ -8,6 +8,7 @@ import { assertImportedBoard, idFactory } from "../src/importers/board-builder";
 import { convertExcalidraw, detectExcalidraw, excalidrawAdapter } from "../src/importers/excalidraw";
 import { ImportError, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
 import { validateMiroCanvasMetadata } from "../src/metadata";
+import { CONNECTOR_CAPS } from "../src/source-model";
 import { compressToBase64 } from "./helpers/lz-string-compress";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "import", "excalidraw");
@@ -212,7 +213,7 @@ describe("excalidraw importer: the scene fixture", () => {
 		const elementEntries = [...elementIds].filter((id) => !onceKinds.includes(id));
 		const live = sceneElements().filter((element) => element === null || element.isDeleted !== true);
 		expect(report.counts.converted + elementEntries.length).toBe(live.length);
-		expect(report.counts).toEqual({ converted: 16, approximated: 6, notImported: 14, skipped: 2 });
+		expect(report.counts).toEqual({ converted: 16, approximated: 7, notImported: 14, skipped: 2 });
 	});
 
 	it("reports what the board cannot draw once per kind", () => {
@@ -250,7 +251,7 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(box.text).toBe("Start\n\n[https://example.com/spec](https://example.com/spec)");
 		expect(board.override("box")).toMatchObject({
 			shape: { kind: "round_rectangle", fallback: "text" },
-			colors: { fill: "#a5d8ff", border: "#1e1e1e", text: "#1971c2" },
+			colors: { fill: "#a5d8ff", text: "#1971c2" },
 			borderStyle: "dashed",
 			borderWidth: 2,
 			typography: { fontSize: 20, fontFamily: "Excalifont", alignment: "center", verticalAlign: "center" },
@@ -262,13 +263,22 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(board.override("plain")).toMatchObject({ shape: { kind: "rectangle" }, colors: { fill: null }, borderStyle: "none" });
 	});
 
+	it("leaves Excalidraw's default ink to the board, so text and outlines read on a dark board too", () => {
+		// The box's outline and the zigzag line are drawn in Excalidraw's default #1e1e1e.
+		expect((board.override("box").colors as Record<string, unknown>).border).toBeUndefined();
+		expect(board.connectors[board.idOf("zigzag")]!.color).toBe("#7f7f7f");
+		// A colour of its own is kept.
+		expect((board.override("choice").colors as Record<string, unknown>).border).toBe("#e03131");
+		expect(board.override("a-both").colors).toEqual({ edge: "#1971c2" });
+	});
+
 	it("keeps a shape's turn as the card's rotation, about the same centre", () => {
 		const oval = board.node("oval");
 		expect(oval).toMatchObject({ x: 400, y: 0, width: 200, height: 100 });
 		expect(board.override("oval")).toMatchObject({
 			shape: { kind: "ellipse" },
 			rotation: 30,
-			colors: { fill: "#ffc9c9", border: "#1e1e1e" },
+			colors: { fill: "#ffc9c9" },
 			borderStyle: "dotted",
 		});
 		expect(board.override("note").rotation).toBe(90);
@@ -317,8 +327,10 @@ describe("excalidraw importer: the scene fixture", () => {
 		});
 		expect(override.connector).toMatchObject({
 			route: "curved",
-			startCap: "filled_circle",
+			startCap: "filled_oval",
 			endCap: "filled_triangle",
+			// Excalidraw draws a dot and a triangle 15 units long, whatever the line's width.
+			headSize: 15,
 			width: 2,
 			strokeStyle: "solid",
 			waypoints: [{ x: 300, y: 30 }],
@@ -347,7 +359,7 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(connector.to).toEqual({ type: "free", x: 850, y: 50 });
 		expect(connector.route).toBe("straight");
 		expect(connector.waypoints).toEqual([]);
-		expect(connector.startCap).toBe("circle");
+		expect(connector.startCap).toBe("oval");
 		expect(connector.endCap).toBe("triangle");
 	});
 
@@ -361,13 +373,21 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(plain.toEnd).toBeUndefined();
 		expect((board.override("a-plain").connector as Record<string, unknown>).endCap).toBe("arrow");
 		const odd = board.connectors[board.idOf("a-odd")]!;
-		expect([odd.startCap, odd.endCap]).toEqual(["filled_circle", "arrow"]);
+		expect([odd.startCap, odd.endCap]).toEqual(["filled_oval", "arrow"]);
 		expect(board.entries("a-odd")).toEqual([
 			{ sourceId: "a-odd", sourceType: "arrow", status: "approximated", reason: "arrowhead" },
-			{ sourceId: "a-odd", sourceType: "arrow", status: "plugin-unsupported", reason: "elementLink" },
+			{ sourceId: "a-odd", sourceType: "arrow", status: "plugin-unsupported", reason: "elementLinkDropped" },
 		]);
 		// Its start was bound to a deleted shape: it stays where it was.
 		expect(odd.from).toEqual({ type: "free", x: 1000, y: 300 });
+	});
+
+	it("gives native edges only ends a native edge draws", () => {
+		for (const edge of board.edges) {
+			const connector = board.overrides[edge.id]?.connector as Record<string, unknown>;
+			expect(CONNECTOR_CAPS as readonly unknown[], edge.id).toContain(connector.startCap);
+			expect(CONNECTOR_CAPS as readonly unknown[], edge.id).toContain(connector.endCap);
+		}
 	});
 
 	it("holds an arrow on a placeholder and on a file card", () => {
@@ -398,6 +418,17 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(connector.startCap).toBe("none");
 		expect(connector.endCap).toBe("none");
 		expect(connector.strokeStyle).toBe("dashed");
+		// An open line is never filled by Excalidraw, whatever its fill says.
+		expect(board.entries("zigzag")).toEqual([]);
+	});
+
+	it("reports the fill of a closed line, which the board does not draw", () => {
+		const closed = board.connectors[board.idOf("closed-fill")]!;
+		expect(closed.from).toEqual({ type: "free", x: 300, y: 800 });
+		expect(closed.to).toEqual({ type: "free", x: 302, y: 803 });
+		expect(board.entries("closed-fill")).toEqual([
+			{ sourceId: "closed-fill", sourceType: "line", status: "approximated", reason: "lineFill" },
+		]);
 	});
 
 	it("makes pen strokes drawings whose points carry the turn", () => {
@@ -439,7 +470,7 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(board.node("picture-data")).toMatchObject({ x: 0, y: 500, width: 300, height: 160 });
 		expect(board.override("picture-data").borderStyle).toBe("dashed");
 		expect(board.entries("picture-lost")[0]).toMatchObject({ status: "missing-asset", reason: "imageNotFound" });
-		expect(board.entries("note-missing")[0]).toMatchObject({ status: "missing-asset", reason: "imageNotFound" });
+		expect(board.entries("note-missing")[0]).toMatchObject({ status: "missing-asset", reason: "fileNotFound" });
 		expect(board.entries("iframe-1")[0]).toMatchObject({ sourceType: "iframe", status: "unsupported", reason: "iframe" });
 		expect(board.entries("sticker")[0]).toMatchObject({ sourceType: "sticker", status: "unsupported", reason: "unknownElement" });
 	});
@@ -508,9 +539,92 @@ describe("excalidraw importer: the plugin's notes", () => {
 		expect(JSON.stringify(fromCompressed)).toBe(JSON.stringify(fromPlain));
 	});
 
+	it("calls a missing embedded note a missing note, and a missing picture a missing picture", () => {
+		const picture = { id: "shown-note", type: "image", x: 0, y: 0, width: 200, height: 100, fileId: "f-note" };
+		const photo = { id: "shown-photo", type: "image", x: 300, y: 0, width: 200, height: 100, fileId: "f-photo" };
+		const text = [
+			"---",
+			"excalidraw-plugin: parsed",
+			"---",
+			"# Excalidraw Data",
+			"## Embedded Files",
+			"f-note: [[Notes/Gone]]",
+			"",
+			"f-photo: [[Attachments/gone.png]]",
+			"",
+			"%%",
+			"## Drawing",
+			"```json",
+			JSON.stringify({ type: "excalidraw", version: 2, elements: [picture, photo], appState: {}, files: {} }),
+			"```",
+			"%%",
+		].join("\n");
+		const source: ImportSource = { path: "Drawings/Missing.excalidraw.md", extension: "md", text, frontmatter: { "excalidraw-plugin": "parsed" } };
+		const board = new Board(convertExcalidraw(source, { ...context(), resolveLink: () => undefined }));
+		expect(board.entries("shown-note")[0]).toMatchObject({ status: "missing-asset", reason: "fileNotFound" });
+		expect(board.entries("shown-photo")[0]).toMatchObject({ status: "missing-asset", reason: "imageNotFound" });
+	});
+
+	it("imports a drawing the Excalidraw plugin itself saved, compressed", () => {
+		// Drawn in Excalidraw 2.24.1 in Obsidian and saved as it saves every drawing.
+		const board = new Board(convertExcalidraw(noteSource("real-compressed.excalidraw.md"), context()));
+		const document = board.result.document;
+		expect(() => assertImportedBoard(document)).not.toThrow();
+		expect(validateMiroCanvasMetadata(document.miroCanvas).diagnostics).toEqual([]);
+		expect(board.result.report.formatVersion).toBe("2");
+		expect(board.result.report.counts).toEqual({ converted: 8, approximated: 0, notImported: 1, skipped: 0 });
+		expect(board.result.report.entries.map((entry) => entry.sourceId)).toEqual(["roughness"]);
+
+		expect(board.node("9gViyYN8")).toMatchObject({ type: "text", text: "Start", x: -512, y: -239, width: 200, height: 110 });
+		expect(board.override("9gViyYN8").shape).toEqual({ kind: "round_rectangle", fallback: "text" });
+		expect(board.node("HVJEafEp").text).toBe("Goal");
+		expect(board.override("HVJEafEp").shape).toEqual({ kind: "ellipse", fallback: "text" });
+		expect(board.override("DHxUxsiB")).toMatchObject({ shape: { kind: "diamond" }, colors: { fill: "#ffec99" } });
+		expect(board.node("TGVDtk0t").text).toBe("Simple test drawing");
+		expect(board.override("TGVDtk0t")).toMatchObject({ item: { type: "text" }, colors: { text: "#1971c2" } });
+
+		// The arrow drawn from one shape to the other holds on to both, its head as large as Excalidraw drew it.
+		const arrow = board.edge("fJB2wi5x");
+		expect(arrow).toMatchObject({ fromNode: board.idOf("9gViyYN8"), toNode: board.idOf("HVJEafEp"), fromSide: "right", toSide: "left" });
+		expect(board.override("fJB2wi5x").connector).toMatchObject({ startCap: "none", endCap: "arrow", headSize: 25 });
+
+		// The pen stroke drawn with the mouse.
+		const strokes = Object.values(board.overrides).filter((override) => (override.item as { type?: string } | undefined)?.type === "drawing");
+		expect(strokes).toHaveLength(1);
+	});
+
 	it("imports the compressed fixture the plugin would write", () => {
 		const result = convertExcalidraw(noteSource("plugin-compressed.excalidraw.md"), context());
 		expect(() => assertImportedBoard(result.document)).not.toThrow();
 		expect((result.document.nodes as unknown[]).length).toBeGreaterThan(0);
+	});
+});
+
+describe("excalidraw importer: fills the board does not draw", () => {
+	function plainScene(elements: readonly Record<string, unknown>[]): ImportSource {
+		const text = JSON.stringify({ type: "excalidraw", version: 2, elements, appState: {}, files: {} });
+		return { path: "Drawings/fills.excalidraw", extension: "excalidraw", text };
+	}
+
+	function course(id: string, type: string, points: readonly (readonly [number, number])[], extra: Record<string, unknown> = {}): Record<string, unknown> {
+		return { id, type, x: 0, y: 0, width: 100, height: 100, strokeColor: "#1e1e1e", backgroundColor: "#ffec99", fillStyle: "solid", points, ...extra };
+	}
+
+	it("reports the fill of a line marked a polygon, and of a pen stroke that closes on itself", () => {
+		const board = new Board(convertExcalidraw(plainScene([
+			course("polygon", "line", [[0, 0], [100, 0], [50, 80]], { polygon: true }),
+			course("loop", "freedraw", [[0, 0], [60, 10], [30, 70], [1, 2]]),
+			course("open", "freedraw", [[0, 0], [60, 10], [30, 70]]),
+			course("unfilled", "line", [[0, 0], [100, 0], [50, 80], [0, 0]], { backgroundColor: "transparent" }),
+			course("two-points", "line", [[0, 0], [0, 0]]),
+		]), context()));
+		expect(board.entries("polygon")).toEqual([{ sourceId: "polygon", sourceType: "line", status: "approximated", reason: "lineFill" }]);
+		expect(board.entries("loop")).toEqual([
+			{ sourceId: "loop", sourceType: "freedraw", status: "approximated", reason: "lineFill", nodeId: board.idOf("loop") },
+		]);
+		expect(board.entries("open")).toEqual([]);
+		expect(board.entries("unfilled")).toEqual([]);
+		expect(board.entries("two-points")).toEqual([]);
+		expect(board.result.report.counts).toMatchObject({ converted: 3, approximated: 2 });
 	});
 });

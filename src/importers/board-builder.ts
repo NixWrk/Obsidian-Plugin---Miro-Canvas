@@ -24,7 +24,7 @@ import { fitsNativeEdge, nativeEdgeOf, readBoardConnector, type BoardConnector }
 import type { CanvasShapeDescriptor } from "../canvas-authoring";
 import { words } from "../i18n";
 import { readLocalItem, type LocalItem, type LocalStroke } from "../local-items";
-import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata } from "../metadata";
+import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata, type MiroCanvasDiagnostic } from "../metadata";
 import {
 	MAX_IMPORT_ENTRIES,
 	type ImportContext,
@@ -393,6 +393,36 @@ export function assertImportedBoard(document: Record<string, unknown>): void {
 	}
 }
 
+function diagnosticKey(diagnostic: MiroCanvasDiagnostic): string {
+	return `${diagnostic.severity} ${diagnostic.code} ${diagnostic.path}`;
+}
+
+/**
+ * The check for a board whose plugin data came with it (a copied Advanced
+ * Canvas board): the board must open as `assertImportedBoard` asks, and the
+ * metadata validator may say nothing of its `miroCanvas` that it did not
+ * already say of the data the board came with (`before`).  Warnings about
+ * fields a newer version wrote, or data the plugin cannot read at all, stay
+ * the board's own; the importer only must not add to them.
+ */
+export function assertNothingNewToSay(document: Record<string, unknown>, before: readonly MiroCanvasDiagnostic[]): void {
+	assertImportedBoard({ ...document, miroCanvas: undefined });
+	if (document.miroCanvas === undefined) return;
+	const known = new Set(before.map(diagnosticKey));
+	const after = validateMiroCanvasMetadata(document.miroCanvas).diagnostics;
+	const added = after.filter((diagnostic) => !known.has(diagnosticKey(diagnostic)));
+	if (added.length > 0) {
+		const messages = added.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
+		throw new Error(`import: the board's metadata gained complaints (${messages})`);
+	}
+}
+
+/** What the plugin's validator says of a board's `miroCanvas` as it is; nothing when there is none. */
+export function metadataDiagnostics(document: Record<string, unknown>): readonly MiroCanvasDiagnostic[] {
+	if (document.miroCanvas === undefined) return [];
+	return validateMiroCanvasMetadata(document.miroCanvas).diagnostics;
+}
+
 /** The format's name in the person's language. */
 export function importFormatName(format: ImportFormat): string {
 	const formats = words().importer.formats;
@@ -524,9 +554,36 @@ function boardBounds(nodes: readonly unknown[]): BoardRect | undefined {
 }
 
 /**
+ * The board's plugin data with the report card's binding added, or
+ * undefined when the binding cannot be added without touching data that is
+ * not the importer's to change: plugin data that is not an object at all,
+ * or that the plugin does not read (a newer schema, a broken bindings
+ * record).  A board without plugin data gets a new record.
+ */
+function metadataWithReportBinding(document: Record<string, unknown>, binding: { sourceId: string; role: string }, id: string): Record<string, unknown> | undefined {
+	if (document.miroCanvas === undefined) {
+		return { schemaVersion: MIRO_CANVAS_SCHEMA_VERSION, bindings: { [id]: binding } };
+	}
+	const metadata = document.miroCanvas;
+	if (!isRecord(metadata)) return undefined;
+	if (!validateMiroCanvasMetadata(metadata).valid) return undefined;
+	if (metadata.bindings !== undefined && !isRecord(metadata.bindings)) return undefined;
+	const bindings = isRecord(metadata.bindings) ? metadata.bindings : {};
+	return { ...metadata, bindings: { ...bindings, [id]: binding } };
+}
+
+/**
  * The same board with a report card to the right of everything imported: a
  * native text card with `reportCardMarkdown`, bound to the source file as
  * the import's report.  The result it is given is left as it was.
+ *
+ * A copied board may bring plugin data of its own that the plugin's
+ * validator already has something to say about; the card is still added,
+ * and the check is only that the card gave the validator nothing new to
+ * say.  Where the board's plugin data is not the importer's to write to (not
+ * an object, or not read by the plugin), that data is kept exactly as it was
+ * and the card goes on the board without its binding - its own text still
+ * names the source.
  */
 export function addReportCard(result: ImportResult, newId: () => string): ImportResult {
 	const nodes = Array.isArray(result.document.nodes) ? result.document.nodes : [];
@@ -543,16 +600,14 @@ export function addReportCard(result: ImportResult, newId: () => string): Import
 		width: REPORT_CARD_WIDTH,
 		height: clamp(lineCount * REPORT_LINE_HEIGHT + 48, REPORT_CARD_MIN_HEIGHT, REPORT_CARD_MAX_HEIGHT),
 	};
-	const metadata = isRecord(result.document.miroCanvas) ? result.document.miroCanvas : { schemaVersion: MIRO_CANVAS_SCHEMA_VERSION };
-	const bindings = isRecord(metadata.bindings) ? metadata.bindings : {};
+	const before = metadataDiagnostics(result.document);
+	const binding = { sourceId: `import:${result.report.sourcePath}`, role: "import-report" };
+	const metadata = metadataWithReportBinding(result.document, binding, id);
 	const document: Record<string, unknown> = {
 		...result.document,
 		nodes: [...nodes, card],
-		miroCanvas: {
-			...metadata,
-			bindings: { ...bindings, [id]: { sourceId: `import:${result.report.sourcePath}`, role: "import-report" } },
-		},
+		...(metadata === undefined ? {} : { miroCanvas: metadata }),
 	};
-	assertImportedBoard(document);
+	assertNothingNewToSay(document, before);
 	return { document, report: { ...result.report, reportNodeId: id } };
 }

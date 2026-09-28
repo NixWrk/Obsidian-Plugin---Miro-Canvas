@@ -8,8 +8,10 @@ import {
 	REPORT_CARD_MAX_ROWS,
 	addReportCard,
 	assertImportedBoard,
+	assertNothingNewToSay,
 	idFactory,
 	importFormatLabel,
+	metadataDiagnostics,
 	reportCardMarkdown,
 } from "../src/importers/board-builder";
 import { IMPORT_ADAPTERS, findAdapter, mayImport } from "../src/importers/registry";
@@ -275,6 +277,26 @@ describe("assertImportedBoard", () => {
 	it("leaves miroSource and fields it does not know alone", () => {
 		const document = { nodes: [node("a")], edges: [], miroSource: { anything: [1, 2] }, foo: "bar" };
 		expect(() => assertImportedBoard(document)).not.toThrow();
+	});
+});
+
+describe("assertNothingNewToSay", () => {
+	const node = (id: string): Record<string, unknown> => ({ id, type: "text", text: "", x: 0, y: 0, width: 10, height: 10 });
+	const warned = { schemaVersion: 1, futureField: true };
+
+	it("lets a board keep what the validator already said of its own data", () => {
+		const document = { nodes: [node("a")], edges: [], miroCanvas: warned };
+		const before = metadataDiagnostics(document);
+		expect(before.length).toBeGreaterThan(0);
+		expect(() => assertNothingNewToSay(document, before)).not.toThrow();
+	});
+
+	it("refuses anything new for the validator, and a board that would not open", () => {
+		const before = metadataDiagnostics({ miroCanvas: warned });
+		const worse = { nodes: [node("a")], edges: [], miroCanvas: { ...warned, bindings: { a: { sourceId: "x", role: "y", extra: true } } } };
+		expect(() => assertNothingNewToSay(worse, before)).toThrow(/gained complaints/u);
+		const broken = { nodes: [node("a")], edges: [{ id: "e", fromNode: "a", toNode: "b" }], miroCanvas: warned };
+		expect(() => assertNothingNewToSay(broken, before)).toThrow(/ends at no node/u);
 	});
 });
 

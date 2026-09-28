@@ -354,3 +354,50 @@ describe("a board that already has plugin data the plugin complains about", () =
 		expect(whyOf(entriesFor(result, "miroCanvas"))).toEqual(["invalid-source:unreadableData"]);
 	});
 });
+
+describe("the report card on a board whose plugin data came with it", () => {
+	function reportCardOf(result: ImportResult): UnknownRecord {
+		const nodes = records(result.document.nodes);
+		const card = nodes[nodes.length - 1]!;
+		expect(card.id).toBe(result.report.reportNodeId);
+		return card;
+	}
+
+	it("goes on a board whose plugin data a newer version wrote, bound, with nothing new for the validator", () => {
+		const input = JSON.parse(STYLED) as UnknownRecord;
+		(input.miroCanvas as UnknownRecord).futureField = { from: "a newer version" };
+		const result = convert(board(input));
+		const before = validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics;
+		expect(before.length).toBeGreaterThan(0);
+
+		const withCard = addReportCard(result, idFactory(99));
+		const card = reportCardOf(withCard);
+		const metadata = metadataOf(withCard);
+		expect(metadata.futureField).toEqual({ from: "a newer version" });
+		expect((metadata.bindings as UnknownRecord)[card.id as string]).toEqual({ sourceId: "import:Boards/Styled.canvas", role: "import-report" });
+		expect(validateMiroCanvasMetadata(withCard.document.miroCanvas).diagnostics).toEqual(before);
+	});
+
+	it("goes on a board whose plugin data the plugin cannot read, which is kept exactly as it was", () => {
+		const input = JSON.parse(STYLED) as UnknownRecord;
+		(input.miroCanvas as UnknownRecord).schemaVersion = 2;
+		const own = structuredClone(input.miroCanvas);
+		const result = convert(board(input));
+
+		const withCard = addReportCard(result, idFactory(99));
+		reportCardOf(withCard);
+		expect(withCard.document.miroCanvas).toEqual(own);
+	});
+
+	it("goes on a board whose plugin data is not an object, which is kept, not replaced", () => {
+		const input = JSON.parse(STYLED) as UnknownRecord;
+		input.miroCanvas = "not plugin data";
+		const result = convert(board(input));
+
+		const withCard = addReportCard(result, idFactory(99));
+		const card = reportCardOf(withCard);
+		expect(withCard.document.miroCanvas).toBe("not plugin data");
+		expect(card.text).toContain("[[Boards/Styled.canvas]]");
+		expect(records(withCard.document.nodes)).toHaveLength(records(result.document.nodes).length + 1);
+	});
+});

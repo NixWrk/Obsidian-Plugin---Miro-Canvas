@@ -183,7 +183,8 @@ export async function importIntoBoard(host: ImportHost, file: TFile): Promise<TF
 /** One row of the preview's short table: what, its id, and why. */
 function appendEntryRow(body: HTMLElement, cells: readonly string[], tag: "td" | "th"): void {
 	const row = body.createEl("tr");
-	for (const cell of cells) row.createEl(tag, { text: cell });
+	// A long id is cut short in its cell; hovering it shows it whole.
+	for (const cell of cells) row.createEl(tag, { text: cell, attr: { title: cell } });
 }
 
 /**
@@ -200,27 +201,31 @@ export function showImportPreview(modal: Modal, preview: ImportPreview): Promise
 		modal.modalEl.classList.add("miro-canvas-import-preview-modal");
 		modal.setTitle(strings.previewTitle);
 		const content = modal.contentEl;
-		content.createEl("p", { text: strings.formatLine(preview.formatLabel) });
-		content.createEl("p", { text: strings.targetLine(preview.targetPath) });
-		content.createEl("p", { text: strings.countsLine(counts.converted, counts.approximated, counts.notImported) });
-		if (counts.skipped > 0) content.createEl("p", { text: strings.skippedLine(counts.skipped) });
+		content.classList.add("miro-canvas-import-preview");
+		const summary = content.createDiv({ cls: "miro-canvas-import-preview__summary" });
+		summary.createEl("p", { text: strings.formatLine(preview.formatLabel) });
+		summary.createEl("p", { text: strings.targetLine(preview.targetPath) });
+		summary.createEl("p", { text: strings.countsLine(counts.converted, counts.approximated, counts.notImported) });
+		if (counts.skipped > 0) summary.createEl("p", { text: strings.skippedLine(counts.skipped) });
 
 		// The first entries, so a person sees what will not look the same
-		// before anything is written; the report card has them all.
+		// before anything is written; the report card has them all.  The
+		// table scrolls on its own, so Create stays in view.
 		const listed = preview.report.entries.filter((entry) => entry.status !== "skipped");
 		if (listed.length > 0) {
 			content.createEl("h4", { text: strings.entriesHeading });
-			const table = content.createEl("table", { cls: "miro-canvas-import-preview__entries" });
+			const scroller = content.createDiv({ cls: "miro-canvas-import-preview__entries-scroll" });
+			const table = scroller.createEl("table", { cls: "miro-canvas-import-preview__entries" });
 			appendEntryRow(table.createEl("thead"), [reportWords.what, reportWords.id, reportWords.why], "th");
 			const body = table.createEl("tbody");
 			for (const entry of listed.slice(0, PREVIEW_ENTRIES)) {
 				appendEntryRow(body, [entry.sourceType, entry.sourceId, importEntryWhy(entry)], "td");
 			}
 			const more = counts.approximated + counts.notImported - Math.min(listed.length, PREVIEW_ENTRIES);
-			if (more > 0) content.createEl("p", { text: reportWords.more(more) });
+			if (more > 0) content.createEl("p", { text: reportWords.more(more), cls: "miro-canvas-import-preview__more" });
 		}
 
-		content.createEl("p", { text: strings.originalUnchanged });
+		content.createEl("p", { text: strings.originalUnchanged, cls: "miro-canvas-import-preview__note" });
 		const label = content.createEl("label", { cls: "miro-canvas-import-preview__report-card" });
 		const checkbox = label.createEl("input", { type: "checkbox" });
 		checkbox.checked = true;

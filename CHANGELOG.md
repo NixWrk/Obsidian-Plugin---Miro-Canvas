@@ -10,6 +10,14 @@
   moves to each and outlines it, Escape closes the bar. In a card being
   written Ctrl+F still searches that card; a setting turns the board's
   Ctrl+F off.
+- Import into a board: Excalidraw drawings (`.excalidraw` and the
+  Excalidraw plugin's `.excalidraw.md`, compressed or not), mind-map notes
+  (Enhancing Mindmap, Markmind's outline mode) and Advanced Canvas boards
+  become new boards, from a file's menu or the command palette. A preview
+  shows what was found and how much comes over; the board is one new file
+  next to the original, which is never changed. Every element comes over or
+  is listed on an optional import report card, and a picture or embed that
+  cannot come over leaves a dashed placeholder where it was.
 - On a narrow board - a small window or an open sidebar - the bottom bar no
   longer runs under the corner dock: until either has been moved, the bar
   goes to the left edge, and when that is still too tight the dock and the

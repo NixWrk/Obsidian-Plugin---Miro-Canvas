@@ -340,18 +340,22 @@ describe("mind map outline: the board", () => {
 		expect(entries).toEqual(expect.arrayContaining([
 			{ sourceId: "line:8", sourceType: "text", status: "approximated", reason: "textBeforeRoot" },
 			{ sourceId: "line:40", sourceType: "heading", status: "approximated", reason: "extraRoots" },
-			{ sourceId: "line:16", sourceType: "list item", status: "approximated", reason: "collapsed" },
-			{ sourceId: "line:23", sourceType: "list item", status: "approximated", reason: "collapsed" },
+			{ sourceId: "line:16", sourceType: "list item", status: "approximated", reason: "foldedBranch" },
+			{ sourceId: "line:23", sourceType: "list item", status: "approximated", reason: "foldedBranch" },
 			{ sourceId: "line:3", sourceType: "property display-mode", status: "plugin-unsupported", reason: "frontmatter" },
 			{ sourceId: "line:4", sourceType: "property tags", status: "plugin-unsupported", reason: "frontmatter" },
-			{ sourceId: "layout", sourceType: "mind map", status: "source-limited", reason: "layout" },
+			{ sourceId: "layout", sourceType: "mind map", status: "approximated", reason: "layout" },
 		]));
 		expect(entries).toHaveLength(7);
 		for (const entry of result.report.entries) {
-			if (entry.status === "approximated") expect(nodesOf(result).some((node) => node.id === entry.nodeId)).toBe(true);
+			// The layout entry is about the whole map, not one card.
+			if (entry.status === "approximated" && entry.sourceId !== "layout") {
+				expect(nodesOf(result).some((node) => node.id === entry.nodeId)).toBe(true);
+			}
 		}
 		const cards = nodesOf(result).length;
-		expect(result.report.counts).toEqual({ converted: cards - 4, approximated: 4, notImported: 3, skipped: 0 });
+		// The whole map came over: only the note's properties are not imported.
+		expect(result.report.counts).toEqual({ converted: cards - 4, approximated: 5, notImported: 2, skipped: 0 });
 	});
 
 	it("builds the same board every time from the same seed", () => {

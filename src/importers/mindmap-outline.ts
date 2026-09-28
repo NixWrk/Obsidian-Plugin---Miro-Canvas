@@ -535,7 +535,7 @@ function convertOutline(source: ImportSource, context: ImportContext): ImportRes
 				builder.note({ sourceId, sourceType: card.node.kind, status: "approximated", reason: "extraRoots", nodeId: id });
 			}
 			if (card.node.folded) {
-				builder.note({ sourceId, sourceType: card.node.kind, status: "approximated", reason: "collapsed", nodeId: id });
+				builder.note({ sourceId, sourceType: card.node.kind, status: "approximated", reason: "foldedBranch", nodeId: id });
 			}
 		}
 		// Each branch: a curved line from the parent's right side to the child's left, with no arrowhead.
@@ -558,8 +558,10 @@ function convertOutline(source: ImportSource, context: ImportContext): ImportRes
 		builder.note({ sourceId: `line:${property.line}`, sourceType: `property ${property.key}`, status: "plugin-unsupported", reason: "frontmatter" });
 	}
 	// The note keeps no places, so every card's place was worked out here.
+	// The whole map came over and only where its cards stand is new, so the
+	// map counts as approximated, not as something left out.
 	if (outline.roots.length > 0) {
-		builder.note({ sourceId: "layout", sourceType: "mind map", status: "source-limited", reason: "layout" });
+		builder.note({ sourceId: "layout", sourceType: "mind map", status: "approximated", reason: "layout" });
 	}
 
 	return builder.finish({ sourcePath: source.path, formatVersion: OUTLINE_FORMAT });

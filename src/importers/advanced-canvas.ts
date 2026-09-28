@@ -24,7 +24,7 @@
 
 import type { CanvasShapeKind } from "../canvas-authoring";
 import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata, type MiroCanvasDiagnostic } from "../metadata";
-import { BoardBuilder, assertImportedBoard } from "./board-builder";
+import { BoardBuilder, assertNothingNewToSay } from "./board-builder";
 import {
 	ImportError,
 	type FormatAdapter,
@@ -185,10 +185,6 @@ function readPluginData(document: UnknownRecord): PluginData {
 		writable: validated.valid && isRecord(own),
 		diagnostics: validated.diagnostics,
 	};
-}
-
-function diagnosticKey(diagnostic: MiroCanvasDiagnostic): string {
-	return `${diagnostic.severity} ${diagnostic.code} ${diagnostic.path}`;
 }
 
 /**
@@ -594,18 +590,7 @@ class AdvancedCanvasCopy {
 	 * them, must not fail them in any new way.
 	 */
 	private check(): void {
-		if (this.plugin.diagnostics.length === 0) {
-			assertImportedBoard(this.document);
-			return;
-		}
-		assertImportedBoard({ ...this.document, miroCanvas: undefined });
-		const before = new Set(this.plugin.diagnostics.map(diagnosticKey));
-		const after = validateMiroCanvasMetadata(this.document.miroCanvas).diagnostics;
-		const added = after.filter((diagnostic) => !before.has(diagnosticKey(diagnostic)));
-		if (added.length > 0) {
-			const messages = added.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
-			throw new Error(`import: the copy's metadata gained complaints (${messages})`);
-		}
+		assertNothingNewToSay(this.document, this.plugin.diagnostics);
 	}
 }
 

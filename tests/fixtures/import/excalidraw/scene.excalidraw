@@ -776,6 +776,58 @@
 			"elbowed": false
 		},
 		{
+			"id": "closed-fill",
+			"type": "line",
+			"x": 300,
+			"y": 800,
+			"width": 120,
+			"height": 100,
+			"angle": 0,
+			"strokeColor": "#1e1e1e",
+			"backgroundColor": "#b2f2bb",
+			"fillStyle": "solid",
+			"strokeWidth": 2,
+			"strokeStyle": "solid",
+			"roughness": 0,
+			"opacity": 100,
+			"groupIds": [],
+			"frameId": null,
+			"index": "ah5",
+			"roundness": null,
+			"seed": 118,
+			"version": 4,
+			"versionNonce": 820,
+			"isDeleted": false,
+			"boundElements": null,
+			"updated": 1727000000000,
+			"link": null,
+			"locked": false,
+			"points": [
+				[
+					0,
+					0
+				],
+				[
+					120,
+					50
+				],
+				[
+					0,
+					100
+				],
+				[
+					2,
+					3
+				]
+			],
+			"lastCommittedPoint": null,
+			"startBinding": null,
+			"endBinding": null,
+			"startArrowhead": null,
+			"endArrowhead": null,
+			"elbowed": false
+		},
+		{
 			"id": "scribble",
 			"type": "freedraw",
 			"x": 100,

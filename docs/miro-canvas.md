@@ -617,6 +617,21 @@ their internals. The plugin can improve rendering only when data exists.
 - Comment content comes from REST, not Web SDK.
 - Exact slide and document internals may be partial.
 
+Boards imported from other plugins ([Import from other plugins](#import-from-other-plugins))
+have limits of their own, each named on the board's report card:
+
+- A mind map keeps no positions: its layout is worked out anew (counted as
+  approximated - the whole map comes over).
+- Excalidraw's hand-drawn roughness, hatching, groups, transparency, picture
+  cropping, background colour and the fill of a closed line are not drawn;
+  pictures stored inside a plain `.excalidraw` file and web embeds leave a
+  placeholder. A standalone text keeps Excalidraw's own box, so in a font
+  other than the one it was measured in it may wrap.
+- An Advanced Canvas portal stays a file card, a collapsed group shows open,
+  a branching slide order follows one line, and style values the plugin does
+  not know are kept for Advanced Canvas but not drawn.
+- Markmind's rich mode is not read yet.
+
 The [display-gap report](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/docs/MIRO_VS_CANVAS_DISPLAY_GAPS.md) records the measured
 baseline and the [capability matrix](https://github.com/NixWrk/Miro_2_Obsidian/blob/main/docs/MIRO_CAPABILITIES.md) records source
 evidence.
@@ -726,7 +741,8 @@ automation, which another agent is finishing, is done. Movable panels
 1. an MCP server in this repository (`FUT-007`), with the
    `miro-canvas-format` skill moved here from miro2obsidian (done 2026-09-28);
 2. import from Excalidraw, mind maps (the note formats of Enhancing Mindmap and
-   Markmind) and Advanced Canvas (`FUT-009`, `MIGRATE-001..003`);
+   Markmind) and Advanced Canvas (`FUT-009`, `MIGRATE-001..003`; done
+   2026-09-28 except Markmind's rich mode, which waits for a sample file);
 3. search on the board (`FUT-020`);
 4. faster dragging on huge boards (about 35 ms of the plugin's work per dragged
    frame on the 2,000-card board measured 2026-09-23);
@@ -976,22 +992,131 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   0.1.1; the README installs through BRAT step by step, checked in a fresh
   vault.
 
-### Future: ecosystem migration
+### Import from other plugins
 
 The formats, chosen by the owner on 2026-09-28: Excalidraw drawings, mind maps
 (the note formats of the Enhancing Mindmap and Markmind plugins - their files
 are read, their code is not copied) and Advanced Canvas boards. This is stage 6
-(`FUT-009`); nothing is built yet.
+(`FUT-009`), built 2026-09-28 (`src/importers/`, `src/import-command.ts`).
 
-- [ ] `MIGRATE-001` Add explicit, non-destructive import adapters for these
+**How it runs.** One action, "Import into a board", in the command palette
+(for the open file) and in a file's menu (for a `.excalidraw` file, a note
+whose properties carry `excalidraw-plugin` or `mindmap-plugin`, and every
+`.canvas`; the content decides). The file is read once (`cachedRead`), the
+importer that recognises it builds the board in memory, and a preview says
+what was found (format and version), where the board goes, how many elements
+were converted, approximated and not imported, the first 20 entries, and
+offers a report card (on by default). Create writes one new file,
+`<folder>/<name> (board).canvas` (`(board 2)`, `(board 3)`... when taken;
+"доска" in Russian), and opens it in a new tab. Nothing is ever modified or
+overwritten - the source least of all; undoing an import is deleting the new
+board. The importers are pure (`src/importers/*`, no `obsidian` import), each
+optional and format-specific; no other plugin is needed at runtime.
+
+**Excalidraw** (a plain `.excalidraw` file, or the plugin's `.excalidraw.md`
+with its `json` or `compressed-json` drawing; LZ-string is read by a local
+port, see [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md)). Coordinates are
+taken 1:1.
+
+| Excalidraw | On the board |
+| --- | --- |
+| rectangle, ellipse, diamond | text card with a shape (`round_rectangle` when rounded), fill, outline, dash, width, lock; `angle` becomes the card's rotation |
+| text inside a shape, text on an arrow | the card's text, the line's label; the note's raw `## Text Elements` wins, so wikilinks survive |
+| standalone text | text item with its size, font (Virgil, Excalifont, Nunito... by number), alignment and colour |
+| arrow, line bound at both ends | native edge holding where its ends lie; middle points become bends; elbowed/curved/straight route; each arrowhead as the nearest board end, drawn at Excalidraw's own head size |
+| arrow, line with a free end | the plugin's own connector with a free anchor |
+| pen stroke | drawing item; the turn is worked into its points |
+| frame, magic frame | frame (a named group drawn under every card) |
+| picture from the vault | file card; missing - dashed placeholder "picture not found" |
+| picture stored inside the drawing, iframe, unknown element | dashed placeholder where it was |
+| `$$…$$` formula, web embed, embedded note | card with the LaTeX, card with a link, file card |
+| element `link` | a line under the card's text; on a line, stroke, picture or frame it is reported ("link not kept") |
+| Excalidraw's default ink (`#1e1e1e`, `#000000`) | the board's own text, outline and line colours, which read on light and dark boards |
+
+Reported once per kind, not drawn: hand-drawn roughness, hatched fills,
+groups, shape transparency, picture cropping, the background colour. A closed
+line's or pen stroke's fill is reported per element ("fill of a closed line").
+Deleted elements are counted as skipped. Excalidraw's bookkeeping (`seed`,
+`version`, `index`, `updated`, `boundElements`...) carries nothing a board
+shows and is neither kept nor reported.
+
+**Mind maps** (`mindmap-plugin: basic`: Enhancing Mindmap, and Markmind's
+outline mode). Headings and nested lists become one card per node, sized
+from its text, joined parent to child by a curved native line with no
+arrowhead, laid out anew as a tree to the right; the root is drawn as Miro
+draws a map's centre (bold, large, Miro blue). Fenced code and tables stay
+inside their node. Text before the first heading gets a card of its own, a
+second root stands beside the first, a folded branch is shown open, and the
+note's other properties are reported. Markmind's rich mode (other
+`mindmap-plugin` values) is not imported yet: it waits for a real file from
+the owner (`MIGRATE-001` stays open for it).
+
+**Advanced Canvas.** The whole board is copied with every field kept
+(`styleAttributes`, `miroSource`, unknown fields) under its own ids, so
+Advanced Canvas still draws the copy; the plugin adds only the overrides the
+board does not already have (an existing override wins and is reported).
+
+| Advanced Canvas | Override |
+| --- | --- |
+| shape pill, diamond, parallelogram, circle, predefined-process, document, database | `flow_chart_terminator`, `rhombus`, `parallelogram`, `circle`, `flow_chart_predefined_process`, `flow_chart_document`, `can` |
+| border dashed, dotted, invisible | `borderStyle` dashed, dotted, none |
+| textAlign center, right | `typography.alignment` |
+| edge path dotted, short-dashed, long-dashed | `strokeStyle` dotted, dashed, dashed (approximated) |
+| arrow triangle-outline, thin-triangle, halved-triangle, diamond(-outline), circle(-outline), blunt | triangle, arrow, stealth (approx.), filled_diamond/diamond, filled_oval/oval, none (approx.) |
+| pathfindingMethod direct, square, a-star | straight, elbowed, elbowed (approx.) |
+| start node and the lines out of it | `miroCanvas.decks[0]`; at a branch the first line wins (approx.) |
+| portal, collapsed group | kept as a file card / shown open (approx.) |
+
+Lines into a portal are reattached to the portal's card where their id says
+which, otherwise reported. With both plugins on, the checked board was not
+drawn twice: the plugin's shapes cover Advanced Canvas's (checked 2026-09-28
+with Advanced Canvas 6.0.1 in the compatibility harness).
+
+**Statuses (LIMIT-002's vocabulary).** Every element is converted, or has an
+entry: `approximated` (on the board, not exactly as it was - a mind map's
+whole layout counts here), `unsupported` (a board has nothing to show it
+with), `source-limited` (the source does not say enough), `missing-asset`
+(the file it points at is not in the vault), `invalid-source` (its data
+cannot be read), `plugin-unsupported` (a board could show it, the plugin does
+not yet), and `skipped` (deleted in the source). A visual element that cannot
+come over leaves a dashed placeholder card where it was (LIMIT-001). Each
+entry's reason is a stable code with words in English and Russian.
+
+**Provenance, within schema/v1 as it is.** Every card or line that stands for
+a source element is bound to it: `miroCanvas.bindings[id] = { sourceId:
+"<format>:<source id>", role: "import:<format>:<type>" }` (an Advanced Canvas
+copy keeps its ids and needs none). The report card is a native text card to
+the right of everything imported, bound `{ sourceId: "import:<source path>",
+role: "import-report" }`, in plain Markdown: a link to the source, the format
+and its version, `miro-canvas <version>`, the date, the counts and a table of
+everything approximated or not imported (at most 500 rows, then "…and N
+more"). On a copied board whose own plugin data the plugin does not read (or
+that is not an object at all), that data is kept as it is and the card goes
+on without its binding. `miroSource` is never used - it is Miro's evidence.
+
+**Deferred: `miroCanvas.imports[]`** (a proposal for miro2obsidian's schema,
+to raise once its agent is done): `{ id, format, formatVersion?, sourcePath,
+importer, importerVersion, importedAt, reportNodeId?, counts { converted,
+approximated, notImported, skipped }, entries[{ sourceId, sourceType, status,
+reason, nodeId? }] (maxItems 10000) }`. `ImportReport` in
+`src/importers/types.ts` already has exactly this shape, so the day the schema
+carries it the report is written as it is.
+
+- [x] `MIGRATE-001` Add explicit, non-destructive import adapters for these
   formats. Convert recoverable structure into native Canvas plus versioned
-  `miroCanvas` metadata while preserving the original file unchanged.
-- [ ] `MIGRATE-002` For each importer record provenance, the list of converted
+  `miroCanvas` metadata while preserving the original file unchanged. Done
+  2026-09-28 for Excalidraw, mind-map outlines and Advanced Canvas.
+- [ ] Markmind's rich mode (`src/importers/markmind-rich.ts` is a stub that
+  recognises nothing): needs a real sample file from the owner; no Markmind
+  code is looked at.
+- [x] `MIGRATE-002` For each importer record provenance, the list of converted
   items and the unsupported fields; promise no equivalence where the other
-  plugin's format does not carry the data.
-- [ ] `MIGRATE-003` Keep adapters format-specific and optional; never make
+  plugin's format does not carry the data. Done 2026-09-28: bindings, the
+  report card and the report (above).
+- [x] `MIGRATE-003` Keep adapters format-specific and optional; never make
   another plugin a runtime dependency or silently rewrite its files. An import
-  runs only on an explicit action, with a preview of the result.
+  runs only on an explicit action, with a preview of the result. Done
+  2026-09-28.
 
 ### M5: release hardening
 

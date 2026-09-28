@@ -3765,6 +3765,88 @@
   border-radius: var(--radius-s, 4px);
 }
 
+/* "Import into a board": the preview before the board is created.  The
+   short table of what did not come over exactly scrolls on its own, so the
+   Create button stays in view however long the list is. */
+.miro-canvas-import-preview-modal {
+  width: min(680px, calc(100vw - 48px));
+  max-width: none;
+}
+
+.miro-canvas-import-preview__summary p {
+  margin: 0 0 4px;
+}
+
+.miro-canvas-import-preview h4 {
+  margin: 14px 0 6px;
+}
+
+.miro-canvas-import-preview__entries-scroll {
+  max-height: min(320px, 40vh);
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+}
+
+.miro-canvas-import-preview__entries {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-ui-small);
+}
+
+.miro-canvas-import-preview__entries th {
+  position: sticky;
+  top: 0;
+  background: var(--background-secondary);
+  text-align: start;
+  font-weight: var(--font-semibold, 600);
+}
+
+.miro-canvas-import-preview__entries th,
+.miro-canvas-import-preview__entries td {
+  padding: 4px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.miro-canvas-import-preview__entries tr:last-child td {
+  border-bottom: none;
+}
+
+/* The element's kind and id stay on one line; the reason wraps. */
+.miro-canvas-import-preview__entries td:nth-child(1),
+.miro-canvas-import-preview__entries td:nth-child(2) {
+  white-space: nowrap;
+}
+
+.miro-canvas-import-preview__entries td:nth-child(2) {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.miro-canvas-import-preview__more,
+.miro-canvas-import-preview__note {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.miro-canvas-import-preview__report-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .miro-canvas-import-preview-modal {
+    width: calc(100vw - 20px);
+  }
+}
+
 /* "Arrange panels": the banner across the top of the board, the tray of
    tools left off the bar, and the drag affordance the mode adds to the
    bar, the dock and the minimap.  None of this exists outside the mode. */

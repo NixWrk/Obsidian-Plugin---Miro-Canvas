@@ -95,8 +95,19 @@ const FRAME_TYPES = new Set(["frame", "magicframe"]);
 const CONTAINER_TYPES = new Set([...SHAPE_TYPES, ...LINE_TYPES]);
 /** The elements Excalidraw draws with a rough, hand-drawn outline. */
 const ROUGH_TYPES = new Set([...SHAPE_TYPES, ...LINE_TYPES]);
-/** The elements whose fill may be hatched. */
-const FILLED_TYPES = new Set([...SHAPE_TYPES, "line"]);
+/**
+ * The elements whose fill may be hatched and whose card keeps the fill's
+ * colour.  A closed line or pen stroke is filled too, but its fill does not
+ * come over at all (`lineFill`), hatched or not.
+ */
+const FILLED_TYPES = new Set([...SHAPE_TYPES]);
+/** The elements Excalidraw fills only when their course closes on itself. */
+const LOOP_FILLED_TYPES = new Set(["line", "freedraw"]);
+/**
+ * How near a course's last point must come to its first for Excalidraw to
+ * call it closed and fill it: its `LINE_CONFIRM_THRESHOLD`, at full zoom.
+ */
+const LOOP_CLOSE_DISTANCE = 8;
 
 /** Excalidraw's fonts by number, named as the Excalidraw font pack names them. */
 const FONT_FAMILIES: Readonly<Record<number, string>> = {
@@ -116,9 +127,11 @@ const ARROWHEADS: Readonly<Record<string, { readonly cap: string; readonly exact
 	arrow: { cap: "arrow", exact: true },
 	triangle: { cap: "filled_triangle", exact: true },
 	triangle_outline: { cap: "triangle", exact: true },
-	dot: { cap: "filled_circle", exact: true },
-	circle: { cap: "filled_circle", exact: true },
-	circle_outline: { cap: "circle", exact: true },
+	// Round ends are the board's ovals: the ends a native edge draws as well
+	// as a free line (`circle` / `filled_circle` are drawn on free lines only).
+	dot: { cap: "filled_oval", exact: true },
+	circle: { cap: "filled_oval", exact: true },
+	circle_outline: { cap: "oval", exact: true },
 	diamond: { cap: "filled_diamond", exact: true },
 	diamond_outline: { cap: "diamond", exact: true },
 	crowfoot_one: { cap: "erd_one", exact: true },
@@ -131,6 +144,23 @@ const ARROWHEADS: Readonly<Record<string, { readonly cap: string; readonly exact
 const UNKNOWN_ARROWHEAD = { cap: "arrow", exact: false } as const;
 
 /**
+ * How long Excalidraw draws each arrowhead, in drawing units, whatever the
+ * line's width (its `getArrowheadSize`).  The board would otherwise size an
+ * end from the line's width, and a thin Excalidraw arrow would end in a
+ * head too small to see.
+ */
+const ARROWHEAD_SIZES: Readonly<Record<string, number>> = {
+	arrow: 25,
+	diamond: 12,
+	diamond_outline: 12,
+	crowfoot_one: 20,
+	crowfoot_many: 20,
+	crowfoot_one_or_many: 20,
+};
+/** Every other arrowhead Excalidraw draws: triangles, dots, circles, the bar. */
+const DEFAULT_ARROWHEAD_SIZE = 15;
+
+/**
  * How wide a pen stroke is drawn for each unit of Excalidraw's stroke width:
  * Excalidraw hands `4.25 * strokeWidth` to its freehand outline as the
  * stroke's size.
@@ -138,6 +168,14 @@ const UNKNOWN_ARROWHEAD = { cap: "arrow", exact: false } as const;
 const FREEDRAW_SIZE_PER_WIDTH = 4.25;
 /** Excalidraw's default ink, for a stroke whose colour cannot be read. */
 const DEFAULT_INK = "#1e1e1e";
+/**
+ * Excalidraw's default ink, today's and the plain black of older drawings.
+ * Excalidraw turns it light on a dark canvas; kept as it is, text and
+ * outlines in it would all but vanish on a dark board.  A card's text and
+ * outline and a line in this ink take the board's own colours instead,
+ * which read on light and dark boards alike.
+ */
+const DEFAULT_INKS = new Set(["#1e1e1e", "#000000"]);
 /** The longest label a line keeps. */
 const MAX_LABEL_LENGTH = 1024;
 /** A web address, or any other link with a scheme (`https:`, `obsidian:`), as opposed to a vault link. */
@@ -328,9 +366,11 @@ class DrawingImport {
 		const fileId = typeof element.data.fileId === "string" ? element.data.fileId : undefined;
 		const embed = fileId === undefined ? undefined : this.file.embeds.get(fileId);
 		if (embed?.kind === "link") {
-			const path = this.context.resolveLink(linkPath(embed.link), this.sourcePath);
+			const target = linkPath(embed.link);
+			const path = this.context.resolveLink(target, this.sourcePath);
 			if (path === undefined) {
-				this.placeholder(element, "missing-asset", "imageNotFound");
+				// The plugin shows a note as a picture of it; a missing one is a missing note.
+				this.placeholder(element, "missing-asset", isNoteLink(target) ? "fileNotFound" : "imageNotFound");
 				return;
 			}
 			const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...styleOption(turnedStyle(element.data)) });
@@ -367,7 +407,7 @@ class DrawingImport {
 		}
 		const path = this.context.resolveLink(linkPath(link), this.sourcePath);
 		if (path === undefined) {
-			this.placeholder(element, "missing-asset", "imageNotFound");
+			this.placeholder(element, "missing-asset", "fileNotFound");
 			return;
 		}
 		const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...styleOption(turnedStyle(element.data)) });
@@ -422,7 +462,8 @@ class DrawingImport {
 			return;
 		}
 		const rect = { x: left, y: top, width: right - left, height: bottom - top };
-		this.builder.drawing(rect, stroke, { source: sourceOf(element), ...styleOption(lockedStyle(data)) });
+		const nodeId = this.builder.drawing(rect, stroke, { source: sourceOf(element), ...styleOption(lockedStyle(data)) });
+		this.noteLostFill(element, nodeId);
 		this.noteLostLink(element);
 	}
 
@@ -443,6 +484,7 @@ class DrawingImport {
 		const color = readColor(data.strokeColor);
 		const width = positiveNumber(data.strokeWidth);
 		const strokeStyle = strokeStyleOf(data.strokeStyle);
+		const headSize = headSizeOf(data.startArrowhead, data.endArrowhead);
 		const line = {
 			from: this.endAnchor(data.startBinding, first),
 			to: this.endAnchor(data.endBinding, last),
@@ -451,14 +493,16 @@ class DrawingImport {
 			endCap: endHead.cap,
 			waypoints: bends.map(roundPoint),
 			...(labelText.trim() === "" ? {} : { label: labelText }),
-			...(color?.kind === "hex" ? { color: color.opaqueHex } : {}),
+			...(color?.kind === "hex" && !isDefaultInk(color) ? { color: color.opaqueHex } : {}),
 			...(width === undefined ? {} : { width: Math.min(1_000, width) }),
 			...(strokeStyle === undefined ? {} : { strokeStyle }),
+			...(headSize === undefined ? {} : { headSize }),
 		};
 		this.builder.connect(line, { source: sourceOf(element) });
 		if (!startHead.exact || !endHead.exact) {
 			this.note({ sourceId: element.id, sourceType: element.type, status: "approximated", reason: "arrowhead" });
 		}
+		this.noteLostFill(element);
 		this.noteLostLink(element);
 		if (label !== undefined) this.noteLostLink(label);
 	}
@@ -518,7 +562,25 @@ class DrawingImport {
 	/** A link on an element with no text of its own to carry it (a line, a stroke, a picture, a frame). */
 	private noteLostLink(element: DrawingElement): void {
 		if (linkOf(element.data) === undefined) return;
-		this.note({ sourceId: element.id, sourceType: element.type, status: "plugin-unsupported", reason: "elementLink" });
+		this.note({ sourceId: element.id, sourceType: element.type, status: "plugin-unsupported", reason: "elementLinkDropped" });
+	}
+
+	/**
+	 * A line or a pen stroke whose course closes on itself is filled by
+	 * Excalidraw; the board draws its course but not the fill.
+	 */
+	private noteLostFill(element: DrawingElement, nodeId?: string): void {
+		if (!LOOP_FILLED_TYPES.has(element.type)) return;
+		const fill = readColor(element.data.backgroundColor);
+		if (fill === undefined || fill.kind !== "hex" || fill.alpha === 0) return;
+		if (!isClosedCourse(element.data)) return;
+		this.note({
+			sourceId: element.id,
+			sourceType: element.type,
+			status: "approximated",
+			reason: "lineFill",
+			...(nodeId === undefined ? {} : { nodeId }),
+		});
 	}
 
 	private remember(element: DrawingElement, nodeId: string, rect: BoardRect): void {
@@ -613,7 +675,7 @@ function cardStyle(shape: ElementRecord | undefined, text: ElementRecord | undef
 		const fill = readColor(shape.backgroundColor);
 		if (fill !== undefined) colors.fill = fill.kind === "hex" ? fill.hex : null;
 		const outline = readColor(shape.strokeColor);
-		if (outline?.kind === "hex") colors.border = outline.hex;
+		if (outline?.kind === "hex" && !isDefaultInk(outline)) colors.border = outline.hex;
 		borderStyle = outline?.kind === "transparent" ? "none" : strokeStyleOf(shape.strokeStyle);
 		const strokeWidth = finiteNumber(shape.strokeWidth);
 		if (strokeWidth !== undefined && strokeWidth >= 0) borderWidth = Math.min(100, strokeWidth);
@@ -621,7 +683,7 @@ function cardStyle(shape: ElementRecord | undefined, text: ElementRecord | undef
 	const typography = text === undefined ? undefined : typographyOf(text);
 	if (text !== undefined) {
 		const ink = readColor(text.strokeColor);
-		if (ink?.kind === "hex") colors.text = ink.hex;
+		if (ink?.kind === "hex" && !isDefaultInk(ink)) colors.text = ink.hex;
 	}
 	const owner = shape ?? text;
 	const locked = owner?.locked === true;
@@ -684,6 +746,14 @@ function routeOf(data: ElementRecord, pointCount: number): "straight" | "elbowed
 	if (data.elbowed === true) return "elbowed";
 	if (isRecord(data.roundness) && pointCount > 2) return "curved";
 	return "straight";
+}
+
+/** The size the line's ends are drawn at: the larger of its two arrowheads, or none for a line without one. */
+function headSizeOf(start: unknown, end: unknown): number | undefined {
+	const sizes = [start, end]
+		.filter((value) => value !== null && value !== undefined)
+		.map((value) => (typeof value === "string" && Object.prototype.hasOwnProperty.call(ARROWHEAD_SIZES, value) ? ARROWHEAD_SIZES[value]! : DEFAULT_ARROWHEAD_SIZE));
+	return sizes.length === 0 ? undefined : Math.max(...sizes);
 }
 
 function arrowheadOf(value: unknown): { readonly cap: string; readonly exact: boolean } {
@@ -771,6 +841,11 @@ function readColor(value: unknown): ReadColor | undefined {
 	return undefined;
 }
 
+/** Whether a colour is Excalidraw's default ink, drawn fully opaque. */
+function isDefaultInk(color: ReadColor): boolean {
+	return color.kind === "hex" && color.alpha === 1 && DEFAULT_INKS.has(color.opaqueHex);
+}
+
 /** An element's own link (`link`), when it has one. */
 function linkOf(data: ElementRecord): string | undefined {
 	if (typeof data.link !== "string") return undefined;
@@ -778,6 +853,28 @@ function linkOf(data: ElementRecord): string | undefined {
 	return link === "" ? undefined : link;
 }
 
+
+/**
+ * Whether Excalidraw fills a line's or a stroke's course: a line marked a
+ * polygon (`polygon`, newer drawings), or a course of three points or more
+ * whose last point lies within `LOOP_CLOSE_DISTANCE` of its first.
+ */
+function isClosedCourse(data: ElementRecord): boolean {
+	if (data.polygon === true) return true;
+	const points = readPoints(data.points);
+	if (points.length < 3) return false;
+	const first = points[0]!;
+	const last = points[points.length - 1]!;
+	return Math.hypot(last.x - first.x, last.y - first.y) <= LOOP_CLOSE_DISTANCE;
+}
+
+/** A link names a note when it has no extension or ends in `.md`; anything else is a picture or a document. */
+function isNoteLink(path: string): boolean {
+	const name = path.split("/").pop() ?? "";
+	const dot = name.lastIndexOf(".");
+	if (dot <= 0) return true;
+	return name.slice(dot + 1).toLowerCase() === "md";
+}
 
 /** The file a link names: `[[target#heading|alias]]` or a bare path, without the heading and the alias. */
 function linkPath(link: string): string {

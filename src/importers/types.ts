@@ -45,7 +45,7 @@ export interface ImportContext {
  *
  * - `approximated`: on the board, but not exactly as it was;
  * - `unsupported`: a board has nothing to show it with;
- * - `source-limited`: the source itself does not say enough (a mind map has no positions);
+ * - `source-limited`: the source itself does not say enough to bring it over;
  * - `missing-asset`: it points at a file that is not in the vault;
  * - `invalid-source`: its data could not be read;
  * - `plugin-unsupported`: a board could show it, but the plugin does not yet;
@@ -80,7 +80,10 @@ export const IMPORT_REASONS = [
 	"formula",
 	"embeddedImage",
 	"imageNotFound",
+	"fileNotFound",
 	"elementLink",
+	"elementLinkDropped",
+	"lineFill",
 	"arrowhead",
 	"unknownElement",
 	"invalidElement",
@@ -90,6 +93,7 @@ export const IMPORT_REASONS = [
 	"frontmatter",
 	"textBeforeRoot",
 	"extraRoots",
+	"foldedBranch",
 	// Advanced Canvas
 	"portal",
 	"portalEdge",
