@@ -14,6 +14,14 @@
 //   node tools/obsidian_cdp/android.mjs deploy --port 9340 [--vault <name the owner agreed to>]
 //   node tools/obsidian_cdp/android.mjs pointer-log start|dump|stop --port 9340 [--out file.json]
 //   node tools/obsidian_cdp/android.mjs shot --serial <s> --out file.png
+//   node tools/obsidian_cdp/android.mjs tap --serial <s> --port 9340 --x 200 --y 300 [--stylus]
+//   node tools/obsidian_cdp/android.mjs swipe --serial <s> --port 9340 --x 200 --y 300 --to-x 200 --to-y 500 [--ms 400] [--stylus]
+//   node tools/obsidian_cdp/android.mjs press --serial <s> --port 9340 --x 200 --y 300 [--ms 900]
+//   node tools/obsidian_cdp/android.mjs pinch --port 9340 --x 200 --y 400 --from 60 --to 160 [--steps 12]
+//
+// tap, swipe and press take the page's own CSS pixels and go through the
+// device's real touch screen (adb input), a stylus with --stylus; pinch
+// needs two fingers at once, which adb cannot give, so it goes over CDP.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -142,7 +150,8 @@ const POINTER_LOG_START = `
     touches: [...event.changedTouches].map((one) => ({ id: one.identifier, x: Math.round(one.clientX), y: Math.round(one.clientY),
       rx: one.radiusX, ry: one.radiusY, f: one.force, type: one.touchType ?? null })),
   });
-  const types = ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerrawupdate"];
+  const types = ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerrawupdate",
+    "click", "dblclick", "contextmenu"];
   for (const type of types) window.addEventListener(type, pointer, { capture: true, passive: true });
   for (const type of ["touchstart", "touchend", "touchcancel"]) window.addEventListener(type, touch, { capture: true, passive: true });
   window.__miroPointerLog = { events, stop() {
@@ -164,6 +173,52 @@ async function pointerLog(send, action, out) {
   const kinds = {};
   for (const event of events) if (event.k) kinds[event.k] = (kinds[event.k] ?? 0) + 1;
   return { count: events.length, byPointerType: kinds, out: out ?? null };
+}
+
+/** A point in the page's CSS pixels, as adb wants it: the screen's own pixels. */
+async function screenPoint(send, x, y) {
+  const ratio = await evaluate(send, "return devicePixelRatio;");
+  return [Math.round(Number(x) * ratio), Math.round(Number(y) * ratio)];
+}
+
+/** A tap, a swipe or a long press on the real touch screen (or with a stylus). */
+async function touch(send, serial, command, args) {
+  const source = args.includes("--stylus") ? "stylus" : "touchscreen";
+  const [x, y] = await screenPoint(send, option(args, "x"), option(args, "y"));
+  if (command === "tap") {
+    adb(["shell", "input", source, "tap", String(x), String(y)], { serial });
+    return { tap: [x, y], source };
+  }
+  const ms = option(args, "ms", command === "press" ? "900" : "400");
+  const [toX, toY] = command === "press"
+    ? [x, y]
+    : await screenPoint(send, option(args, "to-x"), option(args, "to-y"));
+  adb(["shell", "input", source, "swipe", String(x), String(y), String(toX), String(toY), ms], { serial });
+  return { [command]: [x, y, toX, toY], ms: Number(ms), source };
+}
+
+/**
+ * Two fingers moving apart (or together) about a point, over CDP: from
+ * `from` to `to` CSS pixels between them, horizontally.
+ */
+async function pinch(send, args) {
+  const centreX = Number(option(args, "x"));
+  const centreY = Number(option(args, "y"));
+  const from = Number(option(args, "from", "60"));
+  const to = Number(option(args, "to", "160"));
+  const steps = Number(option(args, "steps", "12"));
+  const fingers = (gap) => [
+    { x: centreX - gap / 2, y: centreY, id: 1, radiusX: 8, radiusY: 8, force: 1 },
+    { x: centreX + gap / 2, y: centreY, id: 2, radiusX: 8, radiusY: 8, force: 1 },
+  ];
+  const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+  await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: fingers(from) });
+  for (let step = 1; step <= steps; step += 1) {
+    await wait(16);
+    await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: fingers(from + (to - from) * step / steps) });
+  }
+  await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  return { pinch: { x: centreX, y: centreY, from, to, steps } };
 }
 
 async function main() {
@@ -190,7 +245,9 @@ async function main() {
     if (command === "status") console.log(JSON.stringify(await status(send), null, 1));
     else if (command === "deploy") console.log(JSON.stringify(await deploy(send, option(args, "vault", TEST_VAULT)), null, 1));
     else if (command === "pointer-log") console.log(JSON.stringify(await pointerLog(send, args[0], option(args, "out")), null, 1));
-    else throw new Error("usage: android.mjs <devices|forward|status|deploy|pointer-log|shot> [--serial s] [--port n]");
+    else if (command === "tap" || command === "swipe" || command === "press") console.log(JSON.stringify(await touch(send, serial, command, args)));
+    else if (command === "pinch") console.log(JSON.stringify(await pinch(send, args)));
+    else throw new Error("usage: android.mjs <devices|forward|status|deploy|pointer-log|shot|tap|swipe|press|pinch> [--serial s] [--port n]");
   } finally {
     close();
   }

@@ -29,6 +29,7 @@ import { readLocalItem, type LocalItem } from "./local-items";
 import { listCommentThreads } from "./local-comments";
 import { reorderCards, type LayerCard, type LayerDirection } from "./layer-order";
 import { nativeOmits, nativeRounds } from "./native-graph";
+import { newCanvasId } from "./canvas-ids";
 import { isSafeColor, normalizeColor } from "./appearance";
 import {
 	LOCAL_SHAPE_KINDS, CONNECTOR_CAPS, CONNECTOR_ROUTES, CONNECTOR_STROKES,
@@ -191,7 +192,11 @@ export interface ChangeZOrderInput {
 }
 
 export interface CanvasAuthoringOptions {
-	/** Prefix for generated IDs.  It is never used when an explicit ID is given. */
+	/**
+	 * Prefix for generated IDs, which then read "<prefix>-1", "<prefix>-2"...
+	 * Without one an ID is sixteen hex digits, as native Canvas makes it.
+	 * It is never used when an explicit ID is given.
+	 */
 	readonly idPrefix?: string;
 }
 
@@ -300,7 +305,6 @@ const MAX_DOCUMENT_DEPTH = 96;
 const MAX_TEXT_LENGTH = 1_000_000;
 const MAX_IDENTIFIER_LENGTH = 512;
 const MAX_ID_ATTEMPTS = 10_000;
-const SAFE_GENERATED_ID_PREFIX = "miro-canvas-node";
 const DANGEROUS_IDENTIFIER_NAMES = new Set(["__proto__", "prototype", "constructor"]);
 /** JSON Canvas colors: a preset "1".."6" or a hex color. */
 const NATIVE_COLOR = /^(?:[1-6]|#[0-9a-fA-F]{6})$/;
@@ -1201,14 +1205,16 @@ function collectDocumentIds(snapshot: InternalSnapshot): Set<string> {
 function allocateId(
 	actionId: string | undefined,
 	used: Set<string>,
-	prefix: string,
+	prefix: string | undefined,
 	counter: number,
 ): { readonly id?: string; readonly nextCounter: number } {
 	if (actionId !== undefined) {
 		return used.has(actionId) ? { nextCounter: counter } : { id: actionId, nextCounter: counter };
 	}
 	for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt += 1) {
-		const id = `${prefix}-${counter + attempt}`;
+		// Native Canvas's own form, with no hyphen: Advanced Canvas takes an id
+		// with one for a card seen through a portal, and hides it from the board.
+		const id = prefix === undefined ? newCanvasId() : `${prefix}-${counter + attempt}`;
 		if (isSafeIdentifier(id) && !used.has(id)) {
 			return { id, nextCounter: counter + attempt + 1 };
 		}
@@ -1682,7 +1688,7 @@ function buildZOrderDocument(
 function buildShape(
 	snapshot: InternalSnapshot,
 	action: unknown,
-	prefix: string,
+	prefix: string | undefined,
 	counter: number,
 	diagnostics: CanvasAuthoringDiagnostic[],
 ): BuiltShape | undefined {
@@ -1861,7 +1867,7 @@ export class CanvasAuthoring {
 	private readonly inspection: HostInspection;
 	private readonly host: NativeHost | undefined;
 	private readonly diagnosticList: CanvasAuthoringDiagnostic[];
-	private readonly idPrefix: string;
+	private readonly idPrefix: string | undefined;
 	private idCounter = 1;
 	private disposed = false;
 
@@ -1872,7 +1878,7 @@ export class CanvasAuthoring {
 		const configuredPrefix = safeRead(options, "idPrefix");
 		this.idPrefix = configuredPrefix.ok && isSafeIdentifier(configuredPrefix.value)
 			? configuredPrefix.value
-			: SAFE_GENERATED_ID_PREFIX;
+			: undefined;
 	}
 
 	public get status(): CanvasAuthoringStatus {

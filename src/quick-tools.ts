@@ -11,7 +11,7 @@
  */
 import { words } from "./i18n";
 import { SHAPE_CATALOG, shapeCatalogEntry, shapeCatalogLabel } from "./shape-catalog";
-import { shapePicture } from "./selection-toolbar";
+import { keepPanelInView, shapePicture } from "./selection-toolbar";
 import { LINE_KINDS, lineKind, lineLabel, type LineKindSpec } from "./free-line";
 import { validHeadSize } from "./connector-style";
 import { defaultPalette } from "./appearance";
@@ -736,6 +736,7 @@ export class QuickTools {
       this.closePanels(button);
       if (!open) return;
       panel.hidden = false;
+      keepPanelInView(panel);
       button.setAttribute("aria-expanded", "true");
     });
     this.panels.push({ button, panel });

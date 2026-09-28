@@ -354,7 +354,8 @@ describe("CanvasAuthoring", () => {
 
 		expect(result.ok).toBe(true);
 		expect(result.status).toBe("applied");
-		expect(result.nodeId).toMatch(/^miro-canvas-node-\d+$/);
+		// Native Canvas's own form: Advanced Canvas hides an id with a hyphen.
+		expect(result.nodeId).toMatch(/^[0-9a-f]{16}$/);
 		expect(result.node).toMatchObject({
 			id: result.nodeId,
 			type: "text",
@@ -380,6 +381,17 @@ describe("CanvasAuthoring", () => {
 		expect(runtime.importDataSpy).toHaveBeenCalledWith(expect.any(Object), true);
 		expect(runtime.requestSaveSpy).toHaveBeenCalledTimes(1);
 		expect(runtime.requestSaveSpy).toHaveBeenCalledWith(true);
+	});
+
+	it("names new items with a prefix only when one is asked for", () => {
+		const runtime = new NativeGraph(initialDocument());
+		const authoring = createCanvasAuthoring({ canvas: runtime }, { idPrefix: "test-card" });
+
+		const first = authoring.createShape(action());
+		const second = authoring.createShape(action());
+
+		expect(first.nodeId).toBe("test-card-1");
+		expect(second.nodeId).toBe("test-card-2");
 	});
 
 	it("provides detached read and preview results without a native write", () => {

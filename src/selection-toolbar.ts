@@ -273,6 +273,34 @@ function offeredFonts(document: Document, pool: readonly string[] = OFFERED_FONT
   return [...new Set([...fromObsidian, ...pool])];
 }
 
+/**
+ * A panel opens beside the button it belongs to, and a button near the end
+ * of a bar on a phone would carry it past the edge of the screen: it is
+ * moved back sideways inside the board (or the window), 8px from the edge.
+ * A panel longer than the room left above or below its bar - the keyboard
+ * leaves a phone's board a strip - is cut to fit and scrolls.
+ */
+export function keepPanelInView(panel: HTMLElement): void {
+  if (typeof panel.getBoundingClientRect !== "function" || typeof panel.style?.setProperty !== "function") return;
+  panel.style.removeProperty("translate");
+  panel.style.removeProperty("max-height");
+  const board = panel.closest?.(".miro-canvas-root") ?? panel.ownerDocument?.documentElement;
+  if (board == null || typeof board.getBoundingClientRect !== "function") return;
+  const bounds = board.getBoundingClientRect();
+  const rect = panel.getBoundingClientRect();
+  const margin = 8;
+  let shift = 0;
+  if (rect.right > bounds.right - margin) shift = bounds.right - margin - rect.right;
+  if (rect.left + shift < bounds.left + margin) shift = bounds.left + margin - rect.left;
+  if (shift !== 0) panel.style.setProperty("translate", `${Math.round(shift)}px 0`);
+  const minimum = 120;
+  if (rect.bottom > bounds.bottom - margin) {
+    panel.style.setProperty("max-height", `${Math.round(Math.max(minimum, bounds.bottom - margin - rect.top))}px`);
+  } else if (rect.top < bounds.top + margin) {
+    panel.style.setProperty("max-height", `${Math.round(Math.max(minimum, rect.bottom - bounds.top - margin))}px`);
+  }
+}
+
 function hasDocument(value: unknown): value is Document {
   return value !== null && typeof value === "object"
     && typeof (value as { createElement?: unknown }).createElement === "function";
@@ -613,6 +641,7 @@ export class SelectionToolbar {
     this.closePopovers();
     if (!open) return;
     target.panel.hidden = false;
+    keepPanelInView(target.panel);
     target.button.setAttribute("aria-expanded", "true");
   }
 

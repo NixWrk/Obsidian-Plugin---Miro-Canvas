@@ -266,6 +266,39 @@ def main() -> int:
                   if(b.getSaves()!==saves)throw Error('Selection wrote history');
                   b.session.resetTools();b.session.commentDraft={type:'free',x:200,y:180};b.session.createComment('First press drag');b.session.closeCommentThread();b.select('n1');b.root.focus();
                 }""")
+                # Phones and tablets: a finger on empty board is native Canvas's
+                # pan, not a marquee; a tap on the tool bar ends at the board;
+                # the bars stand above Obsidian's floating navigation bar and
+                # step aside for the keyboard.
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session;
+                  const empty=s.viewportPoint({x:900,y:900});
+                  b.root.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:61,pointerType:'touch',clientX:empty.x,clientY:empty.y,bubbles:true,cancelable:true}));
+                  if(b.root.hasAttribute('data-miro-rectangle-selecting'))throw Error('A finger on empty board started a marquee');
+                  window.dispatchEvent(new PointerEvent('pointerup',{pointerId:61,pointerType:'touch',clientX:empty.x,clientY:empty.y,bubbles:true}));
+                  let reached=0;const count=()=>{reached++;};
+                  b.root.parentElement.addEventListener('click',count);
+                  b.root.querySelector('.miro-canvas-tools [data-tool="select"]').click();
+                  b.root.parentElement.removeEventListener('click',count);
+                  if(reached!==0)throw Error('A click on the tool bar travelled past the board');
+                  const navbar=document.createElement('div');
+                  navbar.className='mobile-navbar';
+                  const board=b.root.getBoundingClientRect();
+                  navbar.style.cssText=`position:fixed;left:0;right:0;top:${board.bottom-100}px;height:52px`;
+                  document.body.appendChild(navbar);
+                  document.body.classList.add('is-mobile');
+                  s.updatePanelPositions();
+                  const tools=b.root.querySelector('.miro-canvas-toolbar.miro-canvas-tools');
+                  if(!b.root.style.getPropertyValue('--miro-canvas-host-foot'))throw Error('The navigation bar was not measured');
+                  if(tools.getBoundingClientRect().bottom>navbar.getBoundingClientRect().top)throw Error('The tool bar sits under the navigation bar');
+                  document.documentElement.style.setProperty('--keyboard-height','300px');
+                  s.updatePanelPositions();
+                  if(b.root.getAttribute('data-miro-canvas-keyboard')!=='open'||getComputedStyle(tools).display!=='none')throw Error('The tool bar stayed up over the keyboard');
+                  document.documentElement.style.removeProperty('--keyboard-height');
+                  navbar.remove();document.body.classList.remove('is-mobile');
+                  s.updatePanelPositions();
+                  if(b.root.style.getPropertyValue('--miro-canvas-host-foot')||b.root.hasAttribute('data-miro-canvas-keyboard'))throw Error('A computer kept the phone layout');
+                }""")
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,c=b.runtime.getData().miroCanvas.connectors['menu-line'];
                   const at=s.viewportPoint(c.from),first={x:at.x-12,y:at.y-12},last={x:at.x+12,y:at.y+12};

@@ -166,3 +166,74 @@ describe("crowding the default tool bar and dock apart on a narrow board", () =>
 		expect(root.getAttribute("data-miro-canvas-crowded")).toBeNull();
 	});
 });
+
+/**
+ * A phone's page, handed to the board only once it is mounted (the tool bar
+ * and the dock are still the fakes above): Obsidian's floating navigation
+ * bar, the system's navigation area and the keyboard, as Obsidian 1.12 on
+ * Android reports them.
+ */
+function phonePage(options: { navbarTop?: number; keyboard?: number } = {}) {
+	const navbar = {
+		nodeType: 1,
+		appendChild: () => undefined,
+		removeChild: () => undefined,
+		getBoundingClientRect: () => ({ left: 34, top: options.navbarTop ?? 0, right: 350, bottom: (options.navbarTop ?? 0) + 52 }),
+	};
+	const bodyStyle = { getPropertyValue: (name: string) => (name === "--safe-area-inset-bottom" ? "48px" : "") };
+	const rootStyle = { getPropertyValue: (name: string) => (name === "--keyboard-height" ? `${options.keyboard ?? 0}px` : "") };
+	const barStyle = { display: "flex", visibility: "visible", transform: "none", getPropertyValue: () => "" };
+	const body = { classList: { contains: (name: string) => name === "is-mobile" } };
+	const documentElement = {};
+	const view = {
+		innerHeight: 600,
+		getComputedStyle: (element: unknown) => (element === body ? bodyStyle : element === documentElement ? rootStyle : barStyle),
+	};
+	return {
+		body,
+		documentElement,
+		defaultView: view,
+		createElement: () => ({}),
+		querySelector: (selector: string) => (selector === ".mobile-navbar" && options.navbarTop !== undefined ? navbar : null),
+	};
+}
+
+describe("keeping the panels clear of a phone's own bars", () => {
+	it("lifts the tool bar and the dock by how far Obsidian's navigation bar reaches up the board", () => {
+		const { root, session } = fixture();
+		(root as unknown as { ownerDocument: unknown }).ownerDocument = phonePage({ navbarTop: 500 });
+		resize(session, root, 800);
+		expect(root.style.map.get("--miro-canvas-host-foot")).toBe("100px");
+		expect(root.getAttribute("data-miro-canvas-keyboard")).toBeNull();
+	});
+
+	it("marks the keyboard being up, so the stylesheet puts the bars away", () => {
+		const { root, session } = fixture();
+		(root as unknown as { ownerDocument: unknown }).ownerDocument = phonePage({ keyboard: 300 });
+		resize(session, root, 800);
+		expect(root.getAttribute("data-miro-canvas-keyboard")).toBe("open");
+		expect(root.style.map.get("--miro-canvas-host-foot")).toBe("300px");
+	});
+
+	it("places a panel a person moved within the part of the board the bars leave uncovered", () => {
+		const layout = { toolbar: { anchor: "bottom-center", dx: 0, dy: 16 } } as const;
+		// Measured with its size, as a real element is, so the stored place resolves.
+		const sized = { left: 0, top: 552, right: 300, bottom: 584, width: 300, height: 32 };
+		const desk = fixture(layout);
+		desk.toolbar.rect = sized;
+		resize(desk.session, desk.root, 800);
+		const phone = fixture(layout);
+		phone.toolbar.rect = sized;
+		(phone.root as unknown as { ownerDocument: unknown }).ownerDocument = phonePage({ navbarTop: 500 });
+		resize(phone.session, phone.root, 800);
+		const top = (element: { style: { map: Map<string, string> } }) => Number.parseFloat(element.style.map.get("top") ?? "NaN");
+		expect(top(desk.toolbar) - top(phone.toolbar)).toBe(100);
+	});
+
+	it("writes nothing on a computer", () => {
+		const { root, session } = fixture();
+		resize(session, root, 800);
+		expect(root.style.map.has("--miro-canvas-host-foot")).toBe(false);
+		expect(root.getAttribute("data-miro-canvas-keyboard")).toBeNull();
+	});
+});

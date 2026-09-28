@@ -123,7 +123,7 @@ import {
 	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "./quick-tools";
 import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
-import { applyPanelPositionSettled, defaultPanelsFit, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
+import { applyPanelPositionSettled, defaultPanelsFit, hostFootInset, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
 import {
 	blockArrowOutline, bowPoint, lineBoardPoints, lineFromBoard, lineKind, planLine, type LineKindSpec, type LinePoint,
@@ -583,6 +583,63 @@ function readStyleValue(element: unknown, property: string): string | undefined 
 		return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 	} catch {
 		return undefined;
+	}
+}
+
+/** Obsidian's own bars floating over the foot of a phone's or a tablet's screen. */
+const HOST_FOOT_BARS = [".mobile-navbar", ".mobile-toolbar"] as const;
+
+/** A length Obsidian keeps in a custom property, such as "48px"; nothing readable counts as none. */
+function cssPixels(value: string | undefined): number {
+	const pixels = Number.parseFloat(value ?? "");
+	return Number.isFinite(pixels) ? pixels : 0;
+}
+
+/** How far a bar is slid up or down right now, so its resting place can be read mid-slide. */
+function translationY(transform: string | undefined): number {
+	const values = /^matrix(3d)?\((.*)\)$/u.exec(transform ?? "")?.[2]?.split(",").map((part) => Number.parseFloat(part));
+	if (values === undefined) return 0;
+	const offset = values.length === 16 ? values[13] : values[5];
+	return offset !== undefined && Number.isFinite(offset) ? offset : 0;
+}
+
+/**
+ * How far up from the board's foot Obsidian's phone and tablet chrome
+ * reaches: its floating navigation bar, the editing toolbar, the keyboard
+ * and the system's own navigation area; and whether the keyboard is up.
+ * Nothing off a phone or a tablet, or where nothing can be measured.
+ */
+function measureHostFoot(root: HTMLElement): { readonly inset: number; readonly keyboard: boolean } {
+	const document = ownerDocument(root);
+	const body = document?.body;
+	const view = document?.defaultView;
+	const nothing = { inset: 0, keyboard: false };
+	if (document === undefined || body == null || view == null || body.classList?.contains("is-mobile") !== true) return nothing;
+	const board = boundingRect(root);
+	if (board === undefined || typeof view.getComputedStyle !== "function") return nothing;
+	try {
+		const barTops: number[] = [];
+		for (const selector of HOST_FOOT_BARS) {
+			const bar = document.querySelector(selector);
+			if (!isElement(bar)) continue;
+			// A phone reading full screen slides the navigation bar away.
+			if (selector === ".mobile-navbar" && body.classList.contains("is-hidden-nav")) continue;
+			const style = view.getComputedStyle(bar);
+			if (style.display === "none" || style.visibility === "hidden") continue;
+			const rect = boundingRect(bar);
+			if (rect === undefined || rect.bottom <= rect.top) continue;
+			barTops.push(rect.top - translationY(style.transform));
+		}
+		const keyboardHeight = cssPixels(view.getComputedStyle(document.documentElement).getPropertyValue("--keyboard-height"));
+		const inset = hostFootInset(board.top, board.bottom, {
+			viewportBottom: view.innerHeight,
+			safeAreaBottom: cssPixels(view.getComputedStyle(body).getPropertyValue("--safe-area-inset-bottom")),
+			keyboardHeight,
+			barTops,
+		});
+		return { inset, keyboard: keyboardHeight > 0 };
+	} catch {
+		return nothing;
 	}
 }
 
@@ -1406,6 +1463,21 @@ export class M1CanvasSession {
 	/** Watches each panel's own size; see `schedulePanelPositions`. */
 	private panelSizeObserver: { readonly observe: (target: HTMLElement) => void } | undefined;
 	private readonly watchedPanels = new WeakSet<HTMLElement>();
+	/** How far up from the board's foot a phone's own bars reach; see `updateHostFoot`. */
+	private hostFoot = 0;
+	/**
+	 * Whether the minimap takes up any room: a phone's stylesheet hides it,
+	 * and a hidden map is neither followed nor drawn.  Read with the panels'
+	 * places, never per frame; a host that cannot measure counts as shown.
+	 */
+	private minimapLaidOut = true;
+	/**
+	 * The board's size as last measured with the panels' places, on every
+	 * resize.  What follows the board frame by frame reads this instead of
+	 * the element itself: reading it mid-frame made the browser lay out a
+	 * large board's every card again, a few milliseconds a frame on a phone.
+	 */
+	private measuredBoardSize: { readonly width: number; readonly height: number } | undefined;
 	private panelFrame: number | undefined;
 	/** The node a resize gesture is changing, and the box to put back if it is cancelled. */
 	private resizeGesture: {
@@ -1682,6 +1754,12 @@ export class M1CanvasSession {
 	 */
 	private updatePanelPositions(): void {
 		const panels = this.arrangePanels();
+		// A place a person chose keeps clear of the phone's own bars too: it
+		// is resolved in the part of the board they leave uncovered.
+		const foot = this.updateHostFoot();
+		const board = clientSize(this.root);
+		this.measuredBoardSize = board;
+		const uncovered = { width: board.width, height: Math.max(1, board.height - foot) };
 		for (const id of PANEL_IDS) {
 			const element = panels[id];
 			// A synthetic host in a test may stand in a real `HTMLElement` with
@@ -1689,7 +1767,7 @@ export class M1CanvasSession {
 			// here is worth doing for it, so it is left alone rather than failing.
 			if (element === undefined || typeof element.style?.setProperty !== "function") continue;
 			const position = this.settings.panelLayout[id];
-			applyPanelPositionSettled(element, position, clientSize(this.root));
+			applyPanelPositionSettled(element, position, uncovered);
 			// Once per element: observing it again would report it again, and
 			// that report would bring the panels back here, frame after frame.
 			if (this.panelSizeObserver !== undefined && !this.watchedPanels.has(element)) {
@@ -1698,6 +1776,50 @@ export class M1CanvasSession {
 			}
 		}
 		this.updateCrowding(panels);
+		this.updateMinimapLaidOut(panels.minimap);
+	}
+
+	/** The board's size for work done every frame; see `measuredBoardSize`. */
+	private boardSize(): { readonly width: number; readonly height: number } {
+		return this.measuredBoardSize ?? clientSize(this.root);
+	}
+
+	/**
+	 * Notes whether the map takes up room now, and draws it for the board as
+	 * it stands at the moment it comes back into view.
+	 */
+	private updateMinimapLaidOut(element: HTMLElement | undefined): void {
+		const rect = boundingRect(element);
+		const laidOut = rect === undefined || rect.right > rect.left;
+		const shownAgain = laidOut && !this.minimapLaidOut;
+		this.minimapLaidOut = laidOut;
+		if (!shownAgain) return;
+		this.lastMinimapSignature = "";
+		this.followViewport();
+	}
+
+	/**
+	 * On a phone or a tablet Obsidian floats its own bars over the foot of
+	 * the board, and the keyboard and the system's navigation area cover it
+	 * as well. How far up they reach goes to the stylesheet as
+	 * `--miro-canvas-host-foot`, so the tool bar and the dock sit above them;
+	 * on a computer nothing is written. Measured before the crowding below,
+	 * which reads where the lifted tool bar ends up.
+	 *
+	 * While the keyboard is up the board keeps only a strip of the screen,
+	 * and the card being written sits in it: the root is marked so the
+	 * stylesheet puts the tool bar and the dock away until it goes down.
+	 */
+	private updateHostFoot(): number {
+		const root = this.root;
+		if (root === undefined || typeof root.style?.setProperty !== "function") return 0;
+		const { inset, keyboard } = measureHostFoot(root);
+		this.hostFoot = inset;
+		if (inset > 0) root.style.setProperty("--miro-canvas-host-foot", `${inset}px`);
+		else root.style.removeProperty("--miro-canvas-host-foot");
+		if (keyboard) root.setAttribute("data-miro-canvas-keyboard", "open");
+		else root.removeAttribute("data-miro-canvas-keyboard");
+		return inset;
 	}
 
 	/**
@@ -3173,12 +3295,20 @@ export class M1CanvasSession {
 		this.attachGuards();
 		this.attachMinimapHandlers();
 		this.attachResizeObserver();
+		this.attachHostFootWatch();
 		this.attachSystemThemeListener();
 		this.attachRefreshPolling();
 		this.attachViewportFrames();
 		this.attachRectangleSelection();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
+		// A press on the plugin's own bars and cards is theirs alone and ends at
+		// the board: another Canvas plugin (Canvas Minimap) reads every click
+		// that reaches the view as a jump on its map, so a tap on the tool bar
+		// lying under that map also flew the board somewhere else.
+		this.listen(this.root, "click", (event) => {
+			if (this.closestTarget(event, PANEL_SELECTOR)) event.stopPropagation();
+		});
 		this.updatePanelPositions();
 		if (this.options.initialArrangeMode === true) this.arrangeMode?.enter();
 		this.refresh();
@@ -3589,7 +3719,7 @@ export class M1CanvasSession {
 	 * positions are recomputed, from measurements cached per document.
 	 */
 	private followViewport(): void {
-		this.followedViewport = this.viewportSignature(this.displayViewport(), clientSize(this.root));
+		this.followedViewport = this.viewportSignature(this.displayViewport(), this.boardSize());
 		this.connectorLayer?.render();
 		this.updateConnectorLabels();
 		this.updateMixedSelectionFrame();
@@ -3612,12 +3742,15 @@ export class M1CanvasSession {
 		this.updateCommentMarkers();
 		this.placeSearchHit();
 		this.updateExportOverlay();
-		const size = clientSize(this.root), viewport = this.displayViewport();
+		const size = this.boardSize(), viewport = this.displayViewport();
 		const signature = `${this.lastSceneSignature}|${this.viewportSignature(viewport, size)}`;
 		// Mid-drag, the minimap follows the cards a few times a second: redrawn
 		// every frame, a large board's would cost more than the drag itself.
 		const now = Date.now();
 		if (signature === this.lastMinimapSignature || (this.pointerHeld && now - this.minimapDrawnAt < MINIMAP_DRAG_INTERVAL)) return;
+		// A map the stylesheet hides - a phone's narrow screen - is not
+		// followed at all; it is brought up to date when it shows again.
+		if (!this.minimapLaidOut) return;
 		this.minimap = new MinimapModel(this.scene, {
 			width: 240, height: 160, padding: 8, viewport, viewportSize: size, coordinateMode: this.viewport.coordinateMode,
 		});
@@ -3682,6 +3815,10 @@ export class M1CanvasSession {
 			}
 			if ((this.connectorLayer?.selection().length ?? 0) > 0 && this.closestTarget(event, ".canvas-selection")
 				&& !this.closestTarget(event, ".canvas-node-resizer") && this.startSelectionMove(event)) return;
+			// A finger on empty board pans and a second one pinches, as native
+			// Canvas does on a touch screen; its own long press still draws the
+			// selection box there.
+			if (event.pointerType === "touch") return;
 			if (event.button !== 0 || this.armedTool !== "select" || this.isSpacePanHeld() || this.inControls(event)
 				|| matchesPointer(this.settings.panBinding, event) || matchesPointer(this.settings.lassoBinding, event)
 				|| this.closestTarget(event, RECTANGLE_EXEMPT_SELECTOR)) return;
@@ -3840,7 +3977,7 @@ export class M1CanvasSession {
 					moved = this.readLiveGeometry();
 				}
 			}
-			const viewport = this.viewportSignature(this.displayViewport(), clientSize(this.root));
+			const viewport = this.viewportSignature(this.displayViewport(), this.boardSize());
 			if (moved || viewport !== this.followedViewport) {
 				this.followViewport();
 				idle = 0;
@@ -5655,9 +5792,11 @@ export class M1CanvasSession {
 		const x = Math.min(Math.max(centre, half + margin), Math.max(half + margin, area.width - half - margin));
 		const above = top - rootRect.top;
 		const below = above >= height + margin + 12 ? undefined : true;
+		// Hanging below, it stays above a phone's own bars at the foot.
+		const floor = area.height - this.hostFoot;
 		return {
 			x,
-			y: below === undefined ? above : Math.min(bottom - rootRect.top, Math.max(0, area.height - height - margin - 12)),
+			y: below === undefined ? above : Math.min(bottom - rootRect.top, Math.max(0, floor - height - margin - 12)),
 			...(below === undefined ? {} : { below }),
 		};
 	}
@@ -7382,7 +7521,7 @@ export class M1CanvasSession {
 	private drawMinimap(): void {
 		const canvas = this.controls.minimapCanvas;
 		const model = this.minimap;
-		if (canvas === undefined || model === undefined) {
+		if (canvas === undefined || model === undefined || !this.minimapLaidOut) {
 			return;
 		}
 		try {
@@ -7598,6 +7737,29 @@ export class M1CanvasSession {
 				this.refresh();
 				this.updatePanelPositions();
 			});
+		}
+	}
+
+	/**
+	 * Obsidian on a phone shows and hides its bars by marking the page: the
+	 * navigation bar slides away while a note reads full screen, the editing
+	 * toolbar opens with the keyboard, whose height it keeps on the page's
+	 * own style. Each such mark puts the panels back in their places once,
+	 * on the next frame; nothing is watched on a computer.
+	 */
+	private attachHostFootWatch(): void {
+		const document = ownerDocument(this.root);
+		const body = document?.body;
+		if (document === undefined || body == null || body.classList?.contains("is-mobile") !== true) return;
+		const Observer = readRuntime(document.defaultView, "MutationObserver");
+		if (typeof Observer !== "function") return;
+		try {
+			const observer = Reflect.construct(Observer, [() => this.schedulePanelPositions()]) as MutationObserver;
+			observer.observe(body, { attributes: true, attributeFilter: ["class"] });
+			observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+			this.disposers.push(() => observer.disconnect());
+		} catch {
+			// Without it the panels still follow the board's own resizes.
 		}
 	}
 

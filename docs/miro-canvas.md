@@ -806,7 +806,22 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   "Agents: the MCP server" under the data contract) and the skill in
   `.agents/skills/miro-canvas-format`, which now points to the server first.
 - [ ] `FUT-010` Tune settings and layouts for other operating systems, phones and tablets
-  (see M5 below). Left: the layouts, and a check on a device matrix.
+  (see M5 below). Android phone done 2026-09-28 on a Samsung Galaxy A33
+  (Obsidian 1.12.7, real touch and stylus input over adb and
+  `tools/obsidian_cdp/android.mjs`): the session measures Obsidian's floating
+  navigation bar, editing toolbar, keyboard (`--keyboard-height`) and the
+  system's navigation area (`--safe-area-inset-bottom`) into
+  `--miro-canvas-host-foot` and lifts the tool bar and the dock above them,
+  re-measuring on the page's class and style marks, never per frame; with the
+  keyboard up it hides both; a stored panel place resolves within the
+  uncovered board; the tool bar keeps every tool, wrapped onto two rows of
+  40px buttons; popovers stay inside the board; handles gain a 40px reach
+  under `pointer: coarse`; one finger on empty board is native Canvas's pan
+  and pinch, not a marquee; a hidden minimap is neither followed nor drawn;
+  new cards get native hex ids (Advanced Canvas's portals hide any id with a
+  hyphen). Left: the tablet with its S Pen (hover, the side button, a palm
+  landing before the pen), landscape on a phone (the dock stacked over the
+  bar leaves little board), iPhone and iPad, macOS and Linux.
 - [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts
   every machine shows as themselves (Inter and Source Code Pro from Obsidian,
   the system's sans-serif and serif) and the fonts set in Obsidian's own

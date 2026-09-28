@@ -49,7 +49,9 @@
    board has one set of view controls.  Selectors are doubled where
    Obsidian styles every button. */
 .miro-canvas-root .canvas-controls {
-  display: none;
+  /* Other Canvas plugins show the native controls again with an inline
+     style (seen on Android with Advanced Canvas and Canvas Minimap). */
+  display: none !important;
 }
 
 .miro-canvas-dock {
@@ -879,6 +881,9 @@
    namespaced, so an ordinary Canvas without an active session is never
    restyled. */
 .miro-canvas-toolbar {
+  /* Its own width, not the room left right of its `left`: on a phone that
+     room squeezed the bar over a selection into four rows. */
+  width: max-content;
   max-width: calc(100% - 16px);
   --miro-canvas-toolbar-bg: var(--background-primary);
   --miro-canvas-toolbar-border: var(--background-modifier-border);
@@ -1082,7 +1087,9 @@
    bigger controls where there is no mouse, and the bars out of each other's
    way where the board is narrow. */
 @media (pointer: coarse) {
-  .miro-canvas-toolbar {
+  /* The tool bar names its own smaller size, so it is named here too. */
+  .miro-canvas-toolbar,
+  .miro-canvas-toolbar.miro-canvas-tools {
     --miro-canvas-toolbar-size: 40px;
   }
 
@@ -1092,26 +1099,24 @@
   }
 
   .miro-canvas-dock .miro-canvas-dock__button {
-    width: 36px;
-    height: 36px;
-  }
-
-  .miro-canvas-handles .miro-canvas-handle--resize {
-    width: 16px;
-    height: 16px;
-  }
-
-  .miro-canvas-handles .miro-canvas-handle--route {
-    width: 14px;
-    height: 14px;
-  }
-
-  .miro-canvas-markers .miro-canvas-comment-marker,
-  .miro-canvas-comment-markers .miro-canvas-comment-marker {
     width: 40px;
     height: 40px;
-    min-width: 40px !important;
-    min-height: 40px !important;
+  }
+
+  /* A grip keeps its small look, which a mouse aims at well enough, and
+     gains an invisible reach around it for a finger: about 40px across.
+     The edges of a card take a wider strip for the same reason.  Comment
+     pins keep their own 32px, the same on every screen as in Miro. */
+  .miro-canvas-handles .miro-canvas-resizer--side {
+    --miro-resizer-reach: 24px;
+  }
+
+  .miro-canvas-handles .miro-canvas-resizer--corner::after,
+  .miro-canvas-handles .miro-canvas-handle::after {
+    content: "";
+    position: absolute;
+    inset: -15px;
+    border-radius: 50%;
   }
 }
 
@@ -1136,6 +1141,39 @@
   .miro-canvas-slideshow {
     bottom: 12px;
   }
+}
+
+/* Phones and tablets: Obsidian floats its own navigation bar, its editing
+   toolbar and the keyboard over the foot of the board, and the system's
+   navigation sits under it too.  `M1CanvasSession.updateHostFoot` measures
+   how far up they reach into `--miro-canvas-host-foot`, and the bars stand
+   on top of that instead of on the board's own edge.  Obsidian's status bar,
+   which the larger desktop gaps clear, does not show here.  The crowding
+   rules below still lift the dock over the bar where both do not fit side by
+   side: they come later with the same weight, so they win. */
+.is-mobile .miro-canvas-toolbar.miro-canvas-tools {
+  bottom: calc(10px + var(--miro-canvas-host-foot, 0px));
+}
+
+.is-mobile .miro-canvas-dock {
+  bottom: calc(10px + var(--miro-canvas-host-foot, 0px));
+}
+
+.is-mobile .miro-canvas-dock__map {
+  bottom: calc(60px + var(--miro-canvas-host-foot, 0px));
+}
+
+.is-mobile .miro-canvas-slideshow {
+  bottom: calc(12px + var(--miro-canvas-host-foot, 0px));
+}
+
+/* With the keyboard up the board keeps a strip of the screen, and the card
+   being written is in it: the tool bar and the dock step aside until the
+   keyboard goes down.  The bar over the selection stays, for formatting. */
+.is-mobile [data-miro-canvas-keyboard="open"] .miro-canvas-toolbar.miro-canvas-tools,
+.is-mobile [data-miro-canvas-keyboard="open"] .miro-canvas-dock,
+.is-mobile [data-miro-canvas-keyboard="open"] .miro-canvas-dock__map {
+  display: none;
 }
 
 /* On a narrow board the tool bar's centred default place can run under the
@@ -2156,6 +2194,25 @@
 
 .miro-canvas-handles[data-miro-canvas-rotating="true"] .miro-canvas-handle--rotate {
   cursor: grabbing;
+}
+
+/* For a finger the rotation grips sit further apart, so the reach each one
+   gains (see the coarse-pointer rules above) does not run into the next. */
+@media (pointer: coarse) {
+  .miro-canvas-handles__rotate-bar .miro-canvas-handle--rotate {
+    left: -30px;
+    top: 30px;
+  }
+
+  .miro-canvas-handles__rotate-bar .miro-canvas-handle--turn-next {
+    left: -30px;
+    top: -16px;
+  }
+
+  .miro-canvas-handles__rotate-bar .miro-canvas-handle--turn-back {
+    left: 16px;
+    top: 30px;
+  }
 }
 
 /* The two ends of a selected connector, dragged along any node's outline. */

@@ -221,6 +221,35 @@ export function defaultPanelsFit(boardWidth: number, toolbarWidth: number, dockW
   return "stacked";
 }
 
+/**
+ * What covers the foot of the screen on a phone or a tablet, in the
+ * window's own coordinates: the system's navigation area under the window,
+ * the on-screen keyboard, and the tops of Obsidian's own bars floating over
+ * the board there (the phone's navigation bar, the editing toolbar).
+ */
+export interface HostFoot {
+  readonly viewportBottom: number;
+  readonly safeAreaBottom: number;
+  readonly keyboardHeight: number;
+  readonly barTops: readonly number[];
+}
+
+/**
+ * How far up from the board's own foot the host's chrome reaches, so the
+ * board's panels can sit above it rather than under it. Zero when nothing
+ * covers the board; never more than half the board, so a bar measured in
+ * a strange place can never push the panels off the top of a small board.
+ */
+export function hostFootInset(boardTop: number, boardBottom: number, foot: HostFoot): number {
+  let coveredFrom = foot.viewportBottom - Math.max(0, foot.safeAreaBottom, foot.keyboardHeight);
+  for (const top of foot.barTops) {
+    if (Number.isFinite(top)) coveredFrom = Math.min(coveredFrom, top);
+  }
+  const inset = Math.max(0, boardBottom - coveredFrom);
+  const limit = Math.max(0, (boardBottom - boardTop) / 2);
+  return Math.round(Math.min(inset, limit));
+}
+
 /** An element whose inline position this module may write; a real `HTMLElement` satisfies it. */
 export interface StyledElement {
   readonly style: {

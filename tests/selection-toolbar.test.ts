@@ -6,6 +6,7 @@ import { frameColors } from "../src/miro-palette";
 import { SHAPE_CATALOG } from "../src/shape-catalog";
 import { CONNECTOR_CAPS } from "../src/source-model";
 import {
+  keepPanelInView,
   SelectionToolbar,
   type SelectionStylePatch,
   type SelectionToolbarOptions,
@@ -816,5 +817,35 @@ describe("selection toolbar in Russian", () => {
     expect(byLabel(edgeRoot, "Начало линии")).toBeDefined();
     expect(byLabel(edgeRoot, "Конец линии")).toBeDefined();
     expect(byLabel(edgeRoot, "Поменять концы местами")).toBeDefined();
+  });
+});
+
+describe("keepPanelInView", () => {
+  /** A panel measured at a given place, inside a phone-sized board. */
+  function panelAt(left: number, top: number, width: number, height: number) {
+    const style = new Map<string, string>();
+    const board = { getBoundingClientRect: () => ({ left: 0, top: 80, right: 384, bottom: 475 }) };
+    const panel = {
+      style: {
+        setProperty: (name: string, value: string) => style.set(name, value),
+        removeProperty: (name: string) => style.delete(name),
+      },
+      closest: () => board,
+      getBoundingClientRect: () => ({ left, top, right: left + width, bottom: top + height }),
+    };
+    keepPanelInView(panel as unknown as HTMLElement);
+    return style;
+  }
+
+  it("moves a panel that runs off the right of a phone back inside, 8px from the edge", () => {
+    expect(panelAt(276, 200, 253, 100).get("translate")).toBe("-153px 0");
+  });
+
+  it("leaves a panel that already fits alone", () => {
+    expect(panelAt(100, 200, 200, 100).size).toBe(0);
+  });
+
+  it("cuts a panel longer than the strip the keyboard leaves, so it scrolls", () => {
+    expect(panelAt(100, 342, 200, 170).get("max-height")).toBe("125px");
   });
 });

@@ -5,6 +5,7 @@ import {
   applyPanelPosition,
   applyPanelPositionSettled,
   defaultPanelsFit,
+  hostFootInset,
   effectivePanelOrientation,
   flipPanelOrientation,
   isVerticalAnchor,
@@ -382,5 +383,28 @@ describe("applyPanelPositionSettled", () => {
     expect(style.size).toBe(0);
     expect(attributes.get("data-miro-canvas-panel-orientation")).toBe("horizontal");
     expect(measureCalls).toHaveLength(0);
+  });
+});
+
+describe("hostFootInset", () => {
+  // A phone 853px tall whose board runs from 80px to the foot of the screen.
+  const phone = { viewportBottom: 853, safeAreaBottom: 48, keyboardHeight: 0, barTops: [755] };
+
+  it("reaches up to the top of Obsidian's floating navigation bar", () => {
+    expect(hostFootInset(80, 853, phone)).toBe(98);
+  });
+
+  it("still clears the system's own navigation area once the bar slides away", () => {
+    expect(hostFootInset(80, 853, { ...phone, barTops: [] })).toBe(48);
+  });
+
+  it("counts the keyboard, and nothing on a board that already ends above it", () => {
+    expect(hostFootInset(80, 853, { ...phone, keyboardHeight: 327, barTops: [] })).toBe(327);
+    expect(hostFootInset(80, 475, { ...phone, keyboardHeight: 327, barTops: [475] })).toBe(0);
+  });
+
+  it("is nothing on a computer and never more than half the board", () => {
+    expect(hostFootInset(0, 800, { viewportBottom: 800, safeAreaBottom: 0, keyboardHeight: 0, barTops: [] })).toBe(0);
+    expect(hostFootInset(80, 853, { ...phone, barTops: [100] })).toBe(387);
   });
 });

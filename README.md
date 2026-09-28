@@ -24,6 +24,7 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 - [Fonts](#fonts)
 - [The file stays a Canvas](#the-file-stays-a-canvas)
 - [Reference](#reference)
+- [Phones and tablets](#phones-and-tablets)
 - [Languages](#languages)
 - [Limits](#limits)
 - [Plans](#plans)
@@ -444,6 +445,33 @@ so nothing is taken from Obsidian or other plugins.
 - **Developer diagnostics** - a badge listing what the plugin could not do.
 
 </details>
+
+## Phones and tablets
+
+The plugin works in Obsidian for Android; it was checked on a Samsung Galaxy
+A33 phone. iPhone and iPad are expected to behave the same but are not
+checked yet.
+
+- **The bars stay clear.** The tool bar and the dock stand above Obsidian's
+  floating navigation bar and the phone's own navigation, and step aside
+  while the keyboard is up, so the card you are writing in stays in view.
+  The bar over a selection stays, for formatting.
+- **Buttons for a finger.** Every tool stays on the bar, which wraps onto two
+  rows of 40px buttons on a phone; the dock's buttons are 40px too. Menus and
+  pickers stay inside the screen and scroll when the keyboard leaves them
+  little room. The minimap is hidden on a narrow screen.
+- **Gestures, as in Obsidian's Canvas.** One finger on empty board pans and
+  two fingers pinch to zoom. A tap selects a card and a second tap edits it.
+  To move a card, hold it for a moment, then drag; a long press on empty
+  board draws a selection box, and a long press on a card opens its menu.
+- **Handles** keep their small look but take a finger from about 40px around.
+- **A stylus** draws while a finger pans (see
+  [Drawing, lines and arrows](#drawing-lines-and-arrows)).
+- **Other plugins.** With Canvas Minimap on, its see-through map covers the
+  lower part of the board; a tap on this plugin's bars no longer moves the
+  board through it. With Advanced Canvas's portals on, a card whose id has a
+  hyphen cannot be selected; the cards this plugin makes use Obsidian's own
+  kind of id.
 
 ## Languages
 

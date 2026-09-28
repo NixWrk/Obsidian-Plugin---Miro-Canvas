@@ -18,6 +18,20 @@
   next to the original, which is never changed. Every element comes over or
   is listed on an optional import report card, and a picture or embed that
   cannot come over leaves a dashed placeholder where it was.
+- On a phone the tool bar and the corner dock stand above Obsidian's
+  floating navigation bar instead of under it, and step aside while the
+  keyboard is up. Their buttons are 40px wide, and handles take a finger
+  from about 40px around. Menus and pickers stay on the screen.
+- One finger on empty board pans and two fingers zoom on a touch screen;
+  before, a finger drew a selection box and the board could not be moved.
+- Obsidian's own Canvas controls no longer come back when another plugin
+  (Advanced Canvas, Canvas Minimap) shows them.
+- New cards, shapes, sticky notes and lines get ids of Obsidian's own kind.
+  With Advanced Canvas's portals on, the old ids, which had a hyphen, hid
+  the new item from the board, and it was never made.
+- A tap on the tool bar no longer also moves the board when Canvas Minimap
+  lies under it, and the bar over a selection keeps its one or two rows
+  instead of squeezing into four.
 - On a narrow board - a small window or an open sidebar - the bottom bar no
   longer runs under the corner dock: until either has been moved, the bar
   goes to the left edge, and when that is still too tight the dock and the

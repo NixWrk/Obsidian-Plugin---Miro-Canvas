@@ -154,6 +154,22 @@ main one - see "Separate windows" below.
 `record.mjs` does not shell out to this file; it imports the same functions
 (`connectTarget`, `evaluate`, `pressKey`, `insertText`, ...) directly.
 
+## Android (`android.mjs`)
+
+Obsidian on an Android phone or tablet connected over USB debugging: `adb`
+forwards its WebView's DevTools socket to a local port, and `cdp.mjs` works
+against it as against the desktop app (`CDP_PORT=9340 CDP_TITLE=Obsidian`).
+The header of `android.mjs` lists every command: `devices`, `forward` (run it
+again after Obsidian restarts), `status`, `deploy` (writes only into the
+vault named on the command line), `pointer-log start|dump|stop` (what the
+page sees of each finger, stylus and palm, clicks included), `shot` (the
+device's own screen), and real input in the page's CSS pixels: `tap`,
+`swipe` and `press` (a long press) through the touch screen, or a stylus
+with `--stylus`, and `pinch`, two fingers over CDP, which `adb input` cannot
+give. `adb input` also cannot hover a stylus or press its side button; that
+needs the pen itself. Wrap each call in a timeout: a device that locks
+leaves `adb` waiting.
+
 ## Recording a scenario
 
 ```
