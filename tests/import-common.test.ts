@@ -374,10 +374,9 @@ describe("the importers", () => {
 		expect(IMPORT_ADAPTERS.map((adapter) => adapter.id).sort()).toEqual([...IMPORT_FORMATS].sort());
 	});
 
-	it("recognises nothing yet: every importer is still a stub", () => {
-		expect(findAdapter(source("a.excalidraw", "excalidraw"))).toBeUndefined();
+	it("leaves an ordinary canvas alone and hands a mind-map note to its importer", () => {
 		expect(findAdapter(source("a.canvas", "canvas"))).toBeUndefined();
-		expect(findAdapter(source("a.md", "md", { "mindmap-plugin": "basic" }))).toBeUndefined();
+		expect(findAdapter(source("a.md", "md", { "mindmap-plugin": "basic" }))?.id).toBe("mindmap-outline");
 	});
 
 	it("takes the first importer that says yes, and counts one that throws as a no", () => {
@@ -520,7 +519,8 @@ describe("importIntoBoard", () => {
 	});
 
 	it("says so, and creates nothing, when no importer recognises the file", async () => {
-		const fake = fakeHost({ adapters: IMPORT_ADAPTERS });
+		const never: FormatAdapter = { id: "excalidraw", detect: () => false, convert: () => { throw new Error("no"); } };
+		const fake = fakeHost({ adapters: [never] });
 		expect(await importIntoBoard(fake.host, sourceFile)).toBeNull();
 		expect(fake.notices).toEqual([words().importer.notRecognised]);
 		expect(fake.create).not.toHaveBeenCalled();

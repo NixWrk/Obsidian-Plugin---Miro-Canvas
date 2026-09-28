@@ -1,0 +1,50 @@
+{
+	"nodes":[
+		{"id":"start","type":"group","label":"Start slide","x":0,"y":-800,"width":400,"height":225,"ratio":1.7777777777777777},
+		{"id":"slide2","type":"group","label":"Slide 2","x":500,"y":-800,"width":400,"height":225},
+		{"id":"slide3","type":"group","label":"Slide 3","x":1000,"y":-800,"width":400,"height":225},
+		{"id":"slide4","type":"group","label":"Slide 4","x":1000,"y":-500,"width":400,"height":225},
+		{"id":"t-pill","type":"text","text":"Pill","x":0,"y":0,"width":200,"height":80,"styleAttributes":{"shape":"pill","border":"dashed","textAlign":"center"}},
+		{"id":"t-diamond","type":"text","text":"Diamond","x":250,"y":0,"width":200,"height":200,"color":"4","styleAttributes":{"shape":"diamond","border":"dotted","textAlign":"right"}},
+		{"id":"t-parallelogram","type":"text","text":"Parallelogram","x":500,"y":0,"width":200,"height":80,"styleAttributes":{"shape":"parallelogram","border":"invisible"}},
+		{"id":"t-circle","type":"text","text":"Circle","x":750,"y":0,"width":150,"height":150,"styleAttributes":{"shape":"circle"}},
+		{"id":"t-predefined","type":"text","text":"Predefined process","x":0,"y":250,"width":200,"height":80,"styleAttributes":{"shape":"predefined-process"}},
+		{"id":"t-document","type":"text","text":"Document","x":250,"y":250,"width":200,"height":100,"styleAttributes":{"shape":"document","textAlign":null}},
+		{"id":"t-database","type":"text","text":"Database","x":500,"y":250,"width":150,"height":150,"styleAttributes":{"shape":"database"}},
+		{"id":"t-existing","type":"text","text":"Already styled by Miro Canvas","x":750,"y":250,"width":200,"height":100,"styleAttributes":{"shape":"pill","border":"dashed"}},
+		{"id":"t-custom","type":"text","text":"Custom style","x":0,"y":450,"width":200,"height":80,"styleAttributes":{"glow":"soft"},"dynamicHeight":true,"zIndex":3},
+		{"id":"t-plain","type":"text","text":"Plain card","x":250,"y":450,"width":200,"height":80,"styleAttributes":{},"foo":{"kept":true}},
+		{"id":"f-shaped","type":"file","file":"Notes/Shaped.md","x":500,"y":450,"width":300,"height":200,"styleAttributes":{"shape":"pill"}},
+		{"id":"portal","type":"file","file":"Boards/Other.canvas","x":0,"y":700,"width":400,"height":300,"portal":true,"interdimensionalEdges":[{"id":"ie-1","fromNode":"t-circle","fromSide":"bottom","toNode":"acportal||portal||inner1","toSide":"top"}]},
+		{"id":"g-collapsed","type":"group","label":"Collapsed group","x":500,"y":700,"width":400,"height":300,"collapsed":true}
+	],
+	"edges":[
+		{"id":"e-slide-1","fromNode":"start","fromSide":"right","toNode":"slide2","toSide":"left"},
+		{"id":"e-slide-2b","fromNode":"slide2","fromSide":"right","toNode":"slide3","toSide":"left","label":"b"},
+		{"id":"e-slide-2a","fromNode":"slide2","fromSide":"bottom","toNode":"slide4","toSide":"left","label":"a"},
+		{"id":"e-slide-back","fromNode":"slide4","fromSide":"left","toNode":"start","toSide":"bottom"},
+		{"id":"e-dotted","fromNode":"t-pill","fromSide":"right","toNode":"t-diamond","toSide":"left","styleAttributes":{"path":"dotted","arrow":"triangle-outline"}},
+		{"id":"e-short","fromNode":"t-diamond","fromSide":"right","toNode":"t-parallelogram","toSide":"left","fromEnd":"arrow","toEnd":"arrow","styleAttributes":{"path":"short-dashed","arrow":"thin-triangle"}},
+		{"id":"e-long","fromNode":"t-parallelogram","fromSide":"right","toNode":"t-circle","toSide":"left","fromEnd":"arrow","styleAttributes":{"path":"long-dashed","arrow":"halved-triangle","pathfindingMethod":"a-star"}},
+		{"id":"e-diamond","fromNode":"t-pill","fromSide":"bottom","toNode":"t-predefined","toSide":"top","styleAttributes":{"arrow":"diamond","pathfindingMethod":"direct"}},
+		{"id":"e-diamond-outline","fromNode":"t-diamond","fromSide":"bottom","toNode":"t-document","toSide":"top","styleAttributes":{"arrow":"diamond-outline","pathfindingMethod":"square"}},
+		{"id":"e-circle","fromNode":"t-parallelogram","fromSide":"bottom","toNode":"t-database","toSide":"top","styleAttributes":{"arrow":"circle"}},
+		{"id":"e-circle-outline","fromNode":"t-circle","fromSide":"bottom","toNode":"t-existing","toSide":"top","fromEnd":"arrow","toEnd":"none","styleAttributes":{"arrow":"circle-outline"}},
+		{"id":"e-blunt","fromNode":"t-predefined","fromSide":"right","toNode":"t-document","toSide":"left","styleAttributes":{"arrow":"blunt"}},
+		{"id":"e-no-ends","fromNode":"t-document","fromSide":"right","toNode":"t-database","toSide":"left","toEnd":"none","styleAttributes":{"arrow":"circle"}},
+		{"id":"e-custom","fromNode":"t-custom","fromSide":"right","toNode":"t-plain","toSide":"left","styleAttributes":{"flow":"animated"}},
+		{"id":"e-existing","fromNode":"t-plain","fromSide":"right","toNode":"f-shaped","toSide":"left","color":"2","styleAttributes":{"path":"dotted"}},
+		{"id":"e-into-portal","fromNode":"t-database","fromSide":"bottom","toNode":"acportal||portal||inner2","toSide":"top"},
+		{"id":"e-lost","fromNode":"t-database","fromSide":"right","toNode":"nowhere","toSide":"left"}
+	],
+	"metadata":{"version":"1.0-1.0","frontmatter":{"tags":["board"]},"startNode":"start"},
+	"miroCanvas":{
+		"schemaVersion":1,
+		"localOverrides":{
+			"t-existing":{"shape":{"kind":"rectangle","fallback":"text"},"typography":{"fontSize":20}},
+			"e-existing":{"connector":{"strokeStyle":"solid"}}
+		}
+	},
+	"miroSource":{"board":{"id":"uXjVKq0vX9Y=","name":"Imported from Miro"},"items":[{"id":"3458764590000000001","type":"sticky_note","data":{"content":"<p>Hello</p>"}}]},
+	"foo":{"nested":[1,2,{"deep":"value"}]}
+}
