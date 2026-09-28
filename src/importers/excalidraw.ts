@@ -40,7 +40,7 @@
 import type { CanvasAnchor } from "../anchors";
 import { isValidFontSize } from "../appearance";
 import { MAX_WAYPOINTS } from "../connector-route";
-import { simplifyPoints, strokeBounds, type StrokePoint } from "../drawing";
+import { defaultPenInk, simplifyPoints, strokeBounds, type StrokePoint } from "../drawing";
 import { MAX_STROKE_POINTS, readLocalStroke, type LocalStroke } from "../local-items";
 import { BoardBuilder, type BoardRect, type ImportedCardStyle, type SourceElement } from "./board-builder";
 import { readExcalidrawFile, type ExcalidrawFile, type ExcalidrawReadErrorCode } from "./excalidraw-file";
@@ -166,14 +166,13 @@ const DEFAULT_ARROWHEAD_SIZE = 15;
  * stroke's size.
  */
 const FREEDRAW_SIZE_PER_WIDTH = 4.25;
-/** Excalidraw's default ink, for a stroke whose colour cannot be read. */
-const DEFAULT_INK = "#1e1e1e";
 /**
  * Excalidraw's default ink, today's and the plain black of older drawings.
  * Excalidraw turns it light on a dark canvas; kept as it is, text and
  * outlines in it would all but vanish on a dark board.  A card's text and
  * outline and a line in this ink take the board's own colours instead,
- * which read on light and dark boards alike.
+ * which read on light and dark boards alike.  A pen stroke must name a
+ * colour: it takes the one the board's own pen draws with by default.
  */
 const DEFAULT_INKS = new Set(["#1e1e1e", "#000000"]);
 /** The longest label a line keeps. */
@@ -449,8 +448,11 @@ class DrawingImport {
 		const colorAlpha = color === undefined ? 1 : color.kind === "hex" ? color.alpha : 0;
 		// A stroke nobody can see is still a stroke: the faintest the board draws.
 		const opacity = Math.min(1, Math.max(0.01, roundTo(opacityShare * colorAlpha, 2)));
+		// The default ink, or a colour that cannot be read, becomes the pen's
+		// own default; the stroke's transparency is kept apart from its colour.
+		const ownColor = color?.kind === "hex" && !DEFAULT_INKS.has(color.opaqueHex) ? color.opaqueHex : undefined;
 		const candidate: LocalStroke = {
-			color: color?.kind === "hex" ? color.opaqueHex : DEFAULT_INK,
+			color: ownColor ?? defaultPenInk(this.context.theme ?? "light"),
 			width,
 			...(opacity < 1 ? { opacity } : {}),
 			box: { width: right - left, height: bottom - top },

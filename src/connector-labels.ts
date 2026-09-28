@@ -95,6 +95,31 @@ export class ConnectorLabels {
     }
   }
 
+  /**
+   * Put the labels last in native Canvas's moving layer, over the cards, as
+   * native labels are.  True when the labels must be laid again: they were
+   * not in this layer yet, or native Canvas has made an edge's own label
+   * since they were put there.  Native Canvas makes that label only when it
+   * first draws the edge - once the edge comes into view, often after the
+   * board has opened - and puts it after these; laid again, the labels find
+   * it and hide it, so an edge never shows its label twice.
+   */
+  public mount(layer: Element): boolean {
+    if (this.element.parentElement !== layer) {
+      layer.appendChild(this.element);
+      return true;
+    }
+    let nativeLabelAdded = false;
+    for (let next = this.element.nextElementSibling; next !== null; next = next.nextElementSibling) {
+      if (next.classList.contains("canvas-path-label-wrapper")) {
+        nativeLabelAdded = true;
+        break;
+      }
+    }
+    if (this.element.nextElementSibling !== null) layer.appendChild(this.element);
+    return nativeLabelAdded;
+  }
+
   /** A route being reshaped: its label moves with it before the pointer is let go. */
   public preview(id: string, points: readonly AnchorPoint[]): void {
     this.previews.set(id, points);

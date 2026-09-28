@@ -1046,7 +1046,7 @@ taken 1:1.
 | picture stored inside the drawing, iframe, unknown element | dashed placeholder where it was |
 | `$$…$$` formula, web embed, embedded note | card with the LaTeX, card with a link, file card |
 | element `link` | a line under the card's text; on a line, stroke, picture or frame it is reported ("link not kept") |
-| Excalidraw's default ink (`#1e1e1e`, `#000000`) | the board's own text, outline and line colours, which read on light and dark boards |
+| Excalidraw's default ink (`#1e1e1e`, `#000000`) | the board's own text, outline and line colours, which read on light and dark boards; a pen stroke, which must name its colour, takes the pen's own default for the theme the new board opens in (white on dark, `#1a1a1a` on light) |
 
 Reported once per kind, not drawn: hand-drawn roughness, hatched fills,
 groups, shape transparency, picture cropping, the background colour. A closed

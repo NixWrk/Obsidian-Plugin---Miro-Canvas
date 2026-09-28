@@ -512,6 +512,21 @@ describe("importIntoBoard", () => {
 		expect(fake.notices).toEqual(["Created Maps/Ideas (board).canvas"]);
 	});
 
+	it("tells the importer the theme the new board opens in, and nothing when the host does not know it", async () => {
+		const themes: Array<string | undefined> = [];
+		const watching: FormatAdapter = {
+			...oneCardAdapter,
+			convert: (source, importContext) => {
+				themes.push(importContext.theme);
+				return oneCardAdapter.convert(source, importContext);
+			},
+		};
+		const dark = fakeHost({ adapters: [watching] });
+		await importIntoBoard({ ...dark.host, theme: () => "dark" }, sourceFile);
+		await importIntoBoard(fakeHost({ adapters: [watching] }).host, sourceFile);
+		expect(themes).toEqual(["dark", undefined]);
+	});
+
 	it("leaves the report card off when asked to", async () => {
 		const fake = fakeHost({ adapters: [oneCardAdapter], choice: { reportCard: false } });
 		await importIntoBoard(fake.host, sourceFile);

@@ -751,6 +751,35 @@ describe("CanvasAuthoring", () => {
 		expect(runtime.getData()).toEqual(applied);
 	});
 
+	it("never adds miroCanvas to a board without it, whether the cards move or not", () => {
+		const nativeBoard = (): CanvasDocument => ({
+			nodes: [
+				{ id: "under", type: "text", text: "under", x: 0, y: 0, width: 100, height: 60 },
+				{ id: "over", type: "text", text: "over", x: 40, y: 20, width: 100, height: 60 },
+			],
+			edges: [],
+		});
+
+		// Already on top: nothing is written and native Canvas's history takes no step.
+		const unchanged = new NativeGraph(nativeBoard());
+		const noop = createCanvasAuthoring(unchanged).changeZOrder({ ids: ["over"], direction: "front" });
+		expect(noop.ok).toBe(true);
+		expect(noop.diagnostics.map((item) => item.code)).toContain("z-order-noop");
+		expect(unchanged.importDataSpy).not.toHaveBeenCalled();
+		expect(unchanged.requestSaveSpy).not.toHaveBeenCalled();
+		expect(unchanged.history).toHaveLength(1);
+		expect(unchanged.getData()).toEqual(nativeBoard());
+
+		// Brought to the front: only the order of the nodes changes.
+		const moved = new NativeGraph(nativeBoard());
+		const result = createCanvasAuthoring(moved).changeZOrder({ ids: ["under"], direction: "front" });
+		expect(result.ok).toBe(true);
+		const applied = moved.getData() as CanvasDocument;
+		expect((applied.nodes as CanvasDocument[]).map((node) => node.id)).toEqual(["over", "under"]);
+		expect(applied).not.toHaveProperty("miroCanvas");
+		expect(moved.history).toHaveLength(2);
+	});
+
 	it("applies stale, review, lock, readonly, and source-ID collision guards to layer transactions", () => {
 		const staleRuntime = new NativeGraph(layerDocument());
 		const staleAuthoring = createCanvasAuthoring(staleRuntime);

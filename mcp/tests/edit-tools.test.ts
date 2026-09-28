@@ -203,11 +203,32 @@ describe("layers", () => {
 		expect(after.miroCanvas?.zOrder).toBeUndefined();
 	});
 
-	it("answers noop when the card is already there", () => {
-		const root = makeFixtureVault();
-		const result = toolsFor(root)("layer", { path: "boards/future-fields-board.canvas", ids: ["n1"], direction: "front" });
-		expect(result.status).toBe("noop");
-		expect(result.written).toBe(false);
+	for (const [name, id] of [["future-fields-board.canvas", "n1"], ["native-board.canvas", "note-1"]] as const) {
+		it(`answers noop when the card is already there, and leaves ${name} as it was`, () => {
+			const root = makeFixtureVault();
+			const bytes = readFileSync(boardFile(root, name));
+			const result = toolsFor(root)("layer", { path: `boards/${name}`, ids: [id], direction: "front" });
+			expect(result.status).toBe("noop");
+			expect(result.written).toBe(false);
+			expect(readFileSync(boardFile(root, name)).equals(bytes)).toBe(true);
+		});
+	}
+
+	it("never adds the plugin's data to a board without it when the cards move", () => {
+		const root = makeVault();
+		const file = path.join(root, "plain.canvas");
+		writeFileSync(file, JSON.stringify({
+			nodes: [
+				{ id: "under", type: "text", text: "under", x: 0, y: 0, width: 100, height: 60 },
+				{ id: "over", type: "text", text: "over", x: 40, y: 20, width: 100, height: 60 },
+			],
+			edges: [],
+		}));
+		const result = toolsFor(root)("layer", { path: "plain.canvas", ids: ["under"], direction: "front" });
+		expect(result.status).toBe("applied");
+		const after = readJson(file);
+		expect(after.nodes.map((node: Answer) => node.id)).toEqual(["over", "under"]);
+		expect(after.miroCanvas).toBeUndefined();
 	});
 });
 

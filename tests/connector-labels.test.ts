@@ -4,6 +4,7 @@ import { ConnectorLabels, type ConnectorLabel, type ConnectorLabelsHost } from "
 
 class FakeStyle {
   public transform = "";
+  public visibility = "";
   private readonly props = new Map<string, string>();
   public setProperty(name: string, value: string): void {
     this.props.set(name, value);
@@ -31,7 +32,22 @@ class FakeElement {
 
   public constructor(public readonly tagName: string) {}
 
+  public get parentElement(): FakeElement | null {
+    return this.parentNode ?? null;
+  }
+
+  public get nextElementSibling(): FakeElement | null {
+    const siblings = this.parentNode?.children;
+    if (siblings === undefined) return null;
+    return siblings[siblings.indexOf(this) + 1] ?? null;
+  }
+
+  public get classList(): { contains: (name: string) => boolean } {
+    return { contains: (name) => this.className.split(" ").includes(name) };
+  }
+
   public appendChild(child: FakeElement): FakeElement {
+    child.parentNode?.removeChild(child);
     child.parentNode = this;
     this.children.push(child);
     return child;
@@ -128,6 +144,51 @@ describe("connector labels", () => {
     for (const property of ["font-family", "font-size", "font-weight", "font-style", "text-decoration"]) {
       expect(label.style.has(property)).toBe(false);
     }
+  });
+
+  it("asks to be laid again when native Canvas makes an edge's own label after them", () => {
+    const labels = new ConnectorLabels(new FakeDocument() as unknown as Document, host());
+    const document = new FakeDocument();
+    const board = document.createElement("div");
+    const ours = labels.element as unknown as FakeElement;
+
+    // Mounted for the first time: laid, and last in the moving layer.
+    expect(labels.mount(board as unknown as Element)).toBe(true);
+    expect(board.children.at(-1)).toBe(ours);
+    expect(labels.mount(board as unknown as Element)).toBe(false);
+
+    // A card coming into view goes after the labels: they go back over it,
+    // with nothing to lay again.
+    const card = board.appendChild(document.createElement("div"));
+    card.className = "canvas-node";
+    expect(labels.mount(board as unknown as Element)).toBe(false);
+    expect(board.children.at(-1)).toBe(ours);
+
+    // An edge drawn for the first time gets its own label only now.
+    const nativeLabel = board.appendChild(document.createElement("div"));
+    nativeLabel.className = "canvas-path-label-wrapper";
+    expect(labels.mount(board as unknown as Element)).toBe(true);
+    expect(board.children.at(-1)).toBe(ours);
+    expect(labels.mount(board as unknown as Element)).toBe(false);
+  });
+
+  it("hides an edge's own label that native Canvas made after the edge's label was first laid", () => {
+    const labels = new ConnectorLabels(new FakeDocument() as unknown as Document, host());
+    const root = labels.element as unknown as FakeElement;
+    // Laid before native Canvas drew the edge: there is no native label yet.
+    labels.update([item()]);
+    const first = root.children[0];
+
+    const nativeLabel = new FakeElement("div");
+    nativeLabel.className = "canvas-path-label-wrapper";
+    labels.update([item({ native: nativeLabel as unknown as HTMLElement })]);
+    expect(nativeLabel.style.visibility).toBe("hidden");
+    expect(root.children).toHaveLength(1);
+    expect(root.children[0]).not.toBe(first);
+
+    // Gone from the board: the edge's own label shows again.
+    labels.update([]);
+    expect(nativeLabel.style.visibility).toBe("");
   });
 
   it("leaves a label with no font untouched, wearing native Canvas's own rule", () => {

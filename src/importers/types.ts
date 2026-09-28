@@ -38,6 +38,13 @@ export interface ImportContext {
 	readonly newId: () => string;
 	/** The vault path a link in the source points at, seen from `from`; undefined when no such file exists. */
 	readonly resolveLink: (link: string, from: string) => string | undefined;
+	/**
+	 * The theme the new board opens in, light when unknown.  A pen stroke in
+	 * the source's default ink takes the pen's own default for it, since a
+	 * stroke must name its colour and the source's near-black would all but
+	 * vanish on a dark board.
+	 */
+	readonly theme?: "light" | "dark";
 }
 
 /**

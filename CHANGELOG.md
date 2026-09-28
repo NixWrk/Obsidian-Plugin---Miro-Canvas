@@ -17,7 +17,9 @@
   shows what was found and how much comes over; the board is one new file
   next to the original, which is never changed. Every element comes over or
   is listed on an optional import report card, and a picture or embed that
-  cannot come over leaves a dashed placeholder where it was.
+  cannot come over leaves a dashed placeholder where it was. A pen stroke in
+  Excalidraw's default ink takes the board's own pen colour for the theme the
+  board opens in, so it no longer all but vanishes on a dark board.
 - On a phone the tool bar and the corner dock stand above Obsidian's
   floating navigation bar instead of under it, and step aside while the
   keyboard is up. Their buttons are 40px wide, and handles take a finger
@@ -32,6 +34,13 @@
 - A tap on the tool bar no longer also moves the board when Canvas Minimap
   lies under it, and the bar over a selection keeps its one or two rows
   instead of squeezing into four.
+- A labelled line no longer shows its label twice: native Canvas makes a
+  line's own label only when it first draws the line - on opening an
+  imported board, or once the line scrolls into view - and that label is
+  now hidden behind the board's own as well.
+- Bringing forward or sending back a card that is already there no longer
+  writes anything, and layering on a board without the plugin's data never
+  adds it.
 - On a narrow board - a small window or an open sidebar - the bottom bar no
   longer runs under the corner dock: until either has been moved, the bar
   goes to the left edge, and when that is still too tight the dock and the

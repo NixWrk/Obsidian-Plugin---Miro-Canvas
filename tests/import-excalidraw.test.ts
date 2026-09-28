@@ -628,3 +628,46 @@ describe("excalidraw importer: fills the board does not draw", () => {
 		expect(board.result.report.counts).toMatchObject({ converted: 3, approximated: 2 });
 	});
 });
+
+describe("excalidraw importer: pen strokes in the default ink", () => {
+	function strokeScene(elements: readonly Record<string, unknown>[]): ImportSource {
+		const text = JSON.stringify({ type: "excalidraw", version: 2, elements, appState: {}, files: {} });
+		return { path: "Drawings/ink.excalidraw", extension: "excalidraw", text };
+	}
+
+	function stroke(id: string, strokeColor: unknown): Record<string, unknown> {
+		return { id, type: "freedraw", x: 0, y: 0, width: 60, height: 20, strokeColor, strokeWidth: 1, points: [[0, 0], [30, 20], [60, 0]] };
+	}
+
+	function inkOf(board: Board, id: string): { readonly color: string; readonly opacity?: number } {
+		return (board.override(id).item as { stroke: { color: string; opacity?: number } }).stroke;
+	}
+
+	const scene = strokeScene([
+		stroke("today", "#1e1e1e"),
+		stroke("older", "#000000"),
+		stroke("unreadable", "ink"),
+		stroke("half", "#1e1e1e80"),
+		stroke("green", "#2f9e44"),
+	]);
+
+	it("draws the default ink as the board's own pen does on a dark board", () => {
+		const board = new Board(convertExcalidraw(scene, { ...context(), theme: "dark" }));
+		for (const id of ["today", "older", "unreadable", "half"]) {
+			expect(inkOf(board, id).color, id).toBe("#ffffff");
+		}
+		// A stroke's transparency is its own, apart from the ink.
+		expect(inkOf(board, "half").opacity).toBe(0.5);
+		expect(inkOf(board, "green").color).toBe("#2f9e44");
+	});
+
+	it("draws the default ink as the board's own pen does on a light board, and when the theme is unknown", () => {
+		for (const theme of ["light", undefined] as const) {
+			const board = new Board(convertExcalidraw(scene, { ...context(), ...(theme === undefined ? {} : { theme }) }));
+			for (const id of ["today", "older", "unreadable"]) {
+				expect(inkOf(board, id).color, `${id} ${theme}`).toBe("#1a1a1a");
+			}
+			expect(inkOf(board, "green").color).toBe("#2f9e44");
+		}
+	});
+});

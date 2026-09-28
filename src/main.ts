@@ -735,6 +735,9 @@ export default class MiroCanvasPlugin extends Plugin {
       pluginVersion: this.manifest.version,
       notice: (message) => new Notice(message),
       confirm: (preview) => showImportPreview(new Modal(this.app), preview),
+      // A new board has no theme of its own: it follows the system's, as
+      // the board itself works it out once it is open.
+      theme: () => (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
     }, file).catch((error: unknown) => {
       console.error("[miro-canvas] import failed", error);
       new Notice(words().importer.failed);

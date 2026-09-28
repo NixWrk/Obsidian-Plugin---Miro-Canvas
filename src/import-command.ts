@@ -60,6 +60,8 @@ export interface ImportHost {
 	readonly now?: () => Date;
 	/** Seeds the new board's ids; random unless a test fixes it. */
 	readonly seed?: number;
+	/** The theme the new board opens in, which a pen stroke's default ink follows; light when absent. */
+	readonly theme?: () => "light" | "dark";
 }
 
 /** How many entries the preview lists; the report card lists the rest. */
@@ -134,6 +136,7 @@ export async function importIntoBoard(host: ImportHost, file: TFile): Promise<TF
 		now: (host.now?.() ?? new Date()).toISOString(),
 		newId,
 		resolveLink: (link, from) => host.app.metadataCache.getFirstLinkpathDest(link, from)?.path,
+		...(host.theme === undefined ? {} : { theme: host.theme() }),
 	};
 	let result: ImportResult;
 	try {

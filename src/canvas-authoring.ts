@@ -1681,7 +1681,13 @@ function buildZOrderDocument(
 		addDiagnostic(diagnostics, "metadata-validation-failed", "error", "The proposed z-order metadata failed validation; no graph import was attempted.");
 		return undefined;
 	}
-	setOwn(document, "miroCanvas", metadata);
+	// A board with no plugin data keeps its cards' layers in the order of its
+	// nodes alone: the plugin's data is written back only where the board
+	// already had it, so a layer change never adds it, and one that moves no
+	// card leaves the board exactly as it was.
+	if (optionalValue(snapshot.document, "miroCanvas").present) {
+		setOwn(document, "miroCanvas", metadata);
+	}
 	return { changed: !structurallyEqual(document, snapshot.document), document };
 }
 

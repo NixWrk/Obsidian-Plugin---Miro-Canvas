@@ -19,6 +19,15 @@ export interface StrokeBox {
   readonly height: number;
 }
 
+/**
+ * What the pen draws with before a colour is picked for it: white on a dark
+ * board, near-black on a light one, so a first stroke always shows.  A
+ * stroke keeps the colour it was drawn in, whatever the board's theme later.
+ */
+export function defaultPenInk(theme: "light" | "dark"): string {
+  return theme === "dark" ? "#ffffff" : "#1a1a1a";
+}
+
 /** How far off level, upright or diagonal a straight line may be and still snap to it. */
 const SNAP_DEGREES = 4;
 

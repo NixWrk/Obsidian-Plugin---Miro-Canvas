@@ -129,7 +129,7 @@ import {
 	blockArrowOutline, bowPoint, lineBoardPoints, lineFromBoard, lineKind, planLine, type LineKindSpec, type LinePoint,
 } from "./free-line";
 import {
-	eraseFromStroke, pointInLasso, recogniseStroke, simplifyPoints, snapAngle, strokeBounds, strokeHitsPoint, strokeHitsSegment,
+	defaultPenInk, eraseFromStroke, pointInLasso, recogniseStroke, simplifyPoints, snapAngle, strokeBounds, strokeHitsPoint, strokeHitsSegment,
 	type StrokePoint,
 } from "./drawing";
 import {
@@ -945,13 +945,13 @@ export class M1CanvasSession {
 		});
 		// The connectors lie with native Canvas's edges, under the cards, and
 		// the labels over the cards, as native labels are; native Canvas may
-		// rebuild its moving layer, and both go back into it.
-		const layer = this.connectorLayer.element, labels = this.connectorLabels.element;
+		// rebuild its moving layer, and both go back into it (the labels as
+		// they are laid, below).
+		const layer = this.connectorLayer.element;
 		if (layer.parentElement !== canvasEl) {
 			const cards = Array.from(canvasEl.children).find((child) => !child.classList.contains("canvas-edges")) ?? null;
 			canvasEl.insertBefore(layer, cards);
 		}
-		if (canvasEl.lastElementChild !== labels) canvasEl.appendChild(labels);
 		this.connectorLayer.render();
 		this.updateConnectorLabels();
 	}
@@ -1276,6 +1276,11 @@ export class M1CanvasSession {
 	private updateConnectorLabels(): void {
 		const labels = this.connectorLabels;
 		if (labels === undefined) return;
+		// An edge's own label appears only once native Canvas first draws the
+		// edge, which can be after the labels were laid: laid again then, so
+		// that label is hidden too, however little else changed.
+		const canvasEl = readRuntime(this.nativeCanvas(), "canvasEl");
+		if (isElement(canvasEl) && labels.mount(canvasEl)) this.labelsPlaced = undefined;
 		const raw = this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument;
 		const { geometry, scene } = this.landingGeometry();
 		const selected = this.selectedIds.length === 1 ? this.selectedIds[0] : undefined;
@@ -4751,7 +4756,7 @@ export class M1CanvasSession {
 	private penInk(): string {
 		if (this.penColor !== undefined) return this.penColor;
 		const theme = this.root === undefined ? undefined : this.root.getAttribute("data-miro-canvas-resolved-theme");
-		return theme === "dark" ? "#ffffff" : "#1a1a1a";
+		return defaultPenInk(theme === "dark" ? "dark" : "light");
 	}
 
 	/**
