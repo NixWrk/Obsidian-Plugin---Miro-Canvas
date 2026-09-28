@@ -55,6 +55,13 @@
   connection, and the plugin never starts it. The `miro-canvas-format` skill
   that explains the format to agents now lives in this repository
   (`.agents/skills/`) and points to the server first.
+- Dragging many cards on a very large board costs the plugin less on every
+  frame: the selection toolbar and the frame around a selection are measured
+  once and then follow the cards, instead of measuring every selected card
+  each frame, and what the selection holds is worked out once per selection.
+- A selection that runs off the edge of the view keeps its toolbar over the
+  part in view; cards native Canvas had taken off the page while out of view
+  used to pull the toolbar towards the window's top-left corner.
 
 ## 0.1.1 - 2026-09-26
 

@@ -669,8 +669,10 @@ and covered by automated tests.
   `src/attachment-labels.ts`).
 - [ ] Verify large-board performance and keyboard accessibility. Large boards
   are measured in the synthetic harness (see "Standard edges, one label editor,
-  large boards" below). Left: faster dragging on huge boards (stage 6), a
-  keyboard pass, and both checked in a real Obsidian.
+  large boards" below). Dragging large selections is measured in a real
+  Obsidian ("Dragging large selections" below). Left: faster dragging on huge
+  boards (stage 6: the per-move work on the whole board), a keyboard pass, and
+  that checked in a real Obsidian.
 
 ### M2: editing fundamentals
 
@@ -1400,6 +1402,49 @@ paste with an empty selection.
 | Configurable lasso/pan/line gestures and button visibility | Settings and pointer-binding tests pass; mixed lasso is covered by browser interactions. Bindings use the supported presets. |
 | Text marker, quiet frame colors, minimap type colors | Text-highlight, selection-toolbar and minimap-model tests pass; full browser gate passes. |
 | Native app validation | Load status observed after reload. Drag smoothness and real OS clipboard still need user verification. |
+
+#### Dragging large selections (2026-09-28)
+
+Measured in a real Obsidian 1.13.7 with `tools/obsidian_cdp/bench` (see its
+README) on synthetic boards of 2,000 and 5,000 cards. A multi-item drag with
+the plugin on goes through the plugin's own selection frame: each pointer
+move previews the whole selection and redraws what follows it.
+
+- The selection toolbar and the shared selection frame no longer measure
+  every selected card each frame. `src/selection-bounds.ts` measures a large
+  selection (more than 32 items on the page) once per selection and saved
+  board, then follows it by two of its cards; while those two only move and
+  scale together - a drag, a pan, a zoom - the measured bounds move and scale
+  with them, and anything else (the two disagree, a card comes onto or leaves
+  the page, another selection, another saved board) measures it again. A
+  smaller selection is still measured card by card.
+- Native Canvas keeps only the cards and lines near the view on the page; the
+  others measure as an empty box in the window's corner, which used to pull
+  the toolbar and the frame there. They are left out now: the toolbar sits
+  over the part of the selection in view.
+- The kinds a selection holds are worked out once per selection and saved
+  board (a drag does not change them), with the board's cards looked up by id;
+  the selected ids are kept as a set beside the list for the per-card checks.
+- During a drag only the toolbar's placement changes, so the rest of its state
+  (with every selected id in it) is signed once, not on every frame.
+
+Time per pointer move with the plugin on (60 moves; the view fitted to the
+selection, zoom 6 %; plugin off shown for scale):
+
+| Board, selection | Before | After | Plugin off |
+| --- | --- | --- | --- |
+| 2,000 cards, all | 841 ms | 719 ms | 236 ms |
+| 5,000 cards, 500 | 626 ms | 595 ms | 342 ms |
+| 5,000 cards, all | 2,146 ms | 1,386 ms | 377 ms |
+| 5,000 cards, all, zoom 100 % | 1,166 ms | 747 ms | 37 ms |
+
+Small selections are unchanged: their cost is the per-move work on the whole
+board that remains - translating the board's document for the preview, the
+source renderer's refresh (it measures every drawn card before its change
+gate), the appearance pass, a forced layout when the overlays read the view's
+size, and writing the move at the end. Those are the next steps for huge
+boards. A long drag of every card on a 2,000-card board is refused at the end
+("the board changed") in both builds; that is a separate problem.
 
 The first production release is ready when:
 

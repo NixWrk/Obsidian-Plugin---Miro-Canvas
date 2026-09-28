@@ -102,6 +102,7 @@ import {
 	type M1NavigationAction,
 } from "./m1-controls";
 import { SourceRenderer, type DeckAction } from "./source-renderer";
+import { SelectionBounds, sameIds, type SelectedElement } from "./selection-bounds";
 import { SlideShow, type SlideRect } from "./slide-show";
 import { buildSourceInspection } from "./source-inspector";
 import {
@@ -570,6 +571,11 @@ function boundingRect(value: unknown): { readonly left: number; readonly top: nu
 	} catch {
 		return undefined;
 	}
+}
+
+/** False only for an element native Canvas has taken off the page; a host that cannot say keeps it. */
+function isOnPage(element: unknown): boolean {
+	return readRuntime(element, "isConnected") !== false;
 }
 
 /** A resolved custom property of an element, when the host can compute styles. */
@@ -1440,6 +1446,13 @@ export class M1CanvasSession {
 	/** Native cards and edges whose methods are guarded already. */
 	private readonly guardedElements = new WeakSet<object>();
 	private selectedIds: readonly string[] = [];
+	/** The same ids, to ask of any card whether it is selected without a search. */
+	private selectedIdSet: ReadonlySet<string> = new Set<string>();
+	/** Where the selected cards and lines are on screen, for the toolbar and the shared frame. */
+	private readonly toolbarBounds = new SelectionBounds();
+	private readonly frameBounds = new SelectionBounds();
+	/** The kinds last worked out, for the selection and the board they were worked out from. */
+	private selectionKindsFor: { readonly ids: readonly string[]; readonly board: unknown; readonly kinds: readonly SelectionKind[] } | undefined;
 	private selectedCommentKeys = new Set<string>();
 	private scene: CanvasScene = { nodes: [], edges: [] };
 	private minimap: MinimapModel | undefined;
@@ -1463,6 +1476,8 @@ export class M1CanvasSession {
 	private landingCache: { readonly document: unknown; readonly geometry: AnchorGeometry; readonly scene: SourceScene } | undefined;
 	private lastToolbarSignature = "";
 	private lastToolbarState: SelectionToolbarState | undefined;
+	/** The signature of that state without its placement, which a drag leaves as it is. */
+	private toolbarRestSignature: { readonly state: SelectionToolbarState; readonly signature: string } | undefined;
 	/** Until when a click is the tail of a reshape drag rather than a click of its own. */
 	private swallowClickUntil = 0;
 	/** Watches each panel's own size; see `schedulePanelPositions`. */
@@ -3401,7 +3416,7 @@ export class M1CanvasSession {
 				: `Metadata persistence is unavailable, so appearance, locking and every other write is disabled: ${this.options.persistenceProblem}`);
 		}
 		const selection = this.adapter.getSelection();
-		this.selectedIds = [...new Set([...(selection === undefined ? [] : allIds(selection)), ...this.ownSelection(this.currentRawDocument)])];
+		this.setSelectedIds([...(selection === undefined ? [] : allIds(selection)), ...this.ownSelection(this.currentRawDocument)]);
 		this.updateShownLayer();
 		this.scene = this.adapter.getScene() ?? sceneFromDocument(this.currentRawDocument) ?? { nodes: [], edges: [] };
 		// The board's own connectors show on the minimap as edges do.
@@ -3736,10 +3751,17 @@ export class M1CanvasSession {
 			const placement = this.selectionPlacement();
 			const { placement: _old, ...rest } = previous;
 			const next: SelectionToolbarState = placement === undefined ? rest : { ...rest, placement };
-			const signature = safeSignature(next);
+			// Only the placement changes between refreshes; the rest, with every
+			// selected id in it, is signed once rather than on every frame.
+			if (this.toolbarRestSignature?.state !== previous) {
+				this.toolbarRestSignature = { state: previous, signature: safeSignature(rest) };
+			}
+			const restSignature = this.toolbarRestSignature.signature;
+			const signature = `${restSignature}|${safeSignature(placement ?? null)}`;
 			if (signature !== this.lastToolbarSignature) {
 				this.lastToolbarSignature = signature;
 				this.lastToolbarState = next;
+				this.toolbarRestSignature = { state: next, signature: restSignature };
 				this.toolbar.update(next);
 			}
 		}
@@ -4019,6 +4041,22 @@ export class M1CanvasSession {
 		});
 	}
 
+	/** What is selected now, kept both as a list and as a set to ask of. */
+	private setSelectedIds(ids: readonly string[]): void {
+		const selectedIdSet = new Set(ids);
+		this.selectedIds = [...selectedIdSet];
+		this.selectedIdSet = selectedIdSet;
+	}
+
+	/**
+	 * The board as last saved.  A drag in progress moves cards without saving,
+	 * and changes nothing that the kinds or sizes of the selected items depend on.
+	 */
+	private settledBoard(): unknown {
+		const moving = this.pointerHeld || this.selectionMovePreview !== undefined;
+		return moving ? this.savedBoard?.document ?? this.currentRawDocument : this.currentRawDocument;
+	}
+
 	/**
 	 * The board as native Canvas has it.  Reading it rebuilds the whole board,
 	 * so it is read again only when native Canvas has saved a change - it
@@ -4085,7 +4123,7 @@ export class M1CanvasSession {
 		const selected = [...(this.adapter.getNodes() ?? []), ...(this.adapter.getEdges() ?? [])]
 			.filter((item) => {
 				const id = readCanvasElementId(item);
-				return id !== undefined && this.selectedIds.includes(id);
+				return id !== undefined && this.selectedIdSet.has(id);
 			})
 			.map((item) => readCanvasElementDom(item));
 		const targets = [canvasEl, ...selected].filter((item) => isElement(item));
@@ -5702,21 +5740,41 @@ export class M1CanvasSession {
 		}
 	}
 
+	/**
+	 * What kinds of item are selected.  Worked out again only for another
+	 * selection or another saved board: dragging moves cards, it does not
+	 * change what they are.
+	 */
 	private selectionKinds(): readonly SelectionKind[] {
 		if (this.selectedIds.length === 0) return [];
+		const board = this.settledBoard();
+		const known = this.selectionKindsFor;
+		if (known !== undefined && known.board === board && sameIds(known.ids, this.selectedIds)) return known.kinds;
+		const kinds = this.workOutSelectionKinds();
+		this.selectionKindsFor = { ids: this.selectedIds, board, kinds };
+		return kinds;
+	}
+
+	private workOutSelectionKinds(): readonly SelectionKind[] {
 		const edgeIds = new Set(collectCanvasElementIds(this.adapter.getEdges() ?? []));
 		for (const connector of boardConnectors(this.currentRawDocument)) edgeIds.add(connector.id);
 		const source = this.landingGeometry().scene;
 		const nodes = readRuntime(this.currentRawDocument, "nodes");
+		// The board's cards by id, so each selected one is found without a search.
+		const nodesById = new Map<unknown, unknown>();
+		if (Array.isArray(nodes)) {
+			for (const item of nodes as readonly unknown[]) {
+				const id = readRuntime(item, "id");
+				if (!nodesById.has(id)) nodesById.set(id, item);
+			}
+		}
 		const kinds = new Set<SelectionKind>();
 		for (const id of this.selectedIds) {
 			if (edgeIds.has(id)) {
 				kinds.add("edge");
 				continue;
 			}
-			const node = Array.isArray(nodes)
-				? (nodes as readonly unknown[]).find((item) => readRuntime(item, "id") === id)
-				: undefined;
+			const node = nodesById.get(id);
 			const descriptor = source.items.get(id);
 			// A line is set like a connector: its ends, route, dashes and colour.
 			if (descriptor?.structured?.line !== undefined) {
@@ -5738,8 +5796,34 @@ export class M1CanvasSession {
 		return [...kinds];
 	}
 
-	/** Screen placement comes from native DOM, so it stays correct under any
-	 * coordinate mode, rotation, or Advanced Canvas transform. */
+	/**
+	 * The selected native cards and lines as the page draws them, from native
+	 * Canvas's own selection: a large board is not searched for them.  An
+	 * edge has no HTML element, only its SVG line group.
+	 */
+	private selectedElements(ids: ReadonlySet<string>, withLines: boolean): readonly SelectedElement[] {
+		const elements: SelectedElement[] = [];
+		for (const item of this.adapter.getSelection() ?? []) {
+			const id = readCanvasElementId(item);
+			if (id === undefined || !ids.has(id)) continue;
+			const card = readCanvasElementDom(item);
+			if (card !== undefined) {
+				elements.push({ element: card, card: true });
+				continue;
+			}
+			const line = withLines ? readRuntime(item, "lineGroupEl") : undefined;
+			if (line !== undefined) elements.push({ element: line, card: false });
+		}
+		return elements;
+	}
+
+	/**
+	 * Screen placement comes from native DOM, so it stays correct under any
+	 * coordinate mode, rotation, or Advanced Canvas transform.  A large
+	 * selection is measured once and then followed while it is dragged,
+	 * panned or zoomed (see selection-bounds.ts), not measured card by card
+	 * on every frame.
+	 */
 	private selectionPlacement(): SelectionToolbarPlacement | undefined {
 		if (this.root === undefined || this.selectedIds.length === 0) {
 			return undefined;
@@ -5748,27 +5832,20 @@ export class M1CanvasSession {
 		if (rootRect === undefined) {
 			return undefined;
 		}
-		let left = Number.POSITIVE_INFINITY;
-		let top = Number.POSITIVE_INFINITY;
-		let right = Number.NEGATIVE_INFINITY;
-		let bottom = Number.NEGATIVE_INFINITY;
-		for (const element of [...(this.adapter.getNodes() ?? []), ...(this.adapter.getEdges() ?? [])]) {
-			const id = readCanvasElementId(element);
-			if (id === undefined || !this.selectedIds.includes(id)) {
-				continue;
-			}
-			// An edge has no HTML element, only its SVG line group; without it a
-			// selected connector had no toolbar - and, with the native menu
-			// adopted into the toolbar, no menu at all.
-			const rect = boundingRect(readCanvasElementDom(element) ?? readRuntime(element, "lineGroupEl"));
-			if (rect === undefined) {
-				continue;
-			}
-			left = Math.min(left, rect.left);
-			top = Math.min(top, rect.top);
-			right = Math.max(right, rect.right);
-			bottom = Math.max(bottom, rect.bottom);
-		}
+		// Without its line group a selected connector had no toolbar - and,
+		// with the native menu adopted into the toolbar, no menu at all.
+		const ids = this.selectedIdSet;
+		const measured = this.toolbarBounds.bounds({
+			ids,
+			board: this.settledBoard(),
+			elements: () => this.selectedElements(ids, true),
+			measure: boundingRect,
+			onPage: isOnPage,
+		});
+		let left = measured?.left ?? Number.POSITIVE_INFINITY;
+		let top = measured?.top ?? Number.POSITIVE_INFINITY;
+		let right = measured?.right ?? Number.NEGATIVE_INFINITY;
+		let bottom = measured?.bottom ?? Number.NEGATIVE_INFINITY;
 		const routes = this.landingGeometry().geometry.edges ?? {};
 		for (const id of this.connectorLayer?.selection() ?? []) {
 			const route = routes[id];
@@ -6649,12 +6726,17 @@ export class M1CanvasSession {
 			top = Math.min(top, y);
 			bottom = Math.max(bottom, y);
 		};
-		for (const element of this.adapter.getNodes() ?? []) {
-			if (!nativeIds.has(readCanvasElementId(element) ?? "")) continue;
-			const rect = boundingRect(readCanvasElementDom(element));
-			if (rect === undefined) continue;
-			add(rect.left - box.left, rect.top - box.top);
-			add(rect.right - box.left, rect.bottom - box.top);
+		// The selected cards, measured once and then followed while they move.
+		const cards = this.frameBounds.bounds({
+			ids: nativeIds,
+			board: this.settledBoard(),
+			elements: () => this.selectedElements(nativeIds, false),
+			measure: boundingRect,
+			onPage: isOnPage,
+		});
+		if (cards !== undefined) {
+			add(cards.left - box.left, cards.top - box.top);
+			add(cards.right - box.left, cards.bottom - box.top);
 		}
 		const geometry = this.landingGeometry().geometry;
 		for (const id of [...nativeIds, ...connectorIds]) {
@@ -7936,7 +8018,7 @@ export class M1CanvasSession {
 		const document = this.savedDocument();
 		this.policy = this.policyFromDocument(document);
 		const selection = this.adapter.getSelection();
-		this.selectedIds = [...new Set([...(selection === undefined ? [] : allIds(selection)), ...this.ownSelection(document)])];
+		this.setSelectedIds([...(selection === undefined ? [] : allIds(selection)), ...this.ownSelection(document)]);
 		if (selection === undefined) {
 			this.interactionBlock = "this Canvas runtime does not report its selection";
 			this.policy = createInteractionPolicy(undefined);

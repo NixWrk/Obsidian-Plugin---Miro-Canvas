@@ -19,6 +19,8 @@ below is unclear once you have tried it, that is a bug in this file.
 | `record.mjs` | Runs a scenario while screen-recording it, then builds a GIF. |
 | `frames_to_gif.py` | Pillow: resamples, times and encodes the captured frames into a GIF. |
 | `scenarios/*.mjs` | Example scenarios (see "Writing a scenario"). |
+| `bench/generate-board.mjs` | Writes a large synthetic board for timing drags (see "Benchmarking a drag"). |
+| `bench/measure-drag.mjs` | Times real drags on such a board, with the plugin on and off. |
 
 ## Prerequisites
 
@@ -297,6 +299,67 @@ small absolutely-positioned element into every window it records, and moves
 it to match every dispatched mouse event (with a brief ripple on click), so a
 viewer can actually see where each action happens. This is automatic - a
 scenario never touches it directly.
+
+## Benchmarking a drag
+
+Two small scripts time what a drag costs on a large board, in a real
+Obsidian with real input. Launch an instance on a port of your own first
+(below, 9338):
+
+```
+python tools/obsidian_cdp/launch.py --port 9338 --fresh --no-welcome-board
+node tools/obsidian_cdp/bench/generate-board.mjs --cards 2000
+node tools/obsidian_cdp/bench/generate-board.mjs --cards 5000
+node tools/obsidian_cdp/bench/measure-drag.mjs --port 9338 \
+  --board tools/obsidian_cdp/.out/bench/board-2000.canvas \
+  --board tools/obsidian_cdp/.out/bench/board-5000.canvas \
+  --select 1,50,500,all --plugin on,off --label after
+python tools/obsidian_cdp/stop.py --port 9338
+```
+
+`launch.py` copies the `main.js` of the checkout it runs from. To time
+another build in the same instance and vault, copy that build's `main.js`
+over `<vault>/.obsidian/plugins/miro-canvas/main.js` and run
+`measure-drag.mjs` again: it turns the plugin off once as it starts, so its
+first run with the plugin on loads the `main.js` then in the vault.
+
+`generate-board.mjs` writes `tools/obsidian_cdp/.out/bench/board-<N>.canvas`
+(ignored by git): N cards on a grid - every tenth a sticky note, one in fifty
+of those turned by 8 degrees, every tenth a shape - about N/2 native edges
+between neighbours, about N/4 of the plugin's own connectors from a card to
+the card below, and one frame per 400 cards, listed after the cards. The same
+N always gives the same board, and its `miroCanvas` record is schema/v1-valid.
+
+`measure-drag.mjs`, for every board, selection size and plugin state: turns
+the plugin on or off (`app.plugins.enablePlugin` / `disablePlugin`), copies
+the board into the running vault's `bench/` folder under a new name and opens
+it, selects the first K cards with native Canvas's own `canvas.select` (`all`
+is every card, frames left out), fits them in view with `canvas.zoomToBbox`
+(or, with `--zoom <z>`, shows the first selected card at that zoom), presses
+on the first selected card it can reach, sends 60 real
+`Input.dispatchMouseEvent` moves about 15 ms apart, lets go, and logs every
+animation frame meanwhile. With the plugin on and several cards selected it
+presses where the plugin's own selection frame covers the card, as a person
+pressing on the selection does, so every run of a build takes the same path.
+
+It prints one JSON line per run and a table: how long each move took on
+average (the page has to take one move before the next is sent, so a slow
+drag shows here even when the idle frames between moves keep the median frame
+short), the median and 95th percentile frame time during the drag and in the
+1.5 s after it, and how far the pressed card moved - 0,0 means the drag did
+not take, and a notice shown then is recorded with the run.
+
+Options: `--json <file>` appends the JSON lines to a file, `--label` names the
+build, `--shots <dir>` saves screenshots before, during and after each drag
+for checking the toolbar by eye, `--profile <dir>` records a CPU profile of
+each drag (open the `.cpuprofile` in DevTools' Performance panel), and
+`--moves`, `--interval` and `--settle` change the drag.
+
+It brings the window to the front before each run and turns off Electron's
+background throttling: Chromium stops the animation frames of a window that
+other windows cover, and nothing would be timed. A drag of every card on a
+5,000-card board takes minutes on a slow build; the whole matrix above takes
+about half an hour.
 
 ## Troubleshooting
 
