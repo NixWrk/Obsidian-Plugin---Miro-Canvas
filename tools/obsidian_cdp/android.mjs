@@ -4,13 +4,14 @@
 // forwards to a local port, and from there cdp.mjs talks to it exactly as it
 // talks to the desktop app.
 //
-// It only ever writes into a vault named TEST_VAULT: a person's own vault on
-// the same device is read for its name and left alone.
+// It only ever writes into a vault named TEST_VAULT, or into the one vault a
+// person names with --vault for this run after agreeing to it: any other
+// vault on the same device is read for its name and left alone.
 //
 //   node tools/obsidian_cdp/android.mjs devices
 //   node tools/obsidian_cdp/android.mjs forward --serial <s> --port 9340
 //   node tools/obsidian_cdp/android.mjs status --port 9340
-//   node tools/obsidian_cdp/android.mjs deploy --port 9340
+//   node tools/obsidian_cdp/android.mjs deploy --port 9340 [--vault <name the owner agreed to>]
 //   node tools/obsidian_cdp/android.mjs pointer-log start|dump|stop --port 9340 [--out file.json]
 //   node tools/obsidian_cdp/android.mjs shot --serial <s> --out file.png
 
@@ -98,10 +99,10 @@ async function status(send) {
 }
 
 /** Copies this build into the test vault through Obsidian itself, then turns the plugin on (again). */
-async function deploy(send) {
+async function deploy(send, allowedVault = TEST_VAULT) {
   const vault = await evaluate(send, "return app.vault.getName();");
-  if (vault !== TEST_VAULT) {
-    throw new Error(`the open vault is "${vault}", not "${TEST_VAULT}": refusing to write into it`);
+  if (vault !== allowedVault) {
+    throw new Error(`the open vault is "${vault}", not "${allowedVault}": refusing to write into it`);
   }
   const files = {};
   for (const name of PLUGIN_FILES) {
@@ -111,7 +112,7 @@ async function deploy(send) {
   }
   const result = await evaluate(send, `
     const files = ${JSON.stringify(files)};
-    if (app.vault.getName() !== ${JSON.stringify(TEST_VAULT)}) return { error: "vault changed" };
+    if (app.vault.getName() !== ${JSON.stringify(allowedVault)}) return { error: "vault changed" };
     const folder = app.vault.configDir + "/plugins/${PLUGIN_ID}";
     if (!(await app.vault.adapter.exists(folder))) await app.vault.adapter.mkdir(folder);
     for (const [name, text] of Object.entries(files)) await app.vault.adapter.write(folder + "/" + name, text);
@@ -187,7 +188,7 @@ async function main() {
   const { send, close } = await connect(port);
   try {
     if (command === "status") console.log(JSON.stringify(await status(send), null, 1));
-    else if (command === "deploy") console.log(JSON.stringify(await deploy(send), null, 1));
+    else if (command === "deploy") console.log(JSON.stringify(await deploy(send, option(args, "vault", TEST_VAULT)), null, 1));
     else if (command === "pointer-log") console.log(JSON.stringify(await pointerLog(send, args[0], option(args, "out")), null, 1));
     else throw new Error("usage: android.mjs <devices|forward|status|deploy|pointer-log|shot> [--serial s] [--port n]");
   } finally {
