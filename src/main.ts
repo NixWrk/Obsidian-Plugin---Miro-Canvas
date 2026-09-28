@@ -394,6 +394,13 @@ export default class MiroCanvasPlugin extends Plugin {
       // No default hotkey: entering this mode is deliberate, from the board menu or the palette.
       checkCallback: (checking) => this.runM1Command(checking, (session) => session.toggleArrangeMode()),
     });
+    this.addCommand({
+      id: "m1-search-board",
+      name: words().commands.searchBoard,
+      // No default hotkey: the board takes Ctrl+F itself while it has focus
+      // (a setting), and a card being written keeps Obsidian's own search.
+      checkCallback: (checking) => this.runM1Command(checking, (session) => session.openSearch()),
+    });
 
     // Import from another plugin's file into a new board: offered for the
     // open file and in a file's own menu, and only for files an importer

@@ -73,6 +73,8 @@ export interface M1ControlsActions {
 	readonly openExport?: () => void;
 	/** Enter (or, already in it, leave) the mode that drags the bar, the dock and the minimap in place. */
 	readonly onArrangePanels?: () => void;
+	/** Open the search bar at the board's top right. */
+	readonly onSearch?: () => void;
 }
 
 export interface M1ControlsOptions {
@@ -408,6 +410,11 @@ export class M1Controls {
 		this.listen(zoomOut, "click", () => this.actions.onNavigation("zoom-out"));
 		this.listen(zoomIn, "click", () => this.actions.onNavigation("zoom-in"));
 		const boardGroup = append(bar, makeElement(document, "span", "miro-canvas-dock__group"));
+		const onSearch = this.actions.onSearch;
+		if (onSearch !== undefined) {
+			const searchButton = this.iconButton(boardGroup, "search", "⌕", dock.search);
+			this.listen(searchButton, "click", () => onSearch());
+		}
 		const boardButton = this.iconButton(boardGroup, "settings-2", "⚙", dock.boardSettings);
 		const diagnosticsButton = this.iconButton(boardGroup, "triangle-alert", "!", dock.diagnostics, "miro-canvas-dock__diagnostics");
 		const diagnosticsCount = append(diagnosticsButton, makeElement(document, "span", "miro-canvas-dock__badge"));

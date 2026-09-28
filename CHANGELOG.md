@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Search on the board: Ctrl+F (Cmd+F on macOS) on the board, the magnifier
+  in the corner dock or the command "Search on the board" opens a bar at the
+  top right that finds words in cards, sticky notes, shapes, tables, frame
+  names, file names, links, line labels and comments, in Russian and in
+  English alike. Enter and Shift+Enter step through the matches, the board
+  moves to each and outlines it, Escape closes the bar. In a card being
+  written Ctrl+F still searches that card; a setting turns the board's
+  Ctrl+F off.
 - On a narrow board - a small window or an open sidebar - the bottom bar no
   longer runs under the corner dock: until either has been moved, the bar
   goes to the left edge, and when that is still too tight the dock and the

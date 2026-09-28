@@ -1314,6 +1314,34 @@ def main() -> int:
             page.wait_for_function("miroBrowser.session.snapshot.selectedIds.length === 0")
             assert page.locator('.miro-canvas-dock[data-miro-canvas-has-selection="false"]').count() == 1
             assert not page.locator(".miro-canvas-panel__selection-only").first.is_visible()
+
+            # Search on the board: Ctrl+F on the focused board opens the bar,
+            # typing finds the diamond and Diagram.png, Enter moves the board
+            # to the next one, Escape closes it and gives the board its keys back.
+            camera_before_search = page.evaluate("({x: miroBrowser.runtime.tx, y: miroBrowser.runtime.ty, zoom: miroBrowser.runtime.tZoom})")
+            saves_before_search = page.evaluate("miroBrowser.getSaves()")
+            page.evaluate("miroBrowser.root.focus()")
+            page.keyboard.press("Control+f")
+            search_input = page.locator(".miro-canvas-search input")
+            assert search_input.is_visible(), "Ctrl+F on the board did not open the search"
+            assert page.evaluate("document.activeElement === document.querySelector('.miro-canvas-search input')")
+            search_input.press_sequentially("DIA")
+            page.wait_for_function("document.querySelector('.miro-canvas-search__count').textContent === '1 / 2'")
+            first_camera = page.evaluate("({x: miroBrowser.runtime.tx, y: miroBrowser.runtime.ty})")
+            search_input.press("Enter")
+            assert page.locator(".miro-canvas-search__count").text_content() == "2 / 2"
+            assert page.evaluate("miroBrowser.session.searchState().key") in ("node:image", "node:miro-canvas-node-2")
+            assert page.evaluate("({x: miroBrowser.runtime.tx, y: miroBrowser.runtime.ty})") != first_camera, "Enter did not move the board to the next match"
+            assert page.locator(".miro-canvas-search-hit").is_visible(), "The match shown has no outline"
+            assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-search-hit')).pointerEvents") == "none"
+            assert page.evaluate("getComputedStyle(document.querySelector('.miro-canvas-search')).top") == "12px"
+            search_input.press("Escape")
+            assert not page.locator(".miro-canvas-search").is_visible(), "Escape did not close the search"
+            assert not page.locator(".miro-canvas-search-hit").is_visible()
+            assert page.evaluate("document.activeElement === miroBrowser.root"), "Closing the search did not return focus to the board"
+            assert page.evaluate("miroBrowser.getSaves()") == saves_before_search, "Searching the board saved it"
+            page.evaluate("c => { miroBrowser.runtime.setViewport(c.x, c.y, c.zoom); miroBrowser.session.refresh(); }", camera_before_search)
+
             output = REPO / "tools/obsidian_oracle/.out/m1-browser.png"
             output.parent.mkdir(parents=True, exist_ok=True)
             m2.evaluate("element => element.scrollTop = 0")

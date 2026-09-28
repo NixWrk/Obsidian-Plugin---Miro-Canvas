@@ -16,6 +16,7 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 - [Comments](#comments)
 - [Locking and review mode](#locking-and-review-mode)
 - [The corner dock and the minimap](#the-corner-dock-and-the-minimap)
+- [Searching the board](#searching-the-board)
 - [Arranging the panels](#arranging-the-panels)
 - [Bringing boards over from Miro](#bringing-boards-over-from-miro)
 - [Exporting to PDF and PowerPoint](#exporting-to-pdf-and-powerpoint)
@@ -220,6 +221,28 @@ keeping panning, selection, links, copying and comments.
 - **The minimap** shows the whole board; click or drag in it to move the
   view there.
 
+## Searching the board
+
+**Ctrl+F** (Cmd+F on macOS) on the board, the magnifier in the corner dock or
+the command **Search on the board** opens a search bar at the top right. It
+looks through the text of cards, sticky notes, shapes and tables, the names
+of frames, files and web links, the labels of lines and arrows, and every
+message of a comment thread. Case, accents and ё/е do not matter; Markdown
+and HTML marks are ignored.
+
+- The counter shows where you are ("3 / 12"); **Enter** or **↓** goes to the
+  next match, **Shift+Enter** or **↑** to the previous one, round from the
+  last to the first.
+- The board moves to each match and an outline marks it; a small card keeps
+  the zoom you had, a large frame is zoomed out to. A comment opens beside
+  its pin; a comment with no pin opens in the comments panel.
+- **Escape** closes the bar and gives the board its keys back. The search
+  changes nothing and selects nothing, so it works in review mode and on
+  locked items too.
+- Ctrl+F takes the board's search only while the board has focus and no text
+  is being edited: in a card being written it still searches that card, as
+  Obsidian does. The setting **Ctrl+F searches the board** turns it off.
+
 ## Arranging the panels
 
 The board's menu (the gear in the corner dock) has an **Arrange panels**
@@ -347,6 +370,7 @@ so nothing is taken from Obsidian or other plugins.
 - Zoom in, zoom out, reset zoom, fit board, toggle minimap, pan left / right /
   up / down
 - Arrange panels
+- Search on the board (Ctrl+F already opens it while the board has focus)
 - Toggle attachment names
 - Open Miro Canvas controls, open source and provenance inspector
 - Local shapes, comments, anchors and documents
@@ -366,7 +390,8 @@ so nothing is taken from Obsidian or other plugins.
 - **Connectors** - what line ends attach to (cards and comments, the empty
   board, other lines), magnet and snap distances, where new labels sit, which
   mouse gestures draw lines, pan or lasso.
-- **Keyboard** - where to give the commands hotkeys.
+- **Keyboard** - where to give the commands hotkeys, and whether Ctrl+F
+  searches the board.
 - **Interface** - the minimap by default, the selection toolbar.
 - **Getting started** - the welcome board and the Miro import guide.
 - **Updates** - the daily check for a new version, and a button to check now.
@@ -399,9 +424,6 @@ Each item has its number and its details in
 
 **New features**
 
-- **Search on the board** (`FUT-020`) - the text of cards, sticky notes,
-  shapes, tables, line labels and comments, and file names; jump to each match
-  with a highlight, next and previous.
 - **Boards from other plugins** (`FUT-009`, `MIGRATE-001`) - Excalidraw
   drawings, mind maps (the notes of the Enhancing Mindmap and Markmind
   plugins), Advanced Canvas boards and other local formats brought into Canvas

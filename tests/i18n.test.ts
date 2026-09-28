@@ -24,6 +24,8 @@ const SAME_IN_RUSSIAN = new Set<string>([
   "welcome.codeBody",
   // An example web address, not a word to translate.
   "toolbar.linkPlaceholder",
+  // The search counter, "3 / 12": numbers only.
+  "search.count",
 ]);
 
 type Table = { readonly [key: string]: unknown };

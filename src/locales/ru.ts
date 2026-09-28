@@ -103,6 +103,7 @@ export const RU: Messages = {
 		toggleMinimap: "Показать или скрыть миникарту",
 		arrangePanels: "Настроить панели",
 		importIntoBoard: "Импортировать в доску",
+		searchBoard: "Поиск по доске",
 		navigation: {
 			zoomIn: "Увеличить масштаб",
 			zoomOut: "Уменьшить масштаб",
@@ -137,6 +138,7 @@ export const RU: Messages = {
 	},
 	dock: {
 		ariaLabel: "Вид доски Miro Canvas",
+		search: "Поиск по доске (Ctrl+F)",
 		minimapAriaLabel: "Миникарта; стрелки прокручивают доску",
 		bar: "Навигация по доске",
 		undo: "Отменить",
@@ -200,6 +202,27 @@ export const RU: Messages = {
 		noteTruncated: "Только для чтения; показана часть данных.",
 		noteComplete: "Только для чтения; исходные данные остаются в файле Canvas.",
 	},
+	search: {
+		ariaLabel: "Поиск по доске",
+		placeholder: "Искать на доске",
+		count: (current: number, total: number) => `${current} / ${total}`,
+		none: "Ничего не найдено",
+		next: "Следующее (Enter)",
+		previous: "Предыдущее (Shift+Enter)",
+		close: "Закрыть (Escape)",
+		announce: (kind: string, current: number, total: number) => `${kind}, ${current} из ${total}`,
+		kinds: {
+			text: "Текст",
+			sticky: "Стикер",
+			shape: "Фигура",
+			table: "Таблица",
+			frame: "Фрейм",
+			file: "Файл",
+			link: "Ссылка",
+			label: "Подпись линии",
+			comment: "Комментарий",
+		},
+	},
 	arrange: {
 		bannerText: "Перетаскивайте панели и инструменты",
 		done: "Готово",
@@ -260,6 +283,8 @@ export const RU: Messages = {
 		shortcutsDesc: (resetToolsCommandName: string) =>
 			`Назначьте клавиши в Настройки → Горячие клавиши, введя в поиск «Miro Canvas». Escape на доске сбрасывает инструменты и выделение; у команды «${resetToolsCommandName}» своей клавиши нет, её можно назначить там же. Пока фокус на доске, инструменты выбираются буквами; в тексте клавиши работают как обычно.`,
 		openHotkeys: "Открыть горячие клавиши",
+		boardFindKeyName: "Ctrl+F ищет на доске",
+		boardFindKeyDesc: "Ctrl+F (Cmd+F на macOS) открывает поиск по доске - только пока фокус на доске и никакой текст не редактируется. В карточке, которую вы пишете, он по-прежнему ищет в ней.",
 		interfaceName: "Интерфейс",
 		interfaceDesc: "Тема доски, режим просмотра и имена вложений задаются у каждой доски отдельно и хранятся в её файле; меняйте их в панели в углу доски.",
 		minimapDefaultName: "Показывать миникарту по умолчанию",

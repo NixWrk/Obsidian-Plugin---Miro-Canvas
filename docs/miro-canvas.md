@@ -867,9 +867,40 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   `data-miro-canvas-crowded` - "toolbar-left" puts the bar at the left
   edge, "stacked" lifts the dock and the minimap above it; a stored place
   turns this off.
-- [ ] Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
+- [x] Search on the board (`FUT-020`): the text of cards, sticky notes, shapes,
   tables, line labels and comments, and file names; jump to a match with a
-  highlight, next and previous.
+  highlight, next and previous. Done in the plugin 2026-09-28
+  (`src/board-search.ts`, `src/board-search-bar.ts`, `src/m1-session.ts`):
+  one pass over the saved board builds an index of what a person reads -
+  text cards by kind (text, sticky note, shape, table, with a table's or
+  code block's title), frame labels, file names with their subpath, link
+  URLs, native edge and board connector labels at their place along the
+  route, and one entry per comment thread with all its replies at its pin
+  (hidden imported threads left out, resolved ones kept) - in reading order.
+  Text is compared lower-cased, without accents (й kept apart from и), ё as
+  е, and without Markdown and HTML marks. The index is built when the bar
+  opens and rebuilt only when native Canvas saved a new document or the
+  comment threads changed, never mid-gesture; nothing runs while the bar is
+  closed. A jump fits a rectangle centred on the match through
+  `fitToBounds`, sized so the zoom is the current one (at least 50%) unless
+  the match needs less to fit; a comment is centred at the current zoom and
+  its thread card opens beside the pin, a thread with no pin opens in the
+  comments panel. One `.miro-canvas-search-hit` outline, which takes no
+  pointer events, is placed on the match in `refresh` and `followViewport` -
+  never a native selection or a class on native nodes. The bar is a
+  `miro-canvas-panel` at the top right; the dock's magnifier and the command
+  `m1-search-board` (no default hotkey) open it.
+  Runtime fact (Obsidian 1.13.7 on the 1.12.7 installer, checked 2026-09-28 over CDP with real key
+  input on the welcome board): Mod+F is bound to `editor:open-search`
+  ("Search current file"). With the board focused and no card being written
+  it reaches the window as a keydown already `defaultPrevented` and does
+  nothing visible. With a card open for writing, focus is in the card's
+  `iframe.embed-iframe` and Ctrl+F opens Obsidian's own find bar inside that
+  card. So the board takes Ctrl+F (by `event.code === "KeyF"`, any layout)
+  only in its window capture handler while the board has focus, no input,
+  `.cm-editor` or iframe is focused and no selected card `isEditing`; a card
+  being written keeps Obsidian's search. The setting `boardFindKey` (on by
+  default) turns the board's claim off.
 - [x] A selection toolbar laid out as Miro's (`FUT-021`). Done in the plugin
   2026-09-25 (`src/selection-toolbar.ts`, `src/text-list.ts`, `src/text-link.ts`,
   `src/m1-session.ts`): a card's groups now read shape | font, size | text

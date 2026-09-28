@@ -163,6 +163,13 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
+      .setName(labels.boardFindKeyName)
+      .setDesc(labels.boardFindKeyDesc)
+      .addToggle((toggle) => toggle
+        .setValue(this.host.settings.boardFindKey)
+        .onChange((value) => void this.host.saveSettings({ boardFindKey: value })));
+
+    new Setting(containerEl)
       .setName(labels.interfaceName)
       .setDesc(labels.interfaceDesc)
       .setHeading();

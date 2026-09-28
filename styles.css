@@ -4048,3 +4048,127 @@
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="right"] .miro-canvas-tools__connectors {
   right: calc(100% + 8px);
 }
+
+/* Search on the board: a bar at the top right, where native Canvas's own
+   controls stood before the dock took their place, and one outline around
+   the match shown.  The outline never takes a press. */
+.miro-canvas-search {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 102;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  max-width: calc(100% - 24px);
+  padding: 3px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small, 13px);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s, 0 4px 18px rgb(0 0 0 / 18%));
+}
+
+.miro-canvas-search[hidden],
+.miro-canvas-search-hit[hidden] {
+  display: none !important;
+}
+
+.miro-canvas-search .miro-canvas-search__input {
+  flex: 1 1 auto;
+  width: 220px;
+  min-width: 80px;
+  height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: inherit;
+}
+
+.miro-canvas-search__count {
+  flex: 0 0 auto;
+  min-width: 3em;
+  padding: 0 6px;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.miro-canvas-search[data-search-state="none"] .miro-canvas-search__count {
+  color: var(--text-error, #dc2626);
+}
+
+.miro-canvas-search .miro-canvas-search__button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  color: var(--icon-color, var(--text-muted));
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-s, 4px);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.miro-canvas-search .miro-canvas-search__button:hover:not(:disabled) {
+  color: var(--icon-color-hover, var(--text-normal));
+  background: var(--background-modifier-hover);
+}
+
+.miro-canvas-search .miro-canvas-search__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.miro-canvas-search .miro-canvas-search__button > .svg-icon {
+  width: var(--icon-s, 16px);
+  height: var(--icon-s, 16px);
+}
+
+/* Heard by a screen reader, never seen. */
+.miro-canvas-search__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.miro-canvas-search-hit {
+  position: absolute;
+  z-index: 98;
+  box-sizing: border-box;
+  border: 2px solid var(--interactive-accent, #7c3aed);
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent, #7c3aed) 25%, transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .miro-canvas-search-hit.is-arriving {
+    animation: miro-canvas-search-pulse 700ms ease-out 1;
+  }
+}
+
+@keyframes miro-canvas-search-pulse {
+  0% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--interactive-accent, #7c3aed) 45%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent, #7c3aed) 25%, transparent);
+  }
+}
+
+.is-screenshotting .miro-canvas-search-hit {
+  display: none !important;
+}

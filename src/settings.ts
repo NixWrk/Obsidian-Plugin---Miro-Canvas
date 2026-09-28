@@ -54,6 +54,12 @@ export interface MiroCanvasSettings {
   readonly connectorLabelPosition: number;
   readonly minimapVisible: boolean;
   readonly selectionToolbarEnabled: boolean;
+  /**
+   * Ctrl+F (Cmd+F on macOS) opens the board's search while the board has
+   * focus and no card is being written; a card being written keeps
+   * Obsidian's own search of that card.
+   */
+  readonly boardFindKey: boolean;
   readonly lassoBinding: PointerBinding;
   readonly panBinding: PointerBinding;
   readonly lineBinding: PointerBinding;
@@ -140,6 +146,7 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   connectorLabelPosition: 0.5,
   minimapVisible: true,
   selectionToolbarEnabled: true,
+  boardFindKey: true,
   lassoBinding: "alt+left",
   panBinding: "none",
   lineBinding: "right",
@@ -361,6 +368,7 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     connectorLabelPosition: readNumber(value, "connectorLabelPosition", DEFAULT_SETTINGS.connectorLabelPosition),
     minimapVisible: readBoolean(value, "minimapVisible", DEFAULT_SETTINGS.minimapVisible),
     selectionToolbarEnabled: readBoolean(value, "selectionToolbarEnabled", DEFAULT_SETTINGS.selectionToolbarEnabled),
+    boardFindKey: readBoolean(value, "boardFindKey", DEFAULT_SETTINGS.boardFindKey),
     lassoBinding: POINTER_BINDINGS.includes(value.lassoBinding as PointerBinding) ? value.lassoBinding as PointerBinding : DEFAULT_SETTINGS.lassoBinding,
     panBinding: POINTER_BINDINGS.includes(value.panBinding as PointerBinding) ? value.panBinding as PointerBinding : DEFAULT_SETTINGS.panBinding,
     lineBinding: POINTER_BINDINGS.includes(value.lineBinding as PointerBinding) ? value.lineBinding as PointerBinding : DEFAULT_SETTINGS.lineBinding,

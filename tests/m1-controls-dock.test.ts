@@ -89,7 +89,7 @@ const STATE: M1ControlsState = {
   snapToObjects: false,
 };
 
-function build(options: { withSettings?: boolean; setIcon?: (element: HTMLElement, icon: string) => void } = {}) {
+function build(options: { withSettings?: boolean; withSearch?: boolean; setIcon?: (element: HTMLElement, icon: string) => void } = {}) {
   const calls: { navigation: M1NavigationAction[]; appearance: unknown[]; interaction: unknown[]; attachment: unknown[]; opened: string[] } = {
     navigation: [], appearance: [], interaction: [], attachment: [], opened: [],
   };
@@ -102,6 +102,7 @@ function build(options: { withSettings?: boolean; setIcon?: (element: HTMLElemen
     openSourceInspector: () => { calls.opened.push("source"); },
     openExport: () => { calls.opened.push("export"); },
     ...(options.withSettings === false ? {} : { openSettings: () => { calls.opened.push("settings"); } }),
+    ...(options.withSearch === true ? { onSearch: () => { calls.opened.push("search"); } } : {}),
   };
   const document = new FakeDocument();
   const controls = new M1Controls(actions, {
@@ -157,6 +158,19 @@ describe("corner dock", () => {
     expect(byLabel(root, "View and zoom").textContent).toBe("124%");
     update({ zoom: undefined });
     expect(byLabel(root, "View and zoom").textContent).toBe("—");
+  });
+
+  it("opens the board's search from the first button of the board group", () => {
+    const drawn: string[] = [];
+    const { root, calls } = build({ withSearch: true, setIcon: (_element, icon) => { drawn.push(icon); } });
+    const bar = root.children[root.children.length - 1]!;
+    const labels = descendants(bar).map((item) => item.attributes.get("aria-label")).filter((label) => label !== undefined);
+    expect(labels.slice(labels.indexOf("Zoom in") + 1, labels.indexOf("Board settings") + 1)).toEqual(["Search on the board (Ctrl+F)", "Board settings"]);
+    expect(drawn).toContain("search");
+    byLabel(root, "Search on the board (Ctrl+F)").dispatch("click");
+    expect(calls.opened).toEqual(["search"]);
+    setLocale("ru");
+    expect(byLabel(build({ withSearch: true }).root, "Поиск по доске (Ctrl+F)")).toBeDefined();
   });
 
   it("reports the row's buttons as navigation", () => {

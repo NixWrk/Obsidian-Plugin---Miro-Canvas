@@ -100,6 +100,7 @@ export const EN = {
 		toggleMinimap: "Toggle minimap",
 		arrangePanels: "Arrange panels",
 		importIntoBoard: "Import into a board",
+		searchBoard: "Search on the board",
 		/** The keyboard-navigation commands of `NAVIGATION_COMMANDS`, read lazily so hotkeys still bind by id. */
 		navigation: {
 			zoomIn: "Zoom in",
@@ -137,6 +138,7 @@ export const EN = {
 	/** The corner dock: minimap, navigation bar, its menus, and the source & command dialogs it opens. */
 	dock: {
 		ariaLabel: "Miro Canvas view",
+		search: "Search on the board (Ctrl+F)",
 		minimapAriaLabel: "Canvas minimap; use arrow keys to pan",
 		bar: "Canvas navigation",
 		undo: "Undo",
@@ -200,6 +202,29 @@ export const EN = {
 		noteTruncated: "Read-only summary; bounded limits were reached.",
 		noteComplete: "Read-only summary; source values remain in the Canvas file.",
 	},
+	/** The search bar at the board's top right: its field, counter and buttons, and what each match is. */
+	search: {
+		ariaLabel: "Search on the board",
+		placeholder: "Search on the board",
+		count: (current: number, total: number) => `${current} / ${total}`,
+		none: "No results",
+		next: "Next (Enter)",
+		previous: "Previous (Shift+Enter)",
+		close: "Close (Escape)",
+		/** Read out for the match shown, such as "Sticky note, 3 of 12". */
+		announce: (kind: string, current: number, total: number) => `${kind}, ${current} of ${total}`,
+		kinds: {
+			text: "Text",
+			sticky: "Sticky note",
+			shape: "Shape",
+			table: "Table",
+			frame: "Frame",
+			file: "File",
+			link: "Link",
+			label: "Line label",
+			comment: "Comment",
+		},
+	},
 	/** The "arrange panels" mode: its banner, and the tray listing the tools left off the bar. */
 	arrange: {
 		bannerText: "Drag the panels and tools",
@@ -262,6 +287,8 @@ export const EN = {
 		shortcutsDesc: (resetToolsCommandName: string) =>
 			`Assign commands in Settings → Hotkeys, filtered by "Miro Canvas". Escape on the board resets tools and selection; the ${resetToolsCommandName} command has no default hotkey and can be bound there. Canvas tools also use letter shortcuts while the canvas has focus; text editors keep their keys.`,
 		openHotkeys: "Open hotkeys",
+		boardFindKeyName: "Ctrl+F searches the board",
+		boardFindKeyDesc: "Ctrl+F (Cmd+F on macOS) opens the board's search - only while the board has focus and no text is being edited. In a card being written it still searches that card.",
 		interfaceName: "Interface",
 		interfaceDesc: "Board theme, review mode and attachment names belong to each board, snapping to Obsidian's Canvas; change them from the corner dock.",
 		minimapDefaultName: "Show the minimap by default",

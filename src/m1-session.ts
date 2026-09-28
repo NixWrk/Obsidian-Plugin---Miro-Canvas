@@ -117,6 +117,8 @@ import { matchesPointer } from "./pointer-bindings";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
+import { buildSearchIndex, findMatches, focusRect, stepMatch, type SearchEntry, type SearchKind } from "./board-search";
+import { BoardSearchBar } from "./board-search-bar";
 import {
 	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "./quick-tools";
@@ -244,6 +246,29 @@ const SETTLE_FRAMES = 20;
 const MINIMAP_DRAG_INTERVAL = 200;
 /** The tool bar's own gap from the board's foot in styles.css, for a host that cannot measure the board. */
 const DEFAULT_TOOLBAR_BOTTOM = 16;
+/** A board with more readable items than this waits for a pause in the typing before it searches. */
+const SEARCH_DEBOUNCE_ENTRIES = 2000;
+const SEARCH_DEBOUNCE_MS = 120;
+/** Pixels the search outline stands off the match it marks. */
+const SEARCH_HIT_MARGIN = 4;
+/** The side, in pixels, of the outline around a label or pin that is not drawn. */
+const SEARCH_HIT_POINT_SIZE = 16;
+
+/**
+ * Ctrl+F, or Cmd+F on macOS, in any keyboard layout: the key's place, not
+ * its letter, so the same key in a Russian layout counts too.
+ */
+function isFindKey(event: KeyboardEvent): boolean {
+	const oneModifier = event.ctrlKey !== event.metaKey;
+	return event.code === "KeyF" && oneModifier && !event.shiftKey && !event.altKey;
+}
+
+/** A value quoted for an attribute selector: IDs come from the board file. */
+function cssString(value: string): string {
+	const quoted = value.replace(/["\\]/gu, (character) => `\\${character}`);
+	// A line break cannot stand in a quoted selector; CSS writes it as a code point.
+	return quoted.replace(/[\n\r\f]/gu, (character) => `\\${character.charCodeAt(0).toString(16)} `);
+}
 /** What a press starts no rectangle selection on: the things it would select, and text. */
 const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.miro-canvas-mixed-selection-frame,"
 	+ ".miro-board-connector,.miro-canvas-connector-labels,input,textarea,[contenteditable=true]";
@@ -1401,6 +1426,25 @@ export class M1CanvasSession {
 	private openThread: { readonly id: string; readonly origin: CommentOrigin } | undefined;
 	/** Where a comment being written will be pinned. */
 	private commentDraft: CanvasAnchor | undefined;
+	/** The search bar at the top right, made the first time it opens. */
+	private searchBar: BoardSearchBar | undefined;
+	/** The one outline around the match shown; it never takes a press. */
+	private searchHit: HTMLElement | undefined;
+	/** The label or pin the outline hugs, found once per match rather than every frame. */
+	private searchHitTarget: { readonly key: string; readonly element: HTMLElement } | undefined;
+	/** What the board reads as, for the saved board and comment threads it was built from. */
+	private searchIndexCache: {
+		readonly document: unknown;
+		readonly threads: unknown;
+		readonly index: readonly SearchEntry[];
+	} | undefined;
+	/** The index the matches below were found in, and the match shown. */
+	private searchMatched: readonly SearchEntry[] = [];
+	private searchMatches: readonly number[] = [];
+	private searchCurrent = -1;
+	private searchQuery = "";
+	/** A thread the search opened beside its pin, closed again when the search moves on. */
+	private searchOpenedThread: { readonly id: string; readonly origin: CommentOrigin } | undefined;
 	private readonly quickTools: QuickTools | undefined;
 	private readonly arrangeMode: PanelArrangeMode | undefined;
 	private armedTool: QuickTool = "select";
@@ -1513,6 +1557,7 @@ export class M1CanvasSession {
 			openSourceInspector: () => this.openSourceInspector(),
 			openExport: () => this.openExport(),
 			onArrangePanels: () => this.toggleArrangeMode(),
+			onSearch: () => this.openSearch(),
 			...(options.onOpenSettings === undefined ? {} : { openSettings: options.onOpenSettings }),
 		};
 		const controlDocument = options.document ?? ownerDocument(this.root);
@@ -1745,6 +1790,280 @@ export class M1CanvasSession {
 		if (this.arrangeMode === undefined) return;
 		if (this.arrangeMode.active) this.arrangeMode.exit();
 		else this.arrangeMode.enter();
+	}
+
+	/**
+	 * Open the search bar, or put the cursor back in it if it is open.  It
+	 * only reads the board, so it works in review mode, on locked items and
+	 * on a board native Canvas keeps read-only.
+	 */
+	public openSearch(): void {
+		const bar = this.ensureSearchBar();
+		if (bar === undefined) return;
+		if (bar.isOpen) {
+			bar.focusInput();
+			return;
+		}
+		bar.open();
+		// Text left from the last search is looked for again on the board as it is now.
+		this.syncSearch();
+		this.placeSearchHit();
+	}
+
+	/** Put the search bar away and give the board its keys back. */
+	public closeSearch(): void {
+		const bar = this.searchBar;
+		if (bar === undefined || !bar.isOpen) return;
+		bar.close();
+		this.closeSearchThread();
+		this.placeSearchHit();
+		this.root?.focus?.({ preventScroll: true });
+	}
+
+	/** Where the search stands: for tests and for whoever drives the board. */
+	public searchState(): {
+		readonly open: boolean;
+		readonly query: string;
+		readonly total: number;
+		readonly current: number;
+		readonly key?: string;
+		readonly kind?: SearchKind;
+	} {
+		const entry = this.currentSearchEntry();
+		return {
+			open: this.searchBar?.isOpen === true,
+			query: this.searchQuery,
+			total: this.searchMatches.length,
+			current: this.searchCurrent,
+			...(entry === undefined ? {} : { key: entry.key, kind: entry.kind }),
+		};
+	}
+
+	private ensureSearchBar(): BoardSearchBar | undefined {
+		if (this.searchBar !== undefined) return this.searchBar;
+		const root = this.root;
+		const document = this.options.document ?? ownerDocument(root);
+		if (root === undefined || document === undefined || this.disposed) return undefined;
+		const bar = new BoardSearchBar(document, {
+			onQuery: (query) => this.runSearch(query),
+			onStep: (direction) => this.stepSearch(direction),
+			onClose: () => this.closeSearch(),
+			// A large board waits for a pause in the typing before it searches.
+			queryDelay: () => ((this.searchIndexCache?.index.length ?? 0) > SEARCH_DEBOUNCE_ENTRIES ? SEARCH_DEBOUNCE_MS : 0),
+			...(this.options.setIcon === undefined ? {} : { setIcon: this.options.setIcon }),
+		});
+		const hit = document.createElement("div");
+		hit.className = "miro-canvas-search-hit";
+		hit.setAttribute("aria-hidden", "true");
+		hit.hidden = true;
+		root.appendChild(hit);
+		root.appendChild(bar.element);
+		this.searchBar = bar;
+		this.searchHit = hit;
+		this.disposers.push(() => {
+			bar.dispose();
+			hit.remove();
+			this.searchBar = undefined;
+			this.searchHit = undefined;
+			this.searchHitTarget = undefined;
+		});
+		return bar;
+	}
+
+	/**
+	 * The board's readable text, built when the search needs it and again only
+	 * when native Canvas has saved a change or the comments changed - never
+	 * mid-gesture, when cards are moving and nothing has been saved yet.
+	 */
+	private searchIndex(): readonly SearchEntry[] {
+		const cache = this.searchIndexCache;
+		const busy = this.pointerHeld
+			|| this.selectionMovePreview !== undefined
+			|| this.commentMovePreview !== undefined
+			|| this.rotationPreview !== undefined;
+		if (cache !== undefined && busy) return cache.index;
+		const document = this.currentRawDocument;
+		const threads = this.commentThreads();
+		if (cache !== undefined && cache.document === document && cache.threads === threads) return cache.index;
+		const { geometry, scene } = this.landingGeometry();
+		const index = buildSearchIndex({
+			document,
+			scene,
+			geometry,
+			threads,
+			labelFallback: this.settings.connectorLabelPosition,
+		});
+		this.searchIndexCache = { document, threads, index };
+		return index;
+	}
+
+	private currentSearchEntry(): SearchEntry | undefined {
+		const position = this.searchMatches[this.searchCurrent];
+		return position === undefined ? undefined : this.searchMatched[position];
+	}
+
+	/** The field's text changed: find it anew and show the first match. */
+	private runSearch(query: string): void {
+		this.searchQuery = query;
+		const index = this.searchIndex();
+		this.searchMatched = index;
+		this.searchMatches = findMatches(index, query);
+		this.searchCurrent = this.searchMatches.length > 0 ? 0 : -1;
+		this.showSearchMatch(true);
+	}
+
+	private stepSearch(direction: 1 | -1): void {
+		if (this.searchMatches.length === 0) return;
+		// A board saved since the last step is searched as it is now.
+		this.syncSearch();
+		this.searchCurrent = stepMatch(this.searchCurrent, this.searchMatches.length, direction);
+		this.showSearchMatch(true);
+	}
+
+	/**
+	 * After a save the matches are found again in the rebuilt index; the match
+	 * shown stays the same item where it still matches, else the one now in
+	 * its place.  Nothing moves the board here.
+	 */
+	private syncSearch(): void {
+		if (this.searchBar?.isOpen !== true || this.searchQuery.trim() === "") return;
+		const index = this.searchIndex();
+		if (index === this.searchMatched) return;
+		const previousKey = this.currentSearchEntry()?.key;
+		const previousPlace = this.searchCurrent;
+		this.searchMatched = index;
+		this.searchMatches = findMatches(index, this.searchQuery);
+		const kept = this.searchMatches.findIndex((position) => index[position]?.key === previousKey);
+		this.searchCurrent = kept >= 0
+			? kept
+			: Math.min(Math.max(previousPlace, 0), this.searchMatches.length - 1);
+		this.showSearchMatch(false);
+	}
+
+	/** Tell the bar where the search stands and, when asked, bring the match into view. */
+	private showSearchMatch(jump: boolean): void {
+		const entry = this.currentSearchEntry();
+		this.searchBar?.showResult({
+			current: entry === undefined ? -1 : this.searchCurrent,
+			total: this.searchMatches.length,
+			...(entry === undefined ? {} : { kind: entry.kind }),
+		});
+		if (entry === undefined) {
+			this.closeSearchThread();
+			this.placeSearchHit();
+			return;
+		}
+		if (jump) this.jumpToSearchEntry(entry);
+		this.placeSearchHit();
+		if (jump) this.pulseSearchHit();
+	}
+
+	/**
+	 * Centre the match at a readable zoom, the camera path "show" takes on
+	 * slides; a comment is centred at the zoom the board is at and its thread
+	 * opens beside the pin.  A thread with no pin opens in the comments panel.
+	 */
+	private jumpToSearchEntry(entry: SearchEntry): void {
+		if (entry.kind !== "comment") this.closeSearchThread();
+		if (entry.rect === undefined) {
+			if (entry.kind === "comment") this.options.onOpenCommentThread?.(entry.targetId, entry.origin ?? "local");
+			return;
+		}
+		const root = this.root;
+		const zoom = this.viewport.getViewport()?.zoom;
+		if (root !== undefined && zoom !== undefined) {
+			const size = clientSize(root);
+			const readableZoom = entry.kind === "comment" ? 0 : undefined;
+			this.viewport.fitToBounds(focusRect(entry.rect, zoom, size, undefined, readableZoom), size);
+		}
+		if (entry.kind === "comment") {
+			const origin = entry.origin ?? "local";
+			const open = this.openThread;
+			if (open?.id !== entry.targetId || open.origin !== origin) {
+				this.openCommentThread(entry.targetId, origin);
+				this.searchOpenedThread = { id: entry.targetId, origin };
+			}
+		}
+		this.refresh();
+	}
+
+	/** Close a thread the search opened, if it is still the one open. */
+	private closeSearchThread(): void {
+		const opened = this.searchOpenedThread;
+		this.searchOpenedThread = undefined;
+		const open = this.openThread;
+		if (opened !== undefined && open?.id === opened.id && open.origin === opened.origin) this.closeCommentThread();
+	}
+
+	/**
+	 * Put the outline on the match shown: around a card's box as the board
+	 * shows it now, or around a line label or comment pin as drawn.  One
+	 * element, placed once per frame the board moves.
+	 */
+	private placeSearchHit(): void {
+		const hit = this.searchHit;
+		if (hit === undefined) return;
+		const entry = this.searchBar?.isOpen === true ? this.currentSearchEntry() : undefined;
+		const box = entry === undefined ? undefined : this.searchHitBox(entry);
+		if (box === undefined) {
+			hit.hidden = true;
+			return;
+		}
+		hit.hidden = false;
+		hit.style.left = `${box.left - SEARCH_HIT_MARGIN}px`;
+		hit.style.top = `${box.top - SEARCH_HIT_MARGIN}px`;
+		hit.style.width = `${box.width + SEARCH_HIT_MARGIN * 2}px`;
+		hit.style.height = `${box.height + SEARCH_HIT_MARGIN * 2}px`;
+	}
+
+	/** Where a match is inside the board's own box, in pixels. */
+	private searchHitBox(entry: SearchEntry): { readonly left: number; readonly top: number; readonly width: number; readonly height: number } | undefined {
+		if (entry.kind === "label" || entry.kind === "comment") {
+			const element = this.searchHitElement(entry);
+			const drawn = element === undefined ? undefined : boundingRect(element);
+			const rootBox = boundingRect(this.root);
+			if (drawn !== undefined && rootBox !== undefined && drawn.right > drawn.left) {
+				return { left: drawn.left - rootBox.left, top: drawn.top - rootBox.top, width: drawn.right - drawn.left, height: drawn.bottom - drawn.top };
+			}
+		}
+		const rect = entry.rect;
+		if (rect === undefined) return undefined;
+		const topLeft = this.boardToRoot({ x: rect.x, y: rect.y });
+		const bottomRight = this.boardToRoot({ x: rect.x + rect.width, y: rect.y + rect.height });
+		if (topLeft === undefined || bottomRight === undefined) return undefined;
+		const shownWidth = bottomRight.x - topLeft.x;
+		const shownHeight = bottomRight.y - topLeft.y;
+		// A label or pin not drawn yet is marked by a small square at its place.
+		const width = Math.max(shownWidth, SEARCH_HIT_POINT_SIZE);
+		const height = Math.max(shownHeight, SEARCH_HIT_POINT_SIZE);
+		const centerX = topLeft.x + shownWidth / 2;
+		const centerY = topLeft.y + shownHeight / 2;
+		return { left: centerX - width / 2, top: centerY - height / 2, width, height };
+	}
+
+	/** The drawn label or pin of a match, looked up again only once it has been redrawn. */
+	private searchHitElement(entry: SearchEntry): HTMLElement | undefined {
+		const known = this.searchHitTarget;
+		if (known !== undefined && known.key === entry.key && known.element.isConnected !== false) return known.element;
+		const root = this.root;
+		if (root === undefined || typeof root.querySelector !== "function") return undefined;
+		const id = cssString(entry.targetId);
+		const selector = entry.kind === "label"
+			? `.miro-canvas-connector-label[data-connector-id="${id}"]`
+			: `.miro-canvas-comment-marker[data-comment-id="${id}"][data-comment-origin="${cssString(entry.origin ?? "local")}"]`;
+		const element = root.querySelector<HTMLElement>(selector) ?? undefined;
+		this.searchHitTarget = element === undefined ? undefined : { key: entry.key, element };
+		return element;
+	}
+
+	/** A short pulse as the outline arrives; styles.css leaves it out for reduced motion. */
+	private pulseSearchHit(): void {
+		const hit = this.searchHit;
+		if (hit === undefined || hit.hidden) return;
+		hit.classList.remove("is-arriving");
+		// Reading the box restarts the animation for a second match in a row.
+		void hit.offsetWidth;
+		hit.classList.add("is-arriving");
 	}
 
 	/**
@@ -2153,15 +2472,20 @@ export class M1CanvasSession {
 	private viewportPoint(point: { readonly x: number; readonly y: number }): { readonly x: number; readonly y: number } | undefined {
 		const rootRect = boundingRect(this.root);
 		const left = rootRect?.left ?? 0, top = rootRect?.top ?? 0;
+		const inRoot = this.boardToRoot(point);
+		return inRoot === undefined ? undefined : { x: inRoot.x + left, y: inRoot.y + top };
+	}
+
+	/** Where a board point is shown now, in pixels from the board's own top left. */
+	private boardToRoot(point: { readonly x: number; readonly y: number }): { readonly x: number; readonly y: number } | undefined {
 		const displayed = this.displayViewport(), size = clientSize(this.root);
 		if (displayed !== undefined && this.viewport.coordinateMode === "center") {
 			return {
-				x: (point.x - displayed.x) * displayed.zoom + size.width / 2 + left,
-				y: (point.y - displayed.y) * displayed.zoom + size.height / 2 + top,
+				x: (point.x - displayed.x) * displayed.zoom + size.width / 2,
+				y: (point.y - displayed.y) * displayed.zoom + size.height / 2,
 			};
 		}
-		const screen = this.viewport.boardToScreen(point);
-		return screen === undefined ? undefined : { x: screen.x + left, y: screen.y + top };
+		return this.viewport.boardToScreen(point);
 	}
 
 	/** Node boxes, silhouettes and routes of the current document, measured once per document. */
@@ -3083,6 +3407,9 @@ export class M1CanvasSession {
 		this.lastToolbarState = toolbarState;
 		this.handles.update(this.handlesState(toolbarState.editable));
 		this.updateExportOverlay();
+		// An open search follows a saved change; the outline follows the board.
+		this.syncSearch();
+		this.placeSearchHit();
 		this.retargetFollow();
 	}
 
@@ -3283,6 +3610,7 @@ export class M1CanvasSession {
 		}
 		this.handles.update(this.handlesState(previous?.editable ?? false));
 		this.updateCommentMarkers();
+		this.placeSearchHit();
 		this.updateExportOverlay();
 		const size = clientSize(this.root), viewport = this.displayViewport();
 		const signature = `${this.lastSceneSignature}|${this.viewportSignature(viewport, size)}`;
@@ -5863,6 +6191,12 @@ export class M1CanvasSession {
 			if (x !== undefined && y !== undefined) this.lastPointer = { x, y, at: Date.now() };
 		};
 		const key = (event: KeyboardEvent): void => {
+			if (isFindKey(event) && this.findKeyOpensSearch(event, onBoard())) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				this.openSearch();
+				return;
+			}
 			if (!onBoard()) return;
 			if (event.key === "Escape" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
 				// Native Canvas puts its own selection away on Escape too.
@@ -5927,6 +6261,35 @@ export class M1CanvasSession {
 			root.removeEventListener("pointermove", track);
 			root.removeEventListener("pointerdown", track, true);
 		});
+	}
+
+	/**
+	 * Whether Ctrl+F (Cmd+F) is the board's to take.  Obsidian binds it to
+	 * "Search current file", which on a board does nothing unless a card is
+	 * being written - so the board takes it only while it has focus and no
+	 * text is being edited, and a card being written keeps Obsidian's search.
+	 * Pressed in the search field itself, it selects the field's text again.
+	 */
+	private findKeyOpensSearch(event: KeyboardEvent, boardFocused: boolean): boolean {
+		const active = ownerDocument(this.root)?.activeElement;
+		if (this.searchBar?.isOpen === true && active != null && this.searchBar.element.contains(active)) return true;
+		if (!this.settings.boardFindKey || !boardFocused) return false;
+		// A card's editor lives in a frame of its own; its keys reach this window
+		// with the editor as their target.
+		if (active?.tagName === "IFRAME") return false;
+		const target = eventTarget(event) as Element | null;
+		if (target?.closest?.("input, textarea, [contenteditable=true], .cm-editor") != null) return false;
+		return !this.cardBeingWritten();
+	}
+
+	/** Whether a selected card is open for writing; only the selection can be. */
+	private cardBeingWritten(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		for (const node of this.adapter.getNodes() ?? []) {
+			const id = readCanvasElementId(node);
+			if (id !== undefined && this.selectedIds.includes(id) && readRuntime(node, "isEditing") === true) return true;
+		}
+		return false;
 	}
 
 	/**

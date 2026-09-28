@@ -72,6 +72,13 @@ describe("plugin settings", () => {
     expect(normalizeSettings({ developerDiagnostics: true }).developerDiagnostics).toBe(true);
   });
 
+  it("lets Ctrl+F search the board unless it was turned off", () => {
+    expect(DEFAULT_SETTINGS.boardFindKey).toBe(true);
+    expect(normalizeSettings({}).boardFindKey).toBe(true);
+    expect(normalizeSettings({ boardFindKey: false }).boardFindKey).toBe(false);
+    expect(normalizeSettings({ boardFindKey: "no" }).boardFindKey).toBe(true);
+  });
+
   it("keeps stored values and drops unknown keys", () => {
     const stored = normalizeSettings({
       zoomStep: 1.5, panStep: 128, wheelZoomModifier: "shift",
