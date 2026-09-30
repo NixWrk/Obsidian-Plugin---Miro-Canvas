@@ -37,7 +37,12 @@
 - On a tablet the board's buttons keep their own size: Obsidian's wide
   tablet padding had squeezed the dock's icons out of sight, shrunk the pen's
   tools to dots, stretched the colours and pushed the tool bar onto two rows.
-  The author's colour on a comment card is a small circle again.
+  The author's colour on a comment card is a small circle again, and so is
+  a comment's pin, which had turned into an oval. One rule now gives every
+  button the plugin draws the padding it was made with (the pins, the
+  comment cards' and threads' buttons, the handles, the bars, the dock, the
+  pickers, the search bar and the export included), so a button added later
+  needs nothing of its own.
 - With a stylus, a palm the tablet rejects leaves no trace: it no longer puts
   the selection away, nudges the board, or ends the pen stroke it landed
   beside.

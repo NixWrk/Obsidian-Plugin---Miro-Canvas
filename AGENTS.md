@@ -58,6 +58,13 @@ python -m pytest -q tools/obsidian_oracle/tests
   stay in English.
 - **Minimal HTML.** Items the tools create are plain text, Markdown fences and
   Markdown tables.
+- **Button padding.** Obsidian's tablet rule `.is-tablet
+  button:not(.clickable-icon)` outweighs the plugin's one- and two-class
+  rules. A rule that pads a button the plugin draws states the padding in
+  `--miro-canvas-button-padding` and pads by it (`padding:
+  var(--miro-canvas-button-padding)`); the one rule under `.is-tablet` in
+  `styles.css` puts it back. The `--controls` smoke finds a miss by comparing
+  every button under the plugin's roots with and without Obsidian's rule.
 - **No installs.** The plugin never installs or runs anything (Obsidian's
   directory rules), and downloads nothing but a font pack on a press; its only
   other request is the update check it discloses. Links open in the browser on

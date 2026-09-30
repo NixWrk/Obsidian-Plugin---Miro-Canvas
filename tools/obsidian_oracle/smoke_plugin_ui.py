@@ -913,6 +913,63 @@ def main() -> int:
                   const t=b.runtime.getData().miroCanvas.localOverrides.e1.connector.labelT;
                   if(typeof t!=='number'||t===0.5)throw Error('Native edge label cannot be moved along body: '+t);
                 }""")
+                # Obsidian on a tablet pads every button but its own icon buttons 20px
+                # on each side, which the plugin's one- and two-class rules do not
+                # outweigh.  Every button the plugin draws - found under its own roots,
+                # not from a list of classes - must be the size and the padding on a
+                # tablet that it is without Obsidian's rule, in every panel the board
+                # can have open: the comment pin and its card, the bars, the handles,
+                # the dock, the search bar, the export, the command list and the tools.
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session;
+                  // Obsidian's own rules for a button - its base rule, then the one a tablet adds - ahead of the plugin's styles, as in Obsidian.
+                  const obsidian=document.createElement('style');
+                  obsidian.textContent=':root{--size-4-1:4px;--size-4-3:12px;--size-4-5:20px}button{padding:var(--size-4-1) var(--size-4-3)}.is-tablet button:not(.clickable-icon){padding:var(--size-4-1) var(--size-4-5)}';
+                  document.head.prepend(obsidian);
+                  const tablet=['is-mobile','is-tablet'].filter((name)=>!document.body.classList.contains(name));
+                  const theirs=(element)=>/(^|\s)miro-(canvas|source)-/.test(String(element.className));
+                  // The board, and whatever the plugin hangs on the page beside it.
+                  const roots=()=>[b.root,...[...document.body.children].filter(theirs)];
+                  const snapshot=(buttons)=>buttons.map((button)=>{
+                    const style=getComputedStyle(button),box=button.getBoundingClientRect();
+                    return {padding:[style.paddingTop,style.paddingRight,style.paddingBottom,style.paddingLeft].join(' '),width:Math.round(box.width*10)/10,height:Math.round(box.height*10)/10};
+                  });
+                  const classes=new Set();
+                  const same=(where)=>{
+                    const buttons=[...new Set(roots().flatMap((root)=>[...root.querySelectorAll('button')]))];
+                    const without=snapshot(buttons);
+                    document.body.classList.add(...tablet);
+                    const on=snapshot(buttons);
+                    document.body.classList.remove(...tablet);
+                    const changed=[];
+                    buttons.forEach((button,index)=>{
+                      String(button.className).split(/\s+/).filter(Boolean).forEach((name)=>classes.add(name));
+                      if(JSON.stringify(without[index])!==JSON.stringify(on[index]))
+                        changed.push({button:String(button.className)||button.getAttribute('aria-label')||button.textContent,without:without[index],tablet:on[index]});
+                    });
+                    if(changed.length)throw Error('On a tablet '+changed.length+' of '+buttons.length+' buttons change with '+where+': '+JSON.stringify(changed.slice(0,6)));
+                    return buttons.length;
+                  };
+                  let counted=0;
+                  s.resetTools();
+                  s.commentDraft={type:'free',x:260,y:210};s.createComment('Tablet pin');s.closeCommentThread();
+                  b.root.querySelector('.miro-canvas-comment-marker')?.click();
+                  b.select('n1');
+                  counted+=same('a comment open and a card picked');
+                  s.armTool('pen');counted+=same('the pen armed');
+                  s.armTool('connector');counted+=same('the lines armed');
+                  s.resetTools();
+                  s.closeCommentThread();
+                  s.toggleArrangeMode();counted+=same('the panels being arranged');s.toggleArrangeMode();
+                  s.openSearch();counted+=same('the search bar open');s.closeSearch();
+                  s.openCommandModal();counted+=same('the command list open');s.controls.closeCommandModal();
+                  s.openExport();counted+=same('the export open');s.closeExport();
+                  b.mountM2();counted+=same('the tools panel open');
+                  obsidian.remove();
+                  for(const name of ['miro-canvas-comment-marker','miro-canvas-thread__button','miro-canvas-toolbar__button','miro-canvas-dock__button','miro-canvas-handle'])
+                    if(!classes.has(name))throw Error('The tablet check never reached a '+name+': '+[...classes].join(' '));
+                  if(counted<120)throw Error('The tablet check reached only '+counted+' buttons');
+                }""")
                 assert errors == [], errors
                 page.evaluate("miroBrowser.dispose()")
                 browser.close()

@@ -887,7 +887,17 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   of its position, so the card and note slots held two buttons each, and a
   slot is a row (`.miro-canvas-toolbar__native-slot`); in a vertical bar it
   is a column. The rule before the "+" of More lay upright there too and is
-  now across. Left: the owner's own trial of the hold
+  now across. (5) Obsidian's tablet rule `.is-tablet
+  button:not(.clickable-icon) { padding: 4px 20px }` (specificity 0,2,1)
+  outweighs every one- and two-class padding rule of the plugin: the comment
+  pin (`min-width: 32px`, padding 0) became a 44 x 32 oval. Every rule that
+  pads a plugin button now states the padding in
+  `--miro-canvas-button-padding`, a button no rule pads takes Obsidian's own
+  `var(--size-4-1) var(--size-4-3)`, and one rule under `.is-tablet` /
+  `.is-mobile` (0,3,1) puts either back for every button with a plugin class
+  and every bare one inside a plugin panel; the `--controls` smoke injects
+  Obsidian's two rules and compares the padding and size of every button under
+  the plugin's roots. Left: the owner's own trial of the hold
   with the real pen, landscape on a phone (the dock stacked over the bar
   leaves little board), iPhone and iPad, macOS and Linux.
 - [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts
