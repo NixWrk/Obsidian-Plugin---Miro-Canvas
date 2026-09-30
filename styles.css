@@ -1176,6 +1176,102 @@
   display: none;
 }
 
+/* Obsidian on a tablet pads every button but its own icon buttons 20px on
+   each side (`.is-tablet button:not(.clickable-icon)`, seen in 1.13 on a
+   Galaxy Tab), which outweighs the board's own one- and two-class rules: a
+   40px dock button kept no room for its icon, the pen's tools shrank to
+   dots, the colours stretched and the tool bar broke onto two rows.  Each
+   rule below is one of the board's buttons whose padding Obsidian's rule
+   outweighs, given back the padding of the base rule it names, in the same
+   order as those rules so the more particular ones still win. */
+
+/* Base: `.miro-canvas-dock .miro-canvas-dock__button`. */
+.is-tablet .miro-canvas-dock .miro-canvas-dock__button:not(.clickable-icon) {
+  padding: 0 5px;
+}
+
+/* Base: `.miro-canvas-dock .miro-canvas-dock__item`. */
+.is-tablet .miro-canvas-dock .miro-canvas-dock__item:not(.clickable-icon) {
+  padding: 4px 8px;
+}
+
+/* Base: `.miro-canvas-dock .miro-canvas-dock__segment`. */
+.is-tablet .miro-canvas-dock .miro-canvas-dock__segment:not(.clickable-icon) {
+  padding: 6px 4px;
+}
+
+/* Base: `.miro-canvas-command-modal .miro-canvas-command-modal__item`. */
+.is-tablet .miro-canvas-command-modal .miro-canvas-command-modal__item:not(.clickable-icon) {
+  padding: 7px 10px;
+}
+
+/* Base: `.miro-canvas-m2-tools button`. */
+.is-tablet .miro-canvas-m2-tools button:not(.clickable-icon) {
+  padding: 3px 9px;
+}
+
+/* Base: `.miro-canvas-toolbar .miro-canvas-toolbar__button`. */
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button:not(.clickable-icon) {
+  padding: 0 5px;
+}
+
+/* Base: `.miro-canvas-tools .miro-canvas-toolbar__button.miro-canvas-tools__item`. */
+.is-tablet .miro-canvas-tools .miro-canvas-toolbar__button.miro-canvas-tools__item:not(.clickable-icon) {
+  padding: 0 8px;
+}
+
+/* Base: `.miro-canvas-tools__connectors > .miro-canvas-toolbar__button`. */
+.is-tablet .miro-canvas-tools__connectors > .miro-canvas-toolbar__button:not(.clickable-icon) {
+  padding: 2px;
+}
+
+/* Base: `.miro-canvas-toolbar .miro-canvas-toolbar__button--font` and `--font-option`. */
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button--font:not(.clickable-icon),
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button--font-option:not(.clickable-icon) {
+  padding: 0 8px;
+}
+
+/* Base: `.miro-canvas-toolbar .miro-canvas-toolbar__button--step`. */
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button--step:not(.clickable-icon) {
+  padding: 0;
+}
+
+/* Base: `.miro-canvas-toolbar .miro-canvas-toolbar__button--default`. */
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button--default:not(.clickable-icon) {
+  padding: 0 8px 0 5px;
+}
+
+/* Base, each with no padding: `.miro-canvas-toolbar .miro-canvas-toolbar__button--picture`,
+   `--swatch`, `.miro-canvas-handle`, `.miro-canvas-handles .miro-canvas-handle--route`,
+   `.miro-source-deck-bar .miro-source-deck-button`,
+   `.miro-canvas-slideshow .miro-canvas-slideshow__button`,
+   `.miro-canvas-search .miro-canvas-search__button` and `.miro-canvas-arrange-flip`. */
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button--picture:not(.clickable-icon),
+.is-tablet .miro-canvas-toolbar .miro-canvas-toolbar__button--swatch:not(.clickable-icon),
+.is-tablet .miro-canvas-handle:not(.clickable-icon),
+.is-tablet .miro-canvas-handles .miro-canvas-handle--route:not(.clickable-icon),
+.is-tablet .miro-source-deck-bar .miro-source-deck-button:not(.clickable-icon),
+.is-tablet .miro-canvas-slideshow .miro-canvas-slideshow__button:not(.clickable-icon),
+.is-tablet .miro-canvas-search .miro-canvas-search__button:not(.clickable-icon),
+.is-tablet .miro-canvas-arrange-flip:not(.clickable-icon) {
+  padding: 0;
+}
+
+/* Base: `.miro-canvas-thread .miro-canvas-thread__button`. */
+.is-tablet .miro-canvas-thread .miro-canvas-thread__button:not(.clickable-icon) {
+  padding: 0 6px;
+}
+
+/* Base: `.miro-canvas-export__segment`. */
+.is-tablet .miro-canvas-export__segment:not(.clickable-icon) {
+  padding: 4px 8px;
+}
+
+/* Base: `.miro-canvas-arrange-banner__button`. */
+.is-tablet .miro-canvas-arrange-banner__button:not(.clickable-icon) {
+  padding: 4px 10px;
+}
+
 /* On a narrow board the tool bar's centred default place can run under the
    corner dock's icon row - seen in real Obsidian around 680px with a
    sidebar open, well above the 900px the two media queries above react to,
@@ -3197,7 +3293,9 @@
   flex: 1;
 }
 
-.miro-canvas-thread__color {
+/* Doubled, with the tag, so Obsidian's own `input[type="color"]` size -
+   40px on a phone or a tablet - does not blow the author's colour up. */
+.miro-canvas-thread input.miro-canvas-thread__color {
   width: 22px;
   height: 22px;
   padding: 0;

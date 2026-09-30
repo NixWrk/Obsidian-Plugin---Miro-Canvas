@@ -34,6 +34,10 @@
 - A tap on the tool bar no longer also moves the board when Canvas Minimap
   lies under it, and the bar over a selection keeps its one or two rows
   instead of squeezing into four.
+- On a tablet the board's buttons keep their own size: Obsidian's wide
+  tablet padding had squeezed the dock's icons out of sight, shrunk the pen's
+  tools to dots, stretched the colours and pushed the tool bar onto two rows.
+  The author's colour on a comment card is a small circle again.
 - A labelled line no longer shows its label twice: native Canvas makes a
   line's own label only when it first draws the line - on opening an
   imported board, or once the line scrolls into view - and that label is
