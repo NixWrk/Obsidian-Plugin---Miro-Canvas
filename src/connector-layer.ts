@@ -32,13 +32,22 @@ export interface ConnectorLayerHost {
   readonly selected?: () => void;
 }
 
+/** One connector as drawn: its elements, how it looks, and the course it was drawn along. */
+interface DrawnConnector {
+  readonly group: SVGGElement;
+  readonly line: SVGPathElement;
+  readonly hit: SVGPathElement;
+  readonly look: string;
+  readonly course: string;
+}
+
 export class ConnectorLayer {
   public readonly element: SVGSVGElement;
   private readonly selected = new Set<string>();
   private previewed: BoardConnector | undefined;
   private routes = new Map<string, PlannedRoute>();
   /** Each connector drawn, and what it was drawn from. */
-  private readonly drawn = new Map<string, { readonly group: SVGGElement; readonly signature: string }>();
+  private readonly drawn = new Map<string, DrawnConnector>();
   /** What the layer was last drawn from; the same again draws nothing. */
   private painted: { readonly document: unknown; readonly geometry: AnchorGeometry; readonly selection: string } | undefined;
   private readonly listeners: (() => void)[] = [];
@@ -109,13 +118,21 @@ export class ConnectorLayer {
       const route = this.routes.get(connector.id);
       if (route === undefined) continue;
       kept.add(connector.id);
-      const signature = `${route.path}|${this.selected.has(connector.id)}|${JSON.stringify(connector)}`;
+      const look = lookOf(connector, this.selected.has(connector.id));
       const known = this.drawn.get(connector.id);
-      if (known?.signature === signature) continue;
-      const group = this.draw(connector, route);
-      if (known === undefined) svg.appendChild(group);
-      else svg.replaceChild(group, known.group);
-      this.drawn.set(connector.id, { group, signature });
+      if (known !== undefined && known.look === look) {
+        if (known.course === route.path) continue;
+        // Only its course changed - a card it holds was moved: the same line
+        // follows it.  Dragging many cards moves every line they hold, and
+        // drawing each afresh on every move of the drag was most of its cost.
+        this.redrawCourse(known, connector, route);
+        this.drawn.set(connector.id, { ...known, course: route.path });
+        continue;
+      }
+      const drawn = this.draw(connector, route, look);
+      if (known === undefined) svg.appendChild(drawn.group);
+      else svg.replaceChild(drawn.group, known.group);
+      this.drawn.set(connector.id, drawn);
     }
     for (const [id, known] of this.drawn) {
       if (kept.has(id)) continue;
@@ -131,7 +148,7 @@ export class ConnectorLayer {
   }
 
   /** One connector: its course, as native Canvas draws an edge's, and the wider copy that takes presses. */
-  private draw(connector: BoardConnector, route: PlannedRoute): SVGGElement {
+  private draw(connector: BoardConnector, route: PlannedRoute, look: string): DrawnConnector {
     const group = this.document.createElementNS(SVG, "g");
     // Its arrowheads go with it, and are drawn again with it.
     const defs = group.appendChild(this.document.createElementNS(SVG, "defs"));
@@ -165,7 +182,13 @@ export class ConnectorLayer {
       if (name === "d" || name.startsWith("marker-")) line.setAttribute(name, value);
       else line.style.setProperty(name, value);
     }
-    return group;
+    return { group, line, hit, look, course };
+  }
+
+  /** The same line along a new course; its look and its arrowheads stay as drawn. */
+  private redrawCourse(drawn: DrawnConnector, connector: BoardConnector, route: PlannedRoute): void {
+    drawn.hit.setAttribute("d", route.path);
+    drawn.line.setAttribute("d", connector.block === true ? blockOutline(connector, route) : route.path);
   }
 
   /** Markers for a connector's two ends, sized as native Canvas sizes its own. */
@@ -190,6 +213,16 @@ export class ConnectorLayer {
     }
     return result;
   }
+}
+
+/**
+ * How a connector looks, apart from where it runs.  Its ends and bends reach
+ * the drawing only through its route, so a line whose card moved looks the
+ * same; anything else about it, a field unknown here included, draws it afresh.
+ */
+function lookOf(connector: BoardConnector, selected: boolean): string {
+  const { from: _from, to: _to, waypoints: _waypoints, ...look } = connector;
+  return `${selected}|${JSON.stringify(look)}`;
 }
 
 function plannedRoute(value: unknown): PlannedRoute | undefined {

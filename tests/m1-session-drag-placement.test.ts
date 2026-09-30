@@ -126,7 +126,7 @@ afterEach(() => {
  * among them, and a frame around the first few - the frame and its cards
  * make a group selection.
  */
-function fixture(count: number) {
+function fixture(count: number, options: { readonly camera?: boolean } = {}) {
 	const root = new HostElement("canvas-wrapper");
 	const cards: Data[] = Array.from({ length: count }, (_, index) => ({
 		id: `card-${index}`, type: "text", text: `Card ${index}`,
@@ -154,6 +154,21 @@ function fixture(count: number) {
 		deselectAll() { selection.clear(); },
 		requestSave() { this.data = this.getData(); },
 	};
+	if (options.camera === true) {
+		// Native Canvas's own camera, as the view shows the board: the board
+		// point at the view's centre, log2 of the zoom, and the view's size.
+		const centreX = () => view.panX + root.clientWidth / (2 * view.zoom);
+		const centreY = () => view.panY + root.clientHeight / (2 * view.zoom);
+		Object.defineProperties(canvas, {
+			x: { get: centreX },
+			y: { get: centreY },
+			zoom: { get: () => Math.log2(view.zoom) },
+			tx: { get: centreX },
+			ty: { get: centreY },
+			tZoom: { get: () => Math.log2(view.zoom) },
+			canvasRect: { get: () => ({ width: root.clientWidth, height: root.clientHeight }) },
+		});
+	}
 	const store = createObsidianMetadataStore({ canvas }).store;
 	const session = new M1CanvasSession({ canvas }, new MetadataWriter(store!), {});
 	sessions.push(session);
@@ -376,6 +391,110 @@ describe("the shared frame around a large selection being dragged", () => {
 		expect(measuredBoxes.length).toBe(2);
 		const followed = frameBox();
 		expect(followed).toEqual(afresh());
+	});
+});
+
+describe("the shared frame while cards alone are dragged by it", () => {
+	/** A pointer event as the window hands it on. */
+	const pointer = (type: string, x: number, y: number): Event => {
+		const event = new Event(type, { cancelable: true });
+		for (const [key, value] of Object.entries({ pointerId: 7, button: 0, shiftKey: false, clientX: x, clientY: y })) {
+			Object.defineProperty(event, key, { value });
+		}
+		return event;
+	};
+	/** A press on the frame, as the session's own listener hands it on. */
+	const pressOn = (frame: HostElement, x: number, y: number) => ({
+		pointerId: 7, button: 0, shiftKey: false, clientX: x, clientY: y, target: frame,
+		preventDefault() {}, stopImmediatePropagation() {},
+	});
+	/** The session's private parts a drag by the frame goes through. */
+	interface Dragging {
+		startSelectionMove(event: unknown): boolean;
+		selectedCommentKeys: Set<string>;
+		movingFrame: unknown;
+	}
+
+	it("moves with the pointer from where it stood as the drag began, measuring nothing, until the view moves", () => {
+		const context = fixture(60, { camera: true });
+		view.zoom = 0.5;
+		view.panX = -200;
+		view.panY = -300;
+		select(context, [...context.nodes.keys()]);
+		const window = new EventTarget();
+		context.root.ownerDocument = { createElement: () => new HostElement(), defaultView: window } as never;
+		const session = context.session;
+		inside(session).updateMixedSelectionFrame();
+		const frame = inside(session).mixedSelectionFrame!;
+		const box = () => [frame.style.left, frame.style.top, frame.style.width, frame.style.height].map((value) => Number.parseFloat(value));
+		const afresh = () => {
+			inside(session).frameBounds.reset();
+			inside(session).updateMixedSelectionFrame();
+			return box();
+		};
+		const expectBox = (actual: number[], expected: number[]) => {
+			expect(actual).toHaveLength(4);
+			actual.forEach((value, index) => expect(value).toBeCloseTo(expected[index]!, 6));
+		};
+		const placed = box();
+		// Pressed inside the frame, on the page.
+		const press = { x: ROOT_LEFT + placed[0]! + 40, y: ROOT_TOP + placed[1]! + 30 };
+		expect((session as unknown as Dragging).startSelectionMove(pressOn(frame, press.x, press.y))).toBe(true);
+		expectBox(box(), placed);
+		const toolbarAtPress = inside(session).selectionPlacement()!;
+		expectPlacement(toolbarAtPress, measuredAfresh(session));
+		const card = context.nodes.get("card-0")!.nodeEl;
+		const handlesState = (session as unknown as { handlesState(editable: boolean): { rect?: unknown; origin?: unknown } }).handlesState;
+		for (const [dx, dy] of [[10, 4], [36, 22], [80, 50]] as const) {
+			window.dispatchEvent(pointer("pointermove", press.x + dx, press.y + dy));
+			// The cards show where they are going, in board units.
+			expect(card.properties.get("translate")).toBe(`${dx / view.zoom}px ${dy / view.zoom}px`);
+			// The frame, the toolbar and the handles measure nothing on the page.
+			measuredBoxes.length = 0;
+			const rootMeasured = vi.spyOn(context.root, "getBoundingClientRect");
+			inside(session).updateMixedSelectionFrame();
+			const toolbar = inside(session).selectionPlacement()!;
+			const handles = handlesState.call(session, true);
+			expect(measuredBoxes).toHaveLength(0);
+			expect(rootMeasured).not.toHaveBeenCalled();
+			rootMeasured.mockRestore();
+			// Exactly as far as the pointer went, the frame's size unchanged.
+			expectBox(box(), [placed[0]! + dx, placed[1]! + dy, placed[2]!, placed[3]!]);
+			expectPlacement(toolbar, { x: toolbarAtPress.x + dx, y: toolbarAtPress.y + dy });
+			// Handles are never shown for many items; none were placed.
+			expect(handles.rect).toBeUndefined();
+			expect(handles.origin).toBeUndefined();
+		}
+		// The view pans mid-drag: the frame is measured again, as before.
+		view.panX += 90;
+		measuredBoxes.length = 0;
+		inside(session).updateMixedSelectionFrame();
+		expect(measuredBoxes.length).toBeGreaterThan(0);
+		expectBox(box(), afresh());
+		expectPlacement(inside(session).selectionPlacement(), measuredAfresh(session));
+		// Cancelled: the cards are back where they were, and the frame and the toolbar are measured around them there.
+		window.dispatchEvent(pointer("pointercancel", press.x + 80, press.y + 50));
+		expect(card.properties.has("translate")).toBe(false);
+		expectBox(box(), afresh());
+		expectPlacement(inside(session).selectionPlacement(), measuredAfresh(session));
+		view.panX -= 90;
+		expectBox(afresh(), placed);
+		expectPlacement(measuredAfresh(session), toolbarAtPress);
+	});
+
+	it("is measured as before while a pin is dragged with the cards", () => {
+		const context = fixture(40, { camera: true });
+		select(context, [...context.nodes.keys()]);
+		const window = new EventTarget();
+		context.root.ownerDocument = { createElement: () => new HostElement(), defaultView: window } as never;
+		const session = context.session as unknown as Dragging;
+		inside(context.session).updateMixedSelectionFrame();
+		const frame = inside(context.session).mixedSelectionFrame!;
+		// A comment pin selected with the cards need not move as a card does.
+		session.selectedCommentKeys.add("local:pin");
+		expect(session.startSelectionMove(pressOn(frame, ROOT_LEFT + 20, ROOT_TOP + 20))).toBe(true);
+		expect(session.movingFrame).toBeUndefined();
+		window.dispatchEvent(pointer("pointercancel", ROOT_LEFT + 20, ROOT_TOP + 20));
 	});
 });
 

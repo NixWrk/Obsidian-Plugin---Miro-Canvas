@@ -127,6 +127,42 @@ describe("connector layer", () => {
     expect(svg.children).toEqual([a]);
   });
 
+  it("moves a line whose ends moved along its new course, keeping what is drawn, and draws it afresh when its look changes", () => {
+    const moved = (dx: number) => connector({ from: { type: "free", x: dx, y: 0 }, to: { type: "free", x: 100 + dx, y: 0 } });
+    const block = (dy: number) => connector({
+      id: "b", block: true, startCap: "none", endCap: "none", width: 20,
+      from: { type: "free", x: 0, y: dy }, to: { type: "free", x: 100, y: dy },
+    });
+    const { layer, svg, replace } = layerOf([connector(), block(0)]);
+    layer.render();
+    const [a, b] = svg.children;
+    const markers = all(a!).filter((element) => element.tag === "marker");
+    const outline = b!.children[1]!.attrs.get("d");
+    // Every move of a drag: both lines follow, each the same group as before.
+    for (const shift of [40, 80]) {
+      replace([moved(shift), block(shift)]);
+      layer.render();
+      expect(svg.children[0]).toBe(a);
+      expect(svg.children[1]).toBe(b);
+      const [, line, hit] = a!.children;
+      expect(line!.attrs.get("d")).toMatch(new RegExp(`^M ${shift} 0`, "u"));
+      expect(hit!.attrs.get("d")).toBe(line!.attrs.get("d"));
+      expect(all(a!).filter((element) => element.tag === "marker")).toEqual(markers);
+      // A block arrow's body is its outline along the course, not the course itself.
+      const [, blockLine, blockHit] = b!.children;
+      expect(blockLine!.attrs.get("d")).not.toBe(outline);
+      expect(blockLine!.attrs.get("d")).toMatch(/ Z$/u);
+      expect(blockHit!.attrs.get("d")).toMatch(new RegExp(`^M 0 ${shift}`, "u"));
+    }
+    expect(layer.routeOf("a")?.start).toMatchObject({ x: 80, y: 0 });
+    // Another colour is another look: the line is drawn afresh.
+    replace([{ ...moved(80), color: "#654321" }]);
+    layer.render();
+    expect(svg.children).toHaveLength(1);
+    expect(svg.children[0]).not.toBe(a);
+    expect(svg.children[0]!.styles.get("--canvas-color")).toBe("#654321");
+  });
+
   it("previews a connector where it is dragged, and says which one was pressed", () => {
     const pressed: string[] = [];
     const { layer, svg } = layerOf([connector()], pressed);

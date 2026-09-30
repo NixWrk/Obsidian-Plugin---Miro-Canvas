@@ -672,9 +672,12 @@ and covered by automated tests.
 - [ ] Verify large-board performance and keyboard accessibility. Large boards
   are measured in the synthetic harness (see "Standard edges, one label editor,
   large boards" below). Dragging large selections is measured in a real
-  Obsidian ("Dragging large selections" below). Left: faster dragging on huge
-  boards (stage 6: the per-move work on the whole board), a keyboard pass, and
-  that checked in a real Obsidian.
+  Obsidian ("Dragging large selections" below): the locks are read once a step,
+  a long drag is written when let go, and a drag of 50 or more cards is 1.5 to 3
+  times faster. Left: the rest of the per-move work on huge boards (restyling
+  the moved cards, translating the board for the preview, writing the move),
+  about 1.1 s per arrow-key press with 5,000 cards selected, and a keyboard
+  pass.
 
 ### M2: editing fundamentals
 
@@ -1555,6 +1558,111 @@ column from 60-move drags, the others from 20-move drags):
 A drag of all 2,000 cards on the 2,000-card board took 745 ms a move and was
 refused at the end before; with the refusal fixed it took 773 ms a move, was
 written as one step of native history, and one undo put every card back.
+
+Part 3 (2026-09-30). Three more changes to what a drag costs, and the whole
+matrix measured on the final build. A profile of a drag of all 5,000 cards (25.3
+s over 23 moves) had put about 9.4 s into the first measuring of the page after
+the cards had moved - the selection frame's, which makes the browser restyle
+every moved card at once - and about 4.7 s into the board's own connectors, most
+of it building each line's elements afresh on every move. Now, while cards alone
+are dragged, the selection frame and the toolbar are placed once as the drag
+begins and then moved with the pointer (measured again if the view pans or
+zooms, and after the drag); the handles, never shown for more than one item,
+measure nothing meanwhile; a connector whose look is unchanged is redrawn along
+its new course in place (`src/connector-layer.ts`); and the dragged ids are
+looked up in sets when the drag starts and ends.
+
+Measured in a real Obsidian 1.13.7 (a 1,280 x 800 window at 100 Hz) with real
+`Input.dispatchMouseEvent` input: 60 pointer moves 15 ms apart, then let go, one
+run for each row. Before is the build without this work (b4a996a), after the
+final build, plugin off native Canvas alone. Each cell is how long one move took
+on average / the 95th-percentile frame during the drag, in ms. The view is
+fitted to the selection (zoom 6 % for the large ones, 100 % for one card). The
+baseline's plugin-on rows at this zoom come from an earlier session (except the
+5,000-card 500 row); repeating them in this one gave the same time per move to
+within 8 %:
+
+| Board | Selection | Before | After | Plugin off |
+| --- | --- | --- | --- | --- |
+| 2,000 cards | 1 (100 %) | 56 / 84 | 52 / 90 | 31 / 10 |
+| 2,000 cards | 50 | 348 / 434 | 205 / 240 | 139 / 220 |
+| 2,000 cards | 500 | 435 / 534 | 271 / 310 | 223 / 430 |
+| 2,000 cards | all | 745 / 834, refused at the end | 497 / 550 | 234 / 300 |
+| 5,000 cards | 1 (100 %) | 112 / 217 | 106 / 210 | 31 / 10 |
+| 5,000 cards | 50 | 559 / 650 | 199 / 210 | 166 / 360 |
+| 5,000 cards | 500 | 596 / 670 | 221 / 260 | 317 / 710 |
+| 5,000 cards | all | 1,490 / 1,584 | 641 / 730 | 399 / 500 |
+
+The first selected card shown at zoom 100 %, so that a screenful of cards is on
+the page:
+
+| Board | Selection | Before | After | Plugin off |
+| --- | --- | --- | --- | --- |
+| 2,000 cards | 1 | 53 / 90 | 53 / 90 | 31 / 10 |
+| 2,000 cards | 50 | 129 / 110 | 66 / 40 | 31 / 10 |
+| 2,000 cards | 500 | 153 / 160 | 79 / 50 | 31 / 10 |
+| 2,000 cards | all | 262 / 270 | 114 / 110 | 31 / 10 |
+| 5,000 cards | 1 | 104 / 210 | 104 / 210 | 31 / 10 |
+| 5,000 cards | 50 | 277 / 320 | 123 / 130 | 31 / 10 |
+| 5,000 cards | 500 | 310 / 350 | 145 / 160 | 31 / 10 |
+| 5,000 cards | all | 767 / 780 | 253 / 270 | 34 / 20 |
+
+Every drag with the plugin on moved the pressed card as far as the pointer went
+and none showed a notice, except the baseline's drag of all 2,000 cards at zoom
+6 %, which was refused at the end. A drag of 50 or more cards takes 1.5 to 3
+times less time, and with 50 or 500 cards on the 5,000-card board at zoom 6 % it
+is now about as quick as native Canvas alone (199 and 221 ms against 166 and
+317). One card is unchanged - 52 ms on the 2,000-card board and 104-106 ms on
+the 5,000-card one, against 31 ms without the plugin - so the work every move of
+any drag still does on the whole board is what is left there. All 5,000 cards
+still take 641 ms a move against 399, and at zoom 100 % a large selection takes
+66-253 ms against 31-34.
+
+An arrow-key press with all the cards selected, on the final build and the
+baseline: a real key press and the wait until the browser has drawn the result,
+three presses in each of three runs (nine per cell), the median and the range in
+ms. The key's handler alone took a median of 3,027 ms before and 607 after with
+2,000 cards, 16,329 and 976 with 5,000; where the cost falls, in the handler or
+in the frame after it, varies from press to press, the sum less. Every press
+moved the first card by the same distance in every build:
+
+| Selection | Before | After | Plugin off |
+| --- | --- | --- | --- |
+| 2,000 cards | 3,387 (3,213-3,780) | 919 (594-1,274) | 477 (467-514) |
+| 5,000 cards | 16,581 (16,174-19,246) | 1,111 (788-1,212) | 492 (451-698) |
+
+Undo, checked with real input on the 2,000-card board: all 2,000 cards dragged
+with `Input.dispatchMouseEvent`, undone with Ctrl+Z and redone with
+Ctrl+Shift+Z, twice. The drag moved every card by the same 3,791 x 1,895 (the 5
+frames stayed, no other field of any card changed, the lines' data was the same,
+no notice appeared), native Canvas's history gained exactly one entry, one undo
+put every card back - the whole node list of the saved board, compared by id
+with the file before the drag, was identical - and one redo moved them again.
+
+The baseline run that ended without moving (5,000 cards, 500 selected, no
+notice) did not come back: in 9 runs on this board with 500 selected (6 of the
+baseline, one of them inside the first matrix in its original order, and 3 of
+the final build) the card moved every time, and in the 6 runs that logged the
+press (5 of the baseline, 1 of the final build) it was on the plugin's selection
+frame, the plugin took it (the pointer-down came back cancelled) and the
+selection stayed at 500. A press put on purpose beside the frame, on an
+unselected card, gives what that run gave - the card does not move, no notice,
+and native Canvas has already dropped the selection from 500 to 1 - so the most
+likely cause is a press point that no longer lay on the frame when the press
+came, a fault of the benchmark and not of the plugin. A silent refusal inside
+the plugin (`startSelectionMove` returns false without a notice under several
+conditions, and native Canvas then gets the press) would look the same and is
+not ruled out. Neither the benchmark nor the plugin was changed for it.
+
+Still slow: every move of a drag still pays for the whole board (one card takes
+104 ms on the 5,000-card board against 31 without the plugin), for the browser
+restyling every moved card (native Canvas pays that too: 399 ms a move for all
+5,000 cards with the plugin off) and, when let go, for writing the move - the
+page then draws no frame for about 1.2 s with all 2,000 cards moved and for more
+than 1.5 s with 500 or all 5,000 cards on the 5,000-card board. An arrow-key
+press with 5,000 cards takes 1.1 s against 0.5 s without the plugin, and has not
+been profiled (the per-card lock check itself takes 15-30 ms for 5,000 cards,
+timed in the unit test host).
 
 The first production release is ready when:
 

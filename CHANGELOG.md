@@ -116,6 +116,11 @@
   cards stay as they are drawn and only the lines that follow them are drawn
   again, and the cards are measured once as the drag begins. On a board of
   5,000 cards a drag of 50 of them takes about 200 ms a move instead of 560.
+- While cards alone are dragged, the frame around them and the selection
+  toolbar move with the pointer instead of being measured on every move, and
+  a line whose cards moved is redrawn along its new course instead of being
+  built again. With the change above, a drag of all 5,000 cards takes about
+  640 ms a move instead of 1.5 s.
 
 ## 0.1.1 - 2026-09-26
 

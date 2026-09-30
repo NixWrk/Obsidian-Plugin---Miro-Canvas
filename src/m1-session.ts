@@ -285,6 +285,8 @@ const SEARCH_DEBOUNCE_MS = 120;
 const SEARCH_HIT_MARGIN = 4;
 /** The side, in pixels, of the outline around a label or pin that is not drawn. */
 const SEARCH_HIT_POINT_SIZE = 16;
+/** Pixels the shared selection frame stands off what it frames. */
+const SELECTION_FRAME_PAD = 8;
 
 /**
  * Ctrl+F, or Cmd+F on macOS, in any keyboard layout: the key's place, not
@@ -576,6 +578,14 @@ function ownerDocument(value: unknown): Document | undefined {
 		return globalThis.document;
 	}
 	return undefined;
+}
+
+/** The shared selection frame's box, in pixels from the board's top left. */
+interface FrameBox {
+	readonly left: number;
+	readonly top: number;
+	readonly width: number;
+	readonly height: number;
 }
 
 function clientSize(root: HTMLElement | undefined): { readonly width: number; readonly height: number } {
@@ -5529,12 +5539,18 @@ export class M1CanvasSession {
 			editable,
 			isEdge: id !== undefined && (geometry.edges?.[id] !== undefined || this.lineOf(id) !== undefined),
 			...(id !== undefined && this.lineOf(id) !== undefined ? { freeEnds: true } : {}),
+			// Handles show for one item alone.  While a larger selection is
+			// dragged, nothing is measured for them: measuring after the cards
+			// moved would lay out every card of the selection again.
 			...(() => {
+				if (this.selectionMoveIds !== undefined && this.selectedIds.length > 1) return {};
 				const origin = this.overlayOrigin();
 				return origin === undefined ? {} : { origin: { x: origin.left, y: origin.top } };
 			})(),
-			...(id === undefined ? {} : { shape: this.selectedShape(id) }),
-			...(id === undefined ? {} : { rect: this.handleRect(id) }),
+			...(id === undefined || (this.selectionMoveIds !== undefined && this.selectedIds.length > 1) ? {} : {
+				shape: this.selectedShape(id),
+				rect: this.handleRect(id),
+			}),
 			...(id === undefined || (geometry.edges?.[id] === undefined && this.lineOf(id) === undefined) ? {} : { endpoints: this.connectorEnds(id) }),
 			...(() => {
 				const grips = id === undefined || (geometry.edges?.[id] === undefined && this.lineOf(id) === undefined) ? undefined : this.routeGrips(id);
@@ -6051,20 +6067,31 @@ export class M1CanvasSession {
 		if (this.root === undefined || this.selectedIds.length === 0) {
 			return undefined;
 		}
-		const rootRect = boundingRect(this.root);
+		// In a drag of cards alone the toolbar goes where their frame goes: the
+		// cards, the board and the toolbar itself are not measured again.
+		const followed = this.followedFrameBox();
+		const moving = followed === undefined ? undefined : this.movingFrame;
+		const rootRect = moving?.board ?? boundingRect(this.root);
 		if (rootRect === undefined) {
 			return undefined;
 		}
 		// Without its line group a selected connector had no toolbar - and,
 		// with the native menu adopted into the toolbar, no menu at all.
 		const ids = this.selectedIdSet;
-		const measured = this.toolbarBounds.bounds({
-			ids,
-			board: this.settledBoard(),
-			elements: () => this.selectedElements(ids, true),
-			measure: boundingRect,
-			onPage: isOnPage,
-		});
+		const measured = followed !== undefined && moving !== undefined
+			? {
+				left: moving.board.left + followed.left + SELECTION_FRAME_PAD,
+				top: moving.board.top + followed.top + SELECTION_FRAME_PAD,
+				right: moving.board.left + followed.left + followed.width - SELECTION_FRAME_PAD,
+				bottom: moving.board.top + followed.top + followed.height - SELECTION_FRAME_PAD,
+			}
+			: this.toolbarBounds.bounds({
+				ids,
+				board: this.settledBoard(),
+				elements: () => this.selectedElements(ids, true),
+				measure: boundingRect,
+				onPage: isOnPage,
+			});
 		let left = measured?.left ?? Number.POSITIVE_INFINITY;
 		let top = measured?.top ?? Number.POSITIVE_INFINITY;
 		let right = measured?.right ?? Number.NEGATIVE_INFINITY;
@@ -6087,8 +6114,8 @@ export class M1CanvasSession {
 		// The toolbar is centred over the selection, but never off the view: a
 		// selection at an edge, or a narrow screen, would otherwise put its
 		// controls out of reach.  Without room above, it hangs below instead.
-		const area = clientSize(this.root);
-		const self = boundingRect(this.toolbar.element);
+		const area = moving === undefined ? clientSize(this.root) : this.boardSize();
+		const self = moving === undefined ? boundingRect(this.toolbar.element) : moving.toolbar;
 		const width = self === undefined ? 320 : self.right - self.left;
 		const height = self === undefined ? 40 : self.bottom - self.top;
 		const margin = 8;
@@ -6914,6 +6941,23 @@ export class M1CanvasSession {
 	private selectionMoveIds?: readonly string[];
 	private selectionMoveEnd?: () => void;
 	private mixedSelectionFrame?: HTMLElement;
+	/** The shared frame's box as last placed, in pixels from the board's top left. */
+	private mixedFrameBox: FrameBox | undefined;
+	/**
+	 * While cards alone are dragged: the frame as the drag began, the view it
+	 * was placed in, and the board's and the toolbar's boxes then.  The frame
+	 * and the toolbar go where the cards go, moved by the drag rather than
+	 * measured again - measuring them after the cards were moved made the
+	 * browser lay out every card of a large selection on each move.
+	 */
+	private movingFrame: {
+		readonly box: FrameBox;
+		readonly view: string;
+		readonly board: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number };
+		readonly toolbar: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number } | undefined;
+	} | undefined;
+	/** How far the dragged selection has come, on the board. */
+	private selectionMoveShift: { readonly dx: number; readonly dy: number } | undefined;
 
 	/**
 	 * One draggable frame around every multi-item selection, however it was
@@ -6937,6 +6981,7 @@ export class M1CanvasSession {
 		// Native Canvas's own frame cannot enclose what it does not know of; the plugin's shows then.
 		mark("miro-canvas-mixed-selection--independent",
 			framed && (connectorIds.length > 0 || this.selectedCommentKeys.size > 0 || partial.length > 0));
+		if (framed && this.followMovingFrame()) return;
 		const box = framed ? boundingRect(root) : undefined;
 		if (!framed || box === undefined) {
 			if (!framed) this.removeMixedSelectionFrame();
@@ -7002,16 +7047,51 @@ export class M1CanvasSession {
 			root.appendChild(frame);
 			this.mixedSelectionFrame = frame;
 		}
-		const pad = 8, frame = this.mixedSelectionFrame;
-		frame.style.left = `${left - pad}px`;
-		frame.style.top = `${top - pad}px`;
-		frame.style.width = `${right - left + pad * 2}px`;
-		frame.style.height = `${bottom - top + pad * 2}px`;
+		const pad = SELECTION_FRAME_PAD;
+		this.placeMixedSelectionFrame({ left: left - pad, top: top - pad, width: right - left + pad * 2, height: bottom - top + pad * 2 });
+	}
+
+	private placeMixedSelectionFrame(box: FrameBox): void {
+		const frame = this.mixedSelectionFrame;
+		if (frame === undefined) return;
+		frame.style.left = `${box.left}px`;
+		frame.style.top = `${box.top}px`;
+		frame.style.width = `${box.width}px`;
+		frame.style.height = `${box.height}px`;
+		this.mixedFrameBox = box;
+	}
+
+	/**
+	 * Where the frame stands in a drag of cards alone: where it stood as the
+	 * drag began, moved as far as the cards, as long as the view is the one it
+	 * was placed in.  Undefined when it has to be measured instead: no such
+	 * drag, or the view panned or zoomed.
+	 */
+	private followedFrameBox(): FrameBox | undefined {
+		const moving = this.movingFrame, shift = this.selectionMoveShift;
+		if (moving === undefined || shift === undefined) return undefined;
+		const view = this.displayViewport();
+		if (view === undefined || this.viewportSignature(view, this.boardSize()) !== moving.view) {
+			// Measured again from here on; the rest of the drag follows that.
+			this.movingFrame = undefined;
+			return undefined;
+		}
+		return { ...moving.box, left: moving.box.left + shift.dx * view.zoom, top: moving.box.top + shift.dy * view.zoom };
+	}
+
+	/** Move the frame with a drag of cards alone; false when it has to be measured instead. */
+	private followMovingFrame(): boolean {
+		if (this.mixedSelectionFrame === undefined) return false;
+		const box = this.followedFrameBox();
+		if (box === undefined) return false;
+		this.placeMixedSelectionFrame(box);
+		return true;
 	}
 
 	private removeMixedSelectionFrame(): void {
 		this.mixedSelectionFrame?.remove();
 		this.mixedSelectionFrame = undefined;
+		this.mixedFrameBox = undefined;
 	}
 
 	/**
@@ -7052,14 +7132,35 @@ export class M1CanvasSession {
 		if (!this.editAllowed("move", ids)) return true;
 		this.selectionMoveEnd?.();
 		this.selectionMoveIds = ids;
+		// Looked up by id: a large selection is checked against every card of the board.
+		const moved = new Set(ids);
 		// Cards show where they are going by a translate native Canvas does not use.
 		const cards = (this.adapter.getNodes() ?? [])
-			.filter((node) => ids.includes(readCanvasElementId(node) ?? ""))
+			.filter((node) => moved.has(readCanvasElementId(node) ?? ""))
 			.map((node) => readCanvasElementDom(node))
 			.filter(isElement)
 			.map((element) => ({
 				element, value: element.style.getPropertyValue("translate"), priority: element.style.getPropertyPriority("translate"),
 			}));
+		// Cards alone move as one piece, and the frame around them with them:
+		// it is placed once as the drag begins, then moved by the drag.  Lines
+		// and pins may stretch as they move, so with them it is measured as before.
+		const cardsAlone = cards.length === ids.length && connectorIds.length === 0 && commentIds.length === 0
+			&& Object.keys(routeEnds).length === 0;
+		this.movingFrame = undefined;
+		this.selectionMoveShift = undefined;
+		if (cardsAlone) {
+			// Measured now, before anything moves, when the page is already laid out.
+			this.updateMixedSelectionFrame();
+			const box = this.mixedFrameBox, placedIn = this.displayViewport(), board = boundingRect(this.root);
+			if (box !== undefined && placedIn !== undefined && board !== undefined) {
+				this.movingFrame = {
+					box, board,
+					view: this.viewportSignature(placedIn, this.boardSize()),
+					toolbar: boundingRect(this.toolbar.element),
+				};
+			}
+		}
 		let dx = 0, dy = 0, changed = false;
 		const move = (moved: PointerEvent): void => {
 			if (moved.pointerId !== event.pointerId) return;
@@ -7073,6 +7174,7 @@ export class M1CanvasSession {
 			this.currentRawDocument = this.selectionMovePreview;
 			this.landingCache = undefined;
 			for (const { element } of cards) element.style.setProperty("translate", `${dx}px ${dy}px`);
+			this.selectionMoveShift = { dx, dy };
 			this.liveGeometryDirty = true;
 			this.sourceRenderer?.refresh();
 			this.connectorLayer?.render();
@@ -7091,6 +7193,9 @@ export class M1CanvasSession {
 			this.selectionMoveIds = undefined;
 			this.selectionMoveEnd = undefined;
 			this.landingCache = undefined;
+			// Let go or cancelled: the frame is measured around the cards where they now are.
+			this.movingFrame = undefined;
+			this.selectionMoveShift = undefined;
 		};
 		const cancel = (cancelled?: Event): void => {
 			// The cancel this session sends native Canvas is not the pointer's own.
@@ -7101,12 +7206,12 @@ export class M1CanvasSession {
 		// Native Canvas may change its own selection while the move is written; it is put back.
 		const restoreSelection = (): void => {
 			if (this.disposed) return;
-			const nativeIds = ids.filter((id) => !connectorIds.includes(id) && selectedComment(id) === undefined);
-			const selected = (this.adapter.getSelection() ?? []).flatMap((item) => allIds([item]));
-			if (selected.length !== nativeIds.length || nativeIds.some((id) => !selected.includes(id))) {
+			const nativeIds = new Set(ids.filter((id) => !connectorIds.includes(id) && selectedComment(id) === undefined));
+			const selected = new Set((this.adapter.getSelection() ?? []).flatMap((item) => allIds([item])));
+			if (selected.size !== nativeIds.size || [...nativeIds].some((id) => !selected.has(id))) {
 				this.callNative("deselectAll");
 				for (const item of [...(this.adapter.getNodes() ?? []), ...(this.adapter.getEdges() ?? [])]) {
-					if (nativeIds.includes(readCanvasElementId(item) ?? "")) this.callNative("select", [item]);
+					if (nativeIds.has(readCanvasElementId(item) ?? "")) this.callNative("select", [item]);
 				}
 			}
 			const retained = this.connectorLayer?.selection() ?? [];
