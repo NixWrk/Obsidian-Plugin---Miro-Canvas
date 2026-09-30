@@ -1538,8 +1538,10 @@ macOS и Linux (`FUT-013`). Этап 6 (экосистема) теперь ид�
   матрица из четырёх профилей. Осталось: совместная работа с Excalidraw и
   проверка обоих в настоящем Obsidian.
 - [ ] `NATIVE-010` `P2 P` Проверить desktop и mobile/touch отдельно; отсутствие
-  mobile patch не должно ломать стандартный mobile Canvas. Осталось: проверка на
-  устройстве.
+  mobile patch не должно ломать стандартный mobile Canvas. Android проверен:
+  телефон 2026-09-28, планшет с пером 2026-09-30 (`FUT-010`) - сдвиг и щипок
+  остаются за Canvas, ладонь не оставляет следа. Осталось: iPhone и iPad,
+  телефон в альбомной ориентации.
 - [ ] `NATIVE-011` `P1 P` Прогнать документированную матрицу Windows/macOS/Linux
   (или репрезентативных VM), разных размеров окна и device-pixel-ratio, а также
   Obsidian desktop/mobile на mouse, trackpad, pen tablet/stylus и touch screen.

@@ -115,6 +115,7 @@ import {
 } from "./source-model";
 import { CommentMarkers } from "./comment-markers";
 import { matchesPointer } from "./pointer-bindings";
+import { PalmRewind, pressedPressure, strokeWidthScale, StylusWatch } from "./stylus";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
@@ -223,10 +224,26 @@ function framePalette(): readonly PaletteColor[] {
 /** Miro's highlighter is a wider, see-through pen. */
 const HIGHLIGHTER_OPACITY = 0.4;
 const HIGHLIGHTER_SCALE = 3;
-/** How long after a stylus a touch is still taken for a palm. */
-const STYLUS_HOLD_MS = 1_500;
-const MIN_PRESSURE_SCALE = 0.5;
-const MAX_PRESSURE_SCALE = 1.6;
+
+/** Whether two views of the board show the same place at the same zoom. */
+function sameViewport(left: ViewportTransform, right: ViewportTransform): boolean {
+	return Math.abs(left.x - right.x) < 0.01
+		&& Math.abs(left.y - right.y) < 0.01
+		&& Math.abs(left.zoom - right.zoom) < 0.0001;
+}
+
+/** Whether two lists hold the same items, in any order. */
+function sameItems(left: readonly unknown[], right: readonly unknown[]): boolean {
+	return left.length === right.length && left.every((item) => right.includes(item));
+}
+
+/** What a palm could change on the board, kept from before it landed; see `attachHandAndPen`. */
+interface BoardBeforePalm {
+	readonly viewport: ViewportTransform | undefined;
+	readonly selection: readonly unknown[];
+	readonly connectors: readonly string[];
+	readonly comments: readonly string[];
+}
 
 /** Whether a colour lets what lies under it show: a hex colour with less than full alpha. */
 function seeThrough(color: unknown): boolean {
@@ -1573,9 +1590,8 @@ export class M1CanvasSession {
 	private penPoints: StrokePoint[] = [];
 	private penPressures: number[] = [];
 	private erasing = new Set<string>();
-	/** When a stylus was last used here, and whether one has been seen at all. */
-	private lastPenAt = 0;
-	private stylusSeen = false;
+	/** When a stylus was last near this board, and whether this device has one at all. */
+	private readonly stylus = new StylusWatch();
 	/** A tool being used on the board: where the press began and what it draws meanwhile. */
 	private toolGesture: {
 		readonly tool: QuickTool;
@@ -3320,6 +3336,7 @@ export class M1CanvasSession {
 		this.attachRefreshPolling();
 		this.attachViewportFrames();
 		this.attachRectangleSelection();
+		this.attachHandAndPen();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
 		// A press on the plugin's own bars and cards is theirs alone and ends at
@@ -3862,6 +3879,80 @@ export class M1CanvasSession {
 		});
 	}
 
+	/**
+	 * Which pens are on the screen, and what a palm did to the board.
+	 *
+	 * A palm resting on a tablet lands as a touch, and Android takes it back
+	 * some 10 ms later (pointercancel).  By then native Canvas has already put
+	 * the selection away on the press, and a palm that slid moved the board:
+	 * a touch taken back that soon, with no other finger down, leaves the
+	 * board as it was before it landed.  See `PalmRewind`.
+	 *
+	 * A pen that came down is drawing; one that did not is hovering, even
+	 * with its side button reported pressed.  A pen is near from its first
+	 * hover, whatever tool is armed, so a palm that comes down with it is
+	 * the hand and not a finger.
+	 */
+	private attachHandAndPen(): void {
+		const root = this.root;
+		const view = root?.ownerDocument?.defaultView;
+		if (root === undefined || view === undefined || view === null) return;
+		const touches = new PalmRewind<BoardBeforePalm>();
+		// On the window and first of all, so the board is read before native
+		// Canvas or the plugin do anything with the press.
+		this.listen(view, "pointerdown", (event) => {
+			const pointer = event as PointerEvent;
+			if (pointer.pointerType === "pen") this.stylus.press(pointer.pointerId, Date.now());
+			if (pointer.pointerType !== "touch" || !root.contains(pointer.target as Node)) return;
+			touches.land(pointer.pointerId, Date.now(), () => this.boardBeforePalm());
+		}, true);
+		this.listen(view, "pointermove", (event) => {
+			if ((event as PointerEvent).pointerType === "pen") this.stylus.notePen(Date.now());
+		}, true);
+		this.listen(view, "pointerup", (event) => {
+			const pointerId = (event as PointerEvent).pointerId;
+			this.stylus.lift(pointerId);
+			touches.lift(pointerId);
+		}, true);
+		this.listen(view, "pointercancel", (event) => {
+			const pointerId = (event as PointerEvent).pointerId;
+			this.stylus.lift(pointerId);
+			const before = touches.cancel(pointerId, Date.now());
+			if (before === undefined) return;
+			// After native Canvas has ended its own part of the gesture.
+			view.requestAnimationFrame(() => this.putBackAfterPalm(before));
+		}, true);
+	}
+
+	/** What a palm could change on the board before Android takes it back. */
+	private boardBeforePalm(): BoardBeforePalm {
+		return {
+			viewport: this.viewport.getViewport(),
+			selection: [...(this.adapter.getSelection() ?? [])],
+			connectors: [...(this.connectorLayer?.selection() ?? [])],
+			comments: [...this.selectedCommentKeys],
+		};
+	}
+
+	/** The board as it was before a palm landed, where the palm changed it. */
+	private putBackAfterPalm(before: BoardBeforePalm): void {
+		const now = this.boardBeforePalm();
+		const moved = before.viewport !== undefined && now.viewport !== undefined && !sameViewport(before.viewport, now.viewport);
+		if (moved) this.viewport.setViewport(before.viewport);
+		const reselect = !sameItems(before.selection, now.selection);
+		if (reselect) {
+			this.callNative("deselectAll");
+			for (const item of before.selection) this.callNative("select", [item]);
+		}
+		const connectors = !sameItems(before.connectors, now.connectors);
+		if (connectors) this.connectorLayer?.select(before.connectors);
+		const comments = !sameItems(before.comments, now.comments);
+		if (comments) this.selectedCommentKeys = new Set(before.comments);
+		if (!moved && !reselect && !connectors && !comments) return;
+		this.readInteractionState();
+		this.refresh();
+	}
+
 	/** Draw the marquee from a press, and select what it caught when let go; a click clears the selection. */
 	private rectangleSelect(root: HTMLElement, view: Window, event: PointerEvent): void {
 		const first = { x: event.clientX, y: event.clientY };
@@ -4378,10 +4469,6 @@ export class M1CanvasSession {
 			return;
 		}
 		const pointer = typeof event.pointerType === "string" ? event.pointerType : "mouse";
-		if (pointer === "pen") {
-			this.lastPenAt = Date.now();
-			this.stylusSeen = true;
-		}
 		// Each click of a polyline or a spline being placed adds a point to it.
 		if (this.linePlacing !== undefined && event.button === 0 && (event.target as Element | null)?.closest?.(PANEL_SELECTOR) == null) {
 			event.preventDefault();
@@ -4392,17 +4479,17 @@ export class M1CanvasSession {
 		if (tool === "select" || root === undefined || (!lasso && event.button !== 0) || this.toolGesture !== undefined) return;
 		const shapeLine = tool === "connector" ? lineKind(this.toolShape) ?? lineKind("arrow") : tool === "shape" ? lineKind(this.toolShape) : undefined;
 		if (shapeLine !== undefined) {
-			if (pointer === "touch" && Date.now() - this.lastPenAt < STYLUS_HOLD_MS) return;
+			if (pointer === "touch" && this.stylus.near(Date.now())) return;
 			if ((event.target as Element | null)?.closest?.(PANEL_SELECTOR) != null) return;
 			this.startLine(shapeLine, event);
 			return;
 		}
 		const drawingTool = isDrawingTool(tool) || tool === "lasso";
 		const erasing = tool === "eraser" || tool === "erase-part";
-		// A stylus rules the board it draws on: while one is in use a touch is a
+		// A stylus rules the board it draws on: while one is near a touch is a
 		// palm or a hand resting, and with a drawing tool armed a finger pans
 		// instead of drawing, as Miro's tablets behave.
-		if (pointer === "touch" && (Date.now() - this.lastPenAt < STYLUS_HOLD_MS || (drawingTool && this.stylusSeen))) return;
+		if (pointer === "touch" && this.stylus.touchIsHand(Date.now(), drawingTool)) return;
 		const target = event.target as Element | null;
 		if (target?.closest?.(PANEL_SELECTOR) != null) return;
 		const start = { x: event.clientX, y: event.clientY };
@@ -4508,22 +4595,27 @@ export class M1CanvasSession {
 			ghost.style.height = `${Math.abs(point.y - start.y)}px`;
 		};
 		draw(start);
+		// The gesture is the pointer that began it: a palm landing beside a pen
+		// stroke, and taken back by Android, neither draws into the stroke nor
+		// ends it.
+		const own = (other: Event): boolean => (other as PointerEvent).pointerId === event.pointerId;
 		const move = (moved: Event): void => {
+			if (!own(moved)) return;
 			const point = moved as PointerEvent;
-			if (point.pointerType === "pen") {
-				this.lastPenAt = Date.now();
-				// A stylus reports how hard it is pressed; a mouse always says 0.5.
-				if (drawing && point.pressure > 0) this.penPressures.push(point.pressure);
-			}
+			// A stylus reports how hard it is pressed; see `strokeWidthScale`.
+			const pressure = pressedPressure(point);
+			if (drawing && pressure !== undefined) this.penPressures.push(pressure);
 			draw({ x: point.clientX, y: point.clientY }, point.shiftKey === true);
 		};
 		const up = (released: Event): void => {
+			if (!own(released)) return;
 			const pointer = released as PointerEvent;
 			const gesture = this.toolGesture;
 			end();
 			if (gesture !== undefined) this.finishToolGesture(gesture.tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from);
 		};
-		const cancel = (): void => {
+		const cancel = (cancelled: Event): void => {
+			if (!own(cancelled)) return;
 			end();
 			this.penPoints = [];
 			this.clearErasing();
@@ -4707,7 +4799,9 @@ export class M1CanvasSession {
 			tip = next;
 			show(tip, points);
 		};
-		const cancel = (): void => {
+		const cancel = (cancelled: Event): void => {
+			// A palm Android takes back is not the line's own pointer.
+			if ((cancelled as PointerEvent).pointerId !== event.pointerId) return;
 			end();
 			this.armTool("select");
 		};
@@ -4795,21 +4889,6 @@ export class M1CanvasSession {
 		if (this.penColor !== undefined) return this.penColor;
 		const theme = this.root === undefined ? undefined : this.root.getAttribute("data-miro-canvas-resolved-theme");
 		return defaultPenInk(theme === "dark" ? "dark" : "light");
-	}
-
-	/**
-	 * How much a stylus's pressure widens or narrows the line.
-	 *
-	 * The middle of the range leaves the chosen thickness alone, so a mouse,
-	 * a finger and an evenly pressed stylus all draw the line that was asked
-	 * for.  The typical pressure of the stroke is used, not its peak, which a
-	 * single hard moment would otherwise decide.
-	 */
-	private pressureScale(): number {
-		const samples = [...this.penPressures].sort((left, right) => left - right);
-		if (samples.length === 0) return 1;
-		const median = samples[Math.floor(samples.length / 2)]!;
-		return Math.min(Math.max(0.5 + median, MIN_PRESSURE_SCALE), MAX_PRESSURE_SCALE);
 	}
 
 	/** Dims a drawing the eraser has caught, so a person sees what will go. */
@@ -4903,7 +4982,7 @@ export class M1CanvasSession {
 		}
 		this.penPoints = [];
 		if (points.length === 0) return;
-		const width = Math.round(this.penWidth * (tool === "highlighter" ? HIGHLIGHTER_SCALE : 1) * this.pressureScale() * 100) / 100;
+		const width = Math.round(this.penWidth * (tool === "highlighter" ? HIGHLIGHTER_SCALE : 1) * strokeWidthScale(this.penPressures) * 100) / 100;
 		this.penPressures = [];
 		const rect = strokeBounds(points.length === 1 ? [points[0]!, points[0]!] : points, width);
 		const stroke = {
@@ -8444,6 +8523,12 @@ export class M1CanvasSession {
 			if (buttons === 0 || (typeof buttons === "number" && (buttons & 4) !== 0) || this.isSpacePanHeld()) {
 				return;
 			}
+			// A pen hovering with its side button held reports that button
+			// pressed (an S Pen does), but it is off the screen and moves nothing.
+			if (this.stylus.hovering(event)) return;
+			// A tool drawing on the board owns the press and moves no card; the
+			// search below walks every card, too much for each move of a pen.
+			if (this.toolGesture !== undefined) return;
 			const id = this.eventElementId(eventTarget(event));
 			const ids = this.pointerEditIds ?? (id === undefined ? undefined : this.eventIds(event));
 			if (ids !== undefined) this.blockIfNeeded(event, "move", [...new Set([...ids, ...this.selectedIds])]);

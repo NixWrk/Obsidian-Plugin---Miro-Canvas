@@ -38,6 +38,14 @@
   tablet padding had squeezed the dock's icons out of sight, shrunk the pen's
   tools to dots, stretched the colours and pushed the tool bar onto two rows.
   The author's colour on a comment card is a small circle again.
+- With a stylus, a palm the tablet rejects leaves no trace: it no longer puts
+  the selection away, nudges the board, or ends the pen stroke it landed
+  beside.
+- A pen hovering above the screen counts as the pen being near whatever tool
+  is on, so a hand coming down with it is taken for the hand from the start.
+- The pen's pressure sets the width around the pressure of ordinary writing:
+  an everyday S Pen stroke keeps the width chosen and a harder one widens it;
+  before, strokes came out about a third thinner than chosen.
 - A labelled line no longer shows its label twice: native Canvas makes a
   line's own label only when it first draws the line - on opening an
   imported board, or once the line scrolls into view - and that label is
