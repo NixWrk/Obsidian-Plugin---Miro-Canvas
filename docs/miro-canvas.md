@@ -1357,6 +1357,12 @@ Locking visibly marks the pin and card and prevents replies, author edits,
 color changes, resolving, and deletion for that thread in both the card and
 comments panel. Unlocking restores those controls; it does not prevent adding
 separate comments elsewhere on the board.
+
+The card's header resolves with an icon button carrying a tick, with no
+caption: `aria-pressed` shows whether the thread is resolved and its tooltip
+says what a press will do ("Mark as resolved" or "Reopen"). A "?" beside it
+explains resolving, as its tooltip on a desktop and, because a touch screen
+has no hover, as a note a press shows under the header.
 The default name still comes from the plugin setting; imported author changes
 are local display aliases, not edits to Miro metadata. Connectors can anchor to
 comment markers and resolve their endpoints as comments move. A connector's

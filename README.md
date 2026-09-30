@@ -202,8 +202,10 @@ layers. As in Miro, moving or selecting a card does not bring it to the top.
 
 Pin a comment anywhere: on a card, on a point of a picture, along a line, or on
 the empty board. Threads have replies, authors with their own colours,
-resolving and locking. Comments imported from Miro stay read-only and can be
-hidden. A panel lists every comment on the board or in the selection.
+resolving and locking. The tick in a thread's header resolves it, and pressing
+it again reopens it; the "?" beside it says what resolving does. Comments
+imported from Miro stay read-only and can be hidden. A panel lists every
+comment on the board or in the selection.
 
 ## Locking and review mode
 

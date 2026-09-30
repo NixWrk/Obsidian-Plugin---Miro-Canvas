@@ -1,6 +1,7 @@
 /**
- * A comment thread the way Miro opens it beside its pin: a resolve switch,
- * each message under its author's initial, name and time, and a reply field.
+ * A comment thread the way Miro opens it beside its pin: a tick that
+ * resolves it, each message under its author's initial, name and time, and
+ * a reply field.
  * Only local threads take replies or change state; imported Miro threads are
  * retain their exported evidence, with optional display author aliases.
  * The host owns persistence and placement.
@@ -109,6 +110,8 @@ export class CommentThreadCard {
   public readonly element: HTMLElement;
   private thread: CommentThread | undefined;
   private readonly toggle: HTMLButtonElement;
+  private readonly helpButton: HTMLButtonElement;
+  private readonly help: HTMLElement;
   private readonly list: HTMLElement;
   private readonly composer: HTMLElement;
   private readonly input: HTMLInputElement;
@@ -133,13 +136,20 @@ export class CommentThreadCard {
     card.hidden = true;
 
     const header = card.appendChild(this.make("div", "miro-canvas-thread__header"));
-    this.toggle = header.appendChild(this.button(words().comments.thread.resolve, "miro-canvas-thread__resolve"));
-    this.toggle.setAttribute("role", "switch");
-    this.toggle.appendChild(this.make("span", "miro-canvas-thread__switch"));
-    this.toggle.appendChild(this.make("span", "miro-canvas-thread__resolve-label", words().comments.thread.resolve));
+    // Resolving is a tick that presses in and out, with no caption: the long
+    // Russian one squeezed the icons beside it. A "?" explains it instead.
+    this.toggle = header.appendChild(this.button(
+      words().comments.thread.resolve, "miro-canvas-thread__icon miro-canvas-thread__resolve", "check", "✓"));
+    this.toggle.setAttribute("aria-pressed", "false");
     this.toggle.addEventListener("click", () => {
       if (!this.toggle.disabled && this.thread?.origin === "local") this.host.onResolve(this.thread.id, !this.thread.resolved);
     });
+    // A hover shows the explanation as the button's tooltip. A touch screen
+    // has no hover, so a press shows it under the header as well.
+    this.helpButton = header.appendChild(this.button(
+      words().comments.thread.resolveHelp, "miro-canvas-thread__icon miro-canvas-thread__help-button", "circle-help", "?"));
+    this.helpButton.setAttribute("aria-expanded", "false");
+    this.helpButton.addEventListener("click", () => this.showHelp(this.help.hidden));
     header.appendChild(this.make("span", "miro-canvas-thread__spacer"));
     this.colorInput = header.appendChild(this.make("input", "miro-canvas-thread__color"));
     this.colorInput.type = "color";
@@ -185,6 +195,9 @@ export class CommentThreadCard {
     const close = header.appendChild(this.button(words().comments.thread.close, "miro-canvas-thread__icon", "x", "×"));
     close.addEventListener("click", () => this.host.onClose());
 
+    this.help = card.appendChild(this.make("p", "miro-canvas-thread__help", words().comments.thread.resolveHelp));
+    this.help.setAttribute("role", "note");
+    this.help.hidden = true;
     this.list = card.appendChild(this.make("div", "miro-canvas-thread__messages"));
     this.note = card.appendChild(this.make("p", "miro-canvas-thread__note"));
     this.composer = card.appendChild(this.make("form", "miro-canvas-thread__composer"));
@@ -242,6 +255,8 @@ export class CommentThreadCard {
     this.element.hidden = false;
     this.element.setAttribute("data-comment-state", "new");
     this.toggle.hidden = true;
+    this.helpButton.hidden = true;
+    this.showHelp(false);
     this.panelButton.hidden = true;
     this.deleteButton.hidden = true;
     this.hideImportedButton.hidden = true;
@@ -262,7 +277,9 @@ export class CommentThreadCard {
     const changed = this.thread?.id !== thread.id || this.thread?.origin !== thread.origin || this.composing;
     if (changed && this.thread) this.host.onPreviewColor?.(this.thread.id, this.thread.origin);
     this.composing = false;
+    if (changed) this.showHelp(false);
     this.toggle.hidden = false;
+    this.helpButton.hidden = false;
     this.panelButton.hidden = false;
     this.list.hidden = false;
     this.input.placeholder = words().comments.thread.replyPlaceholder;
@@ -275,7 +292,10 @@ export class CommentThreadCard {
     const locked = thread.locked === true;
     const canEdit = editable && !locked;
     const authorEditable = !locked && options.editable && (!local || editable) && this.host.onRenameAuthor !== undefined;
-    this.toggle.setAttribute("aria-checked", thread.resolved ? "true" : "false");
+    // The tick shows whether the thread is resolved; its tooltip says what a
+    // press will do.
+    this.toggle.setAttribute("aria-pressed", thread.resolved ? "true" : "false");
+    this.toggle.setAttribute("aria-label", thread.resolved ? words().comments.thread.reopen : words().comments.thread.resolve);
     this.toggle.disabled = !canEdit;
     const color = typeof thread.color === "string" && /^#[0-9a-f]{6}$/i.test(thread.color) ? thread.color : authorColor(commentAuthorLabel(thread));
     if (this.document.activeElement !== this.colorInput) this.colorInput.value = color;
@@ -322,6 +342,7 @@ export class CommentThreadCard {
 
   public hide(): void {
     if (this.thread) this.host.onPreviewColor?.(this.thread.id, this.thread.origin);
+    this.showHelp(false);
     this.element.hidden = true;
     this.thread = undefined;
     this.composing = false;
@@ -344,6 +365,12 @@ export class CommentThreadCard {
   public destroy(): void {
     this.hide();
     this.element.remove();
+  }
+
+  /** The explanation of resolving, under the header; a press on the "?" shows and hides it. */
+  private showHelp(shown: boolean): void {
+    this.help.hidden = !shown;
+    this.helpButton.setAttribute("aria-expanded", shown ? "true" : "false");
   }
 
   private message(message: ThreadMessage, locale: string | undefined, editable: boolean, deletable: boolean): HTMLElement {

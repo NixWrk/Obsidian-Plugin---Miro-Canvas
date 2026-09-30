@@ -665,7 +665,7 @@ def main() -> int:
                 assert page.evaluate('miroBrowser.getSaves()===miroBrowser.colorSaves+1'), 'Color selection did not save exactly once'
                 card.get_by_role('button', name='Lock comment', exact=True).click()
                 assert card.get_by_role('button', name='Delete comment', exact=True).is_disabled()
-                assert card.get_by_label('Resolve', exact=True).is_disabled()
+                assert card.get_by_label('Mark as resolved', exact=True).is_disabled()
                 assert card.get_by_label('Comment color', exact=True).is_disabled()
                 assert card.get_by_label('Edit author name', exact=True).count() == 0
                 assert card.locator('.miro-canvas-thread__composer').is_hidden()
@@ -689,11 +689,41 @@ def main() -> int:
                 }""")
                 card.get_by_role('button', name='Unlock comment', exact=True).click()
                 assert card.locator('.miro-canvas-thread__composer').is_visible()
-                assert card.get_by_label('Resolve', exact=True).is_enabled()
+                assert card.get_by_label('Mark as resolved', exact=True).is_enabled()
                 assert page.evaluate("""() => {
                   const b=miroBrowser;
                   return b.root.querySelector('.miro-canvas-comment-marker[data-comment-id="'+b.pinId+'"]')?.getAttribute('data-comment-locked')==='false';
                 }"""), 'Comment pin did not clear its locked state'
+                # The header holds icon buttons only: a tick to resolve and a "?" beside it,
+                # with no caption or switch, and none of them squeezed.
+                assert card.locator('.miro-canvas-thread__resolve-label, .miro-canvas-thread__switch, [role="switch"]').count() == 0
+                widths = card.locator('.miro-canvas-thread__header button').evaluate_all(
+                    "buttons => buttons.filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width))")
+                assert len(widths) >= 6 and set(widths) == {28}, f'Header icon buttons differ in size: {widths}'
+                header_order = card.locator('.miro-canvas-thread__header button').evaluate_all(
+                    "buttons => buttons.slice(0, 2).map(b => b.className.split(' ').pop())")
+                assert header_order == ['miro-canvas-thread__resolve', 'miro-canvas-thread__help-button'], header_order
+                # The "?" explains resolving as its tooltip and, on a press, under the header.
+                help_button = card.locator('.miro-canvas-thread__help-button')
+                help_note = card.locator('.miro-canvas-thread__help')
+                assert help_button.get_attribute('aria-label').startswith('A resolved thread stays on the board')
+                assert help_note.is_hidden()
+                help_button.click()
+                assert help_note.is_visible() and help_button.get_attribute('aria-expanded') == 'true'
+                help_button.click()
+                assert help_note.is_hidden()
+                # Resolving is one history step, and the tick shows the state.
+                saves = page.evaluate('miroBrowser.getSaves()')
+                tick_button = card.get_by_role('button', name='Mark as resolved', exact=True)
+                assert tick_button.get_attribute('aria-pressed') == 'false'
+                tick_button.click()
+                assert page.evaluate('miroBrowser.getSaves()') == saves + 1, 'Resolving was not one history step'
+                assert card.get_by_role('button', name='Reopen', exact=True).get_attribute('aria-pressed') == 'true'
+                page.evaluate('() => {miroBrowser.runtime.undo();miroBrowser.session.refresh();}')
+                assert card.get_by_role('button', name='Mark as resolved', exact=True).get_attribute('aria-pressed') == 'false', 'One undo did not reopen the resolved thread'
+                page.evaluate('() => {miroBrowser.runtime.redo();miroBrowser.session.refresh();}')
+                card.get_by_role('button', name='Reopen', exact=True).click()
+                assert card.get_by_role('button', name='Mark as resolved', exact=True).get_attribute('aria-pressed') == 'false'
                 card.get_by_label('Reply', exact=True).fill('Temporary reply')
                 card.get_by_role('button', name='Send reply', exact=True).click()
                 assert card.get_by_role('button', name='Delete reply', exact=True).is_visible()
@@ -956,6 +986,10 @@ def main() -> int:
                   b.root.querySelector('.miro-canvas-comment-marker')?.click();
                   b.select('n1');
                   counted+=same('a comment open and a card picked');
+                  // The tick that resolves the thread, pressed in, and the "?" that explains it, lit.
+                  b.root.querySelector('.miro-canvas-thread__resolve').click();
+                  b.root.querySelector('.miro-canvas-thread__help-button').click();
+                  counted+=same('a comment resolved and its help shown');
                   s.armTool('pen');counted+=same('the pen armed');
                   s.armTool('connector');counted+=same('the lines armed');
                   s.resetTools();
@@ -966,7 +1000,7 @@ def main() -> int:
                   s.openExport();counted+=same('the export open');s.closeExport();
                   b.mountM2();counted+=same('the tools panel open');
                   obsidian.remove();
-                  for(const name of ['miro-canvas-comment-marker','miro-canvas-thread__button','miro-canvas-toolbar__button','miro-canvas-dock__button','miro-canvas-handle'])
+                  for(const name of ['miro-canvas-comment-marker','miro-canvas-thread__button','miro-canvas-thread__resolve','miro-canvas-thread__help-button','miro-canvas-toolbar__button','miro-canvas-dock__button','miro-canvas-handle'])
                     if(!classes.has(name))throw Error('The tablet check never reached a '+name+': '+[...classes].join(' '));
                   if(counted<120)throw Error('The tablet check reached only '+counted+' buttons');
                 }""")

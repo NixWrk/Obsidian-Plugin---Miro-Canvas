@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { CommentThreadCard, authorColor, authorInitial, shortTime, threadMessages } from "../src/comment-thread";
+import { setLocale } from "../src/i18n";
 import type { CommentThread } from "../src/local-comments";
 import { buildSourceScene } from "../src/source-model";
 
@@ -81,9 +82,12 @@ describe("comment thread messages", () => {
 });
 
 describe("comment thread card", () => {
-  function setup(rename = false) {
+  afterEach(() => setLocale("en"));
+
+  function setup(rename = false, withIcons = false) {
     const calls: unknown[][] = [];
     const card = new CommentThreadCard(fakeDocument, {
+      ...(withIcons ? { setIcon: (element: HTMLElement, icon: string) => (element as unknown as FakeElement).setAttribute("data-icon", icon) } : {}),
       onReply: (...args) => calls.push(["reply", ...args]),
       onResolve: (...args) => calls.push(["resolve", ...args]),
       onDelete: (...args) => calls.push(["delete", ...args]),
@@ -224,7 +228,7 @@ describe("comment thread card", () => {
     expect(card.threadId).toBe("c1");
     expect(root.byClass("miro-canvas-thread__message")).toHaveLength(2);
     expect(root.byClass("miro-canvas-thread__avatar").map((item) => item.textContent)).toEqual(["N", "A"]);
-    expect(root.byLabel("Resolve").disabled).toBe(true);
+    expect(root.byLabel("Mark as resolved").disabled).toBe(true);
     expect(root.byLabel("Delete comment").hidden).toBe(true);
     expect(root.byClass("miro-canvas-thread__composer")[0]!.hidden).toBe(true);
     expect(root.byClass("miro-canvas-thread__note")[0]!.textContent).toBe("Imported from Miro; read-only.");
@@ -237,9 +241,9 @@ describe("comment thread card", () => {
   it("resolves and answers a local thread unless review mode is on", () => {
     const { card, root, calls } = setup();
     card.show(LOCAL, { editable: true });
-    const toggle = root.byLabel("Resolve");
+    const toggle = root.byLabel("Mark as resolved");
     expect(toggle.disabled).toBe(false);
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
     toggle.fire("click");
     const input = root.byLabel("Reply");
     input.value = "  Thanks  ";
@@ -253,7 +257,7 @@ describe("comment thread card", () => {
     expect(calls.at(-1)).toEqual(["delete", "l1"]);
     card.show({ ...LOCAL, resolved: true }, { editable: false });
     expect(root.getAttribute("data-comment-state")).toBe("resolved");
-    expect(root.byLabel("Resolve").disabled).toBe(true);
+    expect(root.byLabel("Reopen").disabled).toBe(true);
     expect(root.byLabel("Delete comment").disabled).toBe(true);
     expect(form.hidden).toBe(true);
     expect(root.byClass("miro-canvas-thread__note")[0]!.hidden).toBe(false);
@@ -283,14 +287,14 @@ describe("comment thread card", () => {
     expect(root.byLabel("Unlock comment").getAttribute("aria-pressed")).toBe("true");
     expect(root.byClass("miro-canvas-thread__note")[0]!.textContent).toContain("Unlock to reply");
     expect(form.hidden).toBe(true);
-    expect(root.byLabel("Resolve").disabled).toBe(true);
+    expect(root.byLabel("Mark as resolved").disabled).toBe(true);
     expect(root.byLabel("Delete comment").disabled).toBe(true);
     expect(root.byLabel("Comment color").disabled).toBe(true);
     expect(root.byLabel("Edit author name")).toBeUndefined();
     expect(root.byLabel("Delete reply")).toBeUndefined();
     root.byLabel("Reply").value = "Blocked";
     form.fire("submit");
-    root.byLabel("Resolve").fire("click");
+    root.byLabel("Mark as resolved").fire("click");
     root.byLabel("Delete comment").fire("click");
     root.byLabel("Comment color").value = "#123456";
     root.byLabel("Comment color").fire("change");
@@ -301,9 +305,112 @@ describe("comment thread card", () => {
     card.show(LOCAL, { editable: true });
     expect(root.getAttribute("data-comment-locked")).toBe("false");
     expect(form.hidden).toBe(false);
-    expect(root.byLabel("Resolve").disabled).toBe(false);
+    expect(root.byLabel("Mark as resolved").disabled).toBe(false);
     expect(root.byLabel("Edit author name")).toBeDefined();
     expect(root.byLabel("Delete reply")).toBeDefined();
+  });
+
+  it("resolves with a tick button that shows its state and says what a press does", () => {
+    const { card, root, calls } = setup(false, true);
+    card.show(LOCAL, { editable: true });
+    const tick = root.byLabel("Mark as resolved");
+    expect(tick.tagName).toBe("button");
+    expect(tick.getAttribute("data-icon")).toBe("check");
+    expect(tick.getAttribute("role")).toBeNull();
+    expect(tick.getAttribute("aria-pressed")).toBe("false");
+    // The tick is the whole button: no caption and no switch beside it.
+    expect(tick.children).toHaveLength(0);
+    expect(tick.textContent).toBe("");
+    tick.fire("click");
+    expect(calls.at(-1)).toEqual(["resolve", "l1", true]);
+
+    card.show({ ...LOCAL, resolved: true }, { editable: true });
+    // The same button, now pressed in; its tooltip names what a press will do.
+    expect(root.byLabel("Reopen")).toBe(tick);
+    expect(tick.getAttribute("aria-pressed")).toBe("true");
+    expect(tick.disabled).toBe(false);
+    tick.fire("click");
+    expect(calls.at(-1)).toEqual(["resolve", "l1", false]);
+
+    card.show(LOCAL, { editable: true });
+    expect(tick.getAttribute("aria-pressed")).toBe("false");
+    expect(tick.getAttribute("aria-label")).toBe("Mark as resolved");
+    // Only a local thread takes the press, and only where the viewer may edit.
+    card.show({ ...IMPORTED, resolved: true }, { editable: true });
+    expect(tick.disabled).toBe(true);
+    tick.fire("click");
+    card.show(LOCAL, { editable: false });
+    expect(tick.disabled).toBe(true);
+    tick.fire("click");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("keeps the header free of captions, with the tick and its help first in the tab order", () => {
+    for (const locale of ["en", "ru"] as const) {
+      setLocale(locale);
+      const { card, root } = setup();
+      card.show(LOCAL, { editable: true });
+      const header = root.byClass("miro-canvas-thread__header")[0]!;
+      expect(header.byClass("miro-canvas-thread__resolve-label")).toHaveLength(0);
+      expect(header.byClass("miro-canvas-thread__switch")).toHaveLength(0);
+      // Every control in the header is one icon button of the same kind, so
+      // a long caption in any language cannot squeeze the others.
+      const buttons = header.children.filter((child) => child.tagName === "button");
+      expect(buttons.map((button) => button.textContent)).toEqual(["✓", "?", "🔒", "⋮", "×", "×", "×"]);
+      expect(buttons.every((button) => button.className.split(" ").includes("miro-canvas-thread__icon"))).toBe(true);
+      expect(buttons.slice(0, 2).map((button) => button.className.split(" ").at(-1))).toEqual([
+        "miro-canvas-thread__resolve", "miro-canvas-thread__help-button",
+      ]);
+      expect(header.children[0]).toBe(buttons[0]);
+      expect(header.children[1]).toBe(buttons[1]);
+    }
+  });
+
+  it("explains resolving in a tooltip and, on a press, under the header", () => {
+    const { card, root } = setup(false, true);
+    card.show(LOCAL, { editable: true });
+    const help = root.byClass("miro-canvas-thread__help-button")[0]!;
+    const explanation = "A resolved thread stays on the board; its pin shows a tick instead of the author's letter. Press the tick again to reopen it.";
+    expect(help.getAttribute("data-icon")).toBe("circle-help");
+    expect(help.getAttribute("aria-label")).toBe(explanation);
+    const note = root.byClass("miro-canvas-thread__help")[0]!;
+    expect(note.textContent).toBe(explanation);
+    expect(note.hidden).toBe(true);
+    expect(help.getAttribute("aria-expanded")).toBe("false");
+    help.fire("click");
+    expect(note.hidden).toBe(false);
+    expect(help.getAttribute("aria-expanded")).toBe("true");
+    // A refresh of the same thread leaves it open; a press closes it.
+    card.show(LOCAL, { editable: true });
+    expect(note.hidden).toBe(false);
+    help.fire("click");
+    expect(note.hidden).toBe(true);
+    // Another thread, a new comment or a closed card start without it.
+    help.fire("click");
+    card.show({ ...LOCAL, id: "other" }, { editable: true });
+    expect(note.hidden).toBe(true);
+    help.fire("click");
+    card.hide();
+    expect(note.hidden).toBe(true);
+    card.show(LOCAL, { editable: true });
+    help.fire("click");
+    card.compose("Alice");
+    expect(note.hidden).toBe(true);
+    // Nothing to resolve in a new comment, so neither the tick nor its help shows.
+    expect(root.byLabel("Mark as resolved").hidden).toBe(true);
+    expect(help.hidden).toBe(true);
+    card.show(LOCAL, { editable: true });
+    expect(help.hidden).toBe(false);
+  });
+
+  it("says it all in Russian too", () => {
+    setLocale("ru");
+    const { card, root } = setup();
+    card.show(LOCAL, { editable: true });
+    expect(root.byLabel("Отметить как решённое")).toBeDefined();
+    card.show({ ...LOCAL, resolved: true }, { editable: true });
+    expect(root.byLabel("Вернуть в открытые").getAttribute("aria-pressed")).toBe("true");
+    expect(root.byClass("miro-canvas-thread__help")[0]!.textContent).toContain("галочк");
   });
 
   it("opens beside its pin and stays inside the board", () => {

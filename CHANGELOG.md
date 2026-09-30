@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Comments: a thread is resolved with a tick button and no caption, with a
+  "?" beside it that explains resolving in a tooltip and, on a touch
+  screen, under the header on a press. The long caption had squeezed the
+  header's icons in Russian.
 - Search on the board: Ctrl+F (Cmd+F on macOS) on the board, the magnifier
   in the corner dock or the command "Search on the board" opens a bar at the
   top right that finds words in cards, sticky notes, shapes, tables, frame

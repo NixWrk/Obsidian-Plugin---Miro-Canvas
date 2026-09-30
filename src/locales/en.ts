@@ -636,7 +636,10 @@ export const EN = {
 		/** The thread card Miro opens beside a pin (comment-thread.ts). */
 		thread: {
 			ariaLabel: "Comment thread",
-			resolve: "Resolve",
+			/** The tick in the thread's header: what a press does, for each state, and what the "?" beside it says. */
+			resolve: "Mark as resolved",
+			reopen: "Reopen",
+			resolveHelp: "A resolved thread stays on the board; its pin shows a tick instead of the author's letter. Press the tick again to reopen it.",
 			color: "Comment color",
 			lock: "Lock comment",
 			unlock: "Unlock comment",

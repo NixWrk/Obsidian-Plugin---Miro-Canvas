@@ -3165,8 +3165,8 @@
   border-radius: 8px;
 }
 
-/* The thread a pin opens: header with the resolve switch, the messages and a
-   reply field, in a small card beside the pin. */
+/* The thread a pin opens: header with the tick that resolves it, the messages
+   and a reply field, in a small card beside the pin. */
 .miro-canvas-thread {
   position: absolute;
   z-index: 110;
@@ -3310,37 +3310,25 @@
   color: var(--icon-color);
 }
 
-.miro-canvas-thread__switch {
-  position: relative;
-  width: 28px;
-  height: 16px;
-  background: var(--background-modifier-border-hover);
-  border-radius: 8px;
-  transition: background-color 120ms ease;
-}
-
-.miro-canvas-thread__switch::after {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  content: "";
-  background: #ffffff;
-  border-radius: 50%;
-  transition: transform 120ms ease;
-}
-
-.miro-canvas-thread__resolve[aria-checked="true"] .miro-canvas-thread__switch {
-  background: var(--interactive-accent);
-}
-
-.miro-canvas-thread__resolve[aria-checked="true"] .miro-canvas-thread__switch::after {
-  transform: translateX(12px);
+/* The "?" beside the tick is lit while its explanation is shown. */
+.miro-canvas-thread .miro-canvas-thread__help-button[aria-expanded="true"] {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }
 
 .miro-canvas-thread__resolve:disabled {
   opacity: 0.6;
+}
+
+/* What the "?" shows under the header: a touch screen has no hover for the
+   button's tooltip. */
+.miro-canvas-thread__help {
+  margin: 0;
+  padding: 8px 14px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .miro-canvas-thread__messages {
@@ -3413,7 +3401,10 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.miro-canvas-thread[data-comment-locked="true"] .miro-canvas-thread__icon[aria-label="Unlock comment"] {
+/* A pressed-in icon - the lock of a locked comment, the tick of a resolved
+   one - is lit. The state is read from aria-pressed, not from a label, which
+   is in the person's language. */
+.miro-canvas-thread .miro-canvas-thread__icon[aria-pressed="true"] {
   color: var(--interactive-accent);
   background: var(--background-modifier-hover);
 }
