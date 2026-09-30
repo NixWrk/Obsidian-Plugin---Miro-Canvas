@@ -125,6 +125,42 @@ describe("mixed selection transactions",()=>{
     expect(authoring.moveSelection(["n","a"],40,30,{...before,unknown:1}).ok).toBe(false);
     expect(runtime.getData()).toEqual(before);
   });
+  it("commits a long drag as one step when native Canvas listed the cards in another order meanwhile", () => {
+    const runtime = new NativeGraph(document());
+    // The board as the drag began on it.
+    const pressed = runtime.getData();
+    // Native Canvas gives a card or frame its layer as it first draws it, reordering its list.
+    runtime.nodes = new Map([...runtime.nodes].reverse());
+    expect(createCanvasAuthoring(runtime).moveSelection(["n", "a"], 40, 30, pressed).ok).toBe(true);
+    const after = runtime.getData() as any;
+    // The order the board has when let go is the one kept.
+    expect(after.nodes.map((node: { id: string }) => node.id)).toEqual(["m", "n"]);
+    expect(after.nodes[1]).toMatchObject({ id: "n", x: 40, y: 30 });
+    expect(after.miroCanvas.connectors.a.to).toMatchObject({ x: 340, y: 130 });
+    expect(runtime.history).toHaveLength(2);
+    // Undo brings back the board as native Canvas last recorded it, before the drag.
+    runtime.undo();
+    expect(runtime.getData()).toEqual(pressed);
+  });
+  it.each([
+    ["a card's text", (board: any) => { board.nodes[0].text = "edited elsewhere"; }],
+    ["a card added", (board: any) => { board.nodes.push({ id: "new", type: "text", text: "", x: 0, y: 0, width: 10, height: 10 }); }],
+    ["a card removed", (board: any) => { board.nodes.pop(); }],
+    ["the lines' order", (board: any) => { board.edges.reverse(); }],
+    ["the board's own data", (board: any) => { board.miroCanvas.connectors.b.color = "#00ff00"; }],
+  ])("still refuses a drag when %s changed meanwhile, whatever the cards' order", (_change, change) => {
+    const pressed = document() as any;
+    pressed.edges.push({ id: "f", fromNode: "m", toNode: "n" });
+    const changed = clone(pressed);
+    changed.nodes.reverse();
+    change(changed);
+    const runtime = new NativeGraph(changed);
+    const result = createCanvasAuthoring(runtime).moveSelection(["n", "a"], 40, 30, pressed);
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain("stale-selection-move");
+    expect(runtime.getData()).toEqual(changed);
+    expect(runtime.history).toHaveLength(1);
+  });
   it("pastes standalone connectors without inventing nodes",()=>{
     const runtime=new NativeGraph({nodes:[],edges:[]});
     const c={...document().miroCanvas.connectors.a,from:{type:"free" as const,x:0,y:0}} as any;

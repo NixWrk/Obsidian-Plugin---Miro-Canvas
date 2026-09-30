@@ -101,6 +101,21 @@
 - A selection that runs off the edge of the view keeps its toolbar over the
   part in view; cards native Canvas had taken off the page while out of view
   used to pull the toolbar towards the window's top-left corner.
+- A long drag of many cards on a large board is written when you let go, as
+  one undo step. It was refused ("the board changed") whenever native Canvas
+  drew a card or frame for the first time during the drag, which reorders its
+  list of cards without changing any. A card changed, added or removed
+  meanwhile still refuses the move.
+- Moving thousands of selected cards with the arrow keys, or dragging them
+  the native way, is much faster with the plugin on: the locks are read once
+  for all the cards of one step instead of once for each card. An arrow-key
+  press with 2,000 cards selected takes about 0.9 s instead of 3.4 s, and with
+  5,000 about 1.1 s instead of 17 s. Locked cards, cards in a locked frame and
+  review mode are refused as before.
+- While a selection is dragged, shapes, sticky notes and the other drawn
+  cards stay as they are drawn and only the lines that follow them are drawn
+  again, and the cards are measured once as the drag begins. On a board of
+  5,000 cards a drag of 50 of them takes about 200 ms a move instead of 560.
 
 ## 0.1.1 - 2026-09-26
 

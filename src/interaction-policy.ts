@@ -595,7 +595,30 @@ function readPolicyFields(container: UnknownRecord): ParsedPolicyFields | undefi
 	};
 }
 
+/** Every policy this module made: frozen through and through, so reading one again always gives the same answer. */
+const MADE_POLICIES = new WeakSet<InteractionPolicy>([EMPTY_POLICY]);
+/** A policy made here, read again as a decision reads its input. */
+const REREAD_POLICIES = new WeakMap<InteractionPolicy, InteractionPolicy>();
+/** For each policy, every id a lock covers: the locked ids and everything inside a locked frame. */
+const LOCKED_TARGETS = new WeakMap<InteractionPolicy, ReadonlySet<string>>();
+
 function parsePolicy(input: unknown): InteractionPolicy {
+	// A board's policy is asked about once for every card a drag moves; it
+	// cannot change, so it is read once.
+	const made = MADE_POLICIES.has(input as InteractionPolicy) ? input as InteractionPolicy : undefined;
+	const reread = made === undefined ? undefined : REREAD_POLICIES.get(made);
+	if (reread !== undefined) {
+		return reread;
+	}
+	const policy = readPolicy(input);
+	MADE_POLICIES.add(policy);
+	if (made !== undefined) {
+		REREAD_POLICIES.set(made, policy);
+	}
+	return policy;
+}
+
+function readPolicy(input: unknown): InteractionPolicy {
 	const containerResult = getPolicyContainer(input);
 	if (!containerResult.valid || containerResult.container === undefined) {
 		return EMPTY_POLICY;
@@ -688,12 +711,30 @@ function collectLockedTargets(policy: InteractionPolicy, elementIds: readonly st
 	if (!policy.valid) {
 		return Object.freeze(["*"]);
 	}
-	const locked = new Set(policy.lockedElementIds);
-	const descendantsByGroup = policy.groupDescendants;
+	const covered = lockedTargets(policy);
 	const result = new Set<string>();
-	const targets = new Set(elementIds);
-	const lockedGroups = [...locked].filter((id) => descendantsByGroup[id] !== undefined);
-	const visitGroup = (groupId: string, visited: Set<string>): void => {
+	for (const id of elementIds) {
+		if (covered.has(id)) {
+			result.add(id);
+		}
+	}
+	return Object.freeze([...result].sort());
+}
+
+/**
+ * Every id a lock covers: each locked id, and everything a locked frame holds,
+ * however deep.  Worked out once for each policy - a drag asks for every card
+ * it moves.
+ */
+function lockedTargets(policy: InteractionPolicy): ReadonlySet<string> {
+	const known = LOCKED_TARGETS.get(policy);
+	if (known !== undefined) {
+		return known;
+	}
+	const descendantsByGroup = policy.groupDescendants;
+	const covered = new Set<string>(policy.lockedElementIds);
+	const visited = new Set<string>();
+	const visitGroup = (groupId: string): void => {
 		if (visited.has(groupId)) {
 			return;
 		}
@@ -703,21 +744,17 @@ function collectLockedTargets(policy: InteractionPolicy, elementIds: readonly st
 			return;
 		}
 		for (const descendant of descendants) {
-			if (targets.has(descendant)) {
-				result.add(descendant);
-			}
-			visitGroup(descendant, visited);
+			covered.add(descendant);
+			visitGroup(descendant);
 		}
 	};
-	for (const id of elementIds) {
-		if (locked.has(id)) {
-			result.add(id);
-		}
+	for (const id of policy.lockedElementIds) {
+		visitGroup(id);
 	}
-	for (const groupId of lockedGroups) {
-		visitGroup(groupId, new Set<string>());
+	if (Object.isFrozen(policy)) {
+		LOCKED_TARGETS.set(policy, covered);
 	}
-	return Object.freeze([...result].sort());
+	return covered;
 }
 
 function invalidDecision(policy: InteractionPolicy, operation?: InteractionOperation): InteractionDecision {

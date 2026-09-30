@@ -56,11 +56,13 @@ type Data = Record<string, any>;
 const sessions: M1CanvasSession[] = [];
 afterEach(() => { sessions.splice(0).forEach((session) => session.dispose()); vi.restoreAllMocks(); });
 
-function fixture() {
+/** A board with a locked card, a free one and, for a large selection, as many more free cards as asked. */
+function fixture(moreCards = 0) {
 	const root = new HostElement("canvas-wrapper");
 	const nodeData = (id: string) => ({ id, type: "text", text: id, x: 0, y: 0, width: 100, height: 80, futureNode: { keep: id } });
+	const more = Array.from({ length: moreCards }, (_, index) => nodeData(`card-${index}`));
 	const initial: Data = {
-		nodes: [nodeData("locked"), nodeData("free")], edges: [],
+		nodes: [nodeData("locked"), nodeData("free"), ...more], edges: [],
 		miroCanvas: { schemaVersion: 1, settings: {}, localOverrides: { locked: { locked: true, futureOverride: [1, 2] } }, futureMetadata: { keep: true } },
 		miroSource: { items: [{ id: "locked", future: ["immutable"] }] }, futureRoot: { keep: true },
 	};
@@ -196,6 +198,45 @@ describe("M1 session lock enforcement", () => {
 		expect(canvas.nodes.has("locked")).toBe(true);
 		expect(free.moveTo({ x: 5 })).toBe("moved");
 		expect(free.data.x).toBe(5);
+	});
+
+	it("checks each card of a large native move against one reading, still refusing the locked one", () => {
+		const { canvas, locked, selection, session } = fixture(400);
+		const cards = [...canvas.nodes.values()];
+		for (const card of cards) selection.add(card);
+		const reads = vi.spyOn(session as unknown as { readInteractionState(): void }, "readInteractionState");
+		// Native Canvas moves a dragged selection card by card, all in one go.
+		const results = cards.map((card) => card.moveTo({ x: 10 }));
+		expect(reads.mock.calls.length).toBeLessThanOrEqual(1);
+		expect(results.filter((result) => result !== "moved")).toHaveLength(1);
+		expect(locked.data.x).toBe(0);
+		expect(cards.filter((card) => card !== locked).every((card) => card.data.x === 10)).toBe(true);
+	});
+
+	it("reads the board again for the next card once a lock or review mode is written in the same turn", async () => {
+		const { canvas, locked, selection, session } = fixture(3);
+		const cards = [...canvas.nodes.values()].filter((card) => card !== locked);
+		for (const card of cards) selection.add(card);
+		expect(cards[0]!.moveTo({ x: 1 })).toBe("moved");
+		// The same selection, locked between two cards of one move.
+		session.lockSelection();
+		expect(cards[1]!.moveTo({ x: 1 })).toBeUndefined();
+		expect(cards[1]!.data.x).toBe(0);
+		session.unlockSelection();
+		expect(cards[1]!.moveTo({ x: 2 })).toBe("moved");
+		session.toggleReviewMode();
+		expect(cards[2]!.moveTo({ x: 3 })).toBeUndefined();
+		expect(cards[2]!.data.x).toBe(0);
+		// A later turn reads the board again as well.
+		await Promise.resolve();
+		expect(cards[3]!.moveTo({ x: 4 })).toBeUndefined();
+		session.toggleReviewMode();
+		await Promise.resolve();
+		expect(cards[3]!.moveTo({ x: 4 })).toBe("moved");
+		// A locked card added to the selection in the same turn is refused.
+		selection.add(locked);
+		expect(locked.moveTo({ x: 5 })).toBeUndefined();
+		expect(locked.data.x).toBe(0);
 	});
 
 	it("uses current policy and selection for property controls and allows explicit unlock", () => {

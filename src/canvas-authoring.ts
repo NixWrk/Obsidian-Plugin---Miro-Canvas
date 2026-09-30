@@ -608,6 +608,61 @@ function structurallyEqual(left: unknown, right: unknown): boolean {
 	return true;
 }
 
+/**
+ * Whether the board is still the one a drag began on, the order of its cards
+ * and frames aside.  Native Canvas lists them by layer, and gives one its
+ * layer only when it first draws it - a frame by its size, a card on top -
+ * so on a large board the list reorders itself while a long drag is held,
+ * with nothing edited.  Everything else must be as it was: every card and
+ * frame with the same fields, the lines in the same order, the rest of the
+ * board the same.  A move is written onto the board as it is when let go, so
+ * the order it has then is the one kept.
+ */
+function sameBoardInAnyCardOrder(expected: UnknownRecord, current: UnknownRecord): boolean {
+	if (structurallyEqual(expected, current)) {
+		return true;
+	}
+	const expectedKeys = ownKeys(expected);
+	const currentKeys = ownKeys(current);
+	if (expectedKeys === undefined || currentKeys === undefined || expectedKeys.length !== currentKeys.length) {
+		return false;
+	}
+	for (const key of expectedKeys) {
+		if (key === "nodes") {
+			continue;
+		}
+		const expectedValue = safeRead(expected, key);
+		const currentValue = safeRead(current, key);
+		if (!hasOwn(current, key) || !expectedValue.ok || !currentValue.ok || !structurallyEqual(expectedValue.value, currentValue.value)) {
+			return false;
+		}
+	}
+	const expectedNodes = safeRead(expected, "nodes");
+	const currentNodes = safeRead(current, "nodes");
+	if (!expectedNodes.ok || !currentNodes.ok || !Array.isArray(expectedNodes.value) || !Array.isArray(currentNodes.value)
+		|| expectedNodes.value.length !== currentNodes.value.length) {
+		return false;
+	}
+	const earlierById = new Map<string, unknown>();
+	for (const node of expectedNodes.value) {
+		const id = isPlainObject(node) ? readRequiredString(node, "id") : undefined;
+		if (id === undefined || earlierById.has(id)) {
+			return false;
+		}
+		earlierById.set(id, node);
+	}
+	for (const node of currentNodes.value) {
+		const id = isPlainObject(node) ? readRequiredString(node, "id") : undefined;
+		const earlier = id === undefined ? undefined : earlierById.get(id);
+		if (id === undefined || earlier === undefined || !structurallyEqual(earlier, node)) {
+			return false;
+		}
+		// Each card is matched once: a card listed twice now is a change.
+		earlierById.delete(id);
+	}
+	return true;
+}
+
 function readRequiredString(record: UnknownRecord, key: string): string | undefined {
 	const value = safeRead(record, key);
 	return value.ok && isSafeIdentifier(value.value) ? value.value : undefined;
@@ -2452,7 +2507,8 @@ export class CanvasAuthoring {
 		if (before === undefined) return reject();
 		if (expected !== undefined) {
 			const snapshot = makeSnapshot(extractExpectedDocument(expected), diagnostics);
-			if (!snapshot || !structurallyEqual(snapshot.document, before.document)) {
+			// Native Canvas may list the cards in another order by the time a long drag ends; nothing else may differ.
+			if (!snapshot || !sameBoardInAnyCardOrder(snapshot.document, before.document)) {
 				addDiagnostic(diagnostics, "stale-selection-move", "error", "The board changed during the selection move.");
 				return reject();
 			}

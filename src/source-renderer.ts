@@ -9,7 +9,7 @@ import { readableInk } from "./miro-palette";
 import { codeLineCount, fitFontSize, lineNumbersCss, plainText } from "./text-fit";
 import { authorColor, authorInitial, shortTime } from "./comment-thread";
 import { planRoute, routePath, type RouteEnd as PlannedEnd, type RouteSegment } from "./connector-route";
-import { normalizeAnchor, resolveAnchor, type AnchorEdgeGeometry, type AnchorPoint, type AnchorRect } from "./anchors";
+import { normalizeAnchor, resolveAnchor, type AnchorEdgeGeometry, type AnchorGeometry, type AnchorPoint, type AnchorRect } from "./anchors";
 import { readCanvasElementId } from "./canvas-elements";
 import { blockArrowOutline, linePoints, planLine } from "./free-line";
 import { buildSourceScene, type SourceItemDescriptor, type SourceScene } from "./source-model";
@@ -25,7 +25,11 @@ export interface SourceRendererHost {
   getRotationPreview?(): { readonly id: string; readonly rotation: number } | undefined;
   /** The scene the host built from this very document, if it has one. */
   getSourceScene?(document: unknown): SourceScene | undefined;
-  /** Node IDs whose positions come from an uncommitted group-drag document. */
+  /**
+   * Node IDs whose positions come from an uncommitted group-drag document.
+   * While they are given, `getDocument` hands a new document for every move
+   * of the drag: the same document is taken as the same board.
+   */
   getSelectionMovePreviewIds?(): readonly string[] | undefined;
   /** A presentation's own buttons: show its slides, or bring them all into view. */
   onDeckAction?(deckId: string, action: DeckAction): void;
@@ -56,6 +60,26 @@ interface RenderedItem {
 }
 
 type RestorePatch = () => void;
+
+/** Everything the lines of one refresh are drawn from. */
+interface LineDrawing {
+  readonly sourceDocument: unknown;
+  readonly scene: SourceScene;
+  readonly descriptors: ReadonlyMap<string, SourceItemDescriptor>;
+  readonly nativeEdges: ReadonlyMap<string, unknown>;
+  readonly nativeRoutes: ReadonlyMap<string, { readonly edge: unknown; readonly anchors: RouteAnchors }>;
+  readonly edges: ReadonlyMap<string, unknown>;
+  readonly geometry: AnchorGeometry;
+  readonly routeNode: (nodeId: unknown) => RouteNode | undefined;
+  /** A selection is being dragged: lines follow the document's projected places, not the host's. */
+  readonly moving: boolean;
+}
+
+/** The board, and the drawn sizes of its cards, the lines were last drawn from during a drag. */
+interface LinesDrawnFor {
+  readonly document: unknown;
+  readonly measured: string | undefined;
+}
 
 const OWNED_CLASS = "miro-source-rendered";
 const DECORATION_CLASS = "miro-source-decoration";
@@ -1796,9 +1820,19 @@ function applyOrdering(scene: SourceScene, items: readonly RenderedItem[], patch
  * owns only reversible class/attribute/style changes plus inert child layers.
  */
 export class SourceRenderer {
-  private patches: RestorePatch[] = [];
+  /** What was done to the cards and to the lines, kept apart: they touch different elements, and a drag redraws only the lines. */
+  private cardPatches: RestorePatch[] = [];
+  private linePatches: RestorePatch[] = [];
+  private cardItems: RenderedItem[] = [];
+  private lineItems: RenderedItem[] = [];
+  /** What drawing the cards had to report, repeated while only the lines are drawn again. */
+  private cardDiagnostics: readonly string[] = [];
   private lastSignature: string | undefined;
-  private renderedItems: RenderedItem[] = [];
+  /** While a selection is dragged: what the cards were drawn from, and the board and sizes the lines were drawn from. */
+  private movingCards: string | undefined;
+  private linesDrawnFor: LinesDrawnFor | undefined;
+  /** The cards' drawn sizes, measured as a drag began. */
+  private movingMeasured: NodeMeasurements | undefined;
   private diagnosticList: readonly string[] = [];
   private readonly document: Document | undefined;
   /** Observer keeping rotations and redrawn edges in place between refreshes. */
@@ -1883,7 +1917,13 @@ export class SourceRenderer {
     // A connector must end on what the host drew, not on what the file says a
     // collapsed group would occupy if it were open - and on a node being
     // turned, at the angle it is shown at, not the one it will be saved with.
-    const measured = measureNodes(sourceDocument, runtimeNodes, scene, new Set(preview === undefined ? [] : [preview.id]));
+    // A dragged selection only moves, so its cards are measured once, as the
+    // drag begins: measuring makes the browser lay the whole board out again,
+    // on every move of a large selection.
+    const measured = moving && this.movingMeasured !== undefined
+      ? this.movingMeasured
+      : measureNodes(sourceDocument, runtimeNodes, scene, new Set(preview === undefined ? [] : [preview.id]));
+    this.movingMeasured = moving ? measured : undefined;
     const geometry = buildCanvasAnchorGeometry(sourceDocument, preview === undefined ? measured : {
       ...measured, [preview.id]: { ...measured[preview.id], rotation: preview.rotation },
     });
@@ -1933,79 +1973,147 @@ export class SourceRenderer {
       const runtime = runtimeOf(kind, id);
       return runtime === undefined ? [] : [`${id}:${safeGet(runtime, "initialized") === false ? "new" : "ready"}`];
     });
-    const signature = safeSignature({
-      descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, moving, geometry, diagnostics, fittedTexts,
-    });
-    if (signature !== undefined && signature === this.lastSignature
-      && this.decorationsIntact((item) => runtimeOf(item.kind, item.id))) {
-      return this.diagnosticList;
+    const runtimeOfItem = (item: RenderedItem): unknown => runtimeOf(item.kind, item.id);
+    const lines: LineDrawing = { sourceDocument, scene, descriptors, nativeEdges, nativeRoutes, edges, geometry, routeNode, moving };
+    let signature: string | undefined;
+    let movingCards: string | undefined;
+    let linesDrawnFor: LinesDrawnFor | undefined;
+    if (moving) {
+      // While a selection is dragged its cards only move: what is drawn on
+      // them stays, and only the lines that follow them are drawn again.  The
+      // cards are drawn again, as always, when anything else about them changes.
+      movingCards = safeSignature({
+        descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, diagnostics, fittedTexts,
+        sizes: [...descriptors.keys()].map((id) => [id, documentSizes.get(id) ?? null]),
+      });
+      linesDrawnFor = { document: sourceDocument, measured: safeSignature(measured) };
+      if (movingCards !== undefined && movingCards === this.movingCards && this.decorationsIntact(runtimeOfItem, "node")) {
+        const drawn = this.linesDrawnFor;
+        if (drawn !== undefined && drawn.document === linesDrawnFor.document && drawn.measured === linesDrawnFor.measured
+          && this.decorationsIntact(runtimeOfItem, "edge")) {
+          return this.diagnosticList;
+        }
+        return this.redrawLines(lines, linesDrawnFor, diagnostics);
+      }
+    } else {
+      signature = safeSignature({
+        descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, moving, geometry, diagnostics, fittedTexts,
+      });
+      if (signature !== undefined && signature === this.lastSignature && this.decorationsIntact(runtimeOfItem)) {
+        return this.diagnosticList;
+      }
     }
     this.restoreOwnedPatches();
-    this.renderedItems = [];
+    this.cardItems = [];
+    this.lineItems = [];
     this.lastSignature = signature;
-    const nextPatches: RestorePatch[] = [];
-    const rendered: RenderedItem[] = [];
+    this.movingCards = movingCards;
+    this.linesDrawnFor = linesDrawnFor;
+    const cardPatches: RestorePatch[] = [];
+    const cardItems: RenderedItem[] = [];
+    const cardDiagnostics: string[] = [];
+    const linePatches: RestorePatch[] = [];
+    const lineDiagnostics: string[] = [];
     try {
       for (const [id, descriptor] of descriptors) {
-        if (nativeRoutes.has(id)) continue;
-        if (descriptor.kind === "connector") {
-          const runtime = edges.get(id);
-          if (runtime === undefined) {
-            diagnostics.push(`connector-runtime-missing: ${id}.`);
-            continue;
-          }
-          const live = moving ? undefined : liveConnectorGeometry(sourceDocument, id, runtime, nativeEdges.get(id), routeNode, descriptor);
-          const item = applyConnector(this.document, geometry.edges?.[id], nativeEdges.get(id), runtime, id, descriptor, nextPatches, diagnostics, live);
-          if (item !== undefined) rendered.push(item);
-        } else {
-          const runtime = nodes.get(id);
-          if (runtime === undefined) {
-            diagnostics.push(`node-runtime-missing: ${id}.`);
-            continue;
-          }
-          const item = applyNode(
-            this.document,
-            runtime,
-            id,
-            descriptor,
-            nextPatches,
-            diagnostics,
-            documentSizes.get(id),
-            preview?.id === id ? preview.rotation : undefined,
-            this.host.onDeckAction === undefined
-              ? undefined
-              : (deckId, action) => this.host.onDeckAction?.(deckId, action),
-            this.host.onFontUsed === undefined
-              ? undefined
-              : (family) => this.host.onFontUsed?.(family),
-          );
-          if (item !== undefined) rendered.push(item);
-        }
-      }
-      applyOrdering(scene, rendered, nextPatches, diagnostics);
-      for (const [id, route] of nativeRoutes) {
-        const runtime = edges.get(id);
+        if (nativeRoutes.has(id) || descriptor.kind === "connector") continue;
+        const runtime = nodes.get(id);
         if (runtime === undefined) {
-          diagnostics.push(`connector-runtime-missing: ${id}.`);
+          cardDiagnostics.push(`node-runtime-missing: ${id}.`);
           continue;
         }
-        const item = applyNativeRoute(runtime, id, route.edge, route.anchors, routeNode, moving, nextPatches, diagnostics);
-        if (item !== undefined) rendered.push(item);
+        const item = applyNode(
+          this.document,
+          runtime,
+          id,
+          descriptor,
+          cardPatches,
+          cardDiagnostics,
+          documentSizes.get(id),
+          preview?.id === id ? preview.rotation : undefined,
+          this.host.onDeckAction === undefined
+            ? undefined
+            : (deckId, action) => this.host.onDeckAction?.(deckId, action),
+          this.host.onFontUsed === undefined
+            ? undefined
+            : (family) => this.host.onFontUsed?.(family),
+        );
+        if (item !== undefined) cardItems.push(item);
       }
-      this.patches = nextPatches;
-      this.renderedItems = rendered;
+      const lineItems = this.drawLines(lines, cardItems, linePatches, lineDiagnostics);
+      this.cardPatches = cardPatches;
+      this.cardItems = cardItems;
+      this.cardDiagnostics = Object.freeze(cardDiagnostics);
+      this.linePatches = linePatches;
+      this.lineItems = lineItems;
       this.watchLive();
+      diagnostics.push(...cardDiagnostics, ...lineDiagnostics);
     } catch {
-      for (let index = nextPatches.length - 1; index >= 0; index -= 1) {
-        try { nextPatches[index]!(); } catch { /* fail closed */ }
-      }
-      diagnostics.push("source-render-failed: DOM decoration aborted safely.");
-      this.patches = [];
-      this.renderedItems = [];
-      this.lastSignature = undefined;
+      rollBack(linePatches);
+      rollBack(cardPatches);
+      diagnostics.push(...cardDiagnostics, ...lineDiagnostics, "source-render-failed: DOM decoration aborted safely.");
+      this.forgetRendering();
     }
     this.diagnosticList = Object.freeze(diagnostics);
     return this.diagnosticList;
+  }
+
+  /**
+   * Draw the lines again over the cards as they are drawn: the connectors
+   * this module styles, their stacking, and native edges drawn its way.
+   */
+  private redrawLines(lines: LineDrawing, drawnFor: LinesDrawnFor, diagnostics: string[]): readonly string[] {
+    // Stop watching first: the restores below must not be answered by
+    // putting an edge straight back.
+    safeCall(this.liveWatch, "disconnect");
+    this.liveWatch = undefined;
+    rollBack(this.linePatches);
+    this.linePatches = [];
+    this.lineItems = [];
+    const linePatches: RestorePatch[] = [];
+    const lineDiagnostics: string[] = [];
+    try {
+      this.lineItems = this.drawLines(lines, this.cardItems, linePatches, lineDiagnostics);
+      this.linePatches = linePatches;
+      this.linesDrawnFor = drawnFor;
+      this.watchLive();
+      diagnostics.push(...this.cardDiagnostics, ...lineDiagnostics);
+    } catch {
+      rollBack(linePatches);
+      this.restoreOwnedPatches();
+      diagnostics.push(...this.cardDiagnostics, ...lineDiagnostics, "source-render-failed: DOM decoration aborted safely.");
+      this.forgetRendering();
+    }
+    this.diagnosticList = Object.freeze(diagnostics);
+    return this.diagnosticList;
+  }
+
+  private drawLines(lines: LineDrawing, cardItems: readonly RenderedItem[], patches: RestorePatch[], diagnostics: string[]): RenderedItem[] {
+    const connectorItems: RenderedItem[] = [];
+    for (const [id, descriptor] of lines.descriptors) {
+      if (lines.nativeRoutes.has(id) || descriptor.kind !== "connector") continue;
+      const runtime = lines.edges.get(id);
+      if (runtime === undefined) {
+        diagnostics.push(`connector-runtime-missing: ${id}.`);
+        continue;
+      }
+      const native = lines.nativeEdges.get(id);
+      const live = lines.moving ? undefined : liveConnectorGeometry(lines.sourceDocument, id, runtime, native, lines.routeNode, descriptor);
+      const item = applyConnector(this.document, lines.geometry.edges?.[id], native, runtime, id, descriptor, patches, diagnostics, live);
+      if (item !== undefined) connectorItems.push(item);
+    }
+    applyOrdering(lines.scene, [...cardItems, ...connectorItems], patches, diagnostics);
+    const routeItems: RenderedItem[] = [];
+    for (const [id, route] of lines.nativeRoutes) {
+      const runtime = lines.edges.get(id);
+      if (runtime === undefined) {
+        diagnostics.push(`connector-runtime-missing: ${id}.`);
+        continue;
+      }
+      const item = applyNativeRoute(runtime, id, route.edge, route.anchors, lines.routeNode, lines.moving, patches, diagnostics);
+      if (item !== undefined) routeItems.push(item);
+    }
+    return [...connectorItems, ...routeItems];
   }
 
   public dispose(): void {
@@ -2023,8 +2131,9 @@ export class SourceRenderer {
    * transform of every turned node each time.  What does count is the host
    * holding a different element, or none, for the item.
    */
-  private decorationsIntact(runtimeOf: (item: RenderedItem) => unknown): boolean {
-    for (const item of this.renderedItems) {
+  private decorationsIntact(runtimeOf: (item: RenderedItem) => unknown, kind?: RenderedItem["kind"]): boolean {
+    for (const item of [...this.cardItems, ...this.lineItems]) {
+      if (kind !== undefined && item.kind !== kind) continue;
       const runtime = runtimeOf(item);
       if (runtime === undefined || elementFor(runtime, item.anchor.keys) !== item.anchor.element) return false;
       if (item.intact !== undefined) {
@@ -2057,7 +2166,7 @@ export class SourceRenderer {
    */
   private watchLive(): void {
     const keepers = new Map<unknown, { readonly attribute: string; readonly keep: () => void }>();
-    for (const item of this.renderedItems) {
+    for (const item of [...this.cardItems, ...this.lineItems]) {
       for (const expected of item.expectedRotations ?? []) {
         keepers.set(expected.element, { attribute: "style", keep: () => keepRotation(expected.element, expected.rotation) });
       }
@@ -2089,8 +2198,20 @@ export class SourceRenderer {
 
   private resetRenderedState(): void {
     this.restoreOwnedPatches();
-    this.renderedItems = [];
+    this.forgetRendering();
+  }
+
+  /** Nothing is drawn now: the next refresh draws everything. */
+  private forgetRendering(): void {
+    this.cardPatches = [];
+    this.linePatches = [];
+    this.cardItems = [];
+    this.lineItems = [];
+    this.cardDiagnostics = [];
     this.lastSignature = undefined;
+    this.movingCards = undefined;
+    this.linesDrawnFor = undefined;
+    this.movingMeasured = undefined;
   }
 
   private restoreOwnedPatches(): void {
@@ -2098,10 +2219,19 @@ export class SourceRenderer {
     // putting a rotation or an edge straight back.
     safeCall(this.liveWatch, "disconnect");
     this.liveWatch = undefined;
-    const current = this.patches;
-    this.patches = [];
-    for (let index = current.length - 1; index >= 0; index -= 1) {
-      try { current[index]!(); } catch { /* exact-owned restoration is best-effort */ }
-    }
+    const lines = this.linePatches;
+    const cards = this.cardPatches;
+    this.linePatches = [];
+    this.cardPatches = [];
+    // Lines and cards are separate elements; each is undone in the reverse of the order it was done in.
+    rollBack(lines);
+    rollBack(cards);
+  }
+}
+
+/** Undo what was done, last first; exact-owned restoration is best-effort. */
+function rollBack(patches: readonly RestorePatch[]): void {
+  for (let index = patches.length - 1; index >= 0; index -= 1) {
+    try { patches[index]!(); } catch { /* exact-owned restoration is best-effort */ }
   }
 }

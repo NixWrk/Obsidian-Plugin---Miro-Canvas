@@ -54,6 +54,41 @@ describe("M1 interaction policy", () => {
 		expect(decideEditOperation(policy, "delete", ["free"])).toMatchObject({ allowed: true, reason: "allowed" });
 	});
 
+	it("answers each card of a large selection as it answers the whole, reading the policy once", () => {
+		const policy = createInteractionPolicy({
+			localOverrides: { "card-7": { locked: true }, outer: { locked: true } },
+			// Frames inside frames, one of them holding its holder: every card inside is covered once.
+			groupDescendants: { outer: ["inner", "card-20"], inner: ["card-30", "outer"], other: ["card-40"] },
+		});
+		const cards = Array.from({ length: 2000 }, (_, index) => `card-${index}`);
+		const refused = cards.filter((id) => !decideEdit(policy, { operation: "move", elementIds: [id] }).allowed);
+		expect(refused).toEqual(["card-7", "card-20", "card-30"]);
+		expect(decideEdit(policy, { operation: "move", elementIds: cards })).toMatchObject({
+			allowed: false,
+			reason: "element-locked",
+			lockedElementIds: ["card-20", "card-30", "card-7"],
+		});
+		expect(decideEdit(policy, { operation: "move", elementId: "inner" }).lockedElementIds).toEqual(["inner"]);
+		// A policy made here is read once; the reading is the same each time.
+		expect(createInteractionPolicy(policy)).toBe(createInteractionPolicy(policy));
+		// An unverifiable policy still refuses as before: read again, it is review mode.
+		const unverifiable = createInteractionPolicy(undefined);
+		expect(unverifiable.valid).toBe(false);
+		expect(decideEdit(unverifiable, { operation: "move", elementId: "card-1" }).reason).toBe("review-mode");
+	});
+
+	it("reads a plain metadata object afresh on every decision", () => {
+		const metadata: { localOverrides: Record<string, { locked: boolean }>; settings: { reviewMode: boolean } } = {
+			localOverrides: {},
+			settings: { reviewMode: false },
+		};
+		expect(decideEdit(metadata, { operation: "move", elementId: "card" }).allowed).toBe(true);
+		metadata.localOverrides.card = { locked: true };
+		expect(decideEdit(metadata, { operation: "move", elementId: "card" }).reason).toBe("element-locked");
+		metadata.settings.reviewMode = true;
+		expect(decideEdit(metadata, { operation: "move", elementId: "other" }).reason).toBe("review-mode");
+	});
+
 	it("fails closed for malformed, inherited, and prototype-hostile input", () => {
 		expect(decideEdit({ settings: { reviewMode: "yes" } }, { operation: "move", elementId: "node" })).toMatchObject({
 			allowed: false,

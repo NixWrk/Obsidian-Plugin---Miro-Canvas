@@ -1023,7 +1023,8 @@ function routeFixture({ rotation = 0, shape, observe = false, preview }: {
   const document = observe
     ? { ...(dom as unknown as object), defaultView: { MutationObserver: FakeObserver } } as unknown as Document
     : dom;
-  const data: any = {
+  // A drag projects a new board on every move, as the session does.
+  let data: any = {
     nodes: [{ id: "a", type: "text", text: "", x: 0, y: 0, width: 100, height: 80 }, { id: "b", type: "text", text: "", x: 300, y: 200, width: 100, height: 80 }],
     edges: [{ id: "n1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" }],
     ...(shape === undefined ? {} : { miroSource: { items: [{ id: "a", type: "shape", data: { shape } }] } }),
@@ -1062,7 +1063,8 @@ function routeFixture({ rotation = 0, shape, observe = false, preview }: {
     getSelectionMovePreviewIds: () => movingIds,
   }, document);
   const numbers = (value: string | null) => (value ?? "").match(/-?\d+(?:\.\d+)?/gu)!.map(Number);
-  return { renderer, data, a, b, edge, display, interaction, head, NATIVE, observers, numbers,
+  return { renderer, a, b, edge, display, interaction, head, NATIVE, observers, numbers,
+    get data() { return data; }, set data(value: any) { data = value; },
     get movingIds() { return movingIds; }, set movingIds(value: string[] | undefined) { movingIds = value; } };
 }
 
@@ -1201,6 +1203,146 @@ describe("native edges on turned and shaped nodes", () => {
     // The route no longer matches what was captured, so the host redraws its own.
     expect(f.edge.redraws).toBe(2);
     expect(f.display.getAttribute("d")).toBe(f.NATIVE);
+  });
+});
+
+describe("a selection being dragged", () => {
+  /** The shape's own drawing on card a. */
+  const shapeLayer = (f: ReturnType<typeof routeFixture>) =>
+    f.a.nodeEl.children.find((child) => child.getAttribute("data-miro-source-decoration") === "shape");
+  /** Where the line leaves card a, as the path starts. */
+  const start = (f: ReturnType<typeof routeFixture>) => f.numbers(f.display.getAttribute("d")).slice(0, 2);
+  /** Where the line reaches card b, as the path ends. */
+  const end = (f: ReturnType<typeof routeFixture>) => f.numbers(f.display.getAttribute("d")).slice(-2);
+
+  it("draws the line again on every move and keeps what is drawn on the cards", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    expect(start(f)).toEqual([75, 40]);
+    // The drag begins: the board is projected, the cards on it are drawn once.
+    f.movingIds = ["a"];
+    f.data.nodes[0].x = 120;
+    f.renderer.refresh();
+    const drawn = shapeLayer(f);
+    expect(drawn).toBeDefined();
+    expect(start(f)).toEqual([195, 40]);
+    for (const x of [140, 160]) {
+      f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x }, f.data.nodes[1]] };
+      f.renderer.refresh();
+      expect(start(f)).toEqual([x + 75, 40]);
+      expect(f.interaction.getAttribute("d")).toBe(f.display.getAttribute("d"));
+      expect(shapeLayer(f)).toBe(drawn);
+    }
+    // The native card has not moved: only the projected board has.
+    expect(f.a.x).toBe(0);
+    // The same board again draws nothing again.
+    const d = f.display.getAttribute("d");
+    f.renderer.refresh();
+    expect(f.display.getAttribute("d")).toBe(d);
+  });
+
+  it("draws the line from where the cards were put once the move is written, or back where they were once it is cancelled", () => {
+    const committed = routeFixture({ shape: "triangle" });
+    committed.renderer.refresh();
+    committed.movingIds = ["a"];
+    committed.data.nodes[0].x = 140;
+    committed.renderer.refresh();
+    // Written: the board and the native card agree, and nothing is projected any more.
+    committed.movingIds = undefined;
+    committed.a.x = 140;
+    committed.renderer.refresh();
+    expect(start(committed)).toEqual([215, 40]);
+    expect(shapeLayer(committed)).toBeDefined();
+
+    const cancelled = routeFixture({ shape: "triangle" });
+    cancelled.renderer.refresh();
+    cancelled.movingIds = ["a"];
+    cancelled.data.nodes[0].x = 140;
+    cancelled.renderer.refresh();
+    expect(start(cancelled)).toEqual([215, 40]);
+    cancelled.movingIds = undefined;
+    cancelled.data.nodes[0].x = 0;
+    cancelled.renderer.refresh();
+    expect(start(cancelled)).toEqual([75, 40]);
+    expect(shapeLayer(cancelled)).toBeDefined();
+    cancelled.renderer.dispose();
+    expect(shapeLayer(cancelled)).toBeUndefined();
+    expect(cancelled.display.getAttribute("d")).toBe(cancelled.NATIVE);
+  });
+
+  it("moves both ends of a line when both its cards are in the dragged selection", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    expect(end(f)).toEqual([293, 240]);
+    f.movingIds = ["a", "b"];
+    for (const [dx, dy] of [[60, 30], [120, 50]] as const) {
+      f.data = { ...f.data, nodes: [
+        { ...f.data.nodes[0], x: dx, y: dy },
+        { ...f.data.nodes[1], x: 300 + dx, y: 200 + dy },
+      ] };
+      f.renderer.refresh();
+      expect(start(f)).toEqual([75 + dx, 40 + dy]);
+      expect(end(f)).toEqual([293 + dx, 240 + dy]);
+    }
+    f.movingIds = undefined;
+    f.data.nodes[0].x = 0; f.data.nodes[0].y = 0;
+    f.data.nodes[1].x = 300; f.data.nodes[1].y = 200;
+    f.renderer.refresh();
+    expect(start(f)).toEqual([75, 40]);
+    expect(end(f)).toEqual([293, 240]);
+  });
+
+  it("measures the cards once as the drag begins, at any zoom, and the lines still meet them", () => {
+    const f = routeFixture({ shape: "triangle" });
+    // Zoomed out to a half: the page shows every card at half its size.
+    let measured = 0;
+    const box = (width: number, height: number) => () => {
+      measured += 1;
+      return { left: 0, top: 0, right: width, bottom: height, width, height };
+    };
+    Object.assign(f.a.nodeEl, { getBoundingClientRect: box(50, 40) });
+    Object.assign(f.b.nodeEl, { getBoundingClientRect: box(50, 40) });
+    f.renderer.refresh();
+    expect(start(f)).toEqual([75, 40]);
+    f.movingIds = ["a"];
+    f.data.nodes[0].x = 120;
+    f.renderer.refresh();
+    const once = measured;
+    for (const x of [140, 160, 180]) {
+      f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x }, f.data.nodes[1]] };
+      f.renderer.refresh();
+      expect(start(f)).toEqual([x + 75, 40]);
+      expect(end(f)).toEqual([293, 240]);
+    }
+    expect(measured).toBe(once);
+    // Let go: measured again as the board settles.
+    f.movingIds = undefined;
+    f.a.x = 180;
+    f.renderer.refresh();
+    expect(measured).toBeGreaterThan(once);
+    expect(start(f)).toEqual([255, 40]);
+  });
+
+  it("draws the cards again when something about them changes mid-drag", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    f.movingIds = ["a"];
+    f.data.nodes[0].x = 120;
+    f.renderer.refresh();
+    const drawn = shapeLayer(f)!;
+    // Native Canvas threw the drawing away: it is put back.
+    f.a.nodeEl.removeChild(drawn);
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x: 140 }, f.data.nodes[1]] };
+    f.renderer.refresh();
+    const redrawn = shapeLayer(f);
+    expect(redrawn).toBeDefined();
+    expect(redrawn).not.toBe(drawn);
+    expect(start(f)).toEqual([215, 40]);
+    // A card of another size is drawn again, and the line meets its new side.
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x: 160, width: 200 }, f.data.nodes[1]] };
+    f.renderer.refresh();
+    expect(shapeLayer(f)).not.toBe(redrawn);
+    expect(start(f)).toEqual([160 + 150, 40]);
   });
 });
 

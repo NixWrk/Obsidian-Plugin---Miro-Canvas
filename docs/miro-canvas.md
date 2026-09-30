@@ -1501,6 +1501,61 @@ size, and writing the move at the end. Those are the next steps for huge
 boards. A long drag of every card on a 2,000-card board is refused at the end
 ("the board changed") in both builds; that is a separate problem.
 
+Part 2 (2026-09-28). Two faults, and the next cost of a drag:
+
+- **The locks were read once for every card.** Native Canvas moves a
+  selection card by card - on every move of its own drag and on every arrow-key
+  press - and the plugin checks each card against the board's locks before it
+  may move. Each check read the saved board, the whole selection and the
+  metadata again, so one step cost the square of the selection: an arrow-key
+  press with 5,000 cards selected took about 17 s. The reading is now kept for
+  the rest of that step (the same turn of the event loop), and only while the
+  saved board and the selection are the objects it was taken from; a lock,
+  review mode or another selection reads them again. The policy is parsed once,
+  and the ids a lock covers - locked cards and everything inside a locked
+  frame, however deep - are worked out once per policy (`src/m1-session.ts`,
+  `src/interaction-policy.ts`). Locked cards, cards in a locked frame and review
+  mode are refused as before.
+- **A long drag was refused when let go.** Native Canvas lists a board's cards
+  and frames by layer, and gives a frame its layer only when it first draws it.
+  A long drag on a large board brings frames into view that had not been drawn
+  yet, so at release native Canvas lists the same cards in another order, and
+  the check that nobody changed the board meanwhile refused the move. That
+  check (`moveSelection` in `src/canvas-authoring.ts`) now ignores the order of
+  cards and frames and nothing else: a card changed, added or removed, the
+  lines' order or the plugin's own data changed still refuse, and the order the
+  board has at release is kept. The other writes need no such change: each
+  reads the board and writes it in the same step, with no frame drawn between.
+- **The lines follow a drag without the cards being drawn again.** While a
+  selection is dragged, `src/source-renderer.ts` keeps what it drew on the
+  cards - shapes, sticky notes - and draws only the lines again; it measures
+  the cards once as the drag begins. The cards are drawn again, as before,
+  when anything about them other than their place changes.
+
+An arrow-key press, which moves every selected card the native way (at the end
+of part 2, presses sent back to back and timed until the key was handled; three
+presses; the first press with the plugin off also warms up):
+
+| Selection | Before | After | Plugin off |
+| --- | --- | --- | --- |
+| 2,000 cards | 2,937-3,112 ms | 747-777 ms | 5-291 ms |
+| 5,000 cards | 16,592-17,015 ms | 1,094-1,214 ms | 8-319 ms |
+
+Moving all 2,000 selected cards once the native way, timed in the page:
+2,487 ms before, 19 ms after.
+
+Time per pointer move on the 5,000-card board, zoom 6 %, plugin on (the first
+column from 60-move drags, the others from 20-move drags):
+
+| Selection | Before | Locks and refusal fixed | Lines drawn alone | Cards measured once |
+| --- | --- | --- | --- | --- |
+| 50 cards | 559 ms | 561 ms | 229 ms | 221 ms |
+| all 5,000 | 1,490 ms | 1,431 ms | 1,078 ms | 1,033 ms |
+
+A drag of all 2,000 cards on the 2,000-card board took 745 ms a move and was
+refused at the end before; with the refusal fixed it took 773 ms a move, was
+written as one step of native history, and one undo put every card back.
+
 The first production release is ready when:
 
 1. ordinary Canvas boards gain the promised editing features without

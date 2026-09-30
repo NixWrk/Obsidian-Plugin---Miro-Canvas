@@ -1622,6 +1622,12 @@ export class M1CanvasSession {
 	private spacePanHeld = false;
 	private pointerEditIds: readonly string[] | undefined;
 	private nativeHistoryDepth = 0;
+	/**
+	 * The board and the selection the last native edit was checked against.
+	 * Native Canvas moves a selection card by card, in one go; while neither
+	 * has changed, the next card is checked against the same reading.
+	 */
+	private nativeEditReading: { readonly board: unknown; readonly selection: unknown; readonly size: unknown } | undefined;
 	private readonly guardedMethods = new WeakMap<object, Set<string>>();
 	private nextDomIdentity = 1;
 	private lastSceneSignature = "";
@@ -3463,6 +3469,8 @@ export class M1CanvasSession {
 		});
 		if (ownEdges.length > 0) this.scene = { ...this.scene, edges: [...this.scene.edges, ...ownEdges] };
 		this.policy = this.policyFromDocument(this.currentRawDocument);
+		// The policy was read from another document: the next native edit reads it again.
+		this.nativeEditReading = undefined;
 		this.attachNativeGuards();
 		this.ensureAppearanceObserver();
 		// Described again only when native Canvas saved a change or a press is
@@ -8293,8 +8301,37 @@ export class M1CanvasSession {
 	 */
 	private nativeEditAllowed(operation: string, ids: readonly string[]): boolean {
 		if (this.nativeHistoryDepth > 0) return true;
-		this.readInteractionState();
+		if (!this.nativeEditReadingCurrent()) {
+			this.readInteractionState();
+			this.rememberNativeEditReading();
+		}
 		return this.editAllowed(operation, ids);
+	}
+
+	/**
+	 * Native Canvas moves every selected card with one call each, all in the
+	 * same turn: reading the board and the selection for each of thousands of
+	 * cards made one pointer move take seconds.  The reading is kept for the
+	 * rest of this turn only, and only while the saved board and the selection
+	 * are the ones it was taken from; a lock, review mode or a new selection
+	 * reads them again.
+	 */
+	private nativeEditReadingCurrent(): boolean {
+		const reading = this.nativeEditReading;
+		if (reading === undefined) return false;
+		const selection = readRuntime(this.nativeCanvas(), "selection");
+		return reading.board === this.savedDocument()
+			&& reading.selection === selection
+			&& reading.size === readRuntime(selection, "size");
+	}
+
+	private rememberNativeEditReading(): void {
+		const selection = readRuntime(this.nativeCanvas(), "selection");
+		const reading = { board: this.savedDocument(), selection, size: readRuntime(selection, "size") };
+		this.nativeEditReading = reading;
+		queueMicrotask(() => {
+			if (this.nativeEditReading === reading) this.nativeEditReading = undefined;
+		});
 	}
 
 	private attachNativeGuards(): void {
