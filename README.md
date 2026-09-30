@@ -259,7 +259,8 @@ mode with a banner across the top:
   window is resized, and turns vertical near a side edge.
 - Turn the bottom bar or the dock's icon row between a row and a column with
   the small button beside its handle, whichever edge it sits on. A vertical
-  bar opens its menus sideways, towards the middle of the board.
+  bar opens its menus, and the pen's and lines' rows, sideways, towards the
+  middle of the board.
 - Drag a tool on the bottom bar to reorder it, off the bar onto the board to
   put it in a tray, or back from the tray onto the bar. This writes the same
   **Tool bar** setting the settings tab edits, so either way works.
@@ -452,8 +453,8 @@ so nothing is taken from Obsidian or other plugins.
 ## Phones and tablets
 
 The plugin works in Obsidian for Android; it was checked on a Samsung Galaxy
-A33 phone. iPhone and iPad are expected to behave the same but are not
-checked yet.
+A33 phone and a Samsung Galaxy Tab with its S Pen. iPhone and iPad are
+expected to behave the same but are not checked yet.
 
 - **The bars stay clear.** The tool bar and the dock stand above Obsidian's
   floating navigation bar and the phone's own navigation, and step aside
@@ -476,6 +477,9 @@ checked yet.
 - **Handles** keep their small look but take a finger from about 40px around.
   A card, turned or not, shows one frame with them; Obsidian's own large
   corner squares are hidden.
+- **A vertical tool bar** (Arrange panels) opens the pen's row and the lines'
+  row beside it, towards the middle of the board and level with the tool
+  pressed, as one row that stays on the screen.
 - **A stylus.** An S Pen comes to the board as a pen, with its pressure and
   tilt, and the board notices it as soon as it hovers above the screen,
   whatever tool is on. While the pen is near - hovering, drawing, or lifted a
@@ -784,7 +788,8 @@ push after every commit, no tags."
 - [ ] `attachment-names` - file names on every attachment, or only on the
   selected one.
 - [ ] `arrange-panels` - Arrange panels: dragging the panels, turning a bar
-  into a column, a tool into the tray and back, Reset, Done.
+  into a column (and opening the pen's and lines' rows beside it), a tool
+  into the tray and back, Reset, Done.
 - [ ] `tablet-card-drag` - on a tablet: a selected card drags with a finger
   and with a pen; a turned card shows one frame (a tablet or phone; when none
   is at hand, write it down as not recorded).

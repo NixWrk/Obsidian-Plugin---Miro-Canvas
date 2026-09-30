@@ -250,6 +250,71 @@ export function hostFootInset(boardTop: number, boardBottom: number, foot: HostF
   return Math.round(Math.min(inset, limit));
 }
 
+/** The gap between a vertical bar and a row that opens beside it, and the margin such a row keeps from the view's own edges. */
+export const SIDE_ROW_GAP = 8;
+export const SIDE_ROW_MARGIN = 8;
+/** The width a row opened beside a vertical bar asks for: the same as when it stands above a horizontal one. */
+export const SIDE_ROW_WIDTH = 600;
+/** The narrowest such a row is made, so its tools are not squeezed to nothing on a very narrow view. */
+export const SIDE_ROW_MIN_WIDTH = 160;
+
+/** A box in the view's own coordinates. */
+export interface ViewBox {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** What `placeSideRow` needs to know, all in one coordinate system (the view's). */
+export interface SideRowInput {
+  /** The part of the board's view the row may use. */
+  readonly view: ViewBox;
+  /** The vertical bar. */
+  readonly bar: ViewBox;
+  /** Where the row's own `top: 0` lies: the top of the bar's padding box, just inside its border. */
+  readonly barOrigin: number;
+  /** The tool that opened the row, on the bar; none when it is not on the bar. */
+  readonly tool: ViewBox | undefined;
+  /** The row's own height (it never wraps, so its width leaves it alone). */
+  readonly rowHeight: number;
+  /** Which half of the view the bar hugs: the row opens towards the other one. */
+  readonly side: "left" | "right";
+  /** The width the row would like; `SIDE_ROW_WIDTH` when left out. */
+  readonly wantedWidth?: number;
+}
+
+/** Where a row opened beside a vertical bar goes: its width and how far below its `top: 0` it is put. */
+export interface SideRowPlacement {
+  readonly width: number;
+  readonly top: number;
+}
+
+/**
+ * Where the pen's row, or the lines', opens when its bar is vertical.  A row
+ * over a horizontal bar has the whole width of the view to itself; beside a
+ * vertical one it has only the room between the bar and the far edge.  It
+ * stands level with the tool that opened it - its top edge on the tool's -
+ * and is moved up or down only as far as keeps it wholly in the view.  Its
+ * width is what it asks for, or what the room allows, and never less than
+ * `SIDE_ROW_MIN_WIDTH`: past that it scrolls along, its tools laid out as
+ * they are in a horizontal bar.
+ */
+export function placeSideRow(input: SideRowInput): SideRowPlacement {
+  const { view, bar, barOrigin, tool, rowHeight, side } = input;
+  const wanted = input.wantedWidth ?? SIDE_ROW_WIDTH;
+  const room = side === "left"
+    ? view.left + view.width - (bar.left + bar.width) - SIDE_ROW_GAP - SIDE_ROW_MARGIN
+    : bar.left - view.left - SIDE_ROW_GAP - SIDE_ROW_MARGIN;
+  const width = Math.max(0, Math.min(wanted, Math.max(room, SIDE_ROW_MIN_WIDTH)));
+  const wantedTop = tool === undefined ? bar.top : tool.top;
+  const lowest = view.top + view.height - rowHeight - SIDE_ROW_MARGIN;
+  const highest = view.top + SIDE_ROW_MARGIN;
+  // A row taller than the view keeps its top edge in view rather than its foot.
+  const top = Math.max(highest, Math.min(wantedTop, lowest));
+  return { width: Math.round(width * 100) / 100, top: Math.round((top - barOrigin) * 100) / 100 };
+}
+
 /** An element whose inline position this module may write; a real `HTMLElement` satisfies it. */
 export interface StyledElement {
   readonly style: {

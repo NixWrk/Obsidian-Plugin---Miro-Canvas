@@ -63,6 +63,12 @@
   corners of the card's unturned box next to it (and left them where the card
   had been while it was dragged); they are hidden, and the frame's own
   handles, which take a finger from about 40px around, do their work.
+- With the tool bar turned vertical (Arrange panels), the pen's row (tools,
+  colours, width) and the lines' row open beside the bar, on the side towards
+  the middle of the board and level with the tool that opened them, laid out
+  as one row as above a horizontal bar and always wholly on the screen; before
+  they were squeezed into a column as narrow as the bar, and their colours and
+  width slider could not be reached.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

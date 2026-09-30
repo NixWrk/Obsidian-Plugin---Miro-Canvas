@@ -1827,6 +1827,8 @@ export class M1CanvasSession {
 				this.panelSizeObserver.observe(element);
 			}
 		}
+		// The pen's row and the lines' row beside a vertical bar go with it.
+		this.quickTools?.placeSideRows(uncovered);
 		this.updateCrowding(panels);
 		this.updateMinimapLaidOut(panels.minimap);
 	}

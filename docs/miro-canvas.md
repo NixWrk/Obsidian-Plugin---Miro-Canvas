@@ -823,9 +823,58 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   under `pointer: coarse`; one finger on empty board is native Canvas's pan
   and pinch, not a marquee; a hidden minimap is neither followed nor drawn;
   new cards get native hex ids (Advanced Canvas's portals hide any id with a
-  hyphen). Left: the tablet with its S Pen (hover, the side button, a palm
-  landing before the pen), landscape on a phone (the dock stacked over the
-  bar leaves little board), iPhone and iPad, macOS and Linux.
+  hyphen). Tablet done 2026-09-30 on a Samsung Galaxy Tab (SM-X736B, Android
+  16, Obsidian 1.13.8) with its S Pen: the S Pen arrives as pointerType "pen"
+  with pressure and tilt, hovers as a pen with pressure 0, and its side button
+  never reaches the page (a side-button stroke brings no pointerdown at all);
+  Android takes a palm back 7 to 25 ms after it lands (touch pointerdown, then
+  pointercancel, no move in between). `src/stylus.ts` keeps "the pen is near"
+  from any pen event on the window, hover included, whatever tool is armed,
+  and `PalmRewind` puts back the view, the native selection, the connector
+  selection and the comment selection a lone touch changed when Android takes
+  it back within 250 ms - no history step, no card position and no save is
+  touched, and native Canvas starts no card drag in that time. A tool gesture
+  follows only the pointer that began it, so a palm taken back mid-stroke no
+  longer ends the stroke. Pressure scales the width around 0.2 (ordinary S
+  Pen writing, which peaks near 0.3). Holding the pen still (4 px) for 500 ms
+  at the end of a pen or highlighter stroke at least 24 px long straightens
+  it through the Shift path (`holdStraightLine`, on by default). Obsidian's
+  `.is-tablet button:not(.clickable-icon)` padding is undone for the
+  board's own buttons, and the minimap follows its setting on every width,
+  drawn at 160 by 107 px up to 900 px and 120 by 80 px up to 480 px. Pen
+  latency on a 500-card board was unchanged by these (p50 about 17 ms, frames
+  8.4 ms at 120 Hz; pen up to drawing about 160 ms, one long task of native
+  Canvas's import). Three faults the owner found on the tablet, fixed the same
+  day. (1) A card that is selected could not be dragged: native mobile Canvas
+  drags a card only after a 600 ms long press (`onTouchdown`, a finger only),
+  pans the board with a finger that moves at once, does nothing with a pen,
+  and once a card is selected the touch lands on its text, where the browser
+  takes the move for a scroll and sends `pointercancel` after three moves -
+  the same in native Obsidian with the plugin off, in main (b4a996a) and on
+  this branch, so no regression. `attachSelectionDrag` (`src/m1-session.ts`)
+  takes a finger or a pen that presses a selected card and moves 5 px through
+  the selection's own move (`startSelectionMove`, one history step, edges and
+  connectors follow), hands native Canvas's tracking back with a
+  `pointercancel` of its own and puts the board back where a few pixels of
+  native pan left it; a finger held 600 ms, a second finger, a palm while a
+  pen is near, a locked or review-mode board, a frame and a card being written
+  in are left to native Canvas. `touch-action: none` on a selected card's text
+  keeps the move on the page. (2) A turned card showed four large squares at
+  the corners of its unturned box: Obsidian's mobile rule (`.is-mobile
+  .canvas-wrapper:not(.mod-readonly) .canvas-node-interaction-layer
+  .canvas-node-resizer[data-resize=...]`, `display: block`) outweighed the
+  plugin's `display: none`; the plugin's rule now carries `!important`. The
+  three round buttons below the card are the rotation controls of the desktop
+  design too (free grip, a turn each way), pinned to the lower left corner of
+  the turned box, and the line ends on the turned outline as on the desktop.
+  (3) The pen's and lines' rows carry `miro-canvas-toolbar__bar`, so the
+  vertical bar's column and its `max-width: 100%` squeezed them to the bar's
+  own width; beside a vertical bar each is a box of its own, one row, whose
+  top and width `placeSideRow` (`src/panel-layout.ts`) chooses - level with
+  the tool, wholly in view, in the room towards the middle - and
+  `QuickTools.placeSideRows` writes. Left: the owner's own trial of the hold
+  with the real pen, landscape on a phone (the dock stacked over the bar
+  leaves little board), iPhone and iPad, macOS and Linux.
 - [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts
   every machine shows as themselves (Inter and Source Code Pro from Obsidian,
   the system's sans-serif and serif) and the fonts set in Obsidian's own

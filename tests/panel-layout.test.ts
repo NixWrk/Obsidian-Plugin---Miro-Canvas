@@ -11,9 +11,11 @@ import {
   isVerticalAnchor,
   normalizePanelLayout,
   normalizePanelPosition,
+  placeSideRow,
   positionFromPoint,
   resolvePanelRect,
   type PanelPosition,
+  type SideRowInput,
 } from "../src/panel-layout";
 
 const VIEW = { width: 1200, height: 800 };
@@ -406,5 +408,59 @@ describe("hostFootInset", () => {
   it("is nothing on a computer and never more than half the board", () => {
     expect(hostFootInset(0, 800, { viewportBottom: 800, safeAreaBottom: 0, keyboardHeight: 0, barTops: [] })).toBe(0);
     expect(hostFootInset(80, 853, { ...phone, barTops: [100] })).toBe(387);
+  });
+});
+
+describe("placeSideRow", () => {
+  // A vertical bar on the left edge of an 1200 x 800 view, 50 wide and 450
+  // tall, whose top is 200; its padding box starts one pixel inside that.
+  const LEFT_BAR: SideRowInput = {
+    view: { left: 0, top: 0, width: 1200, height: 800 },
+    bar: { left: 0, top: 200, width: 50, height: 450 },
+    barOrigin: 201,
+    tool: { left: 5, top: 300, width: 40, height: 40 },
+    rowHeight: 40,
+    side: "left",
+  };
+
+  it("opens the row beside the bar, level with the tool that opened it", () => {
+    // Its top edge on the tool's: 300 in the view is 99 below the bar's own top edge.
+    expect(placeSideRow(LEFT_BAR)).toEqual({ width: 600, top: 99 });
+    expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 420, width: 40, height: 40 } }).top).toBe(219);
+  });
+
+  it("keeps the row wholly in view: up from the foot of the view, down from its head", () => {
+    // The lowest the row may stand is 8 above the foot of the view: 800 - 40 - 8 = 752.
+    expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 780, width: 40, height: 40 } }).top).toBe(752 - 201);
+    expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 2, width: 40, height: 40 } }).top).toBe(8 - 201);
+    // A part of the view left uncovered by the phone's own bars ends higher.
+    expect(placeSideRow({ ...LEFT_BAR, view: { left: 0, top: 0, width: 1200, height: 600 } }).top).toBe(99);
+    expect(placeSideRow({ ...LEFT_BAR, view: { left: 0, top: 0, width: 1200, height: 600 }, tool: { left: 5, top: 580, width: 40, height: 40 } }).top).toBe(552 - 201);
+  });
+
+  it("keeps a row taller than the view by its top edge", () => {
+    expect(placeSideRow({ ...LEFT_BAR, view: { left: 0, top: 0, width: 1200, height: 30 }, rowHeight: 40 }).top).toBe(8 - 201);
+  });
+
+  it("gives the row the room between the bar and the far edge, less the gap and the margin, when that is short", () => {
+    // 412 wide: the bar takes 50, the gap 8 and the margin 8.
+    const phone = { ...LEFT_BAR, view: { left: 0, top: 0, width: 412, height: 800 } };
+    expect(placeSideRow(phone).width).toBe(412 - 50 - 8 - 8);
+    // Too little room to be any use: never squeezed below 160, it scrolls along instead.
+    expect(placeSideRow({ ...phone, view: { ...phone.view, width: 200 } }).width).toBe(160);
+    // A row that asks for less gets what it asks for.
+    expect(placeSideRow({ ...phone, wantedWidth: 240 }).width).toBe(240);
+  });
+
+  it("opens towards the middle of the view from a bar on the right edge", () => {
+    const right: SideRowInput = { ...LEFT_BAR, bar: { left: 1150, top: 200, width: 50, height: 450 }, side: "right" };
+    expect(placeSideRow(right).width).toBe(600);
+    // The room is what lies left of the bar: 1150 - 8 - 8.
+    expect(placeSideRow({ ...right, bar: { ...right.bar, left: 400 } }).width).toBe(384);
+    expect(placeSideRow({ ...right, view: { left: 100, top: 0, width: 1100, height: 800 }, bar: { ...right.bar, left: 400 } }).width).toBe(284);
+  });
+
+  it("stands level with the top of the bar when its tool is not on the bar", () => {
+    expect(placeSideRow({ ...LEFT_BAR, tool: undefined }).top).toBe(200 - 201);
   });
 });

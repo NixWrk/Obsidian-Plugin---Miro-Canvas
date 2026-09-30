@@ -4297,12 +4297,24 @@
   left: auto;
 }
 
+/* Both rows carry `miro-canvas-toolbar__bar`, so the column the vertical bar
+   gives its items reached them too, and their own width was cut to the bar's
+   50px.  Beside the bar each is a box of its own, laid out as above a
+   horizontal bar - one row of tools, colours and the size, scrolling along
+   where the room is short.  `QuickTools.placeSideRows` puts it level with the
+   tool that opened it, wholly in view: its top and width come from there. */
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing,
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors {
   position: absolute;
-  top: 0;
-  border-bottom: none;
-  padding-bottom: 4px;
+  top: var(--miro-canvas-side-row-top, 0px);
+  flex-direction: row;
+  width: var(--miro-canvas-side-row-width, min(600px, calc(100vw - 48px)));
+  max-width: none;
+  padding: 3px;
+  background: var(--miro-canvas-toolbar-bg);
+  border: 1px solid var(--miro-canvas-toolbar-border);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s, 0 6px 22px rgb(0 0 0 / 22%));
 }
 
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-tools__drawing,

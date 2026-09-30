@@ -62,6 +62,7 @@ vi.mock("../src/quick-tools", async (importOriginal) => ({
 		update() {}
 		dispose() {}
 		closePanels() {}
+		placeSideRows() {}
 	},
 }));
 

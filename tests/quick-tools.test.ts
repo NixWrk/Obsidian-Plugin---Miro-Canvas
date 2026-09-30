@@ -583,3 +583,85 @@ describe("quick tools in Russian", () => {
     expect(byLabel(root, "Цвет новых линий")).toBeDefined();
   });
 });
+
+describe("the pen's and the lines' rows beside a vertical bar", () => {
+  const box = (left: number, top: number, width: number, height: number) => () => ({
+    left, top, width, height, right: left + width, bottom: top + height, x: left, y: top,
+  });
+
+  /** A bar in an 800 x 600 view, 50 wide, 300 tall from y = 100; its pen button at y = 220 and its lines button at y = 260. */
+  function barInView(orientation: "vertical" | "horizontal", side: "left" | "right" = "left") {
+    const { tools, root } = build();
+    const view = new FakeElement("div");
+    view.appendChild(root);
+    (view as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(0, 0, 800, 600);
+    (root as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(side === "left" ? 10 : 740, 100, 50, 300);
+    root.setAttribute("data-miro-canvas-panel-orientation", orientation);
+    root.setAttribute("data-miro-canvas-panel-side", side);
+    const pen = descendants(root).find((item) => item.attributes.get("data-tool-group") === "drawing")!;
+    (pen as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(20, 220, 32, 32);
+    (toolButton(root, "connector") as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(20, 260, 32, 32);
+    const rowOf = (name: string) => root.children.find((child) => child.classes.has(name))!;
+    for (const name of ["miro-canvas-tools__drawing", "miro-canvas-tools__connectors"]) {
+      (rowOf(name) as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(0, 0, 600, 40);
+    }
+    return { tools, root, drawing: rowOf("miro-canvas-tools__drawing"), connectors: rowOf("miro-canvas-tools__connectors") };
+  }
+
+  it("puts the pen's row level with the pen button, with the room to the bar's right", () => {
+    const { tools, drawing } = barInView("vertical");
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.hidden).toBe(false);
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
+    // 800 across, less the bar's 10 + 50, the 8 gap and the 8 margin: 724, of which 600 are asked for.
+    expect(drawing.style["--miro-canvas-side-row-width"]).toBe("600px");
+  });
+
+  it("puts the lines' row level with the lines button", () => {
+    const { tools, connectors } = barInView("vertical");
+    tools.update({ ...STATE, armed: "connector" });
+    expect(connectors.hidden).toBe(false);
+    expect(connectors.style["--miro-canvas-side-row-top"]).toBe("160px");
+  });
+
+  it("keeps a row wholly in the part of the view the session leaves uncovered, and in the room a narrow view leaves", () => {
+    const { tools, drawing } = barInView("vertical");
+    tools.update({ ...STATE, armed: "pen" });
+    // The phone's own bars cover the foot: the view's usable height is 250, so the row may not stand lower than 250 - 40 - 8.
+    tools.placeSideRows({ width: 300, height: 250 });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${250 - 40 - 8 - 100}px`);
+    expect(drawing.style["--miro-canvas-side-row-width"]).toBe(`${300 - 60 - 8 - 8}px`);
+  });
+
+  it("opens to the left of a bar on the right edge", () => {
+    const { tools, drawing } = barInView("vertical", "right");
+    tools.update({ ...STATE, armed: "pen" });
+    // The room is what lies left of the bar, less the gap and the margin: 740 - 16.
+    expect(drawing.style["--miro-canvas-side-row-width"]).toBe("600px");
+    tools.placeSideRows({ width: 800, height: 600 });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
+  });
+
+  it("leaves a horizontal bar's rows to their own styles, and forgets the place a vertical one gave", () => {
+    const { tools, root, drawing } = barInView("vertical");
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
+    root.setAttribute("data-miro-canvas-panel-orientation", "horizontal");
+    tools.placeSideRows();
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBeUndefined();
+    expect(drawing.style["--miro-canvas-side-row-width"]).toBeUndefined();
+    tools.update({ ...STATE, armed: "select" });
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBeUndefined();
+  });
+
+  it("places nothing for a row that is closed, or a bar that is not on the screen", () => {
+    const { tools, root, drawing, connectors } = barInView("vertical");
+    tools.update({ ...STATE, armed: "select" });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBeUndefined();
+    expect(connectors.style["--miro-canvas-side-row-top"]).toBeUndefined();
+    (root as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(0, 0, 0, 0);
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBeUndefined();
+  });
+});

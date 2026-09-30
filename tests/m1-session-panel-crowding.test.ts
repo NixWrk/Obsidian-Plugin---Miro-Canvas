@@ -105,7 +105,7 @@ function fixture(panelLayout: PanelLayout = {}) {
 	const toolbar = new FakePanelElement(300, 32);
 	// Where styles.css puts it by default: 16px above the board's foot.
 	toolbar.rect = { left: 0, top: 552, right: 300, bottom: 584 };
-	(session as unknown as { quickTools: { element: FakePanelElement } }).quickTools = { element: toolbar };
+	(session as unknown as { quickTools: unknown }).quickTools = { element: toolbar, placeSideRows() {} };
 	return { root, session, toolbar };
 }
 

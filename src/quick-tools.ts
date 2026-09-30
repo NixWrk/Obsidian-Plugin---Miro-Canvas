@@ -18,6 +18,7 @@ import { defaultPalette } from "./appearance";
 import { miroStickyColors } from "./miro-palette";
 import { LOCAL_ITEM_SIZES } from "./local-items";
 import { BAR_TOOLTIP_DELAY, PICTURE_TOOLTIP_DELAY } from "./tooltips";
+import { placeSideRow, type ViewBox, type ViewSize } from "./panel-layout";
 
 export const QUICK_TOOLS = [
   "select", "text", "sticky", "shape", "pen", "highlighter", "smart", "eraser", "erase-part", "lasso",
@@ -40,6 +41,9 @@ export function isDragCreateTool(tool: QuickTool): boolean {
 
 /** Screen pixels a press must move before it counts as a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
+/** The custom properties a row opened beside a vertical bar takes its place from; see `QuickTools.placeSideRows`. */
+const SIDE_ROW_TOP = "--miro-canvas-side-row-top";
+const SIDE_ROW_WIDTH_PROPERTY = "--miro-canvas-side-row-width";
 
 /**
  * The ghost's size at zoom 1: the same box the tool would make with a plain
@@ -356,6 +360,10 @@ export class QuickTools {
   private readonly penColors = new Map<string, HTMLButtonElement>();
   private readonly penColor: HTMLInputElement;
   private penButton: HTMLButtonElement | undefined;
+  /** The part of the view the bar's rows may use, as the session last measured it. */
+  private sideView: ViewSize | undefined;
+  /** Which rows were open when they were last placed beside a vertical bar. */
+  private sideRowsOpen = "";
   /** The pen's own row, open for as long as one of its tools is armed. */
   private drawingBar: HTMLElement | undefined;
   private colorRow: HTMLElement | undefined;
@@ -532,6 +540,11 @@ export class QuickTools {
     this.penButton?.style?.setProperty?.("--miro-canvas-swatch", state.penColor);
     this.penButton?.setAttribute("aria-pressed", drawing ? "true" : "false");
     if (this.drawingBar !== undefined) this.drawingBar.hidden = !drawing || !state.editable;
+    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${this.connectorBar.hidden}`;
+    if (rowsOpen !== this.sideRowsOpen) {
+      this.sideRowsOpen = rowsOpen;
+      this.placeSideRows();
+    }
     // An eraser has a size but no colour; a line has both.
     const erasing = isEraser(state.armed);
     if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
@@ -582,6 +595,48 @@ export class QuickTools {
       if (keepOpen !== undefined && panel.contains(keepOpen)) continue;
       panel.hidden = true;
       button.setAttribute("aria-expanded", "false");
+    }
+  }
+
+  /**
+   * A vertical bar opens the pen's row and the lines' row beside it, on the
+   * side towards the middle of the board, level with the tool that opened
+   * it and wholly in view (see `placeSideRow`); above a horizontal bar they
+   * need nothing of the kind, and any place left from a vertical one is
+   * dropped.  `view` is the part of the board the session leaves uncovered,
+   * when it knows; else the whole of the bar's own parent.
+   */
+  public placeSideRows(view?: ViewSize): void {
+    if (view !== undefined) this.sideView = view;
+    const bar = this.element;
+    const vertical = bar.getAttribute("data-miro-canvas-panel-orientation") === "vertical";
+    const rows = [
+      { row: this.drawingBar, tool: this.penButton },
+      { row: this.connectorBar, tool: this.buttons.get("connector") },
+    ];
+    for (const { row, tool } of rows) {
+      if (row === undefined) continue;
+      if (!vertical) {
+        row.style.removeProperty(SIDE_ROW_TOP);
+        row.style.removeProperty(SIDE_ROW_WIDTH_PROPERTY);
+        continue;
+      }
+      if (row.hidden) continue;
+      const parent = bar.parentElement?.getBoundingClientRect?.();
+      const barRect = bar.getBoundingClientRect?.();
+      if (parent === undefined || barRect === undefined || barRect.width === 0) continue;
+      const toolRect = tool?.getBoundingClientRect?.();
+      const seen = (rect: DOMRect): ViewBox => ({ left: rect.left - parent.left, top: rect.top - parent.top, width: rect.width, height: rect.height });
+      const placement = placeSideRow({
+        view: { left: 0, top: 0, width: this.sideView?.width ?? parent.width, height: this.sideView?.height ?? parent.height },
+        bar: seen(barRect),
+        barOrigin: barRect.top - parent.top + (bar.clientTop ?? 0),
+        tool: toolRect === undefined || toolRect.width === 0 ? undefined : seen(toolRect),
+        rowHeight: row.getBoundingClientRect?.().height ?? 0,
+        side: bar.getAttribute("data-miro-canvas-panel-side") === "right" ? "right" : "left",
+      });
+      row.style.setProperty(SIDE_ROW_TOP, `${placement.top}px`);
+      row.style.setProperty(SIDE_ROW_WIDTH_PROPERTY, `${placement.width}px`);
     }
   }
 

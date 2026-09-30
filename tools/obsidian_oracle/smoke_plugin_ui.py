@@ -328,6 +328,42 @@ def main() -> int:
                     throw Error('A picked card that shows a web page cannot scroll it');
                   card.remove();
                 }""")
+                # A bar turned vertical opens the pen's row and the lines' row beside
+                # it: one row of tools, laid out as above a horizontal bar, level
+                # with the tool that opened it and wholly in view.
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session;
+                  const tools=b.root.querySelector('.miro-canvas-toolbar.miro-canvas-tools');
+                  const original=s.settings;
+                  const placeBar=(anchor,dy)=>{
+                    s.settings={...original,panelLayout:{...original.panelLayout,toolbar:{anchor,dx:0,dy,orientation:'vertical'}}};
+                    s.updatePanelPositions();
+                  };
+                  const inside=(inner,outer)=>inner.left>=outer.left-0.5&&inner.right<=outer.right+0.5&&inner.top>=outer.top-0.5&&inner.bottom<=outer.bottom+0.5;
+                  for(const [anchor,dy] of [['left-middle',0],['left-middle',380],['left-middle',-380],['right-middle',0],['right-middle',380]]){
+                    placeBar(anchor,dy);
+                    if(tools.getAttribute('data-miro-canvas-panel-orientation')!=='vertical')throw Error('The bar did not turn vertical at '+anchor);
+                    const side=tools.getAttribute('data-miro-canvas-panel-side');
+                    for(const [button,rowClass] of [['[data-tool-group="drawing"]','miro-canvas-tools__drawing'],['[data-tool="connector"]','miro-canvas-tools__connectors']]){
+                      tools.querySelector(button).click();
+                      const row=tools.querySelector('.'+rowClass);
+                      const at=row.getBoundingClientRect(),bar=tools.getBoundingClientRect(),tool=tools.querySelector(button).getBoundingClientRect();
+                      const where=JSON.stringify({anchor,dy,rowClass,at,bar,tool});
+                      if(row.hidden||getComputedStyle(row).flexDirection!=='row')throw Error('The row is not laid out as one row: '+where);
+                      if(at.width<160||at.height>60)throw Error('The row is squeezed: '+where);
+                      if(!inside(at,b.root.getBoundingClientRect()))throw Error('The row runs off the board: '+where);
+                      if(side==='left'?at.left<bar.right:at.right>bar.left)throw Error('The row is not beside the bar, towards the middle: '+where);
+                      const level=Math.abs(at.top-tool.top)<1.5;
+                      const board=b.root.getBoundingClientRect();
+                      const held=Math.abs(at.top-(board.top+8))<1.5||Math.abs(at.bottom-(board.bottom-8))<1.5;
+                      if(!level&&!held)throw Error('The row is neither level with its tool nor held in view: '+where);
+                    }
+                  }
+                  s.settings=original;s.updatePanelPositions();
+                  const drawing=tools.querySelector('.miro-canvas-tools__drawing');
+                  if(drawing.style.getPropertyValue('--miro-canvas-side-row-top')!==''||getComputedStyle(drawing).flexDirection!=='row')throw Error('A horizontal bar kept the place of a vertical one');
+                  b.root.querySelector('.miro-canvas-tools [data-tool="select"]').click();
+                }""")
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,c=b.runtime.getData().miroCanvas.connectors['menu-line'];
                   const at=s.viewportPoint(c.from),first={x:at.x-12,y:at.y-12},last={x:at.x+12,y:at.y+12};

@@ -197,7 +197,7 @@ function fixture(options: FixtureOptions = {}) {
 	sessions.push(session);
 	root.ownerDocument = document;
 	if (options.toolBar === true) {
-		const toolBar = { element: new HostElement("miro-canvas-toolbar miro-canvas-tools"), update() {}, dispose() {}, placeNativeButton() {} };
+		const toolBar = { element: new HostElement("miro-canvas-toolbar miro-canvas-tools"), update() {}, dispose() {}, placeNativeButton() {}, placeSideRows() {} };
 		(session as unknown as { quickTools: unknown }).quickTools = toolBar;
 	}
 	options.beforeMount?.({ window, document, root });
