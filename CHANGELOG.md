@@ -73,7 +73,11 @@
   screen, above the phone's own bars; where it is still taller than the room
   it scrolls inside itself instead of being squeezed. Before, the settings
   were squeezed into a column as narrow as the bar, and their colours and
-  width slider could not be reached.
+  width slider could not be reached. The bar itself, and the corner dock when
+  it is vertical, hold one button to a row everywhere: native Canvas's card
+  and note buttons, which on the tablet's Obsidian come with a slide and a
+  group button of their own, had stood two to a row, and the rule before the "+"
+  that opens More lay upright in a vertical bar.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

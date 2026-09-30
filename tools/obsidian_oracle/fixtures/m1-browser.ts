@@ -1,5 +1,7 @@
-import { M1CanvasSession } from "../../../src/m1-session";
+import { M1CanvasSession, nativeToolbarItemOf } from "../../../src/m1-session";
 import { normalizeSettings } from "../../../src/settings";
+import { ALL_TOOLBAR_ITEMS, QuickTools } from "../../../src/quick-tools";
+import { applyPanelPositionSettled } from "../../../src/panel-layout";
 import { M2CanvasTools } from "../../../src/m2-tools";
 import { MetadataWriter } from "../../../src/metadata-writer";
 import { createObsidianMetadataStore } from "../../../src/obsidian-metadata-store";
@@ -26,6 +28,32 @@ for (const label of ["Delete", "Zoom to selection", "Edit"]) {
   button.textContent = label.slice(0, 1);
 }
 root.append(nativeMenuContainer);
+
+// Native Canvas's own card menu, as the tablet's Obsidian fills it: besides
+// the card, the note and the media button it holds a slide and a group button,
+// which the tool bar takes in with the others.  A bar that stood only three of
+// them in a row would hide the two that share a slot with card and note.
+const NATIVE_CARD_MENU = [
+  ["Drag to add slide", "lucide-gallery-vertical"],
+  ["Drag to add group", "lucide-group"],
+  ["Drag to add card", "lucide-sticky-note"],
+  ["Drag to add note from vault", "lucide-file-text"],
+  ["Drag to add media from vault", "lucide-file-image"],
+] as const;
+const makeCardMenu = (): HTMLElement => {
+  const menu = document.createElement("div");
+  menu.className = "canvas-card-menu";
+  for (const [label, icon] of NATIVE_CARD_MENU) {
+    const button = menu.appendChild(document.createElement("div"));
+    button.className = "canvas-card-menu-button mod-draggable";
+    button.setAttribute("aria-label", label);
+    const picture = button.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+    picture.setAttribute("class", `svg-icon ${icon}`);
+  }
+  return menu;
+};
+const nativeCardMenu = makeCardMenu();
+root.append(nativeCardMenu);
 
 // Native Canvas's moving layer: what it holds is in board units and moves
 // with the camera.  The synthetic host places it where the session maps the
@@ -196,6 +224,7 @@ let saves = 0;
 const runtime = {
   wrapperEl: root, canvasEl, nodes, edges, selection,
   menu: { menuEl: nativeMenu, containerEl: nativeMenuContainer },
+  cardMenuEl: nativeCardMenu,
   data: clone(initial) as unknown as Record<string, unknown>, readonly: false,
   x: 0, y: 0, zoom: 0, tx: 0, ty: 0, tZoom: 0, scale: 1,
   setViewport(x: number, y: number, zoom: number) {
@@ -292,8 +321,29 @@ const unknownsPreserved = () => {
     && JSON.stringify(current.miroSource) === JSON.stringify(initial.miroSource);
 };
 
+/**
+ * A second tool bar with every item a person can put on it on the bar itself,
+ * none left under More, standing vertical at the left edge of the board, with
+ * native Canvas's own buttons in their slots; for checking that each item of
+ * the list takes a row of its own.  `dispose` takes it away again.
+ */
+const mountFullBar = () => {
+  const bar = new QuickTools(
+    { onArm: () => {}, onShape: () => {}, onPen: () => {} },
+    { document, toolbarItems: ALL_TOOLBAR_ITEMS },
+  );
+  Array.from(makeCardMenu().children).forEach((button, index) => {
+    const item = nativeToolbarItemOf(button, index);
+    if (item !== undefined) bar.placeNativeButton(item, button as HTMLElement);
+  });
+  root.append(bar.element);
+  const view = { width: root.clientWidth, height: root.clientHeight };
+  applyPanelPositionSettled(bar.element, { anchor: "left-middle", dx: 0, dy: 0, orientation: "vertical" }, view);
+  return { element: bar.element, itemsRow: bar.itemsRow, dispose: () => bar.dispose() };
+};
+
 const browser: Record<string, unknown> = {
-  session, runtime, root, mounted, initial, select, openCalls, mountM2,
+  session, runtime, root, mounted, initial, select, openCalls, mountM2, mountFullBar,
   getSaves: () => saves,
   getHistoryLength: () => history.length,
   getHistoryIndex: () => historyIndex,

@@ -879,7 +879,15 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   (`src/panel-layout.ts`) chooses its top - level with the tool, wholly in
   view above the host foot - and, where it is taller than the room, a maximum
   height it scrolls inside of, never squeezed; `QuickTools.placeSideRows`
-  writes both. Left: the owner's own trial of the hold
+  writes both. (4) Two buttons to a row in the vertical bar: Obsidian on
+  the tablet (Android) fills `cardMenuEl` with five buttons, where the
+  desktop's 1.13.7 holds three - besides card, note and media, "Drag to add slide"
+  (`lucide-gallery-vertical`) and "Drag to add group" (`lucide-group`).
+  `nativeToolbarItemOf` knows the three by icon and gives any other the slot
+  of its position, so the card and note slots held two buttons each, and a
+  slot is a row (`.miro-canvas-toolbar__native-slot`); in a vertical bar it
+  is a column. The rule before the "+" of More lay upright there too and is
+  now across. Left: the owner's own trial of the hold
   with the real pen, landscape on a phone (the dock stacked over the bar
   leaves little board), iPhone and iPad, macOS and Linux.
 - [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts

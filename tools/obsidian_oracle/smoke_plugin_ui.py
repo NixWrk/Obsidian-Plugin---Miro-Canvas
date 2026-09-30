@@ -328,37 +328,49 @@ def main() -> int:
                     throw Error('A picked card that shows a web page cannot scroll it');
                   card.remove();
                 }""")
-                # A bar turned vertical opens the pen's settings and the lines'
-                # settings beside it as one column, parallel to the bar: one control
-                # to a row, sizes, colours, then tools, level with the tool that opened
-                # it and wholly in view, scrolling inside itself when the room is short.
+                # A bar turned vertical holds one control to a row wherever a control
+                # sits - native Canvas's own buttons too, which the tablet's Obsidian
+                # offers more than one of in a slot - and opens the pen's settings and
+                # the lines' settings beside it as one column, parallel to the bar:
+                # one control to a row, sizes, colours, then tools, level with the tool
+                # that opened it and wholly in view, scrolling inside itself when the
+                # room is short.
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session;
                   const tools=b.root.querySelector('.miro-canvas-toolbar.miro-canvas-tools');
+                  const dock=b.root.querySelector('.miro-canvas-dock');
                   const original=s.settings;
                   // The page has no Obsidian theme, so the rules between sections have no colour to be drawn in yet.
                   document.documentElement.style.setProperty('--background-modifier-border','#888');
-                  const placeBar=(anchor,dy)=>{
-                    s.settings={...original,panelLayout:{...original.panelLayout,toolbar:{anchor,dx:0,dy,orientation:'vertical'}}};
+                  const placeBars=(anchor,dy,dockAnchor)=>{
+                    s.settings={...original,panelLayout:{...original.panelLayout,toolbar:{anchor,dx:0,dy,orientation:'vertical'},dockBar:{anchor:dockAnchor,dx:0,dy:0,orientation:'vertical'}}};
                     s.updatePanelPositions();
                   };
                   const inside=(inner,outer)=>inner.left>=outer.left-0.5&&inner.right<=outer.right+0.5&&inner.top>=outer.top-0.5&&inner.bottom<=outer.bottom+0.5;
                   const seen=(element)=>{const r=element.getBoundingClientRect();return r.width>0&&r.height>0;};
-                  const nameOf=(control)=>control.getAttribute('data-tool')||control.getAttribute('data-shape')||control.getAttribute('aria-label')||String(control.className);
+                  const nameOf=(control)=>control.getAttribute('data-tool')||control.getAttribute('data-shape')||control.getAttribute('data-native')||control.getAttribute('aria-label')||String(control.className);
                   // Every visible control under `scope`, top to bottom: none shares a row with the one above it.
                   const aloneInItsRow=(scope,selector,what)=>{
-                    const boxes=[...scope.querySelectorAll(selector)].filter((control)=>seen(control))
+                    const boxes=[...scope.querySelectorAll(selector)].filter((control)=>seen(control)&&!control.closest('.miro-canvas-toolbar__panel')&&!control.closest('.miro-canvas-dock__menu'))
                       .map((control)=>({name:nameOf(control),at:control.getBoundingClientRect()})).sort((a,c)=>a.at.top-c.at.top);
                     if(boxes.length<4)throw Error('Too few controls to check in '+what+': '+boxes.length);
                     for(let i=1;i<boxes.length;i++)
                       if(boxes[i].at.top<boxes[i-1].at.bottom-0.5)throw Error('Two controls share a row in '+what+': '+boxes[i-1].name+' and '+boxes[i].name);
                     return boxes;
                   };
+                  const barItems=(bar)=>bar.querySelector(':scope > .miro-canvas-toolbar__bar:not(.miro-canvas-tools__drawing):not(.miro-canvas-tools__connectors)');
                   const settingsOf=(button)=>[...tools.querySelectorAll(button)].find(seen);
-                  for(const [anchor,dy] of [['left-middle',0],['left-middle',380],['left-middle',-380],['right-middle',0],['right-middle',380]]){
-                    placeBar(anchor,dy);
+                  for(const [anchor,dy,dockAnchor] of [['left-middle',0,'right-middle'],['left-middle',380,'right-middle'],['left-middle',-380,'right-middle'],['right-middle',0,'left-middle'],['right-middle',380,'left-middle']]){
+                    placeBars(anchor,dy,dockAnchor);
                     if(tools.getAttribute('data-miro-canvas-panel-orientation')!=='vertical')throw Error('The bar did not turn vertical at '+anchor);
+                    if(dock.getAttribute('data-miro-canvas-panel-orientation')!=='vertical')throw Error('The dock did not turn vertical at '+dockAnchor);
                     const side=tools.getAttribute('data-miro-canvas-panel-side');
+                    aloneInItsRow(barItems(tools),'button,.canvas-card-menu-button','the bar at '+anchor);
+                    aloneInItsRow(dock.querySelector('.miro-canvas-dock__bar'),'button','the dock at '+dockAnchor);
+                    const native=[...barItems(tools).querySelectorAll('.miro-canvas-toolbar__native-slot .canvas-card-menu-button')].filter(seen);
+                    if(native.length<5)throw Error('Native Canvas buttons are not in the bar: '+native.length);
+                    const more=getComputedStyle(tools.querySelector('.miro-canvas-tools__more'));
+                    if(more.borderLeftWidth!=='0px'||more.borderTopWidth==='0px')throw Error('The rule before More does not lie across a vertical bar');
                     for(const [button,rowClass] of [['[data-tool-group="drawing"]','miro-canvas-tools__drawing'],['[data-tool="connector"]','miro-canvas-tools__connectors']]){
                       settingsOf(button).click();
                       const row=tools.querySelector('.'+rowClass);
@@ -383,7 +395,7 @@ def main() -> int:
                     }
                   }
                   // A short view: the column keeps every control its size and scrolls inside itself, wholly in view.
-                  placeBar('left-middle',0);
+                  placeBars('left-middle',0,'right-middle');
                   settingsOf('[data-tool="connector"]').click();
                   const row=tools.querySelector('.miro-canvas-tools__connectors');
                   const sizes=()=>[...row.querySelectorAll('button,input')].filter(seen).map((control)=>Math.round(control.getBoundingClientRect().height));
@@ -398,9 +410,22 @@ def main() -> int:
                   b.root.style.height=height;
                   s.updatePanelPositions();
                   if(row.style.getPropertyValue('--miro-canvas-side-row-max-height')!=='')throw Error('A column kept its maximum height after the room came back');
+                  // Every item a person can put on the bar, all of them on it, stands alone in its row.
+                  const full=b.mountFullBar();
+                  const items=aloneInItsRow(barItems(full.element),'button,.canvas-card-menu-button','the bar holding every item');
+                  if(items.length<18)throw Error('The bar holding every item shows only '+items.length+' controls');
+                  for(const item of ['select','lasso','text','sticky','shape','pen','connector','comment','frame','code','table','link']){
+                    const found=item==='pen'?full.itemsRow.querySelector('[data-tool-group="drawing"]'):full.itemsRow.querySelector('[data-tool="'+item+'"]');
+                    if(!found||!seen(found))throw Error('The item '+item+' is not on the bar holding every item');
+                  }
+                  for(const item of ['card','note','media'])
+                    if(![...full.itemsRow.querySelectorAll('[data-native="'+item+'"] .canvas-card-menu-button')].some(seen))throw Error('The native item '+item+' is not on the bar holding every item');
+                  full.dispose();
                   s.settings=original;s.updatePanelPositions();
                   const drawing=tools.querySelector('.miro-canvas-tools__drawing');
                   if(drawing.style.getPropertyValue('--miro-canvas-side-row-top')!==''||getComputedStyle(drawing).flexDirection!=='row')throw Error('A horizontal bar kept the place of a vertical one');
+                  const slot=getComputedStyle(tools.querySelector('.miro-canvas-toolbar__native-slot'));
+                  if(slot.flexDirection!=='row')throw Error('A horizontal bar stacks its native slots');
                   document.documentElement.style.removeProperty('--background-modifier-border');
                   b.root.querySelector('.miro-canvas-tools [data-tool="select"]').click();
                 }""")

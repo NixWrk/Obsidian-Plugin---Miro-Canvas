@@ -4228,6 +4228,8 @@
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar,
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-dock .miro-canvas-dock__bar {
   flex-direction: column;
+  /* One column, never two: a bar that is too tall runs on, it does not wrap. */
+  flex-wrap: nowrap;
 }
 
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar > .miro-canvas-toolbar__group,
@@ -4295,6 +4297,26 @@
   bottom: auto;
   right: calc(100% + 8px);
   left: auto;
+}
+
+/* A vertical bar holds one control to a row, wherever the control sits, and
+   the rule between two groups lies across it.  Its items are stacked by the
+   rule above; two things stood outside that.  A slot of native Canvas's own
+   buttons holds more than one where the app has more than card, note and
+   media (the tablet's Obsidian also offers a slide and a group), and the
+   slot is a row of its own.  And the "+" that opens More had its rule at its
+   left, a vertical line in a vertical bar. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar > .miro-canvas-toolbar__native-slot:not(.miro-canvas-tools__native) {
+  flex-direction: column;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__more {
+  margin-left: 0;
+  padding-left: 0;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-left: none;
+  border-top: 1px solid var(--miro-canvas-toolbar-border);
 }
 
 /* Beside a vertical bar the pen's settings and the lines' settings are one
