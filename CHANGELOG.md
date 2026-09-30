@@ -46,6 +46,10 @@
 - The pen's pressure sets the width around the pressure of ordinary writing:
   an everyday S Pen stroke keeps the width chosen and a harder one widens it;
   before, strokes came out about a third thinner than chosen.
+- Hold to draw a straight line: stop the pen (or the mouse, or a finger that
+  draws) for half a second at the end of a pen or highlighter stroke and the
+  whole stroke becomes a straight line from where it began, its end following
+  the pointer until it lifts. On by default; Settings → Drawing turns it off.
 - A labelled line no longer shows its label twice: native Canvas makes a
   line's own label only when it first draws the line - on opening an
   imported board, or once the line scrolls into view - and that label is

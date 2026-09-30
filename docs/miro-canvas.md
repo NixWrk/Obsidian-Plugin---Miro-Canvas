@@ -351,7 +351,9 @@ Compatibility modes:
 
 Freehand drawing shipped in 0.1.0: pen, highlighter, smart drawing (a rough
 shape becomes a clean one) and erasers, with stylus pressure (`src/drawing.ts`,
-`src/m1-session.ts`, `tests/drawing.test.ts`). A stroke is kept in its card's
+`src/stylus.ts`, `src/m1-session.ts`, `tests/drawing.test.ts`). A pen or
+highlighter line held still at its end for half a second becomes straight
+from its start, through the same path as Shift (2026-09-30). A stroke is kept in its card's
 `localOverrides` (`src/local-items.ts`); without the plugin that card shows
 empty. Left: a stroke visible without the plugin, export of a drawing to SVG or
 Excalidraw, and Miro's own freehand strokes once its export carries their
@@ -1153,7 +1155,11 @@ carries it the report is written as it is.
   on each device.
 - [ ] Exercise mouse, trackpad, pen tablet/stylus, touch-screen, and phone/tablet
   drawing and selection gestures, including palm rejection and window-focus
-  changes for rotated text rendering. Left: a check on each device.
+  changes for rotated text rendering. Android tablet with S Pen checked
+  2026-09-30 (`FUT-010`): pressure, hover, palms before, beside and after the
+  pen, a finger's pan, pinch, and the hold that straightens a line, replayed
+  over adb and CDP. Left: the other devices, and rotated text on focus
+  changes.
 - [x] Extract the plugin to its own repository only if the stable release boundary
   justifies it (done 2026-09-24: this repository, `FUT-002`).
 

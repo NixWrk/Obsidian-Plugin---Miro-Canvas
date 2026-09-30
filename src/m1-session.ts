@@ -224,6 +224,12 @@ function framePalette(): readonly PaletteColor[] {
 /** Miro's highlighter is a wider, see-through pen. */
 const HIGHLIGHTER_OPACITY = 0.4;
 const HIGHLIGHTER_SCALE = 3;
+/** A pen line held still this long at its end turns straight; see `startToolGesture`. */
+const HOLD_STRAIGHT_MS = 500;
+/** How far, in screen pixels, a held pen may tremble and still count as held. */
+const HOLD_STRAIGHT_STILL = 4;
+/** How long, in screen pixels, a line must already be for a hold to straighten it. */
+const HOLD_STRAIGHT_REACH = 24;
 
 /** Whether two views of the board show the same place at the same zoom. */
 function sameViewport(left: ViewportTransform, right: ViewportTransform): boolean {
@@ -4546,7 +4552,8 @@ export class M1CanvasSession {
 		const shown: string[] = [];
 		// With Shift held a pen draws straight: from the point the line had
 		// reached when Shift went down to the pointer.  Letting go carries on
-		// freehand from the end of the straight part.
+		// freehand from the end of the straight part.  A pen held still at the
+		// end of its line straightens it the same way, from its start.
 		let straightFrom: number | undefined;
 		const draw = (point: { readonly x: number; readonly y: number }, straight = false): void => {
 			if (drawingTool) {
@@ -4595,6 +4602,32 @@ export class M1CanvasSession {
 			ghost.style.height = `${Math.abs(point.y - start.y)}px`;
 		};
 		draw(start);
+		// Held still for half a second at the end of a pen or highlighter line,
+		// the whole line turns straight from its start and stays so, its far
+		// end following the pointer, until the pen lifts.  A stop close to the
+		// start is a pause, not a line.
+		const holdable = (tool === "pen" || tool === "highlighter") && this.settings.holdStraightLine;
+		let held = false;
+		let stoppedAt = start;
+		let latest = start;
+		let holdTimer: number | undefined;
+		const straightenHeld = (): void => {
+			holdTimer = undefined;
+			if (Math.hypot(stoppedAt.x - start.x, stoppedAt.y - start.y) < HOLD_STRAIGHT_REACH) return;
+			held = true;
+			straightFrom = 0;
+			draw(latest, true);
+		};
+		const watchHold = (point: { readonly x: number; readonly y: number }): void => {
+			latest = point;
+			if (!holdable || held) return;
+			// A pen held still still trembles: a move within a few pixels of
+			// where it stopped keeps the wait going.
+			if (holdTimer !== undefined && Math.hypot(point.x - stoppedAt.x, point.y - stoppedAt.y) <= HOLD_STRAIGHT_STILL) return;
+			stoppedAt = point;
+			if (holdTimer !== undefined) view?.clearTimeout(holdTimer);
+			holdTimer = view?.setTimeout(straightenHeld, HOLD_STRAIGHT_MS);
+		};
 		// The gesture is the pointer that began it: a palm landing beside a pen
 		// stroke, and taken back by Android, neither draws into the stroke nor
 		// ends it.
@@ -4605,7 +4638,9 @@ export class M1CanvasSession {
 			// A stylus reports how hard it is pressed; see `strokeWidthScale`.
 			const pressure = pressedPressure(point);
 			if (drawing && pressure !== undefined) this.penPressures.push(pressure);
-			draw({ x: point.clientX, y: point.clientY }, point.shiftKey === true);
+			const at = { x: point.clientX, y: point.clientY };
+			draw(at, point.shiftKey === true || held);
+			watchHold(at);
 		};
 		const up = (released: Event): void => {
 			if (!own(released)) return;
@@ -4624,6 +4659,9 @@ export class M1CanvasSession {
 			view?.removeEventListener("pointermove", move, true);
 			view?.removeEventListener("pointerup", up, true);
 			view?.removeEventListener("pointercancel", cancel, true);
+			// No wait for a hold outlives the stroke, nor the board.
+			if (holdTimer !== undefined) view?.clearTimeout(holdTimer);
+			holdTimer = undefined;
 			ghost.remove();
 			this.toolGesture = undefined;
 		};

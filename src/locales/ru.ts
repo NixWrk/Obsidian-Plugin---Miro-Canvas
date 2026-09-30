@@ -278,6 +278,9 @@ export const RU: Messages = {
 		snapDesc: "На каком расстоянии, в пикселях экрана, конец линии прилипает к одной из точек соединения карточки.",
 		labelPositionName: "Где появляется подпись линии",
 		labelPositionDesc: "Здесь появляется новая подпись на линии или стрелке; потом её можно перетащить.",
+		drawingHeading: "Рисование",
+		holdStraightName: "Задержка — прямая линия",
+		holdStraightDesc: "Задержите перо на полсекунды в конце штриха, и он станет прямой линией.",
 		keyboardHeading: "Клавиатура",
 		shortcutsName: "Горячие клавиши",
 		shortcutsDesc: (resetToolsCommandName: string) =>

@@ -4,7 +4,7 @@ import { M1CanvasSession } from "../src/m1-session";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
 import { DEFAULT_SETTINGS, type MiroCanvasSettings } from "../src/settings";
-import { StylusWatch } from "../src/stylus";
+import { StylusWatch, strokeWidthScale } from "../src/stylus";
 import type { M1ControlsActions } from "../src/m1-controls";
 
 // Only the presentation is replaced; the adapter, the viewport, the policy
@@ -234,7 +234,12 @@ function fixture(options: FixtureOptions = {}) {
 		canvas.setViewport(canvas.tx - 1, canvas.ty - 10, canvas.tZoom);
 	};
 	const selected = () => [...selection].map((node) => node.id);
-	return { window, canvas, root, board, nodes, history, session, hooks, pointer, runFrames, nativeTakesTouch, selected, screen };
+	/** The points the pen's preview shows now, as "x,y" pairs on the board's element. */
+	const preview = (): string[] => {
+		const ghost = root.children.find((child) => child.getAttribute("class")?.includes("miro-canvas-tool-ghost") === true);
+		return ghost?.children[0]?.getAttribute("points")?.split(" ") ?? [];
+	};
+	return { window, canvas, root, board, nodes, history, session, hooks, pointer, runFrames, nativeTakesTouch, selected, screen, preview };
 }
 
 describe("a palm Android takes back", () => {
@@ -449,5 +454,137 @@ describe("a pen and a hand on the same board", () => {
 		for (const hover of ["pointerover", "pointerenter", "mouseover", "mouseenter", "mousemove"]) {
 			expect(heard.has(hover)).toBe(false);
 		}
+	});
+});
+
+describe("a pen held still at the end of a stroke", () => {
+	/** The one drawing on the board and its stroke, as the board keeps it. */
+	const drawing = (canvas: { getData(): Data }) => {
+		const data = canvas.getData();
+		const overrides = Object.values(data.miroCanvas?.localOverrides ?? {}) as Data[];
+		const strokes = overrides.map((override) => override.item?.stroke).filter((stroke) => stroke !== undefined);
+		return { nodes: data.nodes.length, strokes };
+	};
+
+	/** A wavy stroke from (100, 300) that stops at (260, 300). */
+	const wavyStroke = (pointer: ReturnType<typeof fixture>["pointer"]): void => {
+		pointer("pointerdown", 8, "pen", { x: 100, y: 300 });
+		for (const [x, y] of [[140, 320], [180, 290], [220, 330], [260, 300]] as const) pointer("pointermove", 8, "pen", { x, y });
+	};
+
+	it("turns the stroke into one straight line from its start after half a second", () => {
+		vi.useFakeTimers();
+		const { canvas, history, hooks, pointer, preview } = fixture({ nodes: [] });
+		hooks.armTool("pen");
+		wavyStroke(pointer);
+		expect(preview()).toHaveLength(5);
+		vi.advanceTimersByTime(300);
+		// A pen held still trembles; a move within 4 px keeps the wait going.
+		pointer("pointermove", 8, "pen", { x: 262, y: 302 });
+		vi.advanceTimersByTime(150);
+		expect(preview()).toHaveLength(6);
+		vi.advanceTimersByTime(60);
+		// From the first point to where the pen stopped, made level: it was nearly so.
+		const [first, last] = preview().map((point) => point.split(",").map(Number));
+		expect(preview()).toHaveLength(2);
+		expect(first).toEqual([100, 300]);
+		expect(last![1]).toBe(300);
+		expect(last![0]).toBeCloseTo(100 + Math.hypot(162, 2), 3);
+		pointer("pointerup", 8, "pen", { x: 262, y: 302 });
+		// One drawing, straight, in one history step, as wide as any stroke drawn this hard.
+		expect(history).toHaveLength(1);
+		const { nodes, strokes } = drawing(canvas);
+		expect(nodes).toBe(1);
+		expect(strokes[0].points).toHaveLength(4);
+		expect(strokes[0].width).toBe(Math.round(5 * strokeWidthScale([0.17]) * 100) / 100);
+	});
+
+	it("moves the line's far end with the pen once straight, and never goes back to freehand", () => {
+		vi.useFakeTimers();
+		const { canvas, hooks, pointer, preview } = fixture({ nodes: [] });
+		hooks.armTool("highlighter");
+		wavyStroke(pointer);
+		vi.advanceTimersByTime(520);
+		expect(preview()).toHaveLength(2);
+		pointer("pointermove", 8, "pen", { x: 300, y: 410 });
+		expect(preview()).toEqual(["100,300", "300,410"]);
+		pointer("pointermove", 8, "pen", { x: 330, y: 380 });
+		expect(preview()).toEqual(["100,300", "330,380"]);
+		pointer("pointerup", 8, "pen", { x: 330, y: 380 });
+		expect(drawing(canvas).strokes[0].points).toHaveLength(4);
+	});
+
+	it("does nothing for a hold closer than 24 px to the start, and still straightens a later one", () => {
+		vi.useFakeTimers();
+		const { hooks, pointer, preview } = fixture({ nodes: [] });
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 300 });
+		pointer("pointermove", 8, "pen", { x: 108, y: 308 });
+		pointer("pointermove", 8, "pen", { x: 114, y: 300 });
+		vi.advanceTimersByTime(800);
+		expect(preview()).toHaveLength(3);
+		pointer("pointermove", 8, "pen", { x: 160, y: 330 });
+		pointer("pointermove", 8, "pen", { x: 220, y: 310 });
+		vi.advanceTimersByTime(520);
+		expect(preview()).toEqual(["100,300", "220,310"]);
+		pointer("pointerup", 8, "pen", { x: 220, y: 310 });
+	});
+
+	it("keeps drawing freehand while the pen keeps moving, however slowly", () => {
+		vi.useFakeTimers();
+		const { hooks, pointer, preview } = fixture({ nodes: [] });
+		hooks.armTool("pen");
+		wavyStroke(pointer);
+		for (let step = 1; step <= 10; step += 1) {
+			vi.advanceTimersByTime(100);
+			pointer("pointermove", 8, "pen", { x: 260 + step * 5, y: 300 + (step % 2) * 3 });
+		}
+		expect(preview().length).toBeGreaterThan(10);
+		pointer("pointerup", 8, "pen", { x: 310, y: 300 });
+	});
+
+	it("leaves the stroke as drawn when the setting is off", () => {
+		vi.useFakeTimers();
+		const { canvas, hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, holdStraightLine: false } });
+		hooks.armTool("pen");
+		wavyStroke(pointer);
+		vi.advanceTimersByTime(1_000);
+		expect(preview()).toHaveLength(5);
+		pointer("pointerup", 8, "pen", { x: 260, y: 300 });
+		expect(drawing(canvas).strokes[0].points.length).toBeGreaterThan(4);
+	});
+
+	it("leaves the smart pen, the erasers and the lasso alone", () => {
+		vi.useFakeTimers();
+		for (const tool of ["smart", "eraser", "erase-part", "lasso"]) {
+			const { hooks, pointer, preview } = fixture({ nodes: [] });
+			hooks.armTool(tool);
+			wavyStroke(pointer);
+			vi.advanceTimersByTime(1_000);
+			expect(preview()).toHaveLength(5);
+			pointer("pointercancel", 8, "pen");
+		}
+	});
+
+	it("leaves no wait running after the stroke, or after the board closes mid-stroke", () => {
+		vi.useFakeTimers();
+		const { window, hooks, pointer, session } = fixture({ nodes: [], toolBar: true });
+		const wait = vi.spyOn(window, "setTimeout");
+		const stop = vi.spyOn(window, "clearTimeout");
+		/** The waits for a hold started so far: every wait of half a second. */
+		const holds = () => wait.mock.calls.flatMap((call, index) => (call[1] === 500 ? [wait.mock.results[index]!.value] : []));
+		hooks.armTool("pen");
+		// Each move away from where the pen stopped starts the wait again.
+		wavyStroke(pointer);
+		const stroke = holds();
+		expect(stroke.length).toBeGreaterThan(0);
+		pointer("pointerup", 8, "pen", { x: 260, y: 300 });
+		for (const handle of stroke) expect(stop).toHaveBeenCalledWith(handle);
+		wavyStroke(pointer);
+		const unfinished = holds().slice(stroke.length);
+		expect(unfinished.length).toBeGreaterThan(0);
+		session.dispose();
+		for (const handle of unfinished) expect(stop).toHaveBeenCalledWith(handle);
+		expect(hooks.toolGesture).toBeUndefined();
 	});
 });

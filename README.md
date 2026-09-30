@@ -168,11 +168,14 @@ ends, its kind, thickness, arrowhead size and colour, and its label.
 
 - **Pen, highlighter, smart drawing** - a stroke is its own item on the board.
   Smart drawing turns a rough shape into a clean one, or a rough line into an
-  arrow. Hold **Shift** for straight strokes.
+  arrow. Hold **Shift** for straight strokes, or stop the pen for half a
+  second at the end of a stroke: the whole stroke becomes a straight line from
+  where it began, and its end follows the pen until you lift it. The setting
+  "Hold to draw a straight line" turns this off.
 - **Erasers** - a whole stroke, or the part under the pointer.
 - **With a stylus** the pen's pressure sets the line's width and a hand
   resting on the screen is ignored; while a drawing tool is on, a finger pans
-  the board.
+  the board (see [Phones and tablets](#phones-and-tablets)).
 - **Lines and arrows** - straight, elbow, curved, block arrows, polylines and
   splines. A line whose ends are both on cards is an ordinary Canvas edge; a
   line with an end anywhere else - on the empty board, or on another line - is
@@ -465,8 +468,18 @@ checked yet.
   To move a card, hold it for a moment, then drag; a long press on empty
   board draws a selection box, and a long press on a card opens its menu.
 - **Handles** keep their small look but take a finger from about 40px around.
-- **A stylus** draws while a finger pans (see
-  [Drawing, lines and arrows](#drawing-lines-and-arrows)).
+- **A stylus.** An S Pen comes to the board as a pen, with its pressure and
+  tilt, and the board notices it as soon as it hovers above the screen,
+  whatever tool is on. While the pen is near - hovering, drawing, or lifted a
+  moment ago - a palm resting on the screen draws nothing, moves nothing and
+  leaves the selection as it was, and a palm the tablet rejects leaves no
+  trace even when it lands before the pen. While a drawing tool is on, a
+  finger pans the board instead of drawing. The pressure sets the line's
+  width around the pressure of ordinary writing: an everyday stroke keeps the
+  width you chose, pressing harder widens it and a light touch narrows it a
+  little. Stop the pen for half a second at the end of a stroke to turn it
+  into a straight line. The pen's side button never reaches Obsidian, so it
+  does nothing on the board.
 - **Other plugins.** With Canvas Minimap on, its see-through map covers the
   lower part of the board; a tap on this plugin's bars no longer moves the
   board through it. With Advanced Canvas's portals on, a card whose id has a
@@ -747,8 +760,9 @@ push after every commit, no tags."
   empty board; bending a line; a label with its own font.
 - [ ] `drawing` - pen, highlighter, smart drawing turning a rough shape into a
   clean one, both erasers, Shift for a straight stroke.
-- [ ] `stylus` - pressure and a resting hand (a tablet or touch screen; when
-  none is at hand, write it down as not recorded).
+- [ ] `stylus` - pressure, a resting hand, and a stroke held still at its end
+  turning straight (a tablet or touch screen; when none is at hand, write it
+  down as not recorded).
 - [ ] `layers` - to front, forward, backward, to back from More and from the
   right-click menu; a moved card keeps its layer.
 - [ ] `comments` - C; a pin on a card, a picture, a line and the board; a
@@ -798,6 +812,7 @@ push after every commit, no tags."
 - [ ] `setting-snap-distance` - Connectors → Key point snap distance.
 - [ ] `setting-label-position` - Connectors → Default connector label
   position.
+- [ ] `setting-hold-straight` - Drawing → Hold to draw a straight line.
 - [ ] `setting-hotkeys` - Keyboard → Open hotkeys; giving a Miro Canvas
   command a hotkey and using it.
 - [ ] `setting-minimap-default` - Interface → Show the minimap by default.

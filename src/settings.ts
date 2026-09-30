@@ -60,6 +60,11 @@ export interface MiroCanvasSettings {
    * Obsidian's own search of that card.
    */
   readonly boardFindKey: boolean;
+  /**
+   * A pen or highlighter line held still for half a second at its end turns
+   * into a straight line from where it began.
+   */
+  readonly holdStraightLine: boolean;
   readonly lassoBinding: PointerBinding;
   readonly panBinding: PointerBinding;
   readonly lineBinding: PointerBinding;
@@ -147,6 +152,7 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   minimapVisible: true,
   selectionToolbarEnabled: true,
   boardFindKey: true,
+  holdStraightLine: true,
   lassoBinding: "alt+left",
   panBinding: "none",
   lineBinding: "right",
@@ -369,6 +375,7 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     minimapVisible: readBoolean(value, "minimapVisible", DEFAULT_SETTINGS.minimapVisible),
     selectionToolbarEnabled: readBoolean(value, "selectionToolbarEnabled", DEFAULT_SETTINGS.selectionToolbarEnabled),
     boardFindKey: readBoolean(value, "boardFindKey", DEFAULT_SETTINGS.boardFindKey),
+    holdStraightLine: readBoolean(value, "holdStraightLine", DEFAULT_SETTINGS.holdStraightLine),
     lassoBinding: POINTER_BINDINGS.includes(value.lassoBinding as PointerBinding) ? value.lassoBinding as PointerBinding : DEFAULT_SETTINGS.lassoBinding,
     panBinding: POINTER_BINDINGS.includes(value.panBinding as PointerBinding) ? value.panBinding as PointerBinding : DEFAULT_SETTINGS.panBinding,
     lineBinding: POINTER_BINDINGS.includes(value.lineBinding as PointerBinding) ? value.lineBinding as PointerBinding : DEFAULT_SETTINGS.lineBinding,

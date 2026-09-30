@@ -147,6 +147,15 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     this.slider(containerEl, labels.labelPositionName, labels.labelPositionDesc,
       "connectorLabelPosition", (value) => `${Math.round(value * 100)}%`);
 
+    new Setting(containerEl).setName(labels.drawingHeading).setHeading();
+
+    new Setting(containerEl)
+      .setName(labels.holdStraightName)
+      .setDesc(labels.holdStraightDesc)
+      .addToggle((toggle) => toggle
+        .setValue(this.host.settings.holdStraightLine)
+        .onChange((value) => void this.host.saveSettings({ holdStraightLine: value })));
+
     new Setting(containerEl).setName(labels.keyboardHeading).setHeading();
 
     new Setting(containerEl)

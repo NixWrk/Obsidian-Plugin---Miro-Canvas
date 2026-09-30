@@ -1691,8 +1691,12 @@ macOS и Linux (`FUT-013`). Этап 6 (экосистема) теперь ид�
   minimap, comment cards, selection handles и чёткость текста повёрнутых nodes
   при focus/blur окна. Осталось: проверка на устройстве.
 - [ ] `TEST-028` На tablet/stylus/touch проверить pressure, palm rejection,
-  lasso, pan, straight-line Shift equivalent и отмену pointer gesture. Осталось:
-  проверка на устройстве.
+  lasso, pan, straight-line Shift equivalent и отмену pointer gesture.
+  Проверено 2026-09-30 на планшете с S Pen (`FUT-010`): нажатие, наведение,
+  ладонь до, во время и после штриха, отмена жеста Android, сдвиг пальцем,
+  щипок и задержка, выпрямляющая линию (решение владельца 2026-09-30), через
+  adb и CDP. Осталось: проба задержки с настоящим пером, lasso пером, другие
+  устройства.
 
 ## Порядок реализации
 

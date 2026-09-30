@@ -282,6 +282,9 @@ export const EN = {
 		snapDesc: "How close a connector end has to come to a node's standard connection point, in screen pixels, to snap onto it.",
 		labelPositionName: "Default connector label position",
 		labelPositionDesc: "New labels start here along a line or arrow. Drag an individual label to reposition it.",
+		drawingHeading: "Drawing",
+		holdStraightName: "Hold to draw a straight line",
+		holdStraightDesc: "Stop the pen for half a second at the end of a stroke to turn it into a straight line.",
 		keyboardHeading: "Keyboard",
 		shortcutsName: "Keyboard shortcuts",
 		shortcutsDesc: (resetToolsCommandName: string) =>

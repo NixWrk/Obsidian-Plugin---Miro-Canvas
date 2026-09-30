@@ -79,6 +79,13 @@ describe("plugin settings", () => {
     expect(normalizeSettings({ boardFindKey: "no" }).boardFindKey).toBe(true);
   });
 
+  it("straightens a pen line held still at its end unless that was turned off", () => {
+    expect(DEFAULT_SETTINGS.holdStraightLine).toBe(true);
+    expect(normalizeSettings({}).holdStraightLine).toBe(true);
+    expect(normalizeSettings({ holdStraightLine: false }).holdStraightLine).toBe(false);
+    expect(normalizeSettings({ holdStraightLine: "off" }).holdStraightLine).toBe(true);
+  });
+
   it("keeps stored values and drops unknown keys", () => {
     const stored = normalizeSettings({
       zoomStep: 1.5, panStep: 128, wheelZoomModifier: "shift",
