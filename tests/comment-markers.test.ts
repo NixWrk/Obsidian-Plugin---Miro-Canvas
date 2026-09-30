@@ -13,12 +13,24 @@ class Element {
   public parent?: Element;
   public attributes = new Map<string, string>();
   public listeners = new Map<string, Set<(event: Event) => void>>();
-  public style: Record<string, string> = {};
+  /** Custom properties the pin was given, such as its colour. */
+  public readonly properties = new Map<string, string>();
+  public style: Record<string, unknown> = {
+    setProperty: (name: string, value: string) => { this.properties.set(name, value); },
+  };
   public type = "";
   public className = "";
   public title = "";
-  public textContent = "";
+  public hidden = false;
+  /** How often the text was written, to see that a refresh leaves it be. */
+  public textWrites = 0;
+  private text = "";
   public constructor(public readonly tagName: string) {}
+  public get textContent(): string { return this.text; }
+  public set textContent(value: string) {
+    this.text = value;
+    this.textWrites += 1;
+  }
   public setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   public appendChild(child: Element): Element { child.parent = this; this.children.push(child); return child; }
   public addEventListener(name: string, listener: (event: Event) => void): void {
@@ -58,6 +70,7 @@ class WindowTarget {
 const windowTarget = new WindowTarget();
 const dom = {
   createElement: (tag: string) => new Element(tag),
+  createElementNS: (_namespace: string, tag: string) => new Element(tag),
   defaultView: windowTarget,
 } as unknown as Document;
 
@@ -145,9 +158,23 @@ describe("comment marker DOM renderer", () => {
     expect(local.type).toBe("button");
     expect(local.attributes.get("aria-label")).toContain("Open comment by Alice");
     expect(local.attributes.get("aria-label")).toContain("<img src=x onerror=alert(1)>");
-    expect(local.children).toHaveLength(0);
-    // The pin shows who opened the thread, and counts its messages.
-    expect(local.textContent).toBe("A");
+    // The pin is a speech bubble with who opened the thread in its round part
+    // - or, once resolved, a tick - and counts the thread's messages.
+    expect(local.children).toHaveLength(3);
+    const [shape, initial, tick] = local.children;
+    expect(shape.tagName).toBe("svg");
+    expect(shape.attributes.get("class")).toBe("miro-canvas-comment-marker__shape");
+    expect(shape.attributes.get("aria-hidden")).toBe("true");
+    expect(shape.attributes.get("viewBox")).toBe("2 2 20 20");
+    // The emblem the comment tool wears in the bars: Lucide's message-circle.
+    expect(shape.children.map((child) => [child.tagName, child.attributes.get("d")]))
+      .toEqual([["path", "M7.9 20A9 9 0 1 0 4 16.1L2 22Z"]]);
+    expect([initial.textContent, initial.hidden, tick.hidden]).toEqual(["A", false, true]);
+    expect(local.textContent).toBe("");
+    const [resolvedShape, resolvedInitial, resolvedTick] = imported.children;
+    expect(resolvedShape.tagName).toBe("svg");
+    expect([resolvedInitial.hidden, resolvedTick.hidden]).toEqual([true, false]);
+    expect(resolvedTick.children[0].children[0].attributes.get("d")).toBe("M20 6 9 17l-5-5");
     expect(local.attributes.get("data-comment-count")).toBe(String(thread.replies.length + 1));
     expect(local.style.left).toBe("10px");
     expect(local.style.top).toBe("20px");
@@ -181,7 +208,7 @@ describe("comment marker DOM renderer", () => {
     expect(button.attributes.get("data-comment-selected")).toBe("false");
     expect(button.style.left).toBe("75px");
     expect(button.style.top).toBe("75px");
-    expect(button.textContent).toBe("✓");
+    expect(button.children.map((child) => child.hidden)).toEqual([false, true, false]);
     expect(button.attributes.get("aria-label")).toContain("Resolved");
     renderer.update({ ...state, geometry: {} });
     expect(root.children).toHaveLength(0);
@@ -194,6 +221,47 @@ describe("comment marker DOM renderer", () => {
     renderer.update(state);
     expect(onOpenThread).not.toHaveBeenCalled();
     expect(root.children).toHaveLength(1);
+  });
+
+  it("swaps the letter for a tick once resolved and keeps the author's colour and its own elements", () => {
+    const renderer = new CommentMarkers({ onOpenThread: vi.fn() }, { document: dom, ...display });
+    const root = renderer.element as unknown as Element;
+    const colored: CommentThread = { ...thread, color: "#3f66aa" };
+    const state = (value: CommentThread): CommentMarkersState => ({ threads: [value], geometry: {}, boardPoint: { x: 10, y: 20 } });
+    renderer.update(state(colored));
+    const button = root.children[0];
+    const parts = [...button.children];
+    const [, initial, tick] = parts;
+    expect(button.properties.get("--miro-avatar")).toBe("#3f66aa");
+    expect([initial.textContent, initial.hidden, tick.hidden]).toEqual(["A", false, true]);
+    for (let refresh = 0; refresh < 3; refresh += 1) renderer.update(state(colored));
+    // A refresh that changes nothing writes nothing: the letter is set once.
+    expect(initial.textWrites).toBe(1);
+
+    renderer.update(state({ ...colored, resolved: true }));
+    expect(root.children[0]).toBe(button);
+    expect(button.children.every((child, index) => child === parts[index])).toBe(true);
+    expect(button.attributes.get("data-comment-state")).toBe("resolved");
+    // Resolved, the pin keeps its colour and only its content changes.
+    expect(button.properties.get("--miro-avatar")).toBe("#3f66aa");
+    expect([initial.hidden, tick.hidden]).toEqual([true, false]);
+    expect(initial.textContent).toBe("A");
+
+    renderer.update(state(colored));
+    expect(button.attributes.get("data-comment-state")).toBe("open");
+    expect([initial.hidden, tick.hidden]).toEqual([false, true]);
+    expect(button.properties.get("--miro-avatar")).toBe("#3f66aa");
+    expect(initial.textWrites).toBe(1);
+
+    // A colour made up from the author's name is as unchanged by resolving.
+    renderer.update(state(thread));
+    const madeUp = button.properties.get("--miro-avatar");
+    renderer.update(state({ ...thread, resolved: true }));
+    expect(button.properties.get("--miro-avatar")).toBe(madeUp);
+    // The letter follows the author when it changes.
+    renderer.update(state({ ...thread, author: { name: "Bob" } }));
+    expect(initial.textContent).toBe("B");
+    expect(initial.textWrites).toBe(2);
   });
 
   it("moves a pin on release and restores it when the pointer is cancelled", () => {

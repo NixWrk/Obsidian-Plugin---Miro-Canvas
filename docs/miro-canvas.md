@@ -1358,11 +1358,18 @@ color changes, resolving, and deletion for that thread in both the card and
 comments panel. Unlocking restores those controls; it does not prevent adding
 separate comments elsewhere on the board.
 
-The card's header resolves with an icon button carrying a tick, with no
-caption: `aria-pressed` shows whether the thread is resolved and its tooltip
-says what a press will do ("Mark as resolved" or "Reopen"). A "?" beside it
-explains resolving, as its tooltip on a desktop and, because a touch screen
-has no hover, as a note a press shows under the header.
+A pin is the speech bubble the comment tool wears in the bars (Lucide's
+message-circle), filled with its thread's colour and outlined in the board's
+own colour. Its tail is the comment's point, so the pin's bottom-left corner
+sits on it, and the author's letter is centred in the round part. A resolved
+thread keeps its colour and shows a tick (Lucide's check) in place of the
+letter. The bubble is an inline SVG made once with the button; a refresh only
+changes which of the letter and the tick shows. The card's header resolves
+with an icon button carrying that tick, with no caption: `aria-pressed` shows
+whether the thread is resolved and its tooltip says what a press will do
+("Mark as resolved" or "Reopen"). A "?" beside it explains resolving, as its
+tooltip on a desktop and, because a touch screen has no hover, as a note a
+press shows under the header.
 The default name still comes from the plugin setting; imported author changes
 are local display aliases, not edits to Miro metadata. Connectors can anchor to
 comment markers and resolve their endpoints as comments move. A connector's

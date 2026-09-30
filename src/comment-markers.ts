@@ -111,12 +111,26 @@ export interface CommentMarkersHost {
 /** How far a pin must be pulled before a press becomes a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
 
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+/**
+ * The speech bubble the comment tool wears in the bars (Lucide's
+ * message-circle). Its tail is the bottom-left corner of the view box, so the
+ * pin's point, which the button's bottom-left corner sits on, is the tail's tip.
+ */
+const BUBBLE_PATH = "M7.9 20A9 9 0 1 0 4 16.1L2 22Z";
+const BUBBLE_VIEW_BOX = "2 2 20 20";
+/** Lucide's check, shown in the bubble's round part once the thread is resolved. */
+const TICK_PATH = "M20 6 9 17l-5-5";
+
 export interface CommentMarkersOptions extends CommentDisplayOptions {
   readonly document?: Document;
 }
 
 interface MarkerElement {
   readonly button: HTMLButtonElement;
+  /** The author's letter and the tick, both made with the pin; one of them shows. */
+  readonly initial: HTMLElement;
+  readonly tick: HTMLElement;
   readonly dispose: () => void;
 }
 
@@ -177,8 +191,12 @@ export class CommentMarkers {
         button.className = "miro-canvas-comment-marker";
         Object.assign(button.style, {
           position: "absolute", pointerEvents: "auto", transform: "translate(-50%, -50%)",
-          minWidth: "32px", minHeight: "32px", borderRadius: "50%",
+          minWidth: "32px", minHeight: "32px",
         });
+        const pin = this.createPin();
+        button.appendChild(pin.shape);
+        button.appendChild(pin.initial);
+        button.appendChild(pin.tick);
         const stop = (event: Event) => event.stopPropagation();
         let dragged = false;
         let cancelDrag: (() => void) | undefined;
@@ -281,7 +299,7 @@ export class CommentMarkers {
         for (const name of isolatedEvents) button.addEventListener(name, stop);
         button.addEventListener("pointerdown", press);
         button.addEventListener("click", open);
-        entry = { button, dispose: () => {
+        entry = { button, initial: pin.initial, tick: pin.tick, dispose: () => {
           cancelDrag?.();
           for (const name of isolatedEvents) button.removeEventListener(name, stop);
           button.removeEventListener("pointerdown", press);
@@ -303,8 +321,13 @@ export class CommentMarkers {
       button.setAttribute("data-comment-has-replies", marker.replyCount > 0 ? "true" : "false");
       button.setAttribute("aria-label", marker.label);
       button.setAttribute("data-tooltip-delay", TOOLTIP_DELAY);
-      // A pin shows who started the thread; a badge counts its messages.
-      button.textContent = marker.state === "resolved" ? "✓" : marker.initial;
+      // A pin shows who started the thread, or a tick once it is resolved, in
+      // the author's own colour; a badge counts its messages. A refresh only
+      // changes what differs, so the pin's elements are never made anew.
+      const resolved = marker.state === "resolved";
+      if (entry.initial.textContent !== marker.initial) entry.initial.textContent = marker.initial;
+      if (entry.initial.hidden !== resolved) entry.initial.hidden = resolved;
+      if (entry.tick.hidden === resolved) entry.tick.hidden = !resolved;
       button.style.setProperty?.("--miro-avatar", this.previewColors.get(marker.key) ?? marker.color);
       button.setAttribute("data-comment-count", String(marker.replyCount + 1));
       button.style.left = `${marker.point.x}px`;
@@ -315,6 +338,35 @@ export class CommentMarkers {
 
   private markerOf(button: HTMLButtonElement): CommentMarker | undefined {
     return this.current.get(button);
+  }
+
+  /**
+   * What a pin holds: the speech bubble, filled with the author's colour by
+   * styles.css, and the two things that can sit in its round part.
+   */
+  private createPin(): { readonly shape: Element; readonly initial: HTMLElement; readonly tick: HTMLElement } {
+    const shape = this.svgElement("svg", { class: "miro-canvas-comment-marker__shape", viewBox: BUBBLE_VIEW_BOX });
+    shape.appendChild(this.svgElement("path", { d: BUBBLE_PATH }));
+    const initial = this.document.createElement("span");
+    initial.className = "miro-canvas-comment-marker__initial";
+    const tick = this.document.createElement("span");
+    tick.className = "miro-canvas-comment-marker__tick";
+    tick.hidden = true;
+    const tickShape = this.svgElement("svg", { viewBox: "0 0 24 24" });
+    tickShape.appendChild(this.svgElement("path", { d: TICK_PATH }));
+    tick.appendChild(tickShape);
+    return { shape, initial, tick };
+  }
+
+  /** A picture made of shapes says nothing to a screen reader; the pin's label does. */
+  private svgElement(tag: string, attributes: Readonly<Record<string, string>>): Element {
+    const element = this.document.createElementNS(SVG_NAMESPACE, tag);
+    if (tag === "svg") {
+      element.setAttribute("aria-hidden", "true");
+      element.setAttribute("focusable", "false");
+    }
+    for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+    return element;
   }
 
   public destroy(): void {

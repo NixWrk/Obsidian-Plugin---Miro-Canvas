@@ -201,11 +201,14 @@ layers. As in Miro, moving or selecting a card does not bring it to the top.
 ## Comments
 
 Pin a comment anywhere: on a card, on a point of a picture, along a line, or on
-the empty board. Threads have replies, authors with their own colours,
-resolving and locking. The tick in a thread's header resolves it, and pressing
-it again reopens it; the "?" beside it says what resolving does. Comments
-imported from Miro stay read-only and can be hidden. A panel lists every
-comment on the board or in the selection.
+the empty board. A pin is a speech bubble, the one the comment tool wears in
+the bar, in its author's colour with the author's letter in it; its tail points
+at the spot. Threads have replies, authors with their own colours, resolving
+and locking. The tick in a thread's header resolves it, and pressing it again
+reopens it; the "?" beside it says what resolving does. A resolved thread
+stays on the board, and its pin keeps its colour and shows a tick instead of
+the letter. Comments imported from Miro stay read-only and can be hidden. A
+panel lists every comment on the board or in the selection.
 
 ## Locking and review mode
 

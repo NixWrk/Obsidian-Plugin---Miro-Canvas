@@ -6,6 +6,11 @@
   "?" beside it that explains resolving in a tooltip and, on a touch
   screen, under the header on a press. The long caption had squeezed the
   header's icons in Russian.
+- Comments: a pin is now the speech bubble of the comment tool, with its
+  tail on the comment's point, instead of a circle. A resolved pin keeps
+  its author's colour and shows a tick in place of the letter, instead of
+  turning grey. The lock mark moved to the pin's top-left so the tail and
+  the open thread do not cover it.
 - Search on the board: Ctrl+F (Cmd+F on macOS) on the board, the magnifier
   in the corner dock or the command "Search on the board" opens a bar at the
   top right that finds words in cards, sticky notes, shapes, tables, frame

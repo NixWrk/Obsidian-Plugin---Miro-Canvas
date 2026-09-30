@@ -712,17 +712,52 @@ def main() -> int:
                 assert help_note.is_visible() and help_button.get_attribute('aria-expanded') == 'true'
                 help_button.click()
                 assert help_note.is_hidden()
-                # Resolving is one history step, and the tick shows the state.
+                # A pin is the comment tool's speech bubble with its tip on the comment's
+                # point, filled with the author's colour.
+                pin_look = """() => {
+                  const b=miroBrowser,pin=b.root.querySelector('.miro-canvas-comment-marker[data-comment-id="'+b.pinId+'"]');
+                  const path=pin.querySelector('.miro-canvas-comment-marker__shape path');
+                  const tick=pin.querySelector('.miro-canvas-comment-marker__tick'),initial=pin.querySelector('.miro-canvas-comment-marker__initial');
+                  const probe=document.createElement('i');probe.style.color=pin.style.getPropertyValue('--miro-avatar');
+                  document.body.appendChild(probe);const expected=getComputedStyle(probe).color;probe.remove();
+                  const overlay=pin.parentElement.getBoundingClientRect(),box=pin.getBoundingClientRect();
+                  return {state:pin.getAttribute('data-comment-state'),avatar:pin.style.getPropertyValue('--miro-avatar'),
+                    fill:getComputedStyle(path).fill,expected,d:path.getAttribute('d'),
+                    background:getComputedStyle(pin).backgroundColor,ink:getComputedStyle(pin).color,
+                    tick:getComputedStyle(tick).display,initial:getComputedStyle(initial).display,letter:initial.textContent,
+                    tipOffX:box.left-overlay.left-parseFloat(pin.style.left),tipOffY:box.bottom-overlay.top-parseFloat(pin.style.top),
+                    size:[box.width,box.height],children:pin.children.length};
+                }"""
+                open_pin = page.evaluate(pin_look)
+                assert open_pin['state'] == 'open' and open_pin['d'] == 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z', open_pin
+                assert open_pin['fill'] == open_pin['expected'], f'Pin is not filled with its author colour: {open_pin}'
+                assert open_pin['tick'] == 'none' and open_pin['initial'] != 'none' and open_pin['letter'], open_pin
+                assert abs(open_pin['tipOffX']) <= 0.5 and abs(open_pin['tipOffY']) <= 0.5, f'Bubble tip is off the comment point: {open_pin}'
+                assert open_pin['size'] == [32, 32], open_pin
+                # The button itself is bare; the bubble inside it carries the colour.
+                assert open_pin['background'] == 'rgba(0, 0, 0, 0)', open_pin
+                # Resolving is one history step; the pin keeps its colour and shows a tick
+                # where the author's letter was; the tick button shows the state.
                 saves = page.evaluate('miroBrowser.getSaves()')
                 tick_button = card.get_by_role('button', name='Mark as resolved', exact=True)
                 assert tick_button.get_attribute('aria-pressed') == 'false'
                 tick_button.click()
                 assert page.evaluate('miroBrowser.getSaves()') == saves + 1, 'Resolving was not one history step'
-                assert card.get_by_role('button', name='Reopen', exact=True).get_attribute('aria-pressed') == 'true'
+                resolved_pin = page.evaluate(pin_look)
+                assert resolved_pin['state'] == 'resolved', resolved_pin
+                assert resolved_pin['avatar'] == open_pin['avatar'] and resolved_pin['fill'] == open_pin['fill'], f'Resolved pin changed colour: {resolved_pin}'
+                assert resolved_pin['background'] == open_pin['background'] and resolved_pin['ink'] == open_pin['ink'], f'Resolved pin went grey: {resolved_pin}'
+                assert resolved_pin['tick'] != 'none' and resolved_pin['initial'] == 'none', f'Resolved pin does not show a tick: {resolved_pin}'
+                assert resolved_pin['children'] == open_pin['children'], 'Resolving re-made the pin'
+                reopen_button = card.get_by_role('button', name='Reopen', exact=True)
+                assert reopen_button.get_attribute('aria-pressed') == 'true'
                 page.evaluate('() => {miroBrowser.runtime.undo();miroBrowser.session.refresh();}')
-                assert card.get_by_role('button', name='Mark as resolved', exact=True).get_attribute('aria-pressed') == 'false', 'One undo did not reopen the resolved thread'
+                assert page.evaluate(pin_look)['state'] == 'open', 'One undo did not reopen the resolved thread'
+                assert card.get_by_role('button', name='Mark as resolved', exact=True).get_attribute('aria-pressed') == 'false'
                 page.evaluate('() => {miroBrowser.runtime.redo();miroBrowser.session.refresh();}')
+                assert page.evaluate(pin_look)['state'] == 'resolved', 'Redo did not resolve the thread again'
                 card.get_by_role('button', name='Reopen', exact=True).click()
+                assert page.evaluate(pin_look)['state'] == 'open'
                 assert card.get_by_role('button', name='Mark as resolved', exact=True).get_attribute('aria-pressed') == 'false'
                 card.get_by_label('Reply', exact=True).fill('Temporary reply')
                 card.get_by_role('button', name='Send reply', exact=True).click()

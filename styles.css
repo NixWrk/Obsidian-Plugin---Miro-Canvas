@@ -3100,9 +3100,14 @@
   pointer-events: none;
 }
 
-/* A comment is Miro's pin: its author's initial in a round badge with one
-   square corner pointing at the spot, and a count once it has replies.
-   Doubled selectors keep Obsidian's own button look away. */
+/* A comment is the speech bubble the comment tool wears in the bars: filled
+   with its author's colour, outlined in the board's own, with the author's
+   initial - or a tick once the thread is resolved - in its round part and a
+   count once it has replies. The bubble's tail is the pin's point: the
+   button's bottom-left corner sits on the spot the comment is about. The
+   button itself is bare, and its rounded corners leave the tail's corner
+   square, so a press lands on the bubble and its tail only. Doubled
+   selectors keep Obsidian's own button look away. */
 .miro-canvas-comment-markers .miro-canvas-comment-marker {
   display: grid;
   place-items: center;
@@ -3115,28 +3120,90 @@
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
-  background: var(--miro-avatar, var(--interactive-accent));
-  border: 2px solid var(--background-primary);
-  border-radius: 50% 50% 50% 4px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  background: transparent;
+  border: 0;
+  border-radius: 50% 50% 50% 0;
+  box-shadow: none;
   transform: translate(0, -100%) !important;
   cursor: pointer;
   pointer-events: auto;
 }
 
-.miro-canvas-comment-markers .miro-canvas-comment-marker:hover {
-  box-shadow: 0 0 0 2px var(--interactive-accent), 0 2px 8px rgb(0 0 0 / 25%);
+.miro-canvas-comment-markers .miro-canvas-comment-marker:hover,
+.miro-canvas-comment-markers .miro-canvas-comment-marker:active,
+.miro-canvas-comment-markers .miro-canvas-comment-marker:focus-visible {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
 }
 
-.miro-canvas-comment-markers .miro-canvas-comment-marker[data-comment-state="resolved"] {
-  color: var(--text-muted);
-  background: var(--background-secondary);
-  border-color: var(--background-modifier-border);
+/* The bubble, filling its button; its tip lies on the button's bottom-left
+   corner. The outline is painted under the fill, so only its outer half
+   shows, in the board's colour to set the bubble off any board. */
+.miro-canvas-comment-marker__shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 30%));
 }
 
+.miro-canvas-comment-marker__shape path {
+  fill: var(--miro-avatar, var(--interactive-accent));
+  stroke: var(--background-primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+/* Hovered, focused or selected, the bubble's outline takes the accent. */
+.miro-canvas-comment-markers .miro-canvas-comment-marker:hover .miro-canvas-comment-marker__shape path,
+.miro-canvas-comment-markers .miro-canvas-comment-marker:focus-visible .miro-canvas-comment-marker__shape path,
+.miro-canvas-comment-marker[data-comment-selected="true"] .miro-canvas-comment-marker__shape path {
+  stroke: var(--interactive-accent);
+}
+
+.miro-canvas-comment-marker[data-comment-selected="true"] .miro-canvas-comment-marker__shape path {
+  stroke-width: 3.5;
+}
+
+/* The author's letter and the tick sit in the round part, over the bubble.
+   Which one shows follows the thread: a tick once it is resolved. */
+.miro-canvas-comment-marker__initial,
+.miro-canvas-comment-marker__tick {
+  position: relative;
+  pointer-events: none;
+}
+
+.miro-canvas-comment-marker__tick {
+  display: grid;
+  width: 16px;
+  height: 16px;
+}
+
+.miro-canvas-comment-marker__tick svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.miro-canvas-comment-marker__initial[hidden],
+.miro-canvas-comment-marker__tick[hidden] {
+  display: none;
+}
+
+/* The lock hangs off the round part's top-left, clear of the tail and of the
+   thread card that opens to the pin's right. */
 .miro-canvas-comment-marker[data-comment-locked="true"]::before {
   position: absolute;
-  bottom: -6px;
+  z-index: 1;
+  top: -6px;
   left: -6px;
   display: grid;
   place-items: center;
@@ -3252,11 +3319,6 @@
 }
 .miro-canvas-mixed-selection-frame__left { left: -5px; }
 .miro-canvas-mixed-selection-frame__right { right: -5px; }
-
-.miro-canvas-comment-marker[data-comment-selected="true"] {
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 3px;
-}
 
 .miro-canvas-thread__header {
   display: flex;
