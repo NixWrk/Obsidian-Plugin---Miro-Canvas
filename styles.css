@@ -2056,8 +2056,15 @@
   outline: 1px dashed var(--interactive-accent);
 }
 
+/* Obsidian's mobile styles show the four corner squares of a picked card
+   (`.is-mobile .canvas-wrapper:not(.mod-readonly) .canvas-node-interaction-layer
+   .canvas-node-resizer[data-resize="topright"]` and the other three, display:
+   block and 20px), with more weight than a plain rule here.  They stand at the
+   corners of the card's unturned box, next to the frame of a turned card, and
+   stay where the card was while it is dragged; the frame's own grips replace
+   them on every screen. */
 .miro-canvas-root .canvas-node-interaction-layer .canvas-node-resizer {
-  display: none;
+  display: none !important;
 }
 
 .miro-canvas-resizer {

@@ -58,6 +58,11 @@
   the pointer back after three moves, so the card could be picked but never
   dragged. A card that is not selected, a long press, two fingers and a hand
   resting beside the pen are as before.
+- A turned card on a tablet or a phone shows one frame, the plugin's, turned
+  with it. Obsidian's mobile styles drew four large square handles at the
+  corners of the card's unturned box next to it (and left them where the card
+  had been while it was dragged); they are hidden, and the frame's own
+  handles, which take a finger from about 40px around, do their work.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

@@ -474,6 +474,8 @@ checked yet.
   drag. A long press on empty board draws a selection box, and a long press on
   a card opens its menu.
 - **Handles** keep their small look but take a finger from about 40px around.
+  A card, turned or not, shows one frame with them; Obsidian's own large
+  corner squares are hidden.
 - **A stylus.** An S Pen comes to the board as a pen, with its pressure and
   tilt, and the board notices it as soon as it hovers above the screen,
   whatever tool is on. While the pen is near - hovering, drawing, or lifted a
@@ -783,6 +785,9 @@ push after every commit, no tags."
   selected one.
 - [ ] `arrange-panels` - Arrange panels: dragging the panels, turning a bar
   into a column, a tool into the tray and back, Reset, Done.
+- [ ] `tablet-card-drag` - on a tablet: a selected card drags with a finger
+  and with a pen; a turned card shows one frame (a tablet or phone; when none
+  is at hand, write it down as not recorded).
 - [ ] `export` - Export to PDF or PowerPoint: pages, a page per frame, the
   export and the file it makes.
 - [ ] `fonts` - downloading a pack and choosing its font on a card.

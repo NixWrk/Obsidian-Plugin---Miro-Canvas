@@ -299,10 +299,21 @@ def main() -> int:
                   s.updatePanelPositions();
                   if(b.root.style.getPropertyValue('--miro-canvas-host-foot')||b.root.hasAttribute('data-miro-canvas-keyboard'))throw Error('A computer kept the phone layout');
                 }""")
-                # A tablet's own styles hand a finger's move on a picked card's text to
-                # the browser, which takes the pointer back: a picked card keeps it.
+                # A tablet's own styles show the native corner squares of a picked
+                # card (with more weight than a plain rule), and hand a finger's
+                # move on its text to the browser, which takes the pointer back:
+                # neither may happen next to the plugin's frame.
                 page.evaluate("""() => {
                   const b=miroBrowser;
+                  const style=document.createElement('style');
+                  style.textContent='.is-mobile .canvas-wrapper:not(.mod-readonly) .canvas-node-interaction-layer .canvas-node-resizer[data-resize="topright"]{display:block;width:20px;height:20px;border:2px solid red}';
+                  document.head.appendChild(style);
+                  document.body.classList.add('is-mobile');
+                  const layer=document.createElement('div');layer.className='canvas-node-interaction-layer';b.root.appendChild(layer);
+                  const grip=layer.appendChild(document.createElement('div'));grip.className='canvas-node-resizer';grip.setAttribute('data-resize','topright');
+                  const shown=getComputedStyle(grip).display;
+                  layer.remove();style.remove();document.body.classList.remove('is-mobile');
+                  if(shown!=='none')throw Error('The mobile styles show a native corner square next to the frame: '+shown);
                   const card=document.createElement('div');
                   const content=card.appendChild(document.createElement('div'));content.className='canvas-node-content';
                   const text=content.appendChild(document.createElement('div'));
