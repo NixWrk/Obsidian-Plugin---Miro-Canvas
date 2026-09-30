@@ -250,13 +250,10 @@ export function hostFootInset(boardTop: number, boardBottom: number, foot: HostF
   return Math.round(Math.min(inset, limit));
 }
 
-/** The gap between a vertical bar and a row that opens beside it, and the margin such a row keeps from the view's own edges. */
-export const SIDE_ROW_GAP = 8;
+/** The room a column that opens beside a vertical bar keeps from the view's own top and foot. */
 export const SIDE_ROW_MARGIN = 8;
-/** The width a row opened beside a vertical bar asks for: the same as when it stands above a horizontal one. */
-export const SIDE_ROW_WIDTH = 600;
-/** The narrowest such a row is made, so its tools are not squeezed to nothing on a very narrow view. */
-export const SIDE_ROW_MIN_WIDTH = 160;
+/** The least a column is squeezed to; past that it stays this tall and scrolls inside itself. */
+export const SIDE_ROW_MIN_HEIGHT = 48;
 
 /** A box in the view's own coordinates. */
 export interface ViewBox {
@@ -268,51 +265,49 @@ export interface ViewBox {
 
 /** What `placeSideRow` needs to know, all in one coordinate system (the view's). */
 export interface SideRowInput {
-  /** The part of the board's view the row may use. */
+  /** The part of the board's view the column may use: what the phone's own bars leave uncovered. */
   readonly view: ViewBox;
   /** The vertical bar. */
   readonly bar: ViewBox;
-  /** Where the row's own `top: 0` lies: the top of the bar's padding box, just inside its border. */
+  /** Where the column's own `top: 0` lies: the top of the bar's padding box, just inside its border. */
   readonly barOrigin: number;
-  /** The tool that opened the row, on the bar; none when it is not on the bar. */
+  /** The tool that opened the column, on the bar; none when it is not on the bar. */
   readonly tool: ViewBox | undefined;
-  /** The row's own height (it never wraps, so its width leaves it alone). */
+  /** The column's own height with nothing to hold it back: all its controls, one to a row. */
   readonly rowHeight: number;
-  /** Which half of the view the bar hugs: the row opens towards the other one. */
-  readonly side: "left" | "right";
-  /** The width the row would like; `SIDE_ROW_WIDTH` when left out. */
-  readonly wantedWidth?: number;
 }
 
-/** Where a row opened beside a vertical bar goes: its width and how far below its `top: 0` it is put. */
+/** Where a column opened beside a vertical bar goes: how far below its `top: 0` it stands, and the height past which it scrolls. */
 export interface SideRowPlacement {
-  readonly width: number;
   readonly top: number;
+  /** Only when the column is taller than the room: it then scrolls inside itself instead of leaving the view. */
+  readonly maxHeight: number | undefined;
 }
 
 /**
- * Where the pen's row, or the lines', opens when its bar is vertical.  A row
- * over a horizontal bar has the whole width of the view to itself; beside a
- * vertical one it has only the room between the bar and the far edge.  It
- * stands level with the tool that opened it - its top edge on the tool's -
- * and is moved up or down only as far as keeps it wholly in the view.  Its
- * width is what it asks for, or what the room allows, and never less than
- * `SIDE_ROW_MIN_WIDTH`: past that it scrolls along, its tools laid out as
- * they are in a horizontal bar.
+ * Where the pen's settings, or the lines', open when their bar is vertical.
+ * They open as one column, parallel to the bar, one control to a row; its
+ * width is its own, that of one control, so only its height needs placing.
+ * The column stands level with the tool that opened it - its top edge on the
+ * tool's - and is moved up or down only as far as keeps it wholly in the
+ * view.  Where it is taller than the whole view it keeps its top edge and
+ * gets a maximum height: the controls keep their size and scroll inside it,
+ * never squeezed together.
  */
 export function placeSideRow(input: SideRowInput): SideRowPlacement {
-  const { view, bar, barOrigin, tool, rowHeight, side } = input;
-  const wanted = input.wantedWidth ?? SIDE_ROW_WIDTH;
-  const room = side === "left"
-    ? view.left + view.width - (bar.left + bar.width) - SIDE_ROW_GAP - SIDE_ROW_MARGIN
-    : bar.left - view.left - SIDE_ROW_GAP - SIDE_ROW_MARGIN;
-  const width = Math.max(0, Math.min(wanted, Math.max(room, SIDE_ROW_MIN_WIDTH)));
+  const { view, bar, barOrigin, tool, rowHeight } = input;
+  const room = Math.max(view.height - 2 * SIDE_ROW_MARGIN, SIDE_ROW_MIN_HEIGHT);
+  const scrolls = rowHeight > room;
+  const height = scrolls ? room : rowHeight;
   const wantedTop = tool === undefined ? bar.top : tool.top;
-  const lowest = view.top + view.height - rowHeight - SIDE_ROW_MARGIN;
   const highest = view.top + SIDE_ROW_MARGIN;
-  // A row taller than the view keeps its top edge in view rather than its foot.
-  const top = Math.max(highest, Math.min(wantedTop, lowest));
-  return { width: Math.round(width * 100) / 100, top: Math.round((top - barOrigin) * 100) / 100 };
+  const lowest = view.top + view.height - height - SIDE_ROW_MARGIN;
+  // A column that scrolls fills the room, so it starts at the head of the view.
+  const top = scrolls ? highest : Math.max(highest, Math.min(wantedTop, lowest));
+  return {
+    top: Math.round((top - barOrigin) * 100) / 100,
+    maxHeight: scrolls ? Math.round(room * 100) / 100 : undefined,
+  };
 }
 
 /** An element whose inline position this module may write; a real `HTMLElement` satisfies it. */

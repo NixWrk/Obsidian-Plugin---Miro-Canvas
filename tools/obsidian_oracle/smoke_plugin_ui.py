@@ -328,40 +328,80 @@ def main() -> int:
                     throw Error('A picked card that shows a web page cannot scroll it');
                   card.remove();
                 }""")
-                # A bar turned vertical opens the pen's row and the lines' row beside
-                # it: one row of tools, laid out as above a horizontal bar, level
-                # with the tool that opened it and wholly in view.
+                # A bar turned vertical opens the pen's settings and the lines'
+                # settings beside it as one column, parallel to the bar: one control
+                # to a row, sizes, colours, then tools, level with the tool that opened
+                # it and wholly in view, scrolling inside itself when the room is short.
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session;
                   const tools=b.root.querySelector('.miro-canvas-toolbar.miro-canvas-tools');
                   const original=s.settings;
+                  // The page has no Obsidian theme, so the rules between sections have no colour to be drawn in yet.
+                  document.documentElement.style.setProperty('--background-modifier-border','#888');
                   const placeBar=(anchor,dy)=>{
                     s.settings={...original,panelLayout:{...original.panelLayout,toolbar:{anchor,dx:0,dy,orientation:'vertical'}}};
                     s.updatePanelPositions();
                   };
                   const inside=(inner,outer)=>inner.left>=outer.left-0.5&&inner.right<=outer.right+0.5&&inner.top>=outer.top-0.5&&inner.bottom<=outer.bottom+0.5;
+                  const seen=(element)=>{const r=element.getBoundingClientRect();return r.width>0&&r.height>0;};
+                  const nameOf=(control)=>control.getAttribute('data-tool')||control.getAttribute('data-shape')||control.getAttribute('aria-label')||String(control.className);
+                  // Every visible control under `scope`, top to bottom: none shares a row with the one above it.
+                  const aloneInItsRow=(scope,selector,what)=>{
+                    const boxes=[...scope.querySelectorAll(selector)].filter((control)=>seen(control))
+                      .map((control)=>({name:nameOf(control),at:control.getBoundingClientRect()})).sort((a,c)=>a.at.top-c.at.top);
+                    if(boxes.length<4)throw Error('Too few controls to check in '+what+': '+boxes.length);
+                    for(let i=1;i<boxes.length;i++)
+                      if(boxes[i].at.top<boxes[i-1].at.bottom-0.5)throw Error('Two controls share a row in '+what+': '+boxes[i-1].name+' and '+boxes[i].name);
+                    return boxes;
+                  };
+                  const settingsOf=(button)=>[...tools.querySelectorAll(button)].find(seen);
                   for(const [anchor,dy] of [['left-middle',0],['left-middle',380],['left-middle',-380],['right-middle',0],['right-middle',380]]){
                     placeBar(anchor,dy);
                     if(tools.getAttribute('data-miro-canvas-panel-orientation')!=='vertical')throw Error('The bar did not turn vertical at '+anchor);
                     const side=tools.getAttribute('data-miro-canvas-panel-side');
                     for(const [button,rowClass] of [['[data-tool-group="drawing"]','miro-canvas-tools__drawing'],['[data-tool="connector"]','miro-canvas-tools__connectors']]){
-                      tools.querySelector(button).click();
+                      settingsOf(button).click();
                       const row=tools.querySelector('.'+rowClass);
-                      const at=row.getBoundingClientRect(),bar=tools.getBoundingClientRect(),tool=tools.querySelector(button).getBoundingClientRect();
+                      const at=row.getBoundingClientRect(),bar=tools.getBoundingClientRect(),tool=settingsOf(button).getBoundingClientRect(),board=b.root.getBoundingClientRect();
                       const where=JSON.stringify({anchor,dy,rowClass,at,bar,tool});
-                      if(row.hidden||getComputedStyle(row).flexDirection!=='row')throw Error('The row is not laid out as one row: '+where);
-                      if(at.width<160||at.height>60)throw Error('The row is squeezed: '+where);
-                      if(!inside(at,b.root.getBoundingClientRect()))throw Error('The row runs off the board: '+where);
-                      if(side==='left'?at.left<bar.right:at.right>bar.left)throw Error('The row is not beside the bar, towards the middle: '+where);
+                      if(row.hidden||getComputedStyle(row).flexDirection!=='column')throw Error('The settings are not laid out as one column: '+where);
+                      if(at.width>220||at.width<60)throw Error('The settings are not one control column wide: '+where);
+                      if(!inside(at,board))throw Error('The settings run off the board: '+where);
+                      if(side==='left'?at.left<bar.right:at.right>bar.left)throw Error('The settings are not beside the bar, towards the middle: '+where);
                       const level=Math.abs(at.top-tool.top)<1.5;
-                      const board=b.root.getBoundingClientRect();
                       const held=Math.abs(at.top-(board.top+8))<1.5||Math.abs(at.bottom-(board.bottom-8))<1.5;
-                      if(!level&&!held)throw Error('The row is neither level with its tool nor held in view: '+where);
+                      if(!level&&!held)throw Error('The settings are neither level with their tool nor held in view: '+where);
+                      const controls=aloneInItsRow(row,'button,input,.miro-canvas-tools__preview','the settings '+rowClass);
+                      if(controls.some((control)=>control.at.left<at.left-0.5||control.at.right>at.right+0.5))throw Error('A control runs out of its column: '+where);
+                      const column=(selector)=>row.querySelector(selector).getBoundingClientRect().top;
+                      if(!(column(':scope > .miro-canvas-tools__size')<column(':scope > .miro-canvas-tools__swatches')&&column(':scope > .miro-canvas-tools__swatches')<column(':scope > button')))
+                        throw Error('The settings are not in the order widths, colours, tools: '+where);
+                      for(const section of [':scope > .miro-canvas-tools__size',':scope > .miro-canvas-tools__swatches']){
+                        const rule=getComputedStyle(row.querySelector(section));
+                        if(rule.borderBottomWidth!=='1px'||rule.borderLeftWidth!=='0px')throw Error('The rule between the settings does not lie across the column: '+section);
+                      }
                     }
                   }
+                  // A short view: the column keeps every control its size and scrolls inside itself, wholly in view.
+                  placeBar('left-middle',0);
+                  settingsOf('[data-tool="connector"]').click();
+                  const row=tools.querySelector('.miro-canvas-tools__connectors');
+                  const sizes=()=>[...row.querySelectorAll('button,input')].filter(seen).map((control)=>Math.round(control.getBoundingClientRect().height));
+                  const before=JSON.stringify(sizes());
+                  const height=b.root.style.height;
+                  b.root.style.height='420px';
+                  s.updatePanelPositions();
+                  const short=row.getBoundingClientRect(),board=b.root.getBoundingClientRect();
+                  if(!(row.scrollHeight>row.clientHeight+1)||getComputedStyle(row).overflowY==='visible')throw Error('A column taller than the room does not scroll: '+JSON.stringify({scroll:row.scrollHeight,client:row.clientHeight}));
+                  if(short.top<board.top+7.5||short.bottom>board.bottom-7.5)throw Error('A column taller than the room leaves the view: '+JSON.stringify({short,board}));
+                  if(JSON.stringify(sizes())!==before)throw Error('A column taller than the room squeezes its controls: '+before+' against '+JSON.stringify(sizes()));
+                  b.root.style.height=height;
+                  s.updatePanelPositions();
+                  if(row.style.getPropertyValue('--miro-canvas-side-row-max-height')!=='')throw Error('A column kept its maximum height after the room came back');
                   s.settings=original;s.updatePanelPositions();
                   const drawing=tools.querySelector('.miro-canvas-tools__drawing');
                   if(drawing.style.getPropertyValue('--miro-canvas-side-row-top')!==''||getComputedStyle(drawing).flexDirection!=='row')throw Error('A horizontal bar kept the place of a vertical one');
+                  document.documentElement.style.removeProperty('--background-modifier-border');
                   b.root.querySelector('.miro-canvas-tools [data-tool="select"]').click();
                 }""")
                 page.evaluate("""() => {

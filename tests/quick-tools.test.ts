@@ -584,12 +584,16 @@ describe("quick tools in Russian", () => {
   });
 });
 
-describe("the pen's and the lines' rows beside a vertical bar", () => {
+describe("the pen's and the lines' settings beside a vertical bar", () => {
   const box = (left: number, top: number, width: number, height: number) => () => ({
     left, top, width, height, right: left + width, bottom: top + height, x: left, y: top,
   });
 
-  /** A bar in an 800 x 600 view, 50 wide, 300 tall from y = 100; its pen button at y = 220 and its lines button at y = 260. */
+  /**
+   * A bar in an 800 x 600 view, 50 wide, 300 tall from y = 100; its pen
+   * button at y = 220 and its lines button at y = 260.  Each column beside
+   * it is `columnHeight` tall - which a test may change while it runs.
+   */
   function barInView(orientation: "vertical" | "horizontal", side: "left" | "right" = "left") {
     const { tools, root } = build();
     const view = new FakeElement("div");
@@ -602,57 +606,104 @@ describe("the pen's and the lines' rows beside a vertical bar", () => {
     (pen as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(20, 220, 32, 32);
     (toolButton(root, "connector") as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(20, 260, 32, 32);
     const rowOf = (name: string) => root.children.find((child) => child.classes.has(name))!;
+    const column = { height: 200 };
     for (const name of ["miro-canvas-tools__drawing", "miro-canvas-tools__connectors"]) {
-      (rowOf(name) as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(0, 0, 600, 40);
+      (rowOf(name) as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = () => box(0, 0, 132, column.height)();
     }
-    return { tools, root, drawing: rowOf("miro-canvas-tools__drawing"), connectors: rowOf("miro-canvas-tools__connectors") };
+    return { tools, root, column, drawing: rowOf("miro-canvas-tools__drawing"), connectors: rowOf("miro-canvas-tools__connectors") };
   }
 
-  it("puts the pen's row level with the pen button, with the room to the bar's right", () => {
+  it("puts the pen's column level with the pen button", () => {
     const { tools, drawing } = barInView("vertical");
     tools.update({ ...STATE, armed: "pen" });
     expect(drawing.hidden).toBe(false);
+    // The pen button's top is 220, the bar's padding box starts at 100: 120 below it.
     expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
-    // 800 across, less the bar's 10 + 50, the 8 gap and the 8 margin: 724, of which 600 are asked for.
-    expect(drawing.style["--miro-canvas-side-row-width"]).toBe("600px");
+    // It fits, so nothing holds it to a height.
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
+    // The column's width is its own: the stylesheet gives it one control's width, the code none.
+    expect(drawing.style["--miro-canvas-side-row-width"]).toBeUndefined();
   });
 
-  it("puts the lines' row level with the lines button", () => {
+  it("puts the lines' column level with the lines button", () => {
     const { tools, connectors } = barInView("vertical");
     tools.update({ ...STATE, armed: "connector" });
     expect(connectors.hidden).toBe(false);
     expect(connectors.style["--miro-canvas-side-row-top"]).toBe("160px");
   });
 
-  it("keeps a row wholly in the part of the view the session leaves uncovered, and in the room a narrow view leaves", () => {
+  it("keeps a column wholly in the part of the view the session leaves uncovered", () => {
     const { tools, drawing } = barInView("vertical");
     tools.update({ ...STATE, armed: "pen" });
-    // The phone's own bars cover the foot: the view's usable height is 250, so the row may not stand lower than 250 - 40 - 8.
+    // The phone's own bars cover the foot: the view's usable height is 250, so the column may not stand lower than 250 - 200 - 8.
     tools.placeSideRows({ width: 300, height: 250 });
-    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${250 - 40 - 8 - 100}px`);
-    expect(drawing.style["--miro-canvas-side-row-width"]).toBe(`${300 - 60 - 8 - 8}px`);
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${250 - 200 - 8 - 100}px`);
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
   });
 
-  it("opens to the left of a bar on the right edge", () => {
+  it("lets a column taller than the room scroll inside it, from the head of the view, and lets go once the room is back", () => {
+    const { tools, column, drawing } = barInView("vertical");
+    tools.update({ ...STATE, armed: "pen" });
+    column.height = 400;
+    tools.placeSideRows({ width: 800, height: 300 });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${8 - 100}px`);
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBe(`${300 - 16}px`);
+    // A taller view fits it again, whatever height it was held to a moment ago.
+    column.height = 200;
+    tools.placeSideRows({ width: 800, height: 600 });
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
+  });
+
+  it("measures a held column by what it holds, not by the height it was held to", () => {
+    const { tools, drawing } = barInView("vertical");
+    tools.update({ ...STATE, armed: "pen" });
+    // A column held to 284 by an earlier, shorter view: it shows 284 but scrolls through 400.
+    const held = drawing as unknown as { scrollHeight: number; offsetHeight: number; clientHeight: number; getBoundingClientRect: unknown };
+    held.getBoundingClientRect = box(0, 0, 132, 284);
+    held.scrollHeight = 400;
+    held.offsetHeight = 284;
+    held.clientHeight = 282;
+    tools.placeSideRows({ width: 800, height: 450 });
+    // 400 of content and 2 of border: 402 fits the 434 the view leaves, so it is let go.
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
+    tools.placeSideRows({ width: 800, height: 400 });
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBe(`${400 - 16}px`);
+  });
+
+  it("places the column again when an eraser takes its colours away and it changes height", () => {
+    const { tools, column, drawing } = barInView("vertical");
+    // The foot of a 300-tall view: a 200-tall column stands at 92, a 150-tall one at 142.
+    tools.placeSideRows({ width: 800, height: 300 });
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${92 - 100}px`);
+    column.height = 150;
+    tools.update({ ...STATE, armed: "eraser" });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${142 - 100}px`);
+  });
+
+  it("places a column for a bar on the right edge just the same: its side is the stylesheet's to take", () => {
     const { tools, drawing } = barInView("vertical", "right");
     tools.update({ ...STATE, armed: "pen" });
-    // The room is what lies left of the bar, less the gap and the margin: 740 - 16.
-    expect(drawing.style["--miro-canvas-side-row-width"]).toBe("600px");
-    tools.placeSideRows({ width: 800, height: 600 });
     expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
   });
 
   it("leaves a horizontal bar's rows to their own styles, and forgets the place a vertical one gave", () => {
-    const { tools, root, drawing } = barInView("vertical");
+    const { tools, root, column, drawing } = barInView("vertical");
     tools.update({ ...STATE, armed: "pen" });
-    expect(drawing.style["--miro-canvas-side-row-top"]).toBe("120px");
+    column.height = 900;
+    tools.placeSideRows({ width: 800, height: 600 });
+    expect(drawing.style["--miro-canvas-side-row-top"]).toBe(`${8 - 100}px`);
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBe(`${600 - 16}px`);
     root.setAttribute("data-miro-canvas-panel-orientation", "horizontal");
     tools.placeSideRows();
     expect(drawing.style["--miro-canvas-side-row-top"]).toBeUndefined();
-    expect(drawing.style["--miro-canvas-side-row-width"]).toBeUndefined();
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
     tools.update({ ...STATE, armed: "select" });
     tools.update({ ...STATE, armed: "pen" });
     expect(drawing.style["--miro-canvas-side-row-top"]).toBeUndefined();
+    expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
   });
 
   it("places nothing for a row that is closed, or a bar that is not on the screen", () => {

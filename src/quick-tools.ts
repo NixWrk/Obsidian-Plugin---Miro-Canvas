@@ -41,9 +41,9 @@ export function isDragCreateTool(tool: QuickTool): boolean {
 
 /** Screen pixels a press must move before it counts as a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
-/** The custom properties a row opened beside a vertical bar takes its place from; see `QuickTools.placeSideRows`. */
+/** The custom properties a column opened beside a vertical bar takes its place from; see `QuickTools.placeSideRows`. */
 const SIDE_ROW_TOP = "--miro-canvas-side-row-top";
-const SIDE_ROW_WIDTH_PROPERTY = "--miro-canvas-side-row-width";
+const SIDE_ROW_MAX_HEIGHT = "--miro-canvas-side-row-max-height";
 
 /**
  * The ghost's size at zoom 1: the same box the tool would make with a plain
@@ -348,6 +348,16 @@ export const QUICK_TOOL_KEYS: ReadonlyMap<string, QuickTool> = new Map(
   TOOLBAR_TOOL_ICONS.filter((spec) => spec.key !== undefined).map((spec) => [spec.key!, spec.tool]),
 );
 
+/**
+ * A column's own height as if nothing held it back: its whole content and its
+ * border, even where an earlier maximum height now makes it scroll.
+ */
+function heightWithNothingHoldingItBack(row: HTMLElement): number {
+  const shown = row.getBoundingClientRect?.().height ?? 0;
+  if (typeof row.scrollHeight !== "number" || typeof row.offsetHeight !== "number" || typeof row.clientHeight !== "number") return shown;
+  return Math.max(shown, row.scrollHeight + row.offsetHeight - row.clientHeight);
+}
+
 export class QuickTools {
   public readonly element: HTMLElement;
   /** The bar's own row of items, up to the "+" popover - what the arrange mode drags to reorder, remove or add. */
@@ -362,7 +372,7 @@ export class QuickTools {
   private penButton: HTMLButtonElement | undefined;
   /** The part of the view the bar's rows may use, as the session last measured it. */
   private sideView: ViewSize | undefined;
-  /** Which rows were open when they were last placed beside a vertical bar. */
+  /** Which rows were open, and what they held, when they were last placed beside a vertical bar. */
   private sideRowsOpen = "";
   /** The pen's own row, open for as long as one of its tools is armed. */
   private drawingBar: HTMLElement | undefined;
@@ -540,14 +550,16 @@ export class QuickTools {
     this.penButton?.style?.setProperty?.("--miro-canvas-swatch", state.penColor);
     this.penButton?.setAttribute("aria-pressed", drawing ? "true" : "false");
     if (this.drawingBar !== undefined) this.drawingBar.hidden = !drawing || !state.editable;
-    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${this.connectorBar.hidden}`;
+    // An eraser has a size but no colour; a line has both.
+    const erasing = isEraser(state.armed);
+    if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
+    // A column beside a vertical bar is placed again when it opens, closes
+    // or gains or loses the colours, which changes its height.
+    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${erasing}|${this.connectorBar.hidden}`;
     if (rowsOpen !== this.sideRowsOpen) {
       this.sideRowsOpen = rowsOpen;
       this.placeSideRows();
     }
-    // An eraser has a size but no colour; a line has both.
-    const erasing = isEraser(state.armed);
-    if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
     if (this.sizeInput !== undefined && this.sizeNumber !== undefined) {
       const range = erasing ? ERASER_SIZE_RANGE : PEN_WIDTH_RANGE;
       const value = erasing ? state.eraserSize : state.penWidth;
@@ -599,12 +611,15 @@ export class QuickTools {
   }
 
   /**
-   * A vertical bar opens the pen's row and the lines' row beside it, on the
-   * side towards the middle of the board, level with the tool that opened
-   * it and wholly in view (see `placeSideRow`); above a horizontal bar they
-   * need nothing of the kind, and any place left from a vertical one is
-   * dropped.  `view` is the part of the board the session leaves uncovered,
-   * when it knows; else the whole of the bar's own parent.
+   * A vertical bar opens the pen's settings and the lines' settings beside
+   * it, as one column parallel to the bar, on the side towards the middle of
+   * the board (the stylesheet's part).  This puts the column level with the
+   * tool that opened it and wholly in view, and where it is taller than the
+   * room, gives it the height past which it scrolls (see `placeSideRow`);
+   * above a horizontal bar they need nothing of the kind, and any place left
+   * from a vertical one is dropped.  `view` is the part of the board the
+   * session leaves uncovered, when it knows; else the whole of the bar's own
+   * parent.
    */
   public placeSideRows(view?: ViewSize): void {
     if (view !== undefined) this.sideView = view;
@@ -618,7 +633,7 @@ export class QuickTools {
       if (row === undefined) continue;
       if (!vertical) {
         row.style.removeProperty(SIDE_ROW_TOP);
-        row.style.removeProperty(SIDE_ROW_WIDTH_PROPERTY);
+        row.style.removeProperty(SIDE_ROW_MAX_HEIGHT);
         continue;
       }
       if (row.hidden) continue;
@@ -632,11 +647,11 @@ export class QuickTools {
         bar: seen(barRect),
         barOrigin: barRect.top - parent.top + (bar.clientTop ?? 0),
         tool: toolRect === undefined || toolRect.width === 0 ? undefined : seen(toolRect),
-        rowHeight: row.getBoundingClientRect?.().height ?? 0,
-        side: bar.getAttribute("data-miro-canvas-panel-side") === "right" ? "right" : "left",
+        rowHeight: heightWithNothingHoldingItBack(row),
       });
       row.style.setProperty(SIDE_ROW_TOP, `${placement.top}px`);
-      row.style.setProperty(SIDE_ROW_WIDTH_PROPERTY, `${placement.width}px`);
+      if (placement.maxHeight === undefined) row.style.removeProperty(SIDE_ROW_MAX_HEIGHT);
+      else row.style.setProperty(SIDE_ROW_MAX_HEIGHT, `${placement.maxHeight}px`);
     }
   }
 

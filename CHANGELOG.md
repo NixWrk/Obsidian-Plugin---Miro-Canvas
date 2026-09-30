@@ -63,11 +63,16 @@
   corners of the card's unturned box next to it (and left them where the card
   had been while it was dragged); they are hidden, and the frame's own
   handles, which take a finger from about 40px around, do their work.
-- With the tool bar turned vertical (Arrange panels), the pen's row (tools,
-  colours, width) and the lines' row open beside the bar, on the side towards
-  the middle of the board and level with the tool that opened them, laid out
-  as one row as above a horizontal bar and always wholly on the screen; before
-  they were squeezed into a column as narrow as the bar, and their colours and
+- With the tool bar turned vertical (Arrange panels), the pen's settings
+  (width, colours, then the pen, the highlighter and the other tools) and the
+  lines' settings (width, colours, then the kinds of line) open beside the
+  bar, on the side towards the middle of the board, as one column parallel to
+  the bar: one control to a row, each the size it has above a horizontal bar,
+  with a rule across between the three sections. The column stands level with
+  the tool that opened it and is moved only as far as keeps it wholly on the
+  screen, above the phone's own bars; where it is still taller than the room
+  it scrolls inside itself instead of being squeezed. Before, the settings
+  were squeezed into a column as narrow as the bar, and their colours and
   width slider could not be reached.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always

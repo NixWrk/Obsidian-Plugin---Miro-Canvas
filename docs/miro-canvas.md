@@ -872,10 +872,14 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   the turned box, and the line ends on the turned outline as on the desktop.
   (3) The pen's and lines' rows carry `miro-canvas-toolbar__bar`, so the
   vertical bar's column and its `max-width: 100%` squeezed them to the bar's
-  own width; beside a vertical bar each is a box of its own, one row, whose
-  top and width `placeSideRow` (`src/panel-layout.ts`) chooses - level with
-  the tool, wholly in view, in the room towards the middle - and
-  `QuickTools.placeSideRows` writes. Left: the owner's own trial of the hold
+  own width; beside a vertical bar each is a box of its own, one column
+  parallel to the bar (as Miro's side tool bar does), one control to a row,
+  the widths first, then the colours, then the tools, a rule across between
+  the sections. Its width is that of one control; `placeSideRow`
+  (`src/panel-layout.ts`) chooses its top - level with the tool, wholly in
+  view above the host foot - and, where it is taller than the room, a maximum
+  height it scrolls inside of, never squeezed; `QuickTools.placeSideRows`
+  writes both. Left: the owner's own trial of the hold
   with the real pen, landscape on a phone (the dock stacked over the bar
   leaves little board), iPhone and iPad, macOS and Linux.
 - [x] `FUT-016` Fonts. The base is done 2026-09-24: the list offers only fonts

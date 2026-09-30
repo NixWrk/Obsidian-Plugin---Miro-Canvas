@@ -414,50 +414,57 @@ describe("hostFootInset", () => {
 describe("placeSideRow", () => {
   // A vertical bar on the left edge of an 1200 x 800 view, 50 wide and 450
   // tall, whose top is 200; its padding box starts one pixel inside that.
+  // The column beside it is 300 tall: the pen's settings with few colours.
   const LEFT_BAR: SideRowInput = {
     view: { left: 0, top: 0, width: 1200, height: 800 },
     bar: { left: 0, top: 200, width: 50, height: 450 },
     barOrigin: 201,
     tool: { left: 5, top: 300, width: 40, height: 40 },
-    rowHeight: 40,
-    side: "left",
+    rowHeight: 300,
   };
 
-  it("opens the row beside the bar, level with the tool that opened it", () => {
+  it("opens the column level with the tool that opened it", () => {
     // Its top edge on the tool's: 300 in the view is 99 below the bar's own top edge.
-    expect(placeSideRow(LEFT_BAR)).toEqual({ width: 600, top: 99 });
+    expect(placeSideRow(LEFT_BAR)).toEqual({ top: 99, maxHeight: undefined });
     expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 420, width: 40, height: 40 } }).top).toBe(219);
   });
 
-  it("keeps the row wholly in view: up from the foot of the view, down from its head", () => {
-    // The lowest the row may stand is 8 above the foot of the view: 800 - 40 - 8 = 752.
-    expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 780, width: 40, height: 40 } }).top).toBe(752 - 201);
+  it("keeps the column wholly in view: up from the foot of the view, down from its head", () => {
+    // The lowest the column may stand is 8 above the foot of the view: 800 - 300 - 8 = 492.
+    expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 780, width: 40, height: 40 } }).top).toBe(492 - 201);
     expect(placeSideRow({ ...LEFT_BAR, tool: { left: 5, top: 2, width: 40, height: 40 } }).top).toBe(8 - 201);
-    // A part of the view left uncovered by the phone's own bars ends higher.
-    expect(placeSideRow({ ...LEFT_BAR, view: { left: 0, top: 0, width: 1200, height: 600 } }).top).toBe(99);
-    expect(placeSideRow({ ...LEFT_BAR, view: { left: 0, top: 0, width: 1200, height: 600 }, tool: { left: 5, top: 580, width: 40, height: 40 } }).top).toBe(552 - 201);
+    // A part of the view left uncovered by the phone's own bars ends higher: 600 - 300 - 8 = 292.
+    const covered = { left: 0, top: 0, width: 1200, height: 600 };
+    expect(placeSideRow({ ...LEFT_BAR, view: covered, tool: { left: 5, top: 250, width: 40, height: 40 } }).top).toBe(250 - 201);
+    expect(placeSideRow({ ...LEFT_BAR, view: covered }).top).toBe(292 - 201);
+    expect(placeSideRow({ ...LEFT_BAR, view: covered, tool: { left: 5, top: 580, width: 40, height: 40 } }).top).toBe(292 - 201);
   });
 
-  it("keeps a row taller than the view by its top edge", () => {
-    expect(placeSideRow({ ...LEFT_BAR, view: { left: 0, top: 0, width: 1200, height: 30 }, rowHeight: 40 }).top).toBe(8 - 201);
+  it("needs no maximum height for a column that fits, up to the very room the view leaves", () => {
+    expect(placeSideRow(LEFT_BAR).maxHeight).toBeUndefined();
+    // 800 less the margin above and below: 784.
+    const exact = placeSideRow({ ...LEFT_BAR, rowHeight: 784 });
+    expect(exact).toEqual({ top: 8 - 201, maxHeight: undefined });
   });
 
-  it("gives the row the room between the bar and the far edge, less the gap and the margin, when that is short", () => {
-    // 412 wide: the bar takes 50, the gap 8 and the margin 8.
-    const phone = { ...LEFT_BAR, view: { left: 0, top: 0, width: 412, height: 800 } };
-    expect(placeSideRow(phone).width).toBe(412 - 50 - 8 - 8);
-    // Too little room to be any use: never squeezed below 160, it scrolls along instead.
-    expect(placeSideRow({ ...phone, view: { ...phone.view, width: 200 } }).width).toBe(160);
-    // A row that asks for less gets what it asks for.
-    expect(placeSideRow({ ...phone, wantedWidth: 240 }).width).toBe(240);
+  it("gives a column taller than the view the whole room, from its head, to scroll in", () => {
+    const tall = placeSideRow({ ...LEFT_BAR, rowHeight: 900 });
+    expect(tall).toEqual({ top: 8 - 201, maxHeight: 784 });
+    // Whatever tool opened it: the column fills the view, so it cannot stand level with a low one.
+    expect(placeSideRow({ ...LEFT_BAR, rowHeight: 900, tool: { left: 5, top: 700, width: 40, height: 40 } }).top).toBe(8 - 201);
+    // The phone's own bars cover the foot: the room is what they leave.
+    expect(placeSideRow({ ...LEFT_BAR, rowHeight: 560, view: { left: 0, top: 0, width: 1200, height: 500 } })).toEqual({ top: 8 - 201, maxHeight: 484 });
   });
 
-  it("opens towards the middle of the view from a bar on the right edge", () => {
-    const right: SideRowInput = { ...LEFT_BAR, bar: { left: 1150, top: 200, width: 50, height: 450 }, side: "right" };
-    expect(placeSideRow(right).width).toBe(600);
-    // The room is what lies left of the bar: 1150 - 8 - 8.
-    expect(placeSideRow({ ...right, bar: { ...right.bar, left: 400 } }).width).toBe(384);
-    expect(placeSideRow({ ...right, view: { left: 100, top: 0, width: 1100, height: 800 }, bar: { ...right.bar, left: 400 } }).width).toBe(284);
+  it("never squeezes a column below a height a person could use, however short the view", () => {
+    expect(placeSideRow({ ...LEFT_BAR, rowHeight: 300, view: { left: 0, top: 0, width: 1200, height: 30 } }).maxHeight).toBe(48);
+  });
+
+  it("measures from the view's own top, not the screen's", () => {
+    // The same view moved 100 down: the column keeps 8 from its head and its foot all the same.
+    const moved = { ...LEFT_BAR, view: { left: 0, top: 100, width: 1200, height: 700 } };
+    expect(placeSideRow({ ...moved, tool: { left: 5, top: 102, width: 40, height: 40 } }).top).toBe(108 - 201);
+    expect(placeSideRow({ ...moved, tool: { left: 5, top: 790, width: 40, height: 40 } }).top).toBe(492 - 201);
   });
 
   it("stands level with the top of the bar when its tool is not on the bar", () => {

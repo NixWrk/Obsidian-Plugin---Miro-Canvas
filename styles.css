@@ -4297,24 +4297,73 @@
   left: auto;
 }
 
-/* Both rows carry `miro-canvas-toolbar__bar`, so the column the vertical bar
-   gives its items reached them too, and their own width was cut to the bar's
-   50px.  Beside the bar each is a box of its own, laid out as above a
-   horizontal bar - one row of tools, colours and the size, scrolling along
-   where the room is short.  `QuickTools.placeSideRows` puts it level with the
-   tool that opened it, wholly in view: its top and width come from there. */
+/* Beside a vertical bar the pen's settings and the lines' settings are one
+   column, parallel to the bar as in Miro's own side tool bar: one control to
+   a row, each the size it has above a horizontal bar, in three sections with
+   a rule across between them - the sizes, the colours, then the tools (the
+   pen, the highlighter and the rest, or the kinds of line).  Both carry
+   `miro-canvas-toolbar__bar`, so the column the vertical bar gives its
+   items reached them first and squeezed them into its own 50px.  Nothing in
+   the column shrinks or wraps: where it is taller than the room it scrolls
+   inside itself.  `QuickTools.placeSideRows` puts it level with the tool
+   that opened it and wholly in view: its top and, where it must scroll, the
+   height it scrolls past come from there. */
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing,
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors {
   position: absolute;
   top: var(--miro-canvas-side-row-top, 0px);
-  flex-direction: row;
-  width: var(--miro-canvas-side-row-width, min(600px, calc(100vw - 48px)));
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: max-content;
   max-width: none;
+  max-height: var(--miro-canvas-side-row-max-height, none);
   padding: 3px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--miro-canvas-toolbar-bg);
   border: 1px solid var(--miro-canvas-toolbar-border);
   border-radius: var(--radius-m, 8px);
   box-shadow: var(--shadow-s, 0 6px 22px rgb(0 0 0 / 22%));
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > *,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > * {
+  flex: none;
+  order: 3;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__size,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__size {
+  order: 1;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__swatches,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__swatches {
+  order: 2;
+}
+
+/* Each section is a column of its own, set off from the next by a rule
+   across the column where above a horizontal bar it stood to its left. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__size,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__swatches,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__size,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__swatches {
+  flex-direction: column;
+  align-self: stretch;
+  margin: 0;
+  padding: 0 0 3px;
+  border-left: none;
+  border-bottom: 1px solid var(--miro-canvas-toolbar-border);
+}
+
+/* The slider has the width it is drawn with above a horizontal bar. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-toolbar__range,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-toolbar__range {
+  flex: none;
+  width: 120px;
+  min-width: 120px;
 }
 
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-tools__drawing,
