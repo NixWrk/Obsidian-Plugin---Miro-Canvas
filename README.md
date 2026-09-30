@@ -460,9 +460,13 @@ checked yet.
   while the keyboard is up, so the card you are writing in stays in view.
   The bar over a selection stays, for formatting.
 - **Buttons for a finger.** Every tool stays on the bar, which wraps onto two
-  rows of 40px buttons on a phone; the dock's buttons are 40px too. Menus and
-  pickers stay inside the screen and scroll when the keyboard leaves them
-  little room. The minimap is hidden on a narrow screen.
+  rows of 40px buttons on a phone and keeps one row on a tablet; the dock's
+  buttons are 40px too. Menus and pickers stay inside the screen and scroll
+  when the keyboard leaves them little room.
+- **The minimap** shows or hides as its setting and each board's own choice
+  say, as on a computer, and the dock's map button works here too. It is drawn
+  smaller on a narrow screen, above the dock, and steps aside while the
+  keyboard is up.
 - **Gestures, as in Obsidian's Canvas.** One finger on empty board pans and
   two fingers pinch to zoom. A tap selects a card and a second tap edits it.
   To move a card, hold it for a moment, then drag; a long press on empty

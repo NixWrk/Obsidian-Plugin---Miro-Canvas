@@ -50,6 +50,10 @@
   draws) for half a second at the end of a pen or highlighter stroke and the
   whole stroke becomes a straight line from where it began, its end following
   the pointer until it lifts. On by default; Settings → Drawing turns it off.
+- The minimap follows its setting and each board's own choice on phones,
+  tablets and narrow windows too; before, a screen narrower than 900px always
+  hid it and the dock's map button did nothing there. It is drawn smaller on a
+  narrow screen.
 - A labelled line no longer shows its label twice: native Canvas makes a
   line's own label only when it first draws the line - on opening an
   imported board, or once the line scrolls into view - and that label is

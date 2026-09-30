@@ -867,9 +867,18 @@
     bottom: 78px;
   }
 
+  /* A narrow board keeps its map, drawn smaller so that it covers little
+     of the board; the canvas behind it keeps its own 240 by 160 pixels. */
   .miro-canvas-panel__minimap-canvas {
-    width: 180px;
-    height: 120px;
+    width: 160px;
+    height: 107px;
+  }
+}
+
+@media (max-width: 480px) {
+  .miro-canvas-panel__minimap-canvas {
+    width: 120px;
+    height: 80px;
   }
 }
 
@@ -1121,17 +1130,17 @@
 }
 
 @media (max-width: 900px) {
-  /* The map takes most of a small screen; the dock keeps its buttons and sits
-     above the tools instead of beside them. */
+  /* The dock keeps its buttons and sits above the tools instead of beside
+     them, and the status bar covers the foot of the view, so the bars sit
+     above it. */
   .miro-canvas-dock {
     bottom: 116px;
   }
 
-  /* The map takes most of a small screen and the status bar covers the foot
-     of the view, so the bars sit above it. */
-  .miro-canvas-dock__map,
-  .miro-canvas-minimap {
-    display: none;
+  /* The map, shown or not as the board or the settings say on every screen,
+     keeps the 50px it stands above the dock everywhere else. */
+  .miro-canvas-dock__map {
+    bottom: 166px;
   }
 
   .miro-canvas-toolbar.miro-canvas-tools {

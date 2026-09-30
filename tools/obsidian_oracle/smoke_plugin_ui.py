@@ -1375,6 +1375,37 @@ def main() -> int:
             assert page.evaluate("miroBrowser.getSaves()") == saves_before_search, "Searching the board saved it"
             page.evaluate("c => { miroBrowser.runtime.setViewport(c.x, c.y, c.zoom); miroBrowser.session.refresh(); }", camera_before_search)
 
+            # The minimap follows the board's choice, else the settings, on every
+            # screen: a narrow one draws it smaller and keeps it clear of the
+            # dock and the tool bar.
+            for width, canvas_width in ((800, 160), (412, 120)):
+                page.set_viewport_size({"width": width, "height": 915})
+                page.wait_for_timeout(200)
+                layout = page.evaluate("""() => {
+                  const box = (selector) => {
+                    const element = document.querySelector(selector);
+                    if (element === null) return null;
+                    const r = element.getBoundingClientRect();
+                    return {left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width};
+                  };
+                  const map = document.querySelector('.miro-canvas-dock__map');
+                  return {
+                    shown: getComputedStyle(map).display !== 'none' && !map.hidden,
+                    map: box('.miro-canvas-dock__map'), canvas: box('.miro-canvas-panel__minimap-canvas'),
+                    dock: box('.miro-canvas-dock'), tools: box('.miro-canvas-toolbar.miro-canvas-tools'),
+                  };
+                }""")
+                assert layout["shown"], f"The minimap is hidden at {width}px although the settings show it"
+                assert layout["canvas"]["width"] == canvas_width, layout
+                for other in ("dock", "tools"):
+                    a, b = layout["map"], layout[other]
+                    if b is None:
+                        continue
+                    overlap = a["left"] < b["right"] and b["left"] < a["right"] and a["top"] < b["bottom"] and b["top"] < a["bottom"]
+                    assert not overlap, f"The minimap covers the {other} at {width}px: {layout}"
+            page.set_viewport_size({"width": 1600, "height": 900})
+            page.wait_for_timeout(200)
+
             output = REPO / "tools/obsidian_oracle/.out/m1-browser.png"
             output.parent.mkdir(parents=True, exist_ok=True)
             m2.evaluate("element => element.scrollTop = 0")
