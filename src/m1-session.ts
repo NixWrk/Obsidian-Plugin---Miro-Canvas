@@ -230,6 +230,14 @@ const HOLD_STRAIGHT_MS = 500;
 const HOLD_STRAIGHT_STILL = 4;
 /** How long, in screen pixels, a line must already be for a hold to straighten it. */
 const HOLD_STRAIGHT_REACH = 24;
+/**
+ * How far, in screen pixels, a finger or a pen on a selected card goes before
+ * the card follows it.  Native Canvas pans the board once a finger has gone
+ * more than 5, so the card is taken up no later than that.
+ */
+const CARD_DRAG_SLOP = 5;
+/** How long native Canvas waits for a finger to stay put before it takes it for a long press. */
+const NATIVE_LONG_PRESS_MS = 600;
 
 /** Whether two views of the board show the same place at the same zoom. */
 function sameViewport(left: ViewportTransform, right: ViewportTransform): boolean {
@@ -1598,6 +1606,8 @@ export class M1CanvasSession {
 	private erasing = new Set<string>();
 	/** When a stylus was last near this board, and whether this device has one at all. */
 	private readonly stylus = new StylusWatch();
+	/** Pointer events this session sent itself, which its own listeners must not take for a finger or a palm. */
+	private readonly ownPointerEvents = new WeakSet<Event>();
 	/** A tool being used on the board: where the press began and what it draws meanwhile. */
 	private toolGesture: {
 		readonly tool: QuickTool;
@@ -3343,6 +3353,7 @@ export class M1CanvasSession {
 		this.attachViewportFrames();
 		this.attachRectangleSelection();
 		this.attachHandAndPen();
+		this.attachSelectionDrag();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
 		// A press on the plugin's own bars and cards is theirs alone and ends at
@@ -3921,6 +3932,7 @@ export class M1CanvasSession {
 			touches.lift(pointerId);
 		}, true);
 		this.listen(view, "pointercancel", (event) => {
+			if (this.ownPointerEvents.has(event)) return;
 			const pointerId = (event as PointerEvent).pointerId;
 			this.stylus.lift(pointerId);
 			const before = touches.cancel(pointerId, Date.now());
@@ -3957,6 +3969,90 @@ export class M1CanvasSession {
 		if (!moved && !reselect && !connectors && !comments) return;
 		this.readInteractionState();
 		this.refresh();
+	}
+
+	/**
+	 * A finger or a pen that presses a selected card and moves drags it, and
+	 * whatever is selected with it.
+	 *
+	 * Native Canvas on a touch screen drags a card only after a long press; a
+	 * finger that moves at once pans the board.  Once a card is selected its
+	 * text lies open to the touch, the browser takes a move that starts there
+	 * for a scroll of its own and calls the pointer back three moves in
+	 * (pointercancel), so a card that was picked could not be dragged.  The
+	 * styles keep such a move on the page (touch-action); this carries it out.
+	 *
+	 * Left to native Canvas: a press on a card that is not selected, a finger
+	 * held as long as its long press waits, a second finger (a pinch), a hand
+	 * that comes down with the pen, and a selection it must not move.
+	 */
+	private attachSelectionDrag(): void {
+		const view = this.root?.ownerDocument?.defaultView;
+		if (view === undefined || view === null) return;
+		let waiting: { readonly press: PointerEvent; readonly at: number; readonly viewport: ViewportTransform | undefined } | undefined;
+		this.listen(view, "pointerdown", (event) => {
+			const press = event as PointerEvent;
+			waiting = this.pressOnSelectedCard(press) ? { press, at: Date.now(), viewport: this.viewport.getViewport() } : undefined;
+		}, true);
+		this.listen(view, "pointermove", (event) => {
+			const moved = event as PointerEvent;
+			if (waiting === undefined || moved.pointerId !== waiting.press.pointerId) return;
+			const { press, at, viewport } = waiting;
+			if (Math.hypot(moved.clientX - press.clientX, moved.clientY - press.clientY) < CARD_DRAG_SLOP) return;
+			waiting = undefined;
+			const touch = press.pointerType === "touch";
+			// A finger held still this long is native Canvas's long press: it drags by itself.
+			if (touch && Date.now() - at >= NATIVE_LONG_PRESS_MS) return;
+			if (!this.selectionCanDrag()) return;
+			// Native Canvas pans with a finger from its first move: the board goes back to where the press found it.
+			const now = this.viewport.getViewport();
+			if (touch && viewport !== undefined && now !== undefined && !sameViewport(viewport, now)) this.viewport.setViewport(viewport);
+			// Native Canvas lets go of the finger only once the card is taken up: a press that is not ours is left to it.
+			if (this.startSelectionMove(press, { single: true }) && touch) this.releaseNativeTouch(view, press);
+		}, true);
+		const settled = (event: Event): void => {
+			if (waiting?.press.pointerId === (event as PointerEvent).pointerId) waiting = undefined;
+		};
+		this.listen(view, "pointerup", settled, true);
+		this.listen(view, "pointercancel", settled, true);
+	}
+
+	/** Whether a press lands on a card that is selected and not being written in, or on the frame round several. */
+	private pressOnSelectedCard(press: PointerEvent): boolean {
+		const root = this.root;
+		const touch = press.pointerType === "touch";
+		if (root === undefined || (!touch && press.pointerType !== "pen")) return false;
+		// A second finger is a pinch and is left to native Canvas.  A pen is never one of several
+		// fingers, and the S Pen of a Galaxy Tab reports itself as no primary pointer.
+		if ((touch && !press.isPrimary) || press.button !== 0 || press.shiftKey) return false;
+		if (this.armedTool !== "select" || !root.contains(press.target as Node) || this.inControls(press)) return false;
+		// The hand that holds the pen is not a finger.
+		if (touch && this.stylus.near(Date.now())) return false;
+		const card = this.closestElementOf(press, ".canvas-node");
+		if (card === undefined) return this.closestTarget(press, ".canvas-selection");
+		const chosen = card.classList.contains("is-focused") || card.classList.contains("is-selected");
+		return chosen && !card.classList.contains("is-editing");
+	}
+
+	/** Whether what is selected may be moved, and is not a frame, which native Canvas moves with the cards it holds. */
+	private selectionCanDrag(): boolean {
+		this.readInteractionState();
+		if (!decideInteraction(this.policy, { operation: "move", elementIds: this.selectedIds }).allowed) return false;
+		return !(this.adapter.getSelection() ?? []).some((item) => readCanvasElementType(item) === "group");
+	}
+
+	/**
+	 * Tells native Canvas a finger is no longer its to follow, so it neither
+	 * pans the board under a card being dragged nor opens its long-press menu
+	 * when the finger lifts.  Its own listeners end the gesture on a cancel.
+	 */
+	private releaseNativeTouch(view: Window, press: PointerEvent): void {
+		const Cancel = (view as unknown as { PointerEvent?: typeof PointerEvent }).PointerEvent;
+		const fields = { pointerId: press.pointerId, pointerType: press.pointerType, isPrimary: press.isPrimary };
+		const event = Cancel === undefined ? new Event("pointercancel", { bubbles: true }) : new Cancel("pointercancel", { ...fields, bubbles: true });
+		if (Cancel === undefined) for (const [key, value] of Object.entries(fields)) Object.defineProperty(event, key, { value });
+		this.ownPointerEvents.add(event);
+		view.dispatchEvent(event);
 	}
 
 	/** Draw the marquee from a press, and select what it caught when let go; a click clears the selection. */
@@ -6912,16 +7008,18 @@ export class M1CanvasSession {
 	 * Drag the whole selection - cards, native edges, the board's own
 	 * connectors and comment pins, or a connector end caught alone - as one
 	 * preview, and write it as one step when let go.  False when this press
-	 * is not one that moves the selection.
+	 * is not one that moves the selection.  A lone card is native Canvas's to
+	 * drag, unless `single` says a finger or a pen is pulling it.
 	 */
-	private startSelectionMove(event: PointerEvent): boolean {
+	private startSelectionMove(event: PointerEvent, options: { readonly single?: boolean } = {}): boolean {
 		this.readInteractionState();
 		const commentIds = [...this.selectedCommentKeys].flatMap((key) => {
 			const separator = key.indexOf(":");
 			return separator < 0 ? [] : [commentSelectionId(key.slice(0, separator) as CommentOrigin, key.slice(separator + 1))];
 		});
 		const ids = [...this.selectedIds, ...commentIds];
-		if (event.button !== 0 || event.shiftKey || ids.length === 0 || (ids.length < 2 && !this.selectedRouteEnds.has(ids[0]!))
+		const alone = ids.length < 2 && options.single !== true && !this.selectedRouteEnds.has(ids[0]!);
+		if (event.button !== 0 || event.shiftKey || ids.length === 0 || alone
 			|| this.closestTarget(event, "input,textarea,[contenteditable=true],.cm-editor")) return false;
 		const target = this.eventElementId(event.target);
 		if (target !== undefined && !this.selectedIds.includes(target)) return false;
@@ -6984,7 +7082,9 @@ export class M1CanvasSession {
 			this.selectionMoveEnd = undefined;
 			this.landingCache = undefined;
 		};
-		const cancel = (): void => {
+		const cancel = (cancelled?: Event): void => {
+			// The cancel this session sends native Canvas is not the pointer's own.
+			if (cancelled !== undefined && this.ownPointerEvents.has(cancelled)) return;
 			cleanup();
 			this.refresh();
 		};
@@ -8380,6 +8480,20 @@ export class M1CanvasSession {
 
 	private inControls(event: Event): boolean {
 		return this.closestTarget(event, PANEL_SELECTOR);
+	}
+
+	/** The element of the event's target's own ancestry that matches, if any. */
+	private closestElementOf(event: Event, selector: string): Element | undefined {
+		const target = eventTarget(event);
+		if (!isObject(target)) return undefined;
+		const closest = readRuntime(target, "closest");
+		if (typeof closest !== "function") return undefined;
+		try {
+			const found = Reflect.apply(closest, target, [selector]);
+			return isElement(found) ? found : undefined;
+		} catch {
+			return undefined;
+		}
 	}
 
 	private closestTarget(event: Event, selector: string): boolean {

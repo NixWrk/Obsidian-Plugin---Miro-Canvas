@@ -469,8 +469,10 @@ checked yet.
   keyboard is up.
 - **Gestures, as in Obsidian's Canvas.** One finger on empty board pans and
   two fingers pinch to zoom. A tap selects a card and a second tap edits it.
-  To move a card, hold it for a moment, then drag; a long press on empty
-  board draws a selection box, and a long press on a card opens its menu.
+  A card that is selected drags as soon as a finger or a pen presses it and
+  moves; one that is not selected moves after you hold it for a moment, then
+  drag. A long press on empty board draws a selection box, and a long press on
+  a card opens its menu.
 - **Handles** keep their small look but take a finger from about 40px around.
 - **A stylus.** An S Pen comes to the board as a pen, with its pressure and
   tilt, and the board notices it as soon as it hovers above the screen,

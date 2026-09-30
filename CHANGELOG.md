@@ -50,6 +50,14 @@
   draws) for half a second at the end of a pen or highlighter stroke and the
   whole stroke becomes a straight line from where it began, its end following
   the pointer until it lifts. On by default; Settings → Drawing turns it off.
+- On a tablet or a phone a card that is already selected drags as soon as
+  a finger or a pen presses it and moves, in one undo step. Native Canvas on a
+  touch screen moves a card only after a long press: a move that starts at
+  once panned the board with a finger and did nothing with a pen, and on a
+  selected card the browser took the move for a scroll of its own and called
+  the pointer back after three moves, so the card could be picked but never
+  dragged. A card that is not selected, a long press, two fingers and a hand
+  resting beside the pen are as before.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

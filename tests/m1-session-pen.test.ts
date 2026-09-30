@@ -588,3 +588,192 @@ describe("a pen held still at the end of a stroke", () => {
 		expect(hooks.toolGesture).toBeUndefined();
 	});
 });
+
+describe("a finger or a pen on a selected card", () => {
+	// Native Canvas on a touch screen drags a card only after a long press; a
+	// move that starts at once pans the board with a finger and does nothing
+	// with a pen.  Measured on the Galaxy Tab, in native Obsidian, in the main
+	// build and in this one alike: the first tap selects the card, and the
+	// next press that moves is called back by the browser (pointercancel)
+	// three moves in, so the card is picked but never dragged.  The styles keep
+	// the move on the page; the session carries it out.
+	const CARD = { x: 500, y: 360 };
+
+	/** A board whose first card is picked, as native Canvas marks a picked card. */
+	const pickedCard = (options: FixtureOptions = {}) => {
+		const board = fixture(options);
+		const card = board.nodes.values().next().value!;
+		card.nodeEl.classes.add("is-focused");
+		const released: number[] = [];
+		board.window.addEventListener("pointercancel", (event) => {
+			released.push((event as unknown as { pointerId: number }).pointerId);
+		});
+		/** One pointer event on the card. */
+		const onCard = (type: string, pointerId: number, pointerType: string, at: { x: number; y: number }, extra: Data = {}) =>
+			board.pointer(type, pointerId, pointerType, at, { target: card.nodeEl, isPrimary: pointerType === "touch", ...extra });
+		return { ...board, card, released, onCard };
+	};
+
+	it("drags the card a finger presses and moves, in one history step, without a pan from native Canvas", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { canvas, card, history, onCard, released, selected } = pickedCard();
+		onCard("pointerdown", 21, "touch", CARD);
+		// Native Canvas pans with a finger from its first move, before the card is taken up.
+		onCard("pointermove", 21, "touch", { x: 500, y: 362 });
+		canvas.setViewport(0, -2, 0);
+		expect(released).toEqual([]);
+		onCard("pointermove", 21, "touch", { x: 500, y: 368 });
+		// Native Canvas is told the finger is no longer its own, and the board goes back to where the press found it.
+		expect(released).toEqual([21]);
+		expect([canvas.tx, canvas.ty]).toEqual([0, 0]);
+		onCard("pointermove", 21, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 21, "touch", { x: 560, y: 400 });
+		expect([card.data.x, card.data.y]).toEqual([60, 40]);
+		expect(history).toHaveLength(1);
+		expect(selected()).toEqual(["plan"]);
+	});
+
+	it("drags it for a pen as well, which reports itself as no primary pointer on the Galaxy Tab", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard();
+		onCard("pointerdown", 22, "pen", CARD, { isPrimary: false });
+		onCard("pointermove", 22, "pen", { x: 520, y: 380 }, { isPrimary: false });
+		onCard("pointerup", 22, "pen", { x: 520, y: 380 }, { isPrimary: false });
+		// Native Canvas keeps no hold on a pen: nothing to hand over.
+		expect(released).toEqual([]);
+		expect([card.data.x, card.data.y]).toEqual([20, 20]);
+		expect(history).toHaveLength(1);
+	});
+
+	it("writes nothing for a tap, and nothing when the system takes the pointer back mid-drag", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { canvas, card, history, onCard, runFrames } = pickedCard();
+		const before = canvas.getData();
+		onCard("pointerdown", 23, "touch", CARD);
+		onCard("pointermove", 23, "touch", { x: 502, y: 361 });
+		onCard("pointerup", 23, "touch", { x: 502, y: 361 });
+		expect(history).toEqual([]);
+		onCard("pointerdown", 24, "touch", CARD);
+		onCard("pointermove", 24, "touch", { x: 540, y: 400 });
+		onCard("pointercancel", 24, "touch", { x: 540, y: 400 });
+		runFrames();
+		expect([card.data.x, card.data.y]).toEqual([0, 0]);
+		expect(history).toEqual([]);
+		expect(canvas.getData()).toEqual(before);
+	});
+
+	it("leaves a card that is not picked to native Canvas", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard();
+		card.nodeEl.classes.delete("is-focused");
+		onCard("pointerdown", 25, "touch", CARD);
+		onCard("pointermove", 25, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 25, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toEqual([]);
+	});
+
+	it("leaves a card being written in to its editor", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard();
+		card.nodeEl.classes.add("is-editing");
+		onCard("pointerdown", 26, "touch", CARD);
+		onCard("pointermove", 26, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 26, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(history).toEqual([]);
+	});
+
+	it("leaves a finger held as long as native Canvas's long press waits to native Canvas, which drags by itself", () => {
+		const now = vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard();
+		onCard("pointerdown", 27, "touch", CARD);
+		now.mockReturnValue(5_650);
+		onCard("pointermove", 27, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 27, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toEqual([]);
+	});
+
+	it("does not let go of native Canvas's hold on a finger for a press it does not carry out", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { canvas, card, history, nodes, onCard, released } = pickedCard();
+		// The page still marks the card as picked, but native Canvas has another one selected.
+		canvas.selectOnly(nodes.get("note")!);
+		onCard("pointerdown", 35, "touch", CARD);
+		onCard("pointermove", 35, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 35, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toEqual([]);
+	});
+
+	it("leaves a second finger to native Canvas, which pinches with it", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard();
+		onCard("pointerdown", 28, "touch", CARD, { isPrimary: true });
+		onCard("pointerdown", 29, "touch", { x: 560, y: 360 }, { isPrimary: false });
+		onCard("pointermove", 28, "touch", { x: 480, y: 360 });
+		onCard("pointermove", 29, "touch", { x: 600, y: 360 }, { isPrimary: false });
+		onCard("pointerup", 28, "touch", { x: 480, y: 360 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toEqual([]);
+	});
+
+	it("takes a touch for the hand that holds a pen near the board, which drags nothing", () => {
+		const now = vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard();
+		onCard("pointermove", 7, "pen", { x: 560, y: 380 }, { buttons: 0, pressure: 0 });
+		now.mockReturnValue(5_300);
+		onCard("pointerdown", 30, "touch", CARD);
+		onCard("pointermove", 30, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 30, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toEqual([]);
+	});
+
+	it("moves nothing on a locked card, so that a finger pans there as it always did", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, canvas, history, onCard, released } = pickedCard({ overrides: { plan: { locked: true } } });
+		onCard("pointerdown", 31, "touch", CARD);
+		canvas.setViewport(0, -6, 0);
+		onCard("pointermove", 31, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 31, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(canvas.ty).toBe(-6);
+		expect(history).toEqual([]);
+	});
+
+	it("leaves a picked frame to native Canvas, which takes the cards it holds along", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, history, onCard, released } = pickedCard({ nodes: [{ id: "plan", type: "group", label: "Frame", x: 0, y: 0, width: 200, height: 120 }] });
+		onCard("pointerdown", 32, "touch", CARD);
+		onCard("pointermove", 32, "touch", { x: 560, y: 400 });
+		onCard("pointerup", 32, "touch", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toEqual([]);
+	});
+
+	it("does not take up a press on the board's own bars over a card, nor one with a drawing tool armed", () => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const { card, hooks, history, onCard, released, pointer } = pickedCard();
+		const bar = new HostElement("miro-canvas-dock");
+		card.nodeEl.appendChild(bar);
+		pointer("pointerdown", 33, "touch", CARD, { target: bar });
+		pointer("pointermove", 33, "touch", { x: 560, y: 400 }, { target: bar });
+		pointer("pointerup", 33, "touch", { x: 560, y: 400 }, { target: bar });
+		hooks.armTool("pen");
+		onCard("pointerdown", 34, "pen", CARD);
+		onCard("pointermove", 34, "pen", { x: 560, y: 400 });
+		onCard("pointerup", 34, "pen", { x: 560, y: 400 });
+		expect(released).toEqual([]);
+		expect(card.data.x).toBe(0);
+		expect(history).toHaveLength(1);
+	});
+});

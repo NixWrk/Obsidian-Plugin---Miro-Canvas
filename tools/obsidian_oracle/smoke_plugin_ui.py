@@ -299,6 +299,24 @@ def main() -> int:
                   s.updatePanelPositions();
                   if(b.root.style.getPropertyValue('--miro-canvas-host-foot')||b.root.hasAttribute('data-miro-canvas-keyboard'))throw Error('A computer kept the phone layout');
                 }""")
+                # A tablet's own styles hand a finger's move on a picked card's text to
+                # the browser, which takes the pointer back: a picked card keeps it.
+                page.evaluate("""() => {
+                  const b=miroBrowser;
+                  const card=document.createElement('div');
+                  const content=card.appendChild(document.createElement('div'));content.className='canvas-node-content';
+                  const text=content.appendChild(document.createElement('div'));
+                  b.root.appendChild(card);
+                  const touchAction=(classes)=>{card.className=classes;return getComputedStyle(text).touchAction;};
+                  for(const classes of ['canvas-node is-focused','canvas-node is-selected'])
+                    if(touchAction(classes)!=='none')throw Error('A picked card lets the browser scroll under a finger: '+classes);
+                  for(const classes of ['canvas-node','canvas-node is-focused is-editing'])
+                    if(touchAction(classes)==='none')throw Error('A card not picked, or being written in, cannot scroll its text: '+classes);
+                  const frame=content.appendChild(document.createElement('iframe'));
+                  if(touchAction('canvas-node is-focused')==='none'||getComputedStyle(frame).touchAction==='none'||getComputedStyle(content).touchAction==='none')
+                    throw Error('A picked card that shows a web page cannot scroll it');
+                  card.remove();
+                }""")
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,c=b.runtime.getData().miroCanvas.connectors['menu-line'];
                   const at=s.viewportPoint(c.from),first={x:at.x-12,y:at.y-12},last={x:at.x+12,y:at.y+12};
@@ -805,6 +823,31 @@ def main() -> int:
                   b.root.dispatchEvent(new ClipboardEvent('paste',{clipboardData:own,bubbles:true,cancelable:true}));
                   check(b.runtime.nodes.size===initialCount+1,'Paste of a copy added no card');
                   b.runtime.undo(); b.session.refresh();
+                  // A finger that presses a picked card and moves drags it - native Canvas
+                  // drags with a finger only after a long press - in one history step.
+                  {
+                    b.select('n1');
+                    const card=b.node.nodeEl;
+                    card.classList.add('is-focused');
+                    const first=b.runtime.getData().nodes.find(n=>n.id==='n1'),touchSaves=b.getSaves();
+                    const at=card.getBoundingClientRect(),x=at.left+at.width/2,y=at.top+at.height/2;
+                    const finger={button:0,pointerId:71,pointerType:'touch',isPrimary:true,bubbles:true,cancelable:true};
+                    card.dispatchEvent(new PointerEvent('pointerdown',{...finger,clientX:x,clientY:y}));
+                    for(let step=1;step<=8;step++)window.dispatchEvent(new PointerEvent('pointermove',{...finger,clientX:x+step*10,clientY:y+step*5}));
+                    window.dispatchEvent(new PointerEvent('pointerup',{...finger,clientX:x+80,clientY:y+40}));
+                    const moved=b.runtime.getData().nodes.find(n=>n.id==='n1');
+                    check(moved.x>first.x&&moved.y>first.y,'A finger moving a picked card did not drag it: '+JSON.stringify([first.x,first.y,moved.x,moved.y]));
+                    check(b.getSaves()===touchSaves+1,'A finger dragging a card wrote '+(b.getSaves()-touchSaves)+' history steps');
+                    b.runtime.undo(); b.session.refresh();
+                    const undone=b.runtime.getData().nodes.find(n=>n.id==='n1');
+                    check(undone.x===first.x&&undone.y===first.y,'One undo did not put the dragged card back');
+                    card.classList.remove('is-focused');
+                    b.select('n1');
+                    card.dispatchEvent(new PointerEvent('pointerdown',{...finger,pointerId:72,clientX:x,clientY:y}));
+                    window.dispatchEvent(new PointerEvent('pointermove',{...finger,pointerId:72,clientX:x+60,clientY:y+30}));
+                    window.dispatchEvent(new PointerEvent('pointerup',{...finger,pointerId:72,clientX:x+60,clientY:y+30}));
+                    check(b.runtime.getData().nodes.find(n=>n.id==='n1').x===first.x,'A finger moving a card that is not picked dragged it');
+                  }
                   b.select('n1', 'file');
                   b.node.nodeEl.tabIndex = 0;
                   b.node.nodeEl.focus();

@@ -1326,6 +1326,19 @@
   display: none;
 }
 
+/* A card that is selected and not being written in has nothing on its text a
+   finger could scroll.  Left as it is the browser takes a move that starts
+   there for a scroll of its own and calls the pointer back (pointercancel)
+   after three moves - native mobile Canvas does the same - so a selected card
+   could be picked with a tap but never dragged.  The session moves the card
+   (`attachSelectionDrag`).  A card that shows a web page or another frame
+   keeps its own touch handling: what happens inside a frame never reaches the
+   board, and its page must stay scrollable. */
+.miro-canvas-root .canvas-node:is(.is-focused, .is-selected):not(.is-editing) .canvas-node-content:not(:has(iframe, webview)),
+.miro-canvas-root .canvas-node:is(.is-focused, .is-selected):not(.is-editing) .canvas-node-content:not(:has(iframe, webview)) * {
+  touch-action: none;
+}
+
 /* A line takes presses on its course only: the rest of its box lets them
    through to whatever lies under it.  Its own grips replace the box's. */
 .canvas-node.miro-source-line {
