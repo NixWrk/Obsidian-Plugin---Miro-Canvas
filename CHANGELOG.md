@@ -112,6 +112,13 @@
   button for its picker, in either orientation. Picking another tool, or this
   one again after another, opens its settings as before; the letters work as
   before.
+- A stylus hovering over a control of the board on a phone or a tablet shows
+  the control's name as a tooltip, in Obsidian's own look and after the delay
+  the control asks for. Obsidian shows no tooltips there, so the pictures on
+  the bars were unreadable to someone holding the pen. The tooltip goes when
+  the pen leaves the control or the screen's range, or touches the screen; a
+  finger never gets one, and on a computer nothing changes: the mouse keeps
+  Obsidian's own tooltips.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

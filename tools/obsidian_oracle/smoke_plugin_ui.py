@@ -628,6 +628,102 @@ def main() -> int:
                 page.evaluate("document.documentElement.style.removeProperty('--background-modifier-border')")
                 turn_bar('horizontal')
                 arm('select')
+                # A stylus hovering over a control of the board, on a phone or a tablet, shows the
+                # control's label as a tooltip in Obsidian's own classes, after the delay the
+                # control asks for, above or beside it and in view; it goes when the pen leaves,
+                # touches the screen or goes out of range.  A finger never shows one, nor does
+                # the mouse a browser makes of a pen it is driven with; on a computer no tooltip
+                # comes from here at all.  Real pen pointers, through the browser's own input.
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session;
+                  s.resetTools();
+                  s.commentDraft={type:'free',x:240,y:200};s.createComment('Pen tooltip');s.closeCommentThread();
+                  b.select('n1');
+                  s.armTool('pen');
+                }""")
+                viewport = page.viewport_size
+                pen_at = lambda x, y, **extra: cdp.send('Input.dispatchMouseEvent', {'type': 'mouseMoved', 'x': x, 'y': y, 'pointerType': 'pen', 'buttons': 0, **extra})
+                tip = page.locator('.tooltip.miro-canvas-pen-tooltip')
+
+                def hover_with_pen(selector, leave=True):
+                    control = page.locator(selector + ':visible').first
+                    box = control.bounding_box()
+                    assert box is not None, selector
+                    pen_at(2, 2)
+                    page.wait_for_timeout(50)
+                    pen_at(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                    delay = int(control.get_attribute('data-tooltip-delay') or 1000)
+                    page.wait_for_timeout(max(delay - 100, 0))
+                    before = tip.count()
+                    page.wait_for_timeout(250)
+                    found = {'before': before, 'count': tip.count(), 'control': box}
+                    if found['count'] == 1:
+                        shown = tip.first
+                        found.update({'text': shown.text_content(), 'box': shown.bounding_box(), 'class': shown.get_attribute('class'),
+                                      'label': control.get_attribute('aria-label')})
+                    if leave:
+                        pen_at(2, 2)
+                        page.wait_for_timeout(50)
+                        found['after'] = tip.count()
+                    return found
+
+                page.evaluate("document.body.classList.add('is-mobile')")
+                labelled = [
+                    ('the tool bar', '.miro-canvas-tools__more > button'),
+                    ('the pen settings', '.miro-canvas-tools__drawing [data-tool="highlighter"]'),
+                    ('the bar next to the pen', '.miro-canvas-tools [data-tool="text"]'),
+                    ('the dock', '.miro-canvas-dock button[aria-label]'),
+                    ('the selection toolbar', '[data-miro-canvas-toolbar] button[aria-label]'),
+                ]
+                for where, selector in labelled:
+                    found = hover_with_pen(selector)
+                    assert found['before'] == 0 and found['count'] == 1, f'No tooltip, or too early, for a pen over {where}: {found}'
+                    assert found['text'] == found['label'], (where, found)
+                    shown, control = found['box'], found['control']
+                    assert shown['x'] >= 0 and shown['y'] >= 0 and shown['x'] + shown['width'] <= viewport['width'] and shown['y'] + shown['height'] <= viewport['height'], (where, found)
+                    # Beside the control, not over it.
+                    assert shown['y'] + shown['height'] <= control['y'] + 1 or shown['y'] >= control['y'] + control['height'] - 1 \
+                        or shown['x'] + shown['width'] <= control['x'] + 1 or shown['x'] >= control['x'] + control['width'] - 1, (where, found)
+                    assert found['after'] == 0, f'The tooltip stayed when the pen left {where}: {found}'
+                # A comment thread's buttons too: a tool armed puts an open thread away, so with select armed.
+                arm('select')
+                page.evaluate("miroBrowser.root.querySelector('.miro-canvas-comment-marker')?.click()")
+                found = hover_with_pen('.miro-canvas-thread button[aria-label]')
+                assert found['before'] == 0 and found['count'] == 1 and found['text'] == found['label'] and found['after'] == 0, f'A pen over a comment thread: {found}'
+                page.evaluate("miroBrowser.session.closeCommentThread()")
+                # The bar's own pen button asks for its tooltip above it, in Obsidian's top class.
+                found = hover_with_pen('.miro-canvas-tools [data-tool="text"]')
+                assert 'mod-top' in found['class'] and found['box']['y'] + found['box']['height'] <= found['control']['y'], found
+                # It goes when the pen touches the screen, and is not shown again while it presses.
+                pen_at(2, 2)
+                control = page.locator('.miro-canvas-tools [data-tool="text"]:visible').first
+                box = control.bounding_box()
+                pen_at(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                page.wait_for_timeout(450)
+                assert tip.count() == 1
+                cdp.send('Input.dispatchMouseEvent', {'type': 'mousePressed', 'x': box['x'] + box['width'] / 2, 'y': box['y'] + box['height'] / 2,
+                                                      'button': 'left', 'buttons': 1, 'clickCount': 1, 'pointerType': 'pen', 'force': 0.3})
+                assert tip.count() == 0, 'The tooltip stayed when the pen touched the screen'
+                cdp.send('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'x': box['x'] + box['width'] / 2, 'y': box['y'] + box['height'] / 2,
+                                                      'button': 'left', 'buttons': 0, 'clickCount': 1, 'pointerType': 'pen'})
+                arm('select')
+                # A finger, and a mouse, never show one.
+                for pointer_type in ('touch', 'mouse'):
+                    page.evaluate("""(pointerType) => {
+                      const control=document.querySelector('.miro-canvas-tools [data-tool="sticky"]');
+                      control.dispatchEvent(new PointerEvent('pointerover',{pointerType,pointerId:31,bubbles:true}));
+                    }""", pointer_type)
+                    page.wait_for_timeout(450)
+                    assert tip.count() == 0, f'A {pointer_type} was given a tooltip'
+                    page.evaluate("""(pointerType) => document.querySelector('.miro-canvas-tools [data-tool="sticky"]').dispatchEvent(new PointerEvent('pointerout',{pointerType,pointerId:31,bubbles:true}))""", pointer_type)
+                # On a computer, a pen gets nothing from here: Obsidian's own tooltips serve the mouse.
+                page.evaluate("document.body.classList.remove('is-mobile')")
+                found = hover_with_pen('.miro-canvas-tools [data-tool="text"]')
+                assert found['count'] == 0, f'A computer was given the stylus tooltip: {found}'
+                pen_at(2, 2)
+                page.evaluate("""() => {
+                  const s=miroBrowser.session;s.resetTools();s.closeCommentThread();miroBrowser.select('n1');
+                }""")
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,c=b.runtime.getData().miroCanvas.connectors['menu-line'];
                   const at=s.viewportPoint(c.from),first={x:at.x-12,y:at.y-12},last={x:at.x+12,y:at.y+12};

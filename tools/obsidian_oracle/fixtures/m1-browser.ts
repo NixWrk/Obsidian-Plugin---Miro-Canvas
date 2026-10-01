@@ -2,6 +2,7 @@ import { M1CanvasSession, nativeToolbarItemOf } from "../../../src/m1-session";
 import { normalizeSettings } from "../../../src/settings";
 import { ALL_TOOLBAR_ITEMS, QuickTools } from "../../../src/quick-tools";
 import { applyPanelPositionSettled } from "../../../src/panel-layout";
+import { PenTooltips } from "../../../src/pen-tooltips";
 import { M2CanvasTools } from "../../../src/m2-tools";
 import { MetadataWriter } from "../../../src/metadata-writer";
 import { createObsidianMetadataStore } from "../../../src/obsidian-metadata-store";
@@ -280,6 +281,10 @@ placeCanvas = () => {
 placeCanvas();
 const mounted = session.mount();
 
+// A stylus's hover text, which the plugin shows on a phone or a tablet only: here, while the page's body says it is one.
+const penTooltips = new PenTooltips({ isMobile: () => document.body.classList.contains("is-mobile") });
+penTooltips.attach(document);
+
 const openCalls: LocalDocument[] = [];
 const documentHost = {
   hasFile: (path: string) => path === "attachments/Spec.pdf",
@@ -349,7 +354,7 @@ const browser: Record<string, unknown> = {
   getHistoryIndex: () => historyIndex,
   sourceUnchanged: () => JSON.stringify(runtime.data.miroSource) === JSON.stringify(initial.miroSource),
   unknownsPreserved,
-  dispose: () => { m2?.dispose(); session.dispose(); },
+  dispose: () => { m2?.dispose(); penTooltips.dispose(); session.dispose(); },
   checkPreexistingReadonly: () => {
     runtime.readonly = true;
     const before = saves;

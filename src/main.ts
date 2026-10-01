@@ -46,6 +46,7 @@ import { setAuthorColors } from "./comment-thread";
 import { layerActions } from "./layer-order";
 import { localeFor, setLocale, words } from "./i18n";
 import { createWelcomeBoard } from "./welcome-board";
+import { PenTooltips } from "./pen-tooltips";
 import { canImportFile, importIntoBoard, showImportPreview } from "./import-command";
 import { automaticCheckDue, checkForUpdate, isNewerVersion, type ReleaseRequest, type UpdateCheck } from "./update-check";
 
@@ -145,6 +146,8 @@ export default class MiroCanvasPlugin extends Plugin {
   public canvasSettings: MiroCanvasSettings = DEFAULT_SETTINGS;
   /** The `<style>` this plugin owns in every window's head; loads a family's faces lazily, only once something wants it. */
   private readonly fontFaces = new FontFaceRegistry();
+  /** The hover text of a stylus, which Obsidian's own tooltips do not show on a phone or a tablet; every window gets it, and the computer's none. */
+  private readonly penTooltips = new PenTooltips({ isMobile: () => Platform.isMobile });
   /** The installed packs' manifests, kept for the font-face catalog and for what a removal drops from the pool. */
   private installedFontPackManifests: readonly FontPackManifest[] = [];
 
@@ -163,8 +166,15 @@ export default class MiroCanvasPlugin extends Plugin {
     // face's bytes are read only once something wants that family.
     this.fontFaces.setFileReader((path) => this.app.vault.adapter.readBinary(path));
     this.fontFaces.attach(document);
-    this.registerEvent(this.app.workspace.on("window-open", (_win, openedWindow) => this.fontFaces.attach(openedWindow.document)));
-    this.registerEvent(this.app.workspace.on("window-close", (_win, closedWindow) => this.fontFaces.detach(closedWindow.document)));
+    this.penTooltips.attach(document);
+    this.registerEvent(this.app.workspace.on("window-open", (_win, openedWindow) => {
+      this.fontFaces.attach(openedWindow.document);
+      this.penTooltips.attach(openedWindow.document);
+    }));
+    this.registerEvent(this.app.workspace.on("window-close", (_win, closedWindow) => {
+      this.fontFaces.detach(closedWindow.document);
+      this.penTooltips.detach(closedWindow.document);
+    }));
     await this.loadFontPacks();
     this.addSettingTab(new MiroCanvasSettingTab(this.app, this, {
       get settings(): MiroCanvasSettings { return self.canvasSettings; },
@@ -456,6 +466,7 @@ export default class MiroCanvasPlugin extends Plugin {
   override onunload(): void {
     this.disposeShell();
     this.fontFaces.dispose();
+    this.penTooltips.dispose();
   }
 
   private readonly handleActiveLeafChange = (

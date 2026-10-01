@@ -504,7 +504,9 @@ expected to behave the same but are not checked yet.
   width you chose, pressing harder widens it and a light touch narrows it a
   little. Stop the pen for half a second at the end of a stroke to turn it
   into a straight line. The pen's side button never reaches Obsidian, so it
-  does nothing on the board.
+  does nothing on the board. Hold the pen above a button and its name shows
+  as a tooltip after the delay the button asks for; it goes when the pen
+  leaves, touches the screen or goes out of range.
 - **Other plugins.** With Canvas Minimap on, its see-through map covers the
   lower part of the board; a tap on this plugin's bars no longer moves the
   board through it. With Advanced Canvas's portals on, a card whose id has a

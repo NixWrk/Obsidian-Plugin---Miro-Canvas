@@ -7,6 +7,8 @@
  * the pictures, whose only words are their hover text, answer sooner still.
  */
 export const TOOLTIP_DELAY = "500";
+/** Obsidian's own wait, for a control that names none: what a stylus waits too (`PenTooltips`). */
+export const OBSIDIAN_TOOLTIP_DELAY = "1000";
 /** The selection toolbar and the corner dock, used all the time. */
 export const BAR_TOOLTIP_DELAY = "200";
 /** A picture - a shape, an end, a colour - whose name is its hover text. */

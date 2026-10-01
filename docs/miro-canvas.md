@@ -575,6 +575,15 @@ selected card, it also covers that card's outline and resize handles.
   `foldedSettings`, cleared when the armed tool changes; `aria-expanded` on the
   pen's and the lines' buttons; the shape picker is the popover it always was).
   The kinds of drawing inside the pen's settings do not fold them.
+- A stylus's hover text (`src/pen-tooltips.ts`, attached to every window by
+  `main.ts`, on phones and tablets only): Obsidian's tooltips wait for mouse
+  events and the mobile app shows none.  A pen over a labelled control of the
+  plugin, not touching the screen, shows the label as an element with
+  Obsidian's own classes (`tooltip`, `mod-top`...), placed by
+  `data-tooltip-position` and kept in view, after `data-tooltip-delay`
+  (Obsidian's second when unset).  A browser driven with a pen (CDP's
+  `Input.dispatchMouseEvent` with `pointerType: "pen"`) also makes a mouse
+  pointer of it; other pointers neither show nor take away the pen's tooltip.
 
 ### Files and documents
 
