@@ -1466,6 +1466,25 @@ def main() -> int:
                 assert page.evaluate("miroBrowser.node.nodeEl.classList.contains('is-editing')"), "A double click on a card did not open it for writing"
                 assert node_count() == cards_before, "A double click on a card made a card"
                 page.evaluate("miroBrowser.node.nodeEl.classList.remove('is-editing')")
+                # Native Canvas ignores a double click while a button has the keyboard focus, and its
+                # press on the board does not move the focus off the tool just used: a card still
+                # opens on a double click right after a tool of the bar was clicked.
+                for first in ('[data-tool-group="drawing"]', '[data-tool="lasso"]'):
+                    page.locator(f'.miro-canvas-tools {first}').click()
+                    page.locator('.miro-canvas-tools [data-tool="select"]').click()
+                    bar_has_focus = page.evaluate("document.activeElement?.closest('.miro-canvas-tools button') != null")
+                    assert bar_has_focus, "The bar's button does not hold the focus after a click, so this check proves nothing"
+                    card_at = page.evaluate("""() => {
+                      const b = miroBrowser, r = b.node.nodeEl.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+                      return {x, y, covered: document.elementFromPoint(x, y)?.closest('.canvas-node') !== b.node.nodeEl};
+                    }""")
+                    assert not card_at["covered"], f"The middle of the card is covered after {first}"
+                    page.mouse.dblclick(card_at["x"], card_at["y"])
+                    opened = page.evaluate("miroBrowser.node.nodeEl.classList.contains('is-editing')")
+                    assert opened, f"A double click on a card right after the bar's {first} did not open it for writing"
+                    assert page.evaluate("document.activeElement?.closest('button, input') == null"), "The bar's button kept the focus through a press on the board"
+                    page.evaluate("miroBrowser.node.nodeEl.classList.remove('is-editing')")
+                page.evaluate("miroBrowser.session.resetTools()")
                 card_button = page.locator('.miro-canvas-tools .canvas-card-menu-button[aria-label="Drag to add card"]')
                 card_button.click()
                 assert node_count() == cards_before, "A click on the card button made a card"

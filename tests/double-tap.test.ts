@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DOUBLE_TAP_MS, DOUBLE_TAP_REACH, DoubleTapWatch, TAP_MAX_MS, TAP_SLOP } from "../src/double-tap";
+import { DOUBLE_TAP_MS, DOUBLE_TAP_REACH, DoubleTapWatch, RecentPresses, TAP_MAX_MS, TAP_SLOP } from "../src/double-tap";
 
 /** One tap of a finger: down, then up, `lasted` milliseconds later, `moved` pixels to the right. */
 function tap(watch: DoubleTapWatch, id: number, at: { x: number; y: number }, now: number, options: { lasted?: number; moved?: number; counts?: boolean } = {}): boolean {
@@ -92,5 +92,53 @@ describe("a double tap of a finger or a pen", () => {
 
   it("answers nothing for a lift it never saw land", () => {
     expect(new DoubleTapWatch().release(9, { x: 0, y: 0 }, 1_000)).toBe(false);
+  });
+});
+
+describe("the last two presses on the board", () => {
+  it("make a double click a hand's when either press came down beside the pen", () => {
+    const presses = new RecentPresses();
+    presses.note(true, 1_000);
+    presses.note(true, 1_100);
+    expect(presses.handMadeDoubleClick(1_200)).toBe(true);
+    const mixed = new RecentPresses();
+    mixed.note(false, 1_000);
+    mixed.note(true, 1_100);
+    expect(mixed.handMadeDoubleClick(1_200)).toBe(true);
+    const first = new RecentPresses();
+    first.note(true, 1_000);
+    first.note(false, 1_100);
+    expect(first.handMadeDoubleClick(1_200)).toBe(true);
+  });
+
+  it("make it no hand's when neither did, as for a finger away from the pen, a pen or a mouse", () => {
+    const presses = new RecentPresses();
+    presses.note(false, 1_000);
+    presses.note(false, 1_100);
+    expect(presses.handMadeDoubleClick(1_200)).toBe(false);
+    expect(new RecentPresses().handMadeDoubleClick(1_200)).toBe(false);
+  });
+
+  it("keep only the last two: an older hand is not part of a later double click", () => {
+    const presses = new RecentPresses();
+    presses.note(true, 1_000);
+    presses.note(false, 1_100);
+    presses.note(false, 1_200);
+    expect(presses.handMadeDoubleClick(1_300)).toBe(false);
+  });
+
+  it("forget a hand's press after a second: a double click that late is not made of it", () => {
+    const presses = new RecentPresses();
+    presses.note(true, 1_000);
+    presses.note(false, 1_050);
+    expect(presses.handMadeDoubleClick(2_000)).toBe(true);
+    expect(presses.handMadeDoubleClick(2_001)).toBe(false);
+  });
+
+  it("are forgotten when the board is put away", () => {
+    const presses = new RecentPresses();
+    presses.note(true, 1_000);
+    presses.reset();
+    expect(presses.handMadeDoubleClick(1_100)).toBe(false);
   });
 });

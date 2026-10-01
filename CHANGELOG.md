@@ -10,7 +10,13 @@
   or a spline is still that line's own. A finger's or a pen's double tap is
   timed by the plugin, since the browser sends no double click for a touch
   that Canvas has taken for itself. With a drawing tool armed the two taps
-  leave the dots they draw, then act as Escape.
+  leave the dots they draw, then act as Escape. A touch that lands beside the
+  pen is the hand that holds it, never a tap of a double tap.
+- A card now opens on a double tap or a double click right after a tool of the
+  bar was used. Canvas ignores a double click while a button has the
+  keyboard focus, and a press on the board did not take the focus off the
+  tool just pressed; now it does. A card being written in, the search field
+  and every other text field keep their focus.
 - Canvas's own card, note and file buttons (and the slide and group buttons
   on a tablet) now only pick the tool: a press arms the button, lit as the
   other tools are, and the next press on the board places the item there, once,

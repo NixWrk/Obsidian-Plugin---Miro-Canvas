@@ -58,9 +58,27 @@ class HostElement extends EventTarget {
 	querySelector(): null { return null; }
 	querySelectorAll(): HostElement[] { return []; }
 	getBoundingClientRect() { return { left: 0, top: 0, right: this.clientWidth, bottom: this.clientHeight, width: this.clientWidth, height: this.clientHeight }; }
+	focus() {
+		const document = this.ownerDocument as { activeElement?: unknown } | undefined;
+		if (document !== undefined) document.activeElement = this;
+	}
+	blur() {
+		const document = this.ownerDocument as { activeElement?: unknown; body?: unknown } | undefined;
+		if (document?.activeElement === this) document.activeElement = document.body;
+	}
+	/** One simple selector: a tag (`button`), classes (`.a.b`) or an attribute (`[contenteditable=true]`). */
+	private matches(part: string): boolean {
+		if (part.startsWith(".")) {
+			const own = this.className.split(" ");
+			return part.slice(1).split(".").every((name) => own.includes(name));
+		}
+		const attribute = /^\[([\w-]+)=([^\]]*)\]$/u.exec(part);
+		if (attribute !== null) return this.attributes.get(attribute[1]!) === attribute[2];
+		return part.toUpperCase() === this.tagName;
+	}
 	closest(selector: string): HostElement | null {
 		for (const part of selector.split(",").map((value) => value.trim())) {
-			if (part.startsWith(".") && this.className.split(" ").includes(part.slice(1))) return this;
+			if (this.matches(part)) return this;
 		}
 		return this.parentElement?.closest(selector) ?? null;
 	}
@@ -87,6 +105,7 @@ interface Hooks {
 	armNative(button: unknown): void;
 	resetTools(): void;
 	startToolGesture(event: Event): void;
+	handleToolKey(event: Event): void;
 	armedTool: string;
 	armedNative: unknown;
 	toolGesture: unknown;
@@ -113,6 +132,7 @@ function fixture() {
 	};
 	const document = Object.assign(new EventTarget(), {
 		body: new HostElement("", "BODY"),
+		activeElement: null as unknown,
 		defaultView: window,
 		createElement: (tagName: string) => element(tagName),
 		createElementNS: (_namespace: string, tagName: string) => element(tagName),
@@ -188,7 +208,21 @@ function fixture() {
 		vi.advanceTimersByTime(held);
 		pointer("pointerup", id, kind, target, at);
 	};
-	return { window, root, canvas, nodes, session, hooks, cardEl, selected, make, pointer, tap };
+	/** A control of the plugin's in its bar on the board: a button, by default, or a slider or a field. */
+	const barControl = (tagName = "BUTTON", type?: string): HostElement => {
+		let bar = root.children.find((child) => child.className === "miro-canvas-toolbar");
+		if (bar === undefined) {
+			bar = root.appendChild(new HostElement("miro-canvas-toolbar"));
+			bar.ownerDocument = document;
+		}
+		const control = bar.appendChild(new HostElement("", tagName));
+		control.ownerDocument = document;
+		if (type !== undefined) control.setAttribute("type", type);
+		return control;
+	};
+	/** The pen hovers over the board, as a tablet reports it every few milliseconds. */
+	const hoverPen = (): Event => pointer("pointermove", 9, "pen", root, { x: 700, y: 300 }, { buttons: 0 });
+	return { window, document, root, canvas, nodes, session, hooks, cardEl, selected, make, pointer, tap, barControl, hoverPen };
 }
 
 describe("a double click on the board", () => {
@@ -490,5 +524,297 @@ describe("a native Canvas button armed on the bar", () => {
 		vi.advanceTimersByTime(1_000);
 		expect(replayNativeDrag).not.toHaveBeenCalled();
 		expect(hooks.armedTool).toBe("select");
+	});
+});
+
+describe("a hand beside the pen", () => {
+	it("makes no double tap: two touches that land while the pen is near are no pair, though they lift as a finger does", () => {
+		const { root, hooks, tap, hoverPen } = fixture();
+		hooks.armTool("lasso");
+		hoverPen();
+		tap(1, "touch", root);
+		vi.advanceTimersByTime(100);
+		tap(2, "touch", root);
+		vi.advanceTimersByTime(10);
+		expect(hooks.armedTool).toBe("lasso");
+	});
+
+	it("makes no Escape of the double click the browser sends for them, and no card either", () => {
+		const { root, hooks, selected, tap, make, hoverPen } = fixture();
+		const native = vi.fn();
+		root.addEventListener("dblclick", native);
+		hooks.armTool("lasso");
+		hoverPen();
+		tap(1, "touch", root);
+		vi.advanceTimersByTime(100);
+		tap(2, "touch", root);
+		const event = make("dblclick", root);
+		root.dispatchEvent(event);
+		vi.advanceTimersByTime(10);
+		// Nothing is put away, and native Canvas, which would make a card there, never hears of it.
+		expect(hooks.armedTool).toBe("lasso");
+		expect(selected()).toEqual(["plan"]);
+		expect(event.defaultPrevented).toBe(true);
+		expect(native).not.toHaveBeenCalled();
+	});
+
+	it("is no pair when only the second touch came down beside the pen, and breaks the pair a finger began", () => {
+		const { root, hooks, tap, make, hoverPen } = fixture();
+		hooks.armTool("lasso");
+		tap(1, "touch", root);
+		vi.advanceTimersByTime(100);
+		hoverPen();
+		tap(2, "touch", root);
+		root.dispatchEvent(make("dblclick", root));
+		vi.advanceTimersByTime(10);
+		expect(hooks.armedTool).toBe("lasso");
+		// The next tap is the first of a pair of its own; the pen is still near.
+		tap(3, "touch", root);
+		vi.advanceTimersByTime(10);
+		expect(hooks.armedTool).toBe("lasso");
+	});
+
+	it("spoils nothing once the pen has been away: the next double tap, and double click, are Escape again", () => {
+		const { root, hooks, tap, make, hoverPen } = fixture();
+		hooks.armTool("lasso");
+		hoverPen();
+		tap(1, "touch", root);
+		// The pen is out of reach for more than a second and a half.
+		vi.advanceTimersByTime(2_000);
+		tap(2, "touch", root);
+		vi.advanceTimersByTime(100);
+		tap(3, "touch", root);
+		vi.advanceTimersByTime(10);
+		expect(hooks.armedTool).toBe("select");
+		hooks.armTool("lasso");
+		hoverPen();
+		tap(4, "touch", root);
+		// A double click a second after a hand's press is not that hand's.
+		vi.advanceTimersByTime(1_100);
+		root.dispatchEvent(make("dblclick", root));
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("leaves a pen's own double tap and double click, and a mouse's while the pen hovers, as Escape", () => {
+		const { root, hooks, tap, make, hoverPen } = fixture();
+		hooks.armTool("lasso");
+		tap(7, "pen", root);
+		vi.advanceTimersByTime(100);
+		tap(7, "pen", root);
+		root.dispatchEvent(make("dblclick", root));
+		expect(hooks.armedTool).toBe("select");
+		vi.advanceTimersByTime(1_000);
+		// A mouse beside a hovering pen is no hand.
+		hooks.armTool("lasso");
+		hoverPen();
+		tap(1, "mouse", root);
+		vi.advanceTimersByTime(100);
+		tap(1, "mouse", root);
+		root.dispatchEvent(make("dblclick", root));
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("leaves a finger's double tap alone on a device that has a pen, while the pen is away, with a drawing tool armed too", () => {
+		const { root, hooks, tap } = fixture();
+		hooks.stylus = new StylusWatch({ seen: true });
+		hooks.armTool("lasso");
+		tap(1, "touch", root);
+		vi.advanceTimersByTime(100);
+		tap(2, "touch", root);
+		vi.advanceTimersByTime(10);
+		expect(hooks.armedTool).toBe("select");
+		hooks.armTool("pen");
+		tap(3, "touch", root);
+		vi.advanceTimersByTime(100);
+		tap(4, "touch", root);
+		vi.advanceTimersByTime(10);
+		expect(hooks.armedTool).toBe("select");
+	});
+});
+
+describe("one Escape for each double tap", () => {
+	it("is done once when the WebView sends the double click as well: the double click first, then the pair of taps", () => {
+		const { root, session, hooks, tap, make } = fixture();
+		const reset = vi.spyOn(session, "resetTools");
+		hooks.armTool("lasso");
+		tap(1, "touch", root);
+		vi.advanceTimersByTime(100);
+		tap(2, "touch", root);
+		const event = make("dblclick", root);
+		root.dispatchEvent(event);
+		expect(reset).toHaveBeenCalledTimes(1);
+		expect(event.defaultPrevented).toBe(true);
+		// The pair's own Escape, a moment later, finds it done.
+		vi.advanceTimersByTime(10);
+		expect(reset).toHaveBeenCalledTimes(1);
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("is done once the other way round too, and the double click that follows still opens nothing", () => {
+		const { root, session, hooks, cardEl, tap, make } = fixture();
+		const reset = vi.spyOn(session, "resetTools");
+		const native = vi.fn();
+		root.addEventListener("dblclick", native);
+		// A drawing tool takes the card under the taps for board: the pair puts the tool away first.
+		hooks.armTool("pen");
+		tap(1, "touch", cardEl);
+		vi.advanceTimersByTime(100);
+		tap(2, "touch", cardEl);
+		vi.advanceTimersByTime(1);
+		expect(reset).toHaveBeenCalledTimes(1);
+		expect(hooks.armedTool).toBe("select");
+		const event = make("dblclick", cardEl);
+		root.dispatchEvent(event);
+		expect(reset).toHaveBeenCalledTimes(1);
+		expect(event.defaultPrevented).toBe(true);
+		expect(native).not.toHaveBeenCalled();
+	});
+
+	it("is done once for a mouse, whose double click is alone, and again for the next double click, however soon", () => {
+		const { root, session, hooks, make } = fixture();
+		const reset = vi.spyOn(session, "resetTools");
+		root.dispatchEvent(make("dblclick", root));
+		expect(reset).toHaveBeenCalledTimes(1);
+		hooks.armTool("lasso");
+		root.dispatchEvent(make("dblclick", root));
+		expect(reset).toHaveBeenCalledTimes(2);
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("is done again for the next double tap, once the first one is over", () => {
+		const { root, session, hooks, tap, make } = fixture();
+		const reset = vi.spyOn(session, "resetTools");
+		for (const first of [1, 3]) {
+			hooks.armTool("lasso");
+			tap(first, "touch", root);
+			vi.advanceTimersByTime(100);
+			tap(first + 1, "touch", root);
+			root.dispatchEvent(make("dblclick", root));
+			vi.advanceTimersByTime(10);
+			// Past the moment in which the same double tap is seen a second time.
+			vi.advanceTimersByTime(300);
+		}
+		expect(reset).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not hold back a card's double click because an Escape came a while ago", () => {
+		const { root, cardEl, make } = fixture();
+		root.dispatchEvent(make("dblclick", root));
+		vi.advanceTimersByTime(400);
+		const native = vi.fn();
+		root.addEventListener("dblclick", native);
+		const event = make("dblclick", cardEl);
+		root.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		expect(native).toHaveBeenCalledOnce();
+	});
+});
+
+describe("a press on the board while a control of the plugin has the focus", () => {
+	it("takes the focus off the control and gives it to the board, so native Canvas sees no focused button", () => {
+		const { document, root, pointer, barControl } = fixture();
+		const button = barControl();
+		button.focus();
+		expect(document.activeElement).toBe(button);
+		pointer("pointerdown", 1, "touch", root);
+		expect(document.activeElement).toBe(root);
+	});
+
+	it("does so for a press on a card, and for a mouse and a pen as for a finger", () => {
+		const { document, root, cardEl, pointer, barControl } = fixture();
+		const button = barControl();
+		for (const kind of ["touch", "mouse", "pen"]) {
+			button.focus();
+			pointer("pointerdown", 1, kind, cardEl);
+			expect(document.activeElement, kind).toBe(root);
+		}
+	});
+
+	it("lets go of a slider or a swatch as of a button, and of a role that is a button", () => {
+		const { document, root, pointer, barControl } = fixture();
+		for (const control of [barControl("INPUT", "range"), barControl("INPUT", "color"), barControl("DIV")]) {
+			if (control.tagName === "DIV") control.setAttribute("role", "button");
+			control.focus();
+			pointer("pointerdown", 1, "touch", root);
+			expect(document.activeElement).toBe(root);
+		}
+	});
+
+	it("leaves a field somebody is writing in, in the bar or out of it", () => {
+		const { document, root, pointer, barControl } = fixture();
+		const fields = [barControl("INPUT", "text"), barControl("INPUT", "number"), barControl("INPUT"), barControl("TEXTAREA")];
+		// The search field, a comment's reply box and a card's editor are not in the bar, but are plugin panels or the board's own.
+		const reply = new HostElement("miro-canvas-thread");
+		reply.ownerDocument = document;
+		root.appendChild(reply);
+		const replyBox = reply.appendChild(new HostElement("", "TEXTAREA"));
+		replyBox.ownerDocument = document;
+		for (const field of [...fields, replyBox]) {
+			field.focus();
+			pointer("pointerdown", 1, "touch", root);
+			expect(document.activeElement).toBe(field);
+		}
+	});
+
+	it("leaves a focus that is not on a control of the plugin's: a card's editor, or a button elsewhere", () => {
+		const { document, root, pointer } = fixture();
+		const editor = root.appendChild(new HostElement("canvas-node-content", "DIV"));
+		editor.ownerDocument = document;
+		const outside = new HostElement("workspace-button", "BUTTON");
+		outside.ownerDocument = document;
+		for (const element of [editor, outside]) {
+			element.focus();
+			pointer("pointerdown", 1, "touch", root);
+			expect(document.activeElement).toBe(element);
+		}
+	});
+
+	it("leaves the focus where a press on a control of the plugin's put it, and a press outside the board", () => {
+		const { document, root, pointer, barControl } = fixture();
+		const first = barControl();
+		const second = barControl();
+		first.focus();
+		pointer("pointerdown", 1, "touch", second);
+		expect(document.activeElement).toBe(first);
+		const outside = new HostElement("workspace-tab");
+		pointer("pointerdown", 1, "touch", outside);
+		expect(document.activeElement).toBe(first);
+		expect(root.contains(outside)).toBe(false);
+	});
+
+	it("does not touch the focus on the board, or on nothing at all", () => {
+		const { document, root, pointer } = fixture();
+		pointer("pointerdown", 1, "touch", root);
+		expect(document.activeElement).toBeNull();
+		root.focus();
+		pointer("pointerdown", 1, "touch", root);
+		expect(document.activeElement).toBe(root);
+	});
+
+	it("leaves the board's keys working: a tool's letter, Escape, and the guard on Delete reach the board", () => {
+		const { window, document, root, canvas, nodes, hooks, session, pointer, make, barControl } = fixture();
+		const leaf = new HostElement("workspace-leaf mod-active");
+		leaf.appendChild(root);
+		const key = (type: string, name: string, code: string, target: unknown): Event => make(type, target, {
+			key: name, code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false,
+		});
+		const button = barControl();
+		button.focus();
+		pointer("pointerdown", 1, "touch", root);
+		const focused = document.activeElement;
+		expect(focused).toBe(root);
+		// A tool's letter, which the document hears and the session reads off the key's own target.
+		hooks.handleToolKey(key("keydown", "p", "KeyP", focused));
+		expect(hooks.armedTool).toBe("pen");
+		// Escape, heard by the window.
+		window.dispatchEvent(key("keydown", "Escape", "Escape", focused));
+		expect(hooks.armedTool).toBe("select");
+		// Delete is the board's own to guard: with a button focused it was a press in the bar and was let through.
+		// (Escape put the pick away; a card is picked again for it to act on.)
+		canvas.selectOnly(nodes.get("plan")!);
+		session.toggleReviewMode();
+		const refused = key("keydown", "Delete", "Delete", focused);
+		root.dispatchEvent(refused);
+		expect(refused.defaultPrevented).toBe(true);
 	});
 });

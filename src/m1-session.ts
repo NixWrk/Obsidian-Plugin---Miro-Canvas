@@ -117,7 +117,8 @@ import { CommentMarkers } from "./comment-markers";
 import { matchesPointer } from "./pointer-bindings";
 import { PalmRewind, pressedPressure, strokeWidthScale, StylusWatch } from "./stylus";
 import { PickedCardMarks, type BoardWatcher, type CardChange } from "./picked-cards";
-import { DoubleTapWatch } from "./double-tap";
+import { DoubleTapWatch, RecentPresses } from "./double-tap";
+import { controlToLetGo } from "./board-focus";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
@@ -243,6 +244,10 @@ const CARD_DRAG_SLOP = 5;
 const NATIVE_LONG_PRESS_MS = 600;
 /** How long the double-click that finished a polyline or a spline stays that line's own, and is no Escape. */
 const LINE_FINISH_DOUBLE_CLICK_MS = 500;
+/** How soon after one signal of a double press did its Escape the other signal of the same double press is skipped. */
+const SAME_DOUBLE_PRESS_MS = 100;
+/** What tells the board of a double press: the browser's own `dblclick`, or the plugin's own pair of taps. */
+type DoublePressSignal = "dblclick" | "taps";
 /** How long a native item waits for the click that ends the press which places it, before it is placed without. */
 const NATIVE_PLACE_WAIT_MS = 350;
 
@@ -1614,6 +1619,10 @@ export class M1CanvasSession {
 	private suppressContextUntil = 0;
 	/** When a polyline or a spline last finished: the double-click that closed it is that line's own, not an Escape. */
 	private lineFinishedAt = 0;
+	/** What last did a double press's Escape, and when: its double click and its pair of taps may both arrive, and the second finds it done. */
+	private doublePressEscape: { readonly by: DoublePressSignal; readonly at: number } | undefined;
+	/** The last two presses on the board: they tell a hand's double touch from a finger's, a pen's and a mouse's when the browser sends `dblclick`. */
+	private readonly recentPresses = new RecentPresses();
 	/** A polyline or spline being placed a click at a time. */
 	private linePlacing: {
 		readonly spec: LineKindSpec;
@@ -3393,6 +3402,7 @@ export class M1CanvasSession {
 		this.attachHandAndPen();
 		this.attachSelectionDrag();
 		this.attachDoubleTap();
+		this.attachBoardFocus();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
 		// A press on the plugin's own bars and cards is theirs alone and ends at
@@ -4067,6 +4077,11 @@ export class M1CanvasSession {
 	 * click for it - a double tap is two taps and nothing more.  The Escape
 	 * waits for the second tap to be over, so the board has finished with it:
 	 * a pen leaves the dot that one tap would.
+	 *
+	 * A hand that comes down beside the pen - a palm, or the hand that holds
+	 * it - is no double tap: its touch counts towards no pair, and the double
+	 * click of two such touches is no Escape either.  A pen's own double tap,
+	 * and a finger's with no pen near, are.
 	 */
 	private attachDoubleTap(): void {
 		const view = this.root?.ownerDocument?.defaultView;
@@ -4074,21 +4089,74 @@ export class M1CanvasSession {
 		const taps = new DoubleTapWatch();
 		this.listen(view, "pointerdown", (event) => {
 			const press = event as PointerEvent;
-			if (press.pointerType === "mouse" || this.ownPointerEvents.has(press)) return;
-			taps.press(press.pointerId, { x: press.clientX, y: press.clientY }, Date.now(), this.doublePressCounts(press));
+			if (this.ownPointerEvents.has(press)) return;
+			const byHand = this.pressIsHand(press);
+			this.recentPresses.note(byHand, Date.now());
+			if (press.pointerType === "mouse") return;
+			taps.press(press.pointerId, { x: press.clientX, y: press.clientY }, Date.now(), !byHand && this.doublePressCounts(press));
 		}, true);
 		this.listen(view, "pointerup", (event) => {
 			const lift = event as PointerEvent;
 			if (lift.pointerType === "mouse" || this.ownPointerEvents.has(lift)) return;
 			if (!taps.release(lift.pointerId, { x: lift.clientX, y: lift.clientY }, Date.now())) return;
 			view.setTimeout(() => {
-				if (!this.disposed) this.resetTools();
+				if (!this.disposed) this.escapeOnDoublePress("taps");
 			}, 0);
 		}, true);
 		this.listen(view, "pointercancel", (event) => {
 			if (!this.ownPointerEvents.has(event)) taps.cancel((event as PointerEvent).pointerId);
 		}, true);
-		this.listen(view, "blur", () => taps.reset());
+		this.listen(view, "blur", () => {
+			taps.reset();
+			this.recentPresses.reset();
+		});
+	}
+
+	/** Whether a press is a hand beside the pen: a touch that lands while the pen is near is the palm, or the hand that holds it. */
+	private pressIsHand(press: PointerEvent): boolean {
+		return press.pointerType === "touch" && this.stylus.touchIsHand(Date.now(), false);
+	}
+
+	/**
+	 * Escape for a double press, done once.  Where the WebView also sends
+	 * `dblclick` for a double tap, the double click and the pair of taps both
+	 * arrive within a few milliseconds: whichever comes first does the
+	 * Escape, and the other finds it done.  Two double clicks, or two double
+	 * taps, one after the other are two Escapes.
+	 */
+	private escapeOnDoublePress(by: DoublePressSignal): void {
+		const now = Date.now();
+		const done = this.doublePressEscape;
+		this.doublePressEscape = undefined;
+		if (done !== undefined && done.by !== by && now - done.at < SAME_DOUBLE_PRESS_MS) return;
+		this.doublePressEscape = { by, at: now };
+		this.resetTools();
+	}
+
+	/**
+	 * A press on the board takes the keyboard focus back from a button of the
+	 * plugin's that still holds it.  Native Canvas ignores a double click while
+	 * a button or an input has the focus, and a press on the board did not
+	 * move it off a tool of the bar pressed before - native Canvas takes the
+	 * press of a touch for itself - so a card did not open on a double tap
+	 * right after a tool had been used.  The board gets the keys instead, as
+	 * after any press on it.  A card being written in, the search field, a
+	 * comment's reply box and every other field that takes text keep the
+	 * focus; and a press on a control of the plugin's leaves it where it fell.
+	 */
+	private attachBoardFocus(): void {
+		const root = this.root;
+		const view = root?.ownerDocument?.defaultView;
+		if (root === undefined || view === undefined || view === null) return;
+		this.listen(view, "pointerdown", (event) => {
+			const press = event as PointerEvent;
+			if (this.ownPointerEvents.has(press) || !root.contains(eventTarget(press) as Node) || this.inControls(press)) return;
+			if (this.closestTarget(press, "input, textarea, [contenteditable=true], .cm-editor")) return;
+			const held = controlToLetGo(root.ownerDocument.activeElement, PANEL_SELECTOR);
+			if (held === undefined) return;
+			held.blur();
+			root.focus({ preventScroll: true });
+		}, true);
 	}
 
 	/**
@@ -4104,9 +4172,17 @@ export class M1CanvasSession {
 		return eventTarget(press) === root || isDrawingTool(this.armedTool);
 	}
 
-	/** Whether a double click is Escape: the same press as `doublePressCounts`, seen as the browser's own `dblclick`. */
+	/**
+	 * Whether a double click is Escape's: the same press as `doublePressCounts`,
+	 * seen as the browser's own `dblclick`.  One whose pair of taps already did
+	 * the Escape is too, though that put the drawing tool away: the double click
+	 * is still the double tap's, and opens nothing.
+	 */
 	private escapesOnDoublePress(event: Event): boolean {
-		if (Date.now() - this.lineFinishedAt < LINE_FINISH_DOUBLE_CLICK_MS) return false;
+		const now = Date.now();
+		if (now - this.lineFinishedAt < LINE_FINISH_DOUBLE_CLICK_MS) return false;
+		const done = this.doublePressEscape;
+		if (done?.by === "taps" && now - done.at < SAME_DOUBLE_PRESS_MS) return true;
 		return eventTarget(event) === this.root || isDrawingTool(this.armedTool);
 	}
 
@@ -8988,11 +9064,13 @@ export class M1CanvasSession {
 				return;
 			}
 			// A double click on the empty board is Escape, never a new card: it
-			// puts the tools and the selection away, in review mode too.
+			// puts the tools and the selection away, in review mode too.  The
+			// double click of a hand beside the pen makes no card either, but
+			// puts nothing away.
 			if (this.escapesOnDoublePress(event)) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
-				this.resetTools();
+				if (!this.recentPresses.handMadeDoubleClick(Date.now())) this.escapeOnDoublePress("dblclick");
 				return;
 			}
 			const id = this.eventElementId(eventTarget(event));

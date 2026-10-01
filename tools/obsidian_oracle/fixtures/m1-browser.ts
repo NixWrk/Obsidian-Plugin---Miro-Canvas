@@ -325,10 +325,19 @@ const runtime = {
 };
 const nativeCanvas = runtime;
 const view = { canvas: runtime, getViewType: () => "canvas" };
+// Native Canvas takes a press on its board for itself and cancels its default,
+// so a button that had the keyboard focus keeps it.
+root.addEventListener("pointerdown", (event) => {
+  const target = event.target as Element;
+  const onBoard = target === root || target.closest(".canvas-node") !== null;
+  if (onBoard && target.closest("button, input, textarea, select, .miro-canvas-toolbar") === null) event.preventDefault();
+});
 // Native Canvas's own double click: a card opens for writing; the empty board
-// makes a card there, unless the double click was already taken.
+// makes a card there, unless the double click was already taken.  It does
+// nothing while a button or an input has the keyboard focus.
 root.addEventListener("dblclick", (event) => {
   if (event.defaultPrevented) return;
+  if (document.activeElement?.closest("button, input") != null) return;
   const card = (event.target as Element).closest(".canvas-node");
   if (card !== null) {
     card.classList.add("is-editing");

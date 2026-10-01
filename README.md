@@ -422,7 +422,9 @@ web link and Canvas's own card, note and file from the vault have no letter.
 
 The letters work while the board has focus; editors keep their own keys.
 Escape resets the tools and the selection, and so does a double click or
-double tap on the empty board, which never makes a card.
+double tap on the empty board, which never makes a card. A touch that lands
+beside the pen is the hand that holds it, not a tap, so a palm makes no double
+tap.
 
 </details>
 

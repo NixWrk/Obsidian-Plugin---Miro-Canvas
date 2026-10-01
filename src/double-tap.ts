@@ -37,6 +37,36 @@ function distance(from: TapPoint, to: TapPoint): number {
   return Math.hypot(to.x - from.x, to.y - from.y);
 }
 
+/** How long a press is remembered as the first or the second of a double click that may follow it. */
+const DOUBLE_CLICK_MEMORY_MS = 1_000;
+
+/**
+ * The last two presses on the board, and whether each was a hand beside the
+ * pen.  The browser's own `dblclick` says nothing of the pointer that made
+ * it, so a double click is judged by the two presses it came from: a touch
+ * that landed while the pen was near is the palm or the hand that holds it,
+ * and its double click is no Escape.
+ */
+export class RecentPresses {
+  private readonly lastTwo: { readonly byHand: boolean; readonly at: number }[] = [];
+
+  /** A pointer lands; `byHand` when it is a touch that came down beside the pen. */
+  public note(byHand: boolean, now: number): void {
+    this.lastTwo.push({ byHand, at: now });
+    if (this.lastTwo.length > 2) this.lastTwo.shift();
+  }
+
+  /** Whether a double click arriving now came from a hand: either of its two presses was one. */
+  public handMadeDoubleClick(now: number): boolean {
+    return this.lastTwo.some((press) => press.byHand && now - press.at <= DOUBLE_CLICK_MEMORY_MS);
+  }
+
+  /** Forgets every press, as when the board is put away. */
+  public reset(): void {
+    this.lastTwo.length = 0;
+  }
+}
+
 /**
  * One board's taps.  The owner of the board feeds it every press and release
  * of a finger or a pen; a release that completes a pair of taps says so.

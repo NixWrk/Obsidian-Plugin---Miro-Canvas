@@ -616,7 +616,38 @@ selected card, it also covers that card's outline and resize handles.
   runs `resetTools()` once the second tap's events are over, so a pen leaves
   the dot each tap draws.  A polyline's or a spline's finishing double click
   (`linePlacing`, `lineFinishedAt`) is that line's own and not an Escape; a
-  card, a line's label and a line keep their double click.
+  card, a line's label and a line keep their double click.  Corrections from
+  a real tablet: a touch that lands while the pen is near - the palm or the
+  hand that holds it, which Android may report as a finger that lifts as a
+  finger does - is no tap of a pair (`pressIsHand`, that is
+  `StylusWatch.touchIsHand(now, false)`, as `startNativePlacement` asks it),
+  and the `dblclick` made of such touches is no Escape, though it is still
+  swallowed so that Canvas makes no card; a `dblclick` carries no pointer type,
+  so `RecentPresses` keeps the last two presses and whether each was such a
+  touch.  A finger's double tap with no pen near, and a pen's own, count as
+  before - with a drawing tool armed too.  The Android WebView sends the
+  `dblclick` as well as the plugin's pair, some milliseconds apart:
+  whichever signal comes first does the Escape (`escapeOnDoublePress`) and the
+  other, within 100 ms, finds it done; two double clicks, or two pairs, one
+  after the other are two Escapes, and a `dblclick` that follows a pair's
+  Escape is still swallowed, though the pair has put the drawing tool away.
+- A press on the board takes the focus off a tool of the bar (2026-10-01).
+  Canvas ignores `dblclick` while `document.activeElement.closest("button,
+  input")` finds something, and a press on its board - a touch, whose
+  pointerdown it cancels - never moves the focus off a button pressed before,
+  so a card did not open on a double tap right after a tool had been used.
+  `attachBoardFocus` (`controlToLetGo` in `src/board-focus.ts`) answers a
+  pointerdown on the window, capturing, that lands on the board and not on a
+  control of the plugin's (`PANEL_SELECTOR`): when the focus sits on a button,
+  an element with the role of a button or an input that is no text field (a
+  slider, a colour swatch) of the plugin's own controls, it blurs it and
+  focuses the wrapper, which is where native Canvas's copy and the board's
+  own keys look (`activeElement === wrapperEl`, or the body).  A card's
+  editor, the search field, a comment's reply box and every text input are
+  left alone, as is a press on a control of the plugin's; a key reaches the
+  board afterwards as it did - a tool's letter and Escape are heard by the
+  document and the window, and the guard on Delete, which skipped a key whose
+  target was a control of the plugin's, now sees the board as its target.
 - Canvas's own card-menu buttons only arm (2026-10-01).  In `app.js`
   `cardMenuEl` holds the buttons; each has a click that makes the item at
   `posCenter()` (the card at once; the note and media pickers read it when a
