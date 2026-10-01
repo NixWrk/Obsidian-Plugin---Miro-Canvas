@@ -81,7 +81,57 @@ type Loose = Record<string, any>;
  */
 export function translateBoardSelection(document: Record<string, unknown>, ids: readonly string[], dx: number, dy: number,
   routeEnds: Readonly<Record<string, SelectedRouteEnds>> = {}): Record<string, unknown> {
-  const next = JSON.parse(JSON.stringify(document)) as Loose;
+  return translateSelection(document, ids, dx, dy, routeEnds, false);
+}
+
+/**
+ * Whether moving these cards also moves data a line is drawn from: the
+ * waypoints or the free ends of a line whose two cards both move.  A drag
+ * of cards that moves none of it changes only where the cards stand.
+ */
+export function selectionMovesLineData(document: Record<string, unknown>, ids: readonly string[]): boolean {
+  const selected = new Set(ids);
+  const edges = document.edges;
+  if (!Array.isArray(edges)) return false;
+  const overrides = (document.miroCanvas as Loose | undefined)?.localOverrides as Loose | undefined;
+  if (overrides === undefined || overrides === null) return false;
+  for (const edge of edges as Loose[]) {
+    if (!selected.has(edge.id) && !(selected.has(edge.fromNode) && selected.has(edge.toNode))) continue;
+    const override = overrides[edge.id];
+    if (override === undefined || override === null) continue;
+    if (override.connector?.waypoints !== undefined) return true;
+    if (["from", "to"].some((end) => override.connectorAnchors?.[end]?.type === "free")) return true;
+  }
+  return false;
+}
+
+/**
+ * The same board for a dragged preview, which is made on every move.  What the
+ * drag does not change - the source data, the lines, the plugin's own data - is
+ * shared with the board it was made from, so a move costs what moved and what
+ * is worked out from the board stays known.  Nothing shared may be written into.
+ * The write itself uses `translateBoardSelection`, which shares nothing.
+ */
+export function previewBoardSelection(document: Record<string, unknown>, ids: readonly string[], dx: number, dy: number,
+  routeEnds: Readonly<Record<string, SelectedRouteEnds>> = {}): Record<string, unknown> {
+  return translateSelection(document, ids, dx, dy, routeEnds, true);
+}
+
+function translateSelection(document: Record<string, unknown>, ids: readonly string[], dx: number, dy: number,
+  routeEnds: Readonly<Record<string, SelectedRouteEnds>>, share: boolean): Record<string, unknown> {
+  const next = (share ? { ...document } : JSON.parse(JSON.stringify(document))) as Loose;
+  // The plugin's own data, copied whole before the first thing in it changes when it is shared.
+  let canvasCopied = !share;
+  const canvas = (fallback: Loose = {}): Loose => {
+    if (!canvasCopied) {
+      canvasCopied = true;
+      const own = document.miroCanvas;
+      next.miroCanvas = own === undefined || own === null ? fallback : JSON.parse(JSON.stringify(own));
+    } else {
+      next.miroCanvas ??= fallback;
+    }
+    return next.miroCanvas;
+  };
   const selected = new Set(ids);
   const shift = (point: { x: number; y: number }): { x: number; y: number } => ({ x: point.x + dx, y: point.y + dy });
   const geometry = Object.keys(routeEnds).length > 0 ? buildCanvasAnchorGeometry(document) : undefined;
@@ -98,30 +148,36 @@ export function translateBoardSelection(document: Record<string, unknown>, ids: 
   if (comments.length > 0) {
     const pins = buildCanvasAnchorGeometry(document).comments ?? {};
     const threads = new Map(listCommentThreads(document).map((thread) => [`${thread.origin}:${thread.id}`, thread]));
-    next.miroCanvas ??= {};
-    next.miroCanvas.commentPlaces ??= {};
+    canvas().commentPlaces ??= {};
     for (const comment of comments) {
       const point = pins[comment.key], thread = threads.get(comment.key);
       if (point === undefined || thread === undefined) continue;
-      const anchor = normalizeAnchor(next.miroCanvas.commentPlaces[comment.key] ?? thread.anchor).anchor;
+      const anchor = normalizeAnchor(canvas().commentPlaces[comment.key] ?? thread.anchor).anchor;
       // A selected parent carries its child comment already. Keep that link.
       const carried = ((anchor?.type === "node" || anchor?.type === "image") && selected.has(anchor.nodeId))
         || (anchor?.type === "comment" && selected.has(commentSelectionId(anchor.origin, anchor.commentId)));
-      if (!carried) next.miroCanvas.commentPlaces[comment.key] = { type: "free", ...shift(point) };
+      if (!carried) canvas().commentPlaces[comment.key] = { type: "free", ...shift(point) };
     }
   }
 
-  for (const node of next.nodes ?? []) {
-    if (!selected.has(node.id)) continue;
-    node.x += dx;
-    node.y += dy;
+  if (share) {
+    // Only the cards that move are copied; the others are the board's own.
+    if (Array.isArray(next.nodes)) {
+      next.nodes = next.nodes.map((node: Loose) => selected.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node);
+    }
+  } else {
+    for (const node of next.nodes ?? []) {
+      if (!selected.has(node.id)) continue;
+      node.x += dx;
+      node.y += dy;
+    }
   }
 
   for (const connector of boardConnectors(next)) {
     if (!selected.has(connector.id)) continue;
     const mask = routeEnds[connector.id];
     if (mask === undefined) {
-      next.miroCanvas.connectors[connector.id] = translateConnector(connector, dx, dy);
+      canvas().connectors[connector.id] = translateConnector(connector, dx, dy);
       continue;
     }
     const route = geometry?.edges?.[connector.id];
@@ -133,7 +189,7 @@ export function translateBoardSelection(document: Record<string, unknown>, ids: 
       else if (!follows(anchor) && point !== undefined) shifted[end] = { type: "free", ...shift(point) };
     }
     if (mask.wholeRoute && connector.waypoints !== undefined) shifted.waypoints = connector.waypoints.map(shift);
-    next.miroCanvas.connectors[connector.id] = shifted;
+    canvas().connectors[connector.id] = shifted;
   }
 
   // Native route control points are absolute board coordinates as well.
@@ -142,9 +198,13 @@ export function translateBoardSelection(document: Record<string, unknown>, ids: 
     const override = next.miroCanvas?.localOverrides?.[edge.id];
     const mask = routeEnds[edge.id];
     if (mask === undefined) {
-      if (override?.connector?.waypoints !== undefined) override.connector.waypoints = override.connector.waypoints.map(shift);
+      const free = (["from", "to"] as const).some((end) => override?.connectorAnchors?.[end]?.type === "free");
+      if (override?.connector?.waypoints === undefined && !free) continue;
+      // Written into, so it is the copy's own.
+      const own = canvas().localOverrides[edge.id];
+      if (own.connector?.waypoints !== undefined) own.connector.waypoints = own.connector.waypoints.map(shift);
       for (const end of ["from", "to"]) {
-        const anchor = override?.connectorAnchors?.[end];
+        const anchor = own.connectorAnchors?.[end];
         if (anchor?.type === "free") Object.assign(anchor, shift(anchor));
       }
       continue;
@@ -158,12 +218,14 @@ export function translateBoardSelection(document: Record<string, unknown>, ids: 
       }
     }
     if (Object.keys(replacements).length > 0) {
-      next.miroCanvas ??= { schemaVersion: 1 };
-      next.miroCanvas.localOverrides ??= {};
-      const target = next.miroCanvas.localOverrides[edge.id] ??= {};
+      canvas({ schemaVersion: 1 }).localOverrides ??= {};
+      const target = canvas().localOverrides[edge.id] ??= {};
       target.connectorAnchors = { ...target.connectorAnchors, ...replacements };
     }
-    if (mask.wholeRoute && override?.connector?.waypoints !== undefined) override.connector.waypoints = override.connector.waypoints.map(shift);
+    if (mask.wholeRoute && override?.connector?.waypoints !== undefined) {
+      const own = canvas().localOverrides[edge.id];
+      own.connector.waypoints = own.connector.waypoints.map(shift);
+    }
   }
   return next;
 }

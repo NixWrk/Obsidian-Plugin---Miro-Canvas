@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { SourceRenderer } from "../src/source-renderer";
+import { describe, expect, it, vi } from "vitest";
+import { SourceRenderer, sameRoundedData, type SourceRendererHost } from "../src/source-renderer";
 import { buildCanvasAnchorGeometry, updateConnectorEndpoint } from "../src/connector-endpoints";
 import { resolveAnchor } from "../src/anchors";
 
@@ -1010,8 +1010,10 @@ describe("the point a node turns about", () => {
 });
 
 /** A native edge from node a's right side to node b's left, as Obsidian holds it. */
-function routeFixture({ rotation = 0, shape, observe = false, preview }: {
+function routeFixture({ rotation = 0, shape, observe = false, preview, host = {} }: {
   rotation?: number; shape?: string; observe?: boolean; preview?: { id: string; rotation: number };
+  /** What else the host answers to. */
+  host?: Partial<SourceRendererHost>;
 } = {}) {
   const observers: Array<{ callback: (records: unknown[]) => void; connected: boolean }> = [];
   class FakeObserver {
@@ -1061,6 +1063,7 @@ function routeFixture({ rotation = 0, shape, observe = false, preview }: {
     getEdges: () => [edge],
     getRotationPreview: () => preview,
     getSelectionMovePreviewIds: () => movingIds,
+    ...host,
   }, document);
   const numbers = (value: string | null) => (value ?? "").match(/-?\d+(?:\.\d+)?/gu)!.map(Number);
   return { renderer, a, b, edge, display, interaction, head, NATIVE, observers, numbers,
@@ -1418,5 +1421,161 @@ describe("a card's border", () => {
     expect(container.style.getPropertyValue("border-width")).toBe("4px");
     expect(shell.style.getPropertyValue("border-style")).toBe("");
     expect(shell.style.getPropertyValue("border-width")).toBe("");
+  });
+});
+
+describe("a card that native Canvas drags", () => {
+  const shapeLayer = (f: ReturnType<typeof routeFixture>) =>
+    f.a.nodeEl.children.find((child) => child.getAttribute("data-miro-source-decoration") === "shape");
+  const start = (f: ReturnType<typeof routeFixture>) => f.numbers(f.display.getAttribute("d")).slice(0, 2);
+  /** Every write to the card's own element, counted from now on. */
+  const writesTo = (element: Element) => {
+    const spies = [
+      vi.spyOn(element.classList, "add"), vi.spyOn(element.classList, "remove"),
+      vi.spyOn(element, "setAttribute"), vi.spyOn(element, "removeAttribute"), vi.spyOn(element.style, "setProperty"),
+    ];
+    return () => spies.reduce((count, spy) => count + spy.mock.calls.length, 0);
+  };
+  const moveCardTo = (f: ReturnType<typeof routeFixture>, x: number) => {
+    f.a.x = x;
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x }, f.data.nodes[1]] };
+  };
+
+  it("keeps what is drawn on the card and draws only its line again", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    const drawn = shapeLayer(f);
+    expect(drawn).toBeDefined();
+    const writes = writesTo(f.a.nodeEl);
+    for (const x of [20, 60, 140]) {
+      moveCardTo(f, x);
+      f.renderer.refresh();
+      expect(start(f)).toEqual([x + 75, 40]);
+      expect(shapeLayer(f)).toBe(drawn);
+    }
+    // Nothing is written to the card: not a class, an attribute nor a style.
+    expect(writes()).toBe(0);
+  });
+
+  it("draws nothing again when nothing moved", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    const d = f.display.getAttribute("d");
+    const setPath = vi.spyOn(f.display, "setAttribute");
+    f.renderer.refresh();
+    f.renderer.refresh();
+    expect(setPath).not.toHaveBeenCalled();
+    expect(f.display.getAttribute("d")).toBe(d);
+    // The same board read again, as a new document: the same places.
+    f.data = JSON.parse(JSON.stringify(f.data));
+    f.renderer.refresh();
+    expect(setPath).not.toHaveBeenCalled();
+  });
+
+  it("draws the card again when it is resized or native Canvas threw its drawing away", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    const drawn = shapeLayer(f)!;
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], width: 200 }, f.data.nodes[1]] };
+    f.renderer.refresh();
+    const resized = shapeLayer(f);
+    expect(resized).toBeDefined();
+    expect(resized).not.toBe(drawn);
+    f.a.nodeEl.removeChild(resized!);
+    moveCardTo(f, 40);
+    f.renderer.refresh();
+    expect(shapeLayer(f)).toBeDefined();
+    expect(shapeLayer(f)).not.toBe(resized);
+  });
+
+  it("measures the page once while a card is dragged, and again when a card changes size or the drag ends", () => {
+    let gesture: number | undefined = 1;
+    const f = routeFixture({ shape: "triangle", host: { getLiveGesture: () => gesture } });
+    let measured = 0;
+    const box = () => {
+      measured += 1;
+      return { left: 0, top: 0, right: 100, bottom: 80, width: 100, height: 80 };
+    };
+    Object.assign(f.a.nodeEl, { getBoundingClientRect: box });
+    Object.assign(f.b.nodeEl, { getBoundingClientRect: box });
+    f.renderer.refresh();
+    const once = measured;
+    expect(once).toBeGreaterThan(0);
+    for (const x of [20, 40, 60]) {
+      moveCardTo(f, x);
+      f.renderer.refresh();
+    }
+    expect(measured).toBe(once);
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], width: 160 }, f.data.nodes[1]] };
+    f.renderer.refresh();
+    expect(measured).toBeGreaterThan(once);
+    const resized = measured;
+    // The next drag measures afresh, and so does a refresh outside any drag.
+    gesture = 2;
+    f.renderer.refresh();
+    expect(measured).toBeGreaterThan(resized);
+    const second = measured;
+    moveCardTo(f, 80);
+    f.renderer.refresh();
+    expect(measured).toBe(second);
+    gesture = undefined;
+    f.renderer.refresh();
+    expect(measured).toBeGreaterThan(second);
+  });
+
+  it("draws its lines from the places the host worked out, unless a card was measured at another size", () => {
+    let known: ReturnType<typeof buildCanvasAnchorGeometry> | undefined;
+    const asked: unknown[] = [];
+    const f = routeFixture({ shape: "triangle", host: { getAnchorGeometry: (document) => { asked.push(document); return known; } } });
+    f.movingIds = ["a"];
+    f.renderer.refresh();
+    expect(start(f)).toEqual([75, 40]);
+    expect(asked.length).toBeGreaterThan(0);
+    // The host's own places for the board win over making them again.
+    known = buildCanvasAnchorGeometry({ ...f.data, nodes: [{ ...f.data.nodes[0], x: 500 }, f.data.nodes[1]] });
+    f.data = { ...f.data };
+    f.renderer.refresh();
+    expect(start(f)).toEqual([575, 40]);
+  });
+
+  it("leaves a line the page does not show alone while a selection moves, and draws it when it is shown", () => {
+    const f = routeFixture({ shape: "triangle" });
+    f.renderer.refresh();
+    f.movingIds = ["a"];
+    f.data.nodes[0].x = 120;
+    Object.assign(f.edge.lineGroupEl, { isConnected: false });
+    f.renderer.refresh();
+    expect(f.display.getAttribute("d")).toBe(f.NATIVE);
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x: 140 }, f.data.nodes[1]] };
+    f.renderer.refresh();
+    expect(f.display.getAttribute("d")).toBe(f.NATIVE);
+    Object.assign(f.edge.lineGroupEl, { isConnected: true });
+    f.data = { ...f.data, nodes: [{ ...f.data.nodes[0], x: 160 }, f.data.nodes[1]] };
+    f.renderer.refresh();
+    expect(start(f)).toEqual([235, 40]);
+    // The move written: every line is drawn again, shown or not.
+    Object.assign(f.edge.lineGroupEl, { isConnected: false });
+    f.movingIds = undefined;
+    f.a.x = 160;
+    f.renderer.refresh();
+    expect(start(f)).toEqual([235, 40]);
+  });
+});
+
+describe("telling places apart without writing them out", () => {
+  it("takes numbers to a hundredth and everything else as it is", () => {
+    expect(sameRoundedData({ a: 1.001, b: [1, 2] }, { a: 1.004, b: [1, 2] })).toBe(true);
+    expect(sameRoundedData({ a: 1.001 }, { a: 1.02 })).toBe(false);
+    expect(sameRoundedData({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    expect(sameRoundedData({ a: 1, b: 2 }, { a: 1 })).toBe(false);
+    expect(sameRoundedData({ a: 1, b: undefined }, { a: 1 })).toBe(true);
+    expect(sameRoundedData({ a: 1 }, { a: undefined })).toBe(false);
+    expect(sameRoundedData([1, 2], [1, 2, 3])).toBe(false);
+    expect(sameRoundedData([1, 2], { 0: 1, 1: 2 })).toBe(false);
+    expect(sameRoundedData(Number.NaN, Number.NaN)).toBe(true);
+    expect(sameRoundedData(Number.NaN, 1)).toBe(false);
+    expect(sameRoundedData(null, {})).toBe(false);
+    expect(sameRoundedData("a", "a")).toBe(true);
+    expect(sameRoundedData("a", "b")).toBe(false);
   });
 });

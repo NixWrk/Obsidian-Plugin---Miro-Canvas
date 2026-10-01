@@ -1866,6 +1866,109 @@ MutationObserver on the classes of the cards, which sees the many class writes
 the plugin's own decoration pass makes to every card on each refresh, so a few
 per cent on the 50-card rows are possible.
 
+Part 4 (2026-10-02). Per-card work removed from every refresh. A profile of one
+card dragged on the 5,000-card board (zoom 100 %, 100 ms a move) put the time
+into work done on the whole board on each move, not into the card:
+
+- the source renderer took every decorated card's marks off and put them back
+  on every move (its signature held the places of all cards, so any move
+  changed it), which is the 12,600-25,200 class toggles per drag that the
+  earlier profile counted, and signed all the places as text;
+- the board's scene and places were built twice a move, and every card's drawn
+  size was read from the page, which makes the browser lay it out;
+- the 750 ms poll ran a whole refresh (about 190 ms) in the middle of a drag
+  that the frame loop already follows;
+- the pointer-move guard searched every card for the one under the pointer;
+- the export overlay measured the board on every refresh although nothing was
+  being exported (a forced layout: 3.7 s of a 14 s drag of all 5,000 cards);
+- a dragged selection copied the whole board as text on every move, and when
+  let go checked the locks by parsing the board's policy once for each card
+  (1.1 s for 5,000 cards).
+
+Now (`src/source-renderer.ts`, `src/m1-session.ts`, `src/board-selection.ts`,
+`src/canvas-authoring.ts`):
+
+- The cards are drawn from what is drawn on them (kind, look, size), not from
+  where they stand. A card that only moves, whoever drags it, keeps its marks;
+  only the lines are drawn again, and only when the places they run through
+  differ by more than a hundredth (compared directly, not written out).
+- During a drag of cards the page's boxes are measured once (again when a
+  card's size changes or the next press begins), the host's own places are used
+  instead of making them again, and lines native Canvas has taken off the
+  page are not drawn: the move that brings one back draws it, and the move
+  written draws every line.
+- The renderer reads the board that was just read, so its scene is not built
+  again; the poll leaves a drag that is followed frame by frame alone.
+- The lock marks are written to a card only when its state changes (and read
+  for the locked ones); a card that left the board is put back as the host had
+  it. The ids of a selection are worked out once for as long as it holds the
+  same items.
+- The preview of a dragged selection shares what the move does not change
+  (`previewBoardSelection`: the source data, the lines, the plugin's data);
+  for cards alone it also keeps the scene it began with and plans only the
+  lines of the cards that moved, unless a presentation or a line's waypoints or
+  free ends move with them. The write is unchanged and shares nothing. The
+  locks are read once for a whole move.
+
+Time per pointer move with the plugin on, median of three runs, builds
+alternated pass by pass (60 moves; ms a move / 95th-percentile frame during the
+drag). Before is c92b1d4, after the build with this work, off native Canvas
+alone. The first selected card at zoom 100 %:
+
+| Board | Selection | Before | After | Plugin off |
+| --- | --- | --- | --- | --- |
+| 2,000 cards | 1 | 52 / 90 | 32 / 20 | 32 / 10 |
+| 2,000 cards | 50 | 69 / 40 | 36 / 10 | 31 / 10 |
+| 2,000 cards | all | 121 / 110 | 49 / 50 | 31 / 10 |
+| 5,000 cards | 1 | 98 / 210 | 39 / 50 | 31 / 10 |
+| 5,000 cards | 50 | 124 / 120 | 49 / 20 | 31 / 10 |
+| 5,000 cards | all | 248 / 270 | 120 / 150 | 34 / 20 |
+
+The view fitted to the selection (zoom 6 % for the large ones, 100 % for one
+card):
+
+| Board | Selection | Before | After | Plugin off |
+| --- | --- | --- | --- | --- |
+| 2,000 cards | 1 | 51 / 90 | 32 / 20 | 31 / 10 |
+| 2,000 cards | 50 | 217 / 250 | 165 / 200 | 141 / 220 |
+| 2,000 cards | all | 518 / 600 | 477 / 530 | 237 / 300 |
+| 5,000 cards | 1 | 97 / 200 | 38 / 50 | 31 / 10 |
+| 5,000 cards | 50 | 199 / 210 | 193 / 210 | 162 / 370 |
+| 5,000 cards | all | 665 / 780 | 590 / 640 | 364 / 450 |
+
+One card is now as quick as native Canvas on the 2,000-card board and 7-8 ms
+over it on the 5,000-card one, and no row is slower. The three runs of each cell
+lay within 1-5 ms of one another at zoom 100 % (up to 40 ms for all 5,000
+cards, 113-122 after). The fitted rows are dominated by what the browser does
+with every card on the page, which native Canvas pays too.
+
+An arrow-key press with all 5,000 cards selected, nine presses per cell
+(handler + drawing, median ms; range): before 1,033 (745-1,272), after 1,027
+(872-1,145), plugin off 526-544. Unchanged: where the time went moved from the
+frame after the key into its handler, and the key still costs what native
+Canvas's own move of 5,000 cards costs plus the plugin's follow-up (the page
+laying out the cards that came into view).
+
+Unchanged by the same checks, with real input: the 2,000-card drag of every
+card, undone and redone on the final build, moved every card by the same 3,791
+x 1,895, no other field of any card or line changed, native history gained one
+entry, one undo restored the whole saved node list and one redo moved it again.
+The DOM the plugin leaves on the cards and lines after a drag of 1, 50 and all
+cards was compared with the earlier build: the same classes, attributes and
+decoration layers on 587-1,360 cards and the same path on all 978 lines. The
+lines native Canvas has taken off the page are the one difference: they keep the
+path native Canvas gave them until they come back on the page, and the earlier
+build had drawn them at the new place meanwhile. With 50 cards dragged and the
+view then moved to those lines, frame by frame, a line is attached to the page
+together with its new path in the same frame (never an old path on the page),
+and after a pan over the whole board every line's path equals the earlier
+build's.
+
+Still per card: the appearance pass (`refreshAppearanceDecorations`) and a
+full redraw of the cards when something about them really changes (a card
+shown for the first time, a resize) are still done for the whole board, once a
+gesture, not once a move.
+
 The first production release is ready when:
 
 1. ordinary Canvas boards gain the promised editing features without

@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {commentSelectionId, pointInSelectionBox, rectIntersectsBox, routeContainedInBox, routeEndsInBox, selectedComment, translateBoardSelection} from "../src/board-selection";
+import {commentSelectionId, pointInSelectionBox, previewBoardSelection, rectIntersectsBox, routeContainedInBox, routeEndsInBox, selectedComment, selectionMovesLineData, translateBoardSelection} from "../src/board-selection";
 describe("connector marquee hit testing",()=>{
   const a={x:10,y:10},b={x:20,y:20};
   it("does not select a long connector just because it crosses the box",()=>{
@@ -102,5 +102,81 @@ describe("comment-inclusive selection movement",()=>{
     expect(together.miroCanvas.commentPlaces["local:attached"]).toBeUndefined();
     const alone=translateBoardSelection(before,[id],30,20) as any;
     expect(alone.miroCanvas.commentPlaces["local:attached"]).toEqual({type:"free",x:80,y:70});
+  });
+});
+
+describe("the preview of a dragged selection", () => {
+  const board = () => ({
+    nodes: [
+      { id: "a", type: "text", x: 0, y: 0, width: 30, height: 30 },
+      { id: "b", type: "text", x: 300, y: 0, width: 30, height: 30 },
+      { id: "c", type: "text", x: 600, y: 0, width: 30, height: 30 },
+    ],
+    edges: [{ id: "ab", fromNode: "a", toNode: "b" }, { id: "bc", fromNode: "b", toNode: "c" }],
+    miroSource: { items: [{ id: "a", data: { deep: [1, 2, 3] } }] },
+    miroCanvas: {
+      schemaVersion: 1,
+      localOverrides: { ab: { connector: { waypoints: [{ x: 100, y: 5 }] }, connectorAnchors: { from: { type: "free", x: 40, y: 10 } } } },
+      connectors: {
+        long: { id: "long", from: { type: "free", x: 15, y: 15 }, to: { type: "free", x: 300, y: 15 }, route: "straight", color: "#123456", width: 2, startCap: "none", endCap: "arrow" },
+      },
+    },
+  });
+  const written = (value: unknown) => JSON.parse(JSON.stringify(value));
+
+  it("is the board the write makes, to the last field, in every kind of move", () => {
+    for (const [ids, ends] of [
+      [["a"], {}],
+      [["a", "b"], {}],
+      [["a", "b", "c"], {}],
+      [["long"], {}],
+      [["a", "long"], {}],
+      [["ab"], { ab: { from: true, to: false, wholeRoute: true } }],
+      [["long"], { long: { from: true, to: false, wholeRoute: false } }],
+    ] as const) {
+      const before = board();
+      expect(written(previewBoardSelection(before, ids, 20, 10, ends))).toEqual(written(translateBoardSelection(before, ids, 20, 10, ends)));
+    }
+  });
+
+  it("never writes into the board it was made from", () => {
+    const before = board();
+    const untouched = written(before);
+    for (const ids of [["a", "b"], ["long"], ["a", "b", "c", "long"]]) previewBoardSelection(before, ids, 20, 10);
+    previewBoardSelection(before, ["ab"], 20, 10, { ab: { from: true, to: true, wholeRoute: true } });
+    expect(written(before)).toEqual(untouched);
+  });
+
+  it("shares what the move does not change, so a board of thousands costs what moved", () => {
+    const before = board();
+    const preview = previewBoardSelection(before, ["a"], 20, 10) as any;
+    expect(preview.miroSource).toBe(before.miroSource);
+    expect(preview.edges).toBe(before.edges);
+    expect(preview.miroCanvas).toBe(before.miroCanvas);
+    expect(preview.nodes[1]).toBe(before.nodes[1]);
+    expect(preview.nodes[2]).toBe(before.nodes[2]);
+    expect(preview.nodes[0]).not.toBe(before.nodes[0]);
+    expect(preview.nodes[0]).toMatchObject({ x: 20, y: 10 });
+    // The connectors stay one record while none of them is carried, so what is read from them stays known.
+    expect(preview.miroCanvas.connectors).toBe(before.miroCanvas.connectors);
+    // A selected connector is carried in a copy of what the plugin keeps; the board's own stays as it was.
+    const carried = previewBoardSelection(before, ["long"], 20, 10) as any;
+    expect(carried.miroCanvas).not.toBe(before.miroCanvas);
+    expect(carried.miroCanvas.connectors.long.from).toMatchObject({ x: 35, y: 25 });
+    expect(before.miroCanvas.connectors.long.from.x).toBe(15);
+    expect(carried.miroSource).toBe(before.miroSource);
+  });
+
+  it("copies what a line holds only when both its cards move with free ends or waypoints", () => {
+    const before = board();
+    const moved = previewBoardSelection(before, ["a", "b"], 20, 10) as any;
+    expect(moved.miroCanvas.localOverrides.ab.connector.waypoints[0]).toMatchObject({ x: 120, y: 15 });
+    expect(moved.miroCanvas.localOverrides.ab.connectorAnchors.from).toMatchObject({ x: 60, y: 20 });
+    expect(before.miroCanvas.localOverrides.ab.connector.waypoints[0]).toMatchObject({ x: 100, y: 5 });
+    expect(selectionMovesLineData(before, ["a", "b"])).toBe(true);
+    expect(selectionMovesLineData(before, ["a"])).toBe(false);
+    expect(selectionMovesLineData(before, ["b", "c"])).toBe(false);
+    expect(selectionMovesLineData(before, ["ab"])).toBe(true);
+    expect(selectionMovesLineData({ nodes: [], edges: [] }, ["a"])).toBe(false);
   });
 });

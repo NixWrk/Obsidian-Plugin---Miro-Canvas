@@ -14,6 +14,17 @@
   first and keeps the other kinds' layouts it holds, and a change of the file
   by a sync is picked up at once, so two devices open on one vault never
   overwrite each other's layout.
+- A drag on a large board is much cheaper: the plugin no longer does work for
+  every card on every move. A card that only moves keeps what is drawn on it
+  and only its lines are drawn again, lock marks are written only when a
+  card's lock changes, the board is measured once per drag, the poll leaves a
+  followed drag alone, and a dragged selection shares what the move does not
+  change. One card dragged at zoom 100 % takes 32 ms a move on the 2,000-card
+  board (52 before; native Canvas 31) and 39 ms on the 5,000-card one (98
+  before); 50 selected cards 36 and 49 ms (69 and 124 before); all cards 49
+  and 120 ms (121 and 248 before). Medians of three runs; the arrow-key
+  press with 5,000 cards selected is unchanged (about 1 s). Measurements in
+  docs/miro-canvas.md, "Dragging large selections".
 - A double click or a double tap on the empty board is now Escape and never
   makes a card: it puts the armed tool, the selection, an open comment and
   the open bar menus away, whatever tool was armed. Canvas's own double click

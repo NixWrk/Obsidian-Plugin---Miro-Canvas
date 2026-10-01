@@ -1617,3 +1617,48 @@ describe("changeItems", () => {
 		expect(runtime.importDataSpy).not.toHaveBeenCalled();
 	});
 });
+
+describe("moving a large selection", () => {
+	const cards = (count: number, metadata: Record<string, unknown> = {}): CanvasDocument => ({
+		nodes: Array.from({ length: count }, (_, index) => ({ id: `c${index}`, type: "text", text: "", x: index * 10, y: 0, width: 5, height: 5 })),
+		edges: [],
+		miroCanvas: { schemaVersion: 1, localOverrides: {}, ...metadata },
+	});
+	const ids = (count: number): string[] => Array.from({ length: count }, (_, index) => `c${index}`);
+
+	it("moves every card of a selection of hundreds in one history step", () => {
+		const before = cards(400);
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).moveSelection(ids(400), 40, 30, before).ok).toBe(true);
+		const after = runtime.getData() as { nodes: Array<{ x: number; y: number }> };
+		expect(after.nodes.every((node, index) => node.x === index * 10 + 40 && node.y === 30)).toBe(true);
+		expect(runtime.history).toHaveLength(2);
+		runtime.undo();
+		expect(runtime.getData()).toEqual(before);
+	});
+
+	it("refuses the whole move, writing nothing, when one card of the selection is locked", () => {
+		for (const locked of ["c0", "c250", "c399"]) {
+			const before = cards(400, { localOverrides: { [locked]: { locked: true } } });
+			const runtime = new NativeGraph(before);
+			const result = createCanvasAuthoring(runtime).moveSelection(ids(400), 40, 30, before);
+			expect(result.ok).toBe(false);
+			expect(result.diagnostics.map((item) => item.code)).toContain("element-style-blocked-lock");
+			expect(runtime.getData()).toEqual(before);
+			expect(runtime.history).toHaveLength(1);
+		}
+	});
+
+	it("refuses a card inside a locked frame, and any move in review mode", () => {
+		const framed = cards(50, { localOverrides: { frame: { locked: true } }, groupDescendants: { frame: ["c3", "c4"] } });
+		(framed.nodes as Array<Record<string, unknown>>).push({ id: "frame", type: "group", x: 0, y: 0, width: 1000, height: 100 });
+		const runtime = new NativeGraph(framed);
+		expect(createCanvasAuthoring(runtime).moveSelection(["c3", "c4"], 40, 30, framed).ok).toBe(false);
+		const review = cards(50, { settings: { reviewMode: true } });
+		const reviewRuntime = new NativeGraph(review);
+		const result = createCanvasAuthoring(reviewRuntime).moveSelection(ids(50), 40, 30, review);
+		expect(result.ok).toBe(false);
+		expect(result.diagnostics.map((item) => item.code)).toContain("element-style-blocked-review");
+		expect(reviewRuntime.history).toHaveLength(1);
+	});
+});

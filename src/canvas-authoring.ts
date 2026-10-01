@@ -10,6 +10,7 @@
  */
 
 import {
+	createInteractionPolicy,
 	decideEditOperation,
 	type InteractionDecision,
 } from "./interaction-policy";
@@ -1381,14 +1382,15 @@ function hasGraphElement(snapshot: InternalSnapshot, id: string): boolean {
 	return graphElementIds(snapshot).includes(id);
 }
 
+/** `policySource` is the board, or the policy already read from it when many elements are asked about in turn. */
 function policyAllowsGraphEdit(
-	document: UnknownRecord,
+	policySource: unknown,
 	operation: "rotate" | "edit" | NodeUpdateOperation,
 	id: string,
 	code: "rotation" | "z-order" | "element-style" | "update-node",
 	diagnostics: CanvasAuthoringDiagnostic[],
 ): boolean {
-	const decision = decideEditOperation(document, operation, id);
+	const decision = decideEditOperation(policySource, operation, id);
 	if (!decision.valid) {
 		addDiagnostic(diagnostics, `${code}-policy-invalid`, "error", "The Canvas interaction policy is invalid; the graph edit was refused.");
 		return false;
@@ -2516,6 +2518,8 @@ export class CanvasAuthoring {
 		const known = collectDocumentIds(before);
 		for (const connector of boardConnectors(before.document)) known.add(connector.id);
 		const comments = new Map(listCommentThreads(before.document).map((thread) => [`${thread.origin}:${thread.id}`, thread]));
+		// Read once: a selection of thousands is asked about one card at a time.
+		const policy = createInteractionPolicy(before.document);
 		const decorationRead = isObject(before.document.miroCanvas) ? safeRead(before.document.miroCanvas, "commentDecorations") : undefined;
 		const decorations = decorationRead?.ok ? decorationRead.value : undefined;
 		// A locked comment, or an element locked or unknown, refuses the whole move.
@@ -2533,7 +2537,7 @@ export class CanvasAuthoring {
 			} else if (!known.has(id)) {
 				return reject();
 			}
-			if (!policyAllowsGraphEdit(before.document, "edit", id, "element-style", diagnostics)) return reject();
+			if (!policyAllowsGraphEdit(policy, "edit", id, "element-style", diagnostics)) return reject();
 		}
 		const document = translateBoardSelection(before.document, ids, dx, dy, routeEnds);
 		const verified = this.commitDocument(before, document, diagnostics);

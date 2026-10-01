@@ -40,7 +40,7 @@ import {
 	boardConnectors, connectorEndCap, fitsNativeEdge, heldByNode, nativeEdgeOf, readBoardConnector,
 	restyleBoardConnector, translateConnector, type BoardConnector,
 } from "./board-connectors";
-import { commentSelectionId, selectedComment, translateBoardSelection, routeEndsInBox, pointInSelectionBox, rectIntersectsBox, type SelectedRouteEnds } from "./board-selection";
+import { commentSelectionId, previewBoardSelection, selectedComment, selectionMovesLineData, routeEndsInBox, pointInSelectionBox, rectIntersectsBox, type SelectedRouteEnds } from "./board-selection";
 import { ConnectorLayer } from "./connector-layer";
 import { ConnectorLabels, type ConnectorLabel } from "./connector-labels";
 import {
@@ -445,8 +445,10 @@ function cssNumber(value: string | undefined): number | undefined {
 export function resolveSelectionToolbarPresentation(
 	document: unknown,
 	id: string | undefined,
+	/** The board's scene, when the caller has built it already. */
+	scene?: SourceScene,
 ): Pick<SelectionToolbarState, "typography" | "colors"> & { readonly style: SelectionToolbarStyle } {
-	const descriptor = id === undefined ? undefined : buildSourceScene(document).items.get(id);
+	const descriptor = id === undefined ? undefined : (scene ?? buildSourceScene(document)).items.get(id);
 	const css = descriptor?.css ?? {};
 	const fontSize = cssNumber(css["font-size"]);
 	const lineHeight = cssNumber(css["line-height"]);
@@ -1466,7 +1468,11 @@ export class M1CanvasSession {
 	private readonly sourceRenderer: SourceRenderer | undefined;
 	private slideShow: SlideShow | undefined;
 	private readonly readonlyOriginal: boolean | undefined;
-	private readonly lockedDom = new Map<HTMLElement, { readonly classPresent: boolean; readonly attrPresent: boolean; readonly attrValue: string | null }>();
+	/**
+	 * The cards marked locked, or left alone as unlocked, with how each was before the plugin looked at it
+	 * and what it was last made: a card is written to only when its state changes.
+	 */
+	private readonly lockedDom = new Map<HTMLElement, { readonly classPresent: boolean; readonly attrPresent: boolean; readonly attrValue: string | null; locked: boolean }>();
 	private readonly appearanceDom = new Map<HTMLElement, AppearanceDomSnapshot>();
 	/** Node shells this session has checked for an editor frame, so a card no longer being edited is still found once more to clean up. */
 	private readonly editorAppearanceDom = new Set<HTMLElement>();
@@ -1672,6 +1678,14 @@ export class M1CanvasSession {
 	/** How many times the board was read mid-gesture, and when the minimap was last drawn. */
 	private liveGeneration = 0;
 	private minimapDrawnAt = 0;
+	/** When native Canvas's moving cards were last read mid-gesture. */
+	private lastLiveReadAt = 0;
+	/** Which press the cards are being moved from: what is measured in one drag is not carried into the next. */
+	private gestureSerial = 0;
+	/** The board just read mid-gesture, handed to the source renderer so it does not read it a second time. */
+	private liveDocument: unknown;
+	/** The ids of the selection last read, kept while it holds the same items. */
+	private selectionIdsFor: { readonly items: readonly unknown[]; readonly ids: readonly string[]; readonly unidentified: number } | undefined;
 	/** The saved board the scene was last described for. */
 	private sceneSignedFor: unknown;
 	private lastAppearanceSignature = "";
@@ -1695,7 +1709,7 @@ export class M1CanvasSession {
 				: undefined;
 		const renderDocument = options.document ?? ownerDocument(this.root);
 		this.sourceRenderer = renderDocument === undefined ? undefined : new SourceRenderer({
-			getDocument: () => this.commentMovePreview ?? this.selectionMovePreview ?? this.boardDocument(),
+			getDocument: () => this.commentMovePreview ?? this.selectionMovePreview ?? this.liveDocument ?? this.boardDocument(),
 			getNodes: () => this.adapter.getNodes(),
 			getEdges: () => this.adapter.getEdges(),
 			getSelectionMovePreviewIds: () => this.selectionMovePreview === undefined ? undefined : this.selectionMoveIds,
@@ -1703,6 +1717,11 @@ export class M1CanvasSession {
 			getSourceScene: (document) => {
 				const cache = this.landingCache;
 				return cache !== undefined && cache.document === document ? cache.scene : undefined;
+			},
+			getLiveGesture: () => this.liveDocument === undefined ? undefined : this.gestureSerial,
+			getAnchorGeometry: (document) => {
+				const cache = this.landingCache;
+				return cache !== undefined && cache.document === document && this.rotationPreview === undefined ? cache.geometry : undefined;
 			},
 			onDeckAction: (deckId, action) => this.runDeckAction(deckId, action),
 			onFontUsed: (family) => options.onFontUsed?.(family),
@@ -2710,7 +2729,7 @@ export class M1CanvasSession {
 	}
 
 	/** Node boxes, silhouettes and routes of the current document, measured once per document. */
-	private landingGeometry(previous?: AnchorGeometry): { readonly geometry: AnchorGeometry; readonly scene: SourceScene } {
+	private landingGeometry(previous?: AnchorGeometry, knownScene?: SourceScene): { readonly geometry: AnchorGeometry; readonly scene: SourceScene } {
 		const document = this.commentMovePreview ?? this.currentRawDocument;
 		const preview = this.rotationPreview;
 		if (preview !== undefined) {
@@ -2719,7 +2738,7 @@ export class M1CanvasSession {
 		}
 		let cache = this.landingCache;
 		if (cache === undefined || cache.document !== document) {
-			const scene = buildSourceScene(document);
+			const scene = knownScene ?? buildSourceScene(document);
 			cache = { document, geometry: buildCanvasAnchorGeometry(document, undefined, scene, previous), scene };
 			this.landingCache = cache;
 		}
@@ -3499,7 +3518,7 @@ export class M1CanvasSession {
 				: `Metadata persistence is unavailable, so appearance, locking and every other write is disabled: ${this.options.persistenceProblem}`);
 		}
 		const selection = this.adapter.getSelection();
-		this.setSelectedIds([...(selection === undefined ? [] : allIds(selection)), ...this.ownSelection(this.currentRawDocument)]);
+		this.setSelectedIds([...(selection === undefined ? [] : this.idsOfSelection(selection).ids), ...this.ownSelection(this.currentRawDocument)]);
 		this.updateShownLayer();
 		this.scene = this.adapter.getScene() ?? sceneFromDocument(this.currentRawDocument) ?? { nodes: [], edges: [] };
 		// The board's own connectors show on the minimap as edges do.
@@ -4382,6 +4401,7 @@ export class M1CanvasSession {
 		this.wakeFrames = wake;
 		const down = (): void => {
 			held = true;
+			this.gestureSerial += 1;
 			this.pointerHeld = true;
 			this.liveGeometryDirty = true;
 			wake();
@@ -4406,8 +4426,38 @@ export class M1CanvasSession {
 	/** What is selected now, kept both as a list and as a set to ask of. */
 	private setSelectedIds(ids: readonly string[]): void {
 		const selectedIdSet = new Set(ids);
-		this.selectedIds = [...selectedIdSet];
+		const next = [...selectedIdSet];
+		// The same ids again leave the lists as they were: what is worked out from them stays.
+		if (next.length === this.selectedIds.length && next.every((id, index) => id === this.selectedIds[index])) return;
+		this.selectedIds = next;
 		this.selectedIdSet = selectedIdSet;
+	}
+
+	/**
+	 * The ids of the selected items.  A press, a move or a key asks for them,
+	 * and a selection of thousands is read item by item; it is read again only
+	 * when it holds other items.
+	 */
+	private idsOfSelection(selection: readonly unknown[]): { readonly ids: readonly string[]; readonly unidentified: number } {
+		const known = this.selectionIdsFor;
+		if (known !== undefined && known.items.length === selection.length && known.items.every((item, index) => item === selection[index])) {
+			return known;
+		}
+		const ids = allIds(selection);
+		const unidentified = selection.filter((item) => allIds([item]).length !== 1).length;
+		this.selectionIdsFor = { items: [...selection], ids, unidentified };
+		return this.selectionIdsFor;
+	}
+
+	/**
+	 * The poll that keeps up what native Canvas changes without telling.  While
+	 * a drag is followed frame by frame the board is read already, so the poll
+	 * has nothing to add and would only repeat the whole refresh.
+	 */
+	private pollRefresh(): void {
+		const following = this.pointerHeld || this.selectionMovePreview !== undefined;
+		if (following && Date.now() - this.lastLiveReadAt < REFRESH_INTERVAL_MS) return;
+		this.refresh();
 	}
 
 	/**
@@ -4465,8 +4515,14 @@ export class M1CanvasSession {
 			&& readRuntime(readRuntime(before.document, "edges"), "length") === document.edges.length;
 		this.currentRawDocument = document;
 		this.landingCache = undefined;
+		this.lastLiveReadAt = Date.now();
 		const routes = this.landingGeometry(same ? before.geometry : undefined).geometry.edges ?? {};
-		this.sourceRenderer?.refresh();
+		this.liveDocument = document;
+		try {
+			this.sourceRenderer?.refresh();
+		} finally {
+			this.liveDocument = undefined;
+		}
 		const ownEdges = boardConnectors(document).flatMap((connector) => {
 			const route = routes[connector.id];
 			return route === undefined ? [] : [{ id: connector.id, ...route }];
@@ -5829,7 +5885,9 @@ export class M1CanvasSession {
 			this.shapeCache = cache;
 		}
 		if (!cache.shapes.has(id)) {
-			cache.shapes.set(id, resolveSelectionToolbarPresentation(document, id).style.shape);
+			// The board's scene is built once for this document, not once for each selected card.
+			const scene = this.commentMovePreview === undefined && this.rotationPreview === undefined ? this.landingGeometry().scene : undefined;
+			cache.shapes.set(id, resolveSelectionToolbarPresentation(document, id, scene).style.shape);
 		}
 		return cache.shapes.get(id);
 	}
@@ -6171,8 +6229,10 @@ export class M1CanvasSession {
 	/** The pages over the board, where the view now shows them. */
 	private updateExportOverlay(): void {
 		const exporting = this.exporting;
+		// Measuring the board makes the browser lay it out: only when there are pages to place.
+		if (exporting === undefined) return;
 		const origin = this.exportOrigin();
-		if (exporting === undefined || origin === undefined) return;
+		if (origin === undefined) return;
 		const pages = exporting.state.pages.flatMap((page, index) => {
 			const a = this.viewportPoint({ x: page.x, y: page.y });
 			const b = this.viewportPoint({ x: page.x + page.width, y: page.y + page.height });
@@ -7417,6 +7477,17 @@ export class M1CanvasSession {
 				};
 			}
 		}
+		// Cards alone only change where they stand, so the lines are planned
+		// again for the cards that moved and the board's scene is the one it
+		// began with: unless a presentation's slides, ordered by where they
+		// stand, or a line's own waypoints and free ends move with the cards.
+		let lastGeometry: AnchorGeometry | undefined;
+		let beganScene: SourceScene | undefined;
+		if (cardsAlone && !selectionMovesLineData(original, ids)) {
+			const scene = buildSourceScene(original);
+			lastGeometry = buildCanvasAnchorGeometry(original, undefined, scene);
+			if (![...scene.items.values()].some((item) => item.structured?.deck !== undefined)) beganScene = scene;
+		}
 		let dx = 0, dy = 0, changed = false;
 		const move = (moved: PointerEvent): void => {
 			if (moved.pointerId !== event.pointerId) return;
@@ -7426,9 +7497,13 @@ export class M1CanvasSession {
 			dy = at.y - first.y;
 			changed ||= Math.hypot(moved.clientX - event.clientX, moved.clientY - event.clientY) > 3;
 			if (!changed) return;
-			this.selectionMovePreview = translateBoardSelection(original, ids, dx, dy, routeEnds);
+			this.selectionMovePreview = previewBoardSelection(original, ids, dx, dy, routeEnds);
+			this.lastLiveReadAt = Date.now();
 			this.currentRawDocument = this.selectionMovePreview;
 			this.landingCache = undefined;
+			// Worked out once for the preview: the cards' lines, the connectors and the pins all draw from it.
+			const planned = this.landingGeometry(lastGeometry, beganScene);
+			if (lastGeometry !== undefined) lastGeometry = planned.geometry;
 			for (const { element } of cards) element.style.setProperty("translate", `${dx}px ${dy}px`);
 			this.selectionMoveShift = { dx, dy };
 			this.liveGeometryDirty = true;
@@ -8134,6 +8209,36 @@ export class M1CanvasSession {
 		};
 	}
 
+	/** Put the lock mark on a card, or take it off, writing only what differs. */
+	private markLocked(dom: HTMLElement, locked: boolean): void {
+		if (locked) {
+			if (!dom.classList.contains("miro-canvas-locked")) dom.classList.add("miro-canvas-locked");
+			if (dom.getAttribute("data-miro-canvas-locked") !== "true") dom.setAttribute("data-miro-canvas-locked", "true");
+			return;
+		}
+		if (dom.classList.contains("miro-canvas-locked")) dom.classList.remove("miro-canvas-locked");
+		if (dom.hasAttribute("data-miro-canvas-locked")) dom.removeAttribute("data-miro-canvas-locked");
+	}
+
+	/** A card as the host had it before the plugin marked it. */
+	private restoreLockedDom(element: HTMLElement, previous: { readonly classPresent: boolean; readonly attrPresent: boolean; readonly attrValue: string | null }): void {
+		try {
+			if (previous.classPresent) {
+				element.classList.add("miro-canvas-locked");
+			} else {
+				element.classList.remove("miro-canvas-locked");
+			}
+			if (previous.attrPresent && previous.attrValue !== null) {
+				element.setAttribute("data-miro-canvas-locked", previous.attrValue);
+			} else {
+				element.removeAttribute("data-miro-canvas-locked");
+			}
+		} catch {
+			// A closed/replaced Canvas node may no longer be writable; it is safe
+			// to forget the decoration and let the host own the element.
+		}
+	}
+
 	private refreshDecorations(): void {
 		for (const label of this.attachmentLabels.splice(0)) {
 			try {
@@ -8143,24 +8248,17 @@ export class M1CanvasSession {
 			}
 		}
 		this.restoreNativeAttachmentLabels();
-		for (const [element, previous] of this.lockedDom) {
-			try {
-				if (previous.classPresent) {
-					element.classList.add("miro-canvas-locked");
-				} else {
-					element.classList.remove("miro-canvas-locked");
-				}
-				if (previous.attrPresent && previous.attrValue !== null) {
-					element.setAttribute("data-miro-canvas-locked", previous.attrValue);
-				} else {
-					element.removeAttribute("data-miro-canvas-locked");
-				}
-			} catch {
-				// A closed/replaced Canvas node may no longer be writable; it is safe
-				// to forget the decoration and let the host own the element.
-			}
+		// A card the board no longer shows goes back as the host had it.
+		const shown = new Set<HTMLElement>();
+		for (const node of this.scene.nodes) {
+			const dom = readCanvasElementDom(node);
+			if (dom !== undefined) shown.add(dom);
 		}
-		this.lockedDom.clear();
+		for (const [element, previous] of this.lockedDom) {
+			if (shown.has(element)) continue;
+			this.restoreLockedDom(element, previous);
+			this.lockedDom.delete(element);
+		}
 		for (const node of this.scene.nodes) {
 			const dom = readCanvasElementDom(node);
 			if (dom === undefined) {
@@ -8172,17 +8270,19 @@ export class M1CanvasSession {
 			}
 			const locked = decideEditOperation(this.policy, "move", [id]).reason === "element-locked";
 			try {
-				this.lockedDom.set(dom, {
-					classPresent: dom.classList.contains("miro-canvas-locked"),
-					attrPresent: dom.hasAttribute("data-miro-canvas-locked"),
-					attrValue: dom.getAttribute("data-miro-canvas-locked"),
-				});
-				if (locked) {
-					dom.classList.add("miro-canvas-locked");
-					dom.setAttribute("data-miro-canvas-locked", "true");
-				} else {
-					dom.classList.remove("miro-canvas-locked");
-					dom.removeAttribute("data-miro-canvas-locked");
+				const known = this.lockedDom.get(dom);
+				if (known === undefined) {
+					this.lockedDom.set(dom, {
+						classPresent: dom.classList.contains("miro-canvas-locked"),
+						attrPresent: dom.hasAttribute("data-miro-canvas-locked"),
+						attrValue: dom.getAttribute("data-miro-canvas-locked"),
+						locked,
+					});
+					this.markLocked(dom, locked);
+				} else if (known.locked !== locked || locked) {
+					// A card marked locked is looked at again; an unlocked one is left alone until its state changes.
+					this.markLocked(dom, locked);
+					known.locked = locked;
 				}
 			} catch {
 				continue;
@@ -8487,7 +8587,7 @@ export class M1CanvasSession {
 			return;
 		}
 		try {
-			const timer = Reflect.apply(setIntervalValue, globalThis, [() => this.refresh(), REFRESH_INTERVAL_MS]);
+			const timer = Reflect.apply(setIntervalValue, globalThis, [() => this.pollRefresh(), REFRESH_INTERVAL_MS]);
 			this.refreshTimer = timer as ReturnType<typeof setInterval>;
 			this.disposers.push(() => {
 				if (this.refreshTimer === undefined) {
@@ -8641,13 +8741,13 @@ export class M1CanvasSession {
 		const document = this.savedDocument();
 		this.policy = this.policyFromDocument(document);
 		const selection = this.adapter.getSelection();
-		this.setSelectedIds([...(selection === undefined ? [] : allIds(selection)), ...this.ownSelection(document)]);
+		this.setSelectedIds([...(selection === undefined ? [] : this.idsOfSelection(selection).ids), ...this.ownSelection(document)]);
 		if (selection === undefined) {
 			this.interactionBlock = "this Canvas runtime does not report its selection";
 			this.policy = createInteractionPolicy(undefined);
 			return;
 		}
-		const unidentified = selection.filter((item) => allIds([item]).length !== 1).length;
+		const unidentified = this.idsOfSelection(selection).unidentified;
 		if (unidentified > 0) {
 			this.interactionBlock = `${unidentified} of ${selection.length} selected item(s) could not be identified`;
 			this.policy = createInteractionPolicy(undefined);
@@ -9127,6 +9227,8 @@ export class M1CanvasSession {
 		listen("paste", (event) => this.blockIfNeeded(event, "paste", this.eventIds(event)));
 		listen("cut", (event) => this.blockIfNeeded(event, "delete", this.eventIds(event)));
 		listen("pointermove", (event) => {
+			// A selection move was checked against the locks as it began.
+			if (this.selectionMoveEnd !== undefined) return;
 			const buttons = readRuntime(event, "buttons");
 			if (buttons === 0 || (typeof buttons === "number" && (buttons & 4) !== 0) || this.isSpacePanHeld()) {
 				return;
@@ -9137,8 +9239,10 @@ export class M1CanvasSession {
 			// A tool drawing on the board owns the press and moves no card; the
 			// search below walks every card, too much for each move of a pen.
 			if (this.toolGesture !== undefined) return;
-			const id = this.eventElementId(eventTarget(event));
-			const ids = this.pointerEditIds ?? (id === undefined ? undefined : this.eventIds(event));
+			// The press has named what the gesture moves; asking the page which
+			// card the pointer is over, on every move, walks every card.
+			const pressed = this.pointerEditIds;
+			const ids = pressed ?? (this.eventElementId(eventTarget(event)) === undefined ? undefined : this.eventIds(event));
 			if (ids !== undefined) this.blockIfNeeded(event, "move", [...new Set([...ids, ...this.selectedIds])]);
 		});
 	}
@@ -9178,20 +9282,7 @@ export class M1CanvasSession {
 		}
 		this.restoreNativeAttachmentLabels();
 		for (const [element, previous] of this.lockedDom) {
-			try {
-				if (previous.classPresent) {
-					element.classList.add("miro-canvas-locked");
-				} else {
-					element.classList.remove("miro-canvas-locked");
-				}
-				if (previous.attrPresent && previous.attrValue !== null) {
-					element.setAttribute("data-miro-canvas-locked", previous.attrValue);
-				} else {
-					element.removeAttribute("data-miro-canvas-locked");
-				}
-			} catch {
-				// The Canvas node may have been destroyed with its pane.
-			}
+			this.restoreLockedDom(element, previous);
 		}
 		this.lockedDom.clear();
 		this.restoreAppearanceDom();

@@ -25,6 +25,13 @@ export interface SourceRendererHost {
   getRotationPreview?(): { readonly id: string; readonly rotation: number } | undefined;
   /** The scene the host built from this very document, if it has one. */
   getSourceScene?(document: unknown): SourceScene | undefined;
+  /** The places and routes the host worked out from this very document, if it has them. */
+  getAnchorGeometry?(document: unknown): AnchorGeometry | undefined;
+  /**
+   * Which gesture the board is being read in, mid-gesture: cards are being moved
+   * or resized by the host and nothing else changes.  Undefined when it is not.
+   */
+  getLiveGesture?(): number | undefined;
   /**
    * Node IDs whose positions come from an uncommitted group-drag document.
    * While they are given, `getDocument` hands a new document for every move
@@ -75,10 +82,51 @@ interface LineDrawing {
   readonly moving: boolean;
 }
 
-/** The board, and the drawn sizes of its cards, the lines were last drawn from during a drag. */
+/**
+ * What the lines were last drawn from.  During a selection drag that is the
+ * projected board and the drawn sizes of its cards; otherwise it is where the
+ * cards and lines run, so a card that only moved is told from one that did not.
+ */
 interface LinesDrawnFor {
+  readonly moving: boolean;
   readonly document: unknown;
   readonly measured: string | undefined;
+  readonly geometry: AnchorGeometry;
+}
+
+/**
+ * Whether two plain values hold the same numbers to a hundredth and the same
+ * of everything else.  It reads what two geometries hold without writing them
+ * out: a large board's places take longer to write out than to compare.
+ */
+export function sameRoundedData(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (typeof left === "number" && typeof right === "number") {
+    if (!Number.isFinite(left) || !Number.isFinite(right)) return !Number.isFinite(left) && !Number.isFinite(right);
+    return Math.round(left * 100) === Math.round(right * 100);
+  }
+  if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (!sameRoundedData(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  let leftKeys = 0;
+  for (const key of Object.keys(leftRecord)) {
+    const value = leftRecord[key];
+    if (value === undefined) continue;
+    leftKeys += 1;
+    if (!sameRoundedData(value, rightRecord[key])) return false;
+  }
+  let rightKeys = 0;
+  for (const key of Object.keys(rightRecord)) {
+    if (rightRecord[key] !== undefined) rightKeys += 1;
+  }
+  return leftKeys === rightKeys;
 }
 
 const OWNED_CLASS = "miro-source-rendered";
@@ -970,6 +1018,7 @@ function domSize(element: DomElementLike | undefined): { readonly width: number;
  */
 function measureNodes(
   document: unknown, runtimeNodes: readonly unknown[], scene: SourceScene, turning: ReadonlySet<string> = new Set(),
+  memo?: MeasureMemo,
 ): NodeMeasurements {
   const declared = new Map<string, { readonly width: number; readonly height: number }>();
   const nodes = safeGet(document, "nodes");
@@ -981,6 +1030,45 @@ function measureNodes(
       declared.set(id, { width, height });
     }
   }
+  // While a card is dragged no card changes its size, and reading the page's
+  // boxes makes the browser lay out every card on it again.
+  const turningKey = [...turning].join("|");
+  if (memo?.measurements !== undefined && memo.turning === turningKey && sameDeclaredSizes(memo.declared, declared)) {
+    return memo.measurements;
+  }
+  const measurements = observeNodes(runtimeNodes, scene, turning, declared);
+  if (memo !== undefined) {
+    memo.declared = declared;
+    memo.turning = turningKey;
+    memo.measurements = measurements;
+  }
+  return measurements;
+}
+
+/** What the last measuring of the page was made from, kept while a gesture only moves cards. */
+interface MeasureMemo {
+  readonly gesture: number;
+  declared?: ReadonlyMap<string, { readonly width: number; readonly height: number }>;
+  turning?: string;
+  measurements?: NodeMeasurements;
+}
+
+function sameDeclaredSizes(
+  left: ReadonlyMap<string, { readonly width: number; readonly height: number }> | undefined,
+  right: ReadonlyMap<string, { readonly width: number; readonly height: number }>,
+): boolean {
+  if (left === undefined || left.size !== right.size) return false;
+  for (const [id, size] of right) {
+    const known = left.get(id);
+    if (known === undefined || known.width !== size.width || known.height !== size.height) return false;
+  }
+  return true;
+}
+
+function observeNodes(
+  runtimeNodes: readonly unknown[], scene: SourceScene, turning: ReadonlySet<string>,
+  declared: ReadonlyMap<string, { readonly width: number; readonly height: number }>,
+): NodeMeasurements {
   const observed = new Map<string, { readonly width: number; readonly height: number }>();
   const ratios: number[] = [];
   for (const runtime of runtimeNodes) {
@@ -1827,12 +1915,14 @@ export class SourceRenderer {
   private lineItems: RenderedItem[] = [];
   /** What drawing the cards had to report, repeated while only the lines are drawn again. */
   private cardDiagnostics: readonly string[] = [];
-  private lastSignature: string | undefined;
-  /** While a selection is dragged: what the cards were drawn from, and the board and sizes the lines were drawn from. */
-  private movingCards: string | undefined;
+  /** What the cards were drawn from: everything about them but where they stand. */
+  private drawnCards: string | undefined;
+  /** What the lines were drawn from. */
   private linesDrawnFor: LinesDrawnFor | undefined;
   /** The cards' drawn sizes, measured as a drag began. */
   private movingMeasured: NodeMeasurements | undefined;
+  /** The same for a card native Canvas drags or resizes. */
+  private liveMeasure: MeasureMemo | undefined;
   private diagnosticList: readonly string[] = [];
   private readonly document: Document | undefined;
   /** Observer keeping rotations and redrawn edges in place between refreshes. */
@@ -1897,6 +1987,7 @@ export class SourceRenderer {
 
     const runtimeNodes = readCollection(this.host, "getNodes", diagnostics);
     const runtimeEdges = readCollection(this.host, "getEdges", diagnostics);
+    // Only a card that is drawn on is read: a board of thousands has a handful of kinds drawn on.
     const documentSizes = new Map<string, { readonly width: number; readonly height: number }>();
     // A note's text sets its fitted size and a code block's its numbering, so
     // an edit to either renders again.
@@ -1905,11 +1996,12 @@ export class SourceRenderer {
     if (Array.isArray(documentNodes)) {
       for (const node of documentNodes) {
         const nodeId = safeGet(node, "id");
-        const kind = typeof nodeId === "string" ? descriptors.get(nodeId)?.kind : undefined;
-        if (typeof nodeId === "string" && (kind === "sticky" || kind === "code")) fittedTexts.push([nodeId, safeGet(node, "text")]);
+        if (typeof nodeId !== "string") continue;
+        const descriptor = descriptors.get(nodeId);
+        if (descriptor === undefined) continue;
+        if (descriptor.kind === "sticky" || descriptor.kind === "code") fittedTexts.push([nodeId, safeGet(node, "text")]);
         const width = safeGet(node, "width"), height = safeGet(node, "height");
-        if (typeof nodeId === "string" && typeof width === "number" && typeof height === "number"
-          && width > 0 && height > 0) {
+        if (typeof width === "number" && typeof height === "number" && width > 0 && height > 0) {
           documentSizes.set(nodeId, { width, height });
         }
       }
@@ -1920,13 +2012,21 @@ export class SourceRenderer {
     // A dragged selection only moves, so its cards are measured once, as the
     // drag begins: measuring makes the browser lay the whole board out again,
     // on every move of a large selection.
+    // A card dragged by native Canvas only moves too, or is resized: a resize is told by the sizes.
+    const gesture = safeCall(this.host, "getLiveGesture");
+    if (typeof gesture !== "number") this.liveMeasure = undefined;
+    else if (this.liveMeasure?.gesture !== gesture) this.liveMeasure = { gesture };
     const measured = moving && this.movingMeasured !== undefined
       ? this.movingMeasured
-      : measureNodes(sourceDocument, runtimeNodes, scene, new Set(preview === undefined ? [] : [preview.id]));
+      : measureNodes(sourceDocument, runtimeNodes, scene, new Set(preview === undefined ? [] : [preview.id]), this.liveMeasure);
     this.movingMeasured = moving ? measured : undefined;
-    const geometry = buildCanvasAnchorGeometry(sourceDocument, preview === undefined ? measured : {
+    // With no card measured at another size, the host's own places and routes for this board are these.
+    const known = preview === undefined && Object.keys(measured).length === 0
+      ? safeCall(this.host, "getAnchorGeometry", [sourceDocument]) as AnchorGeometry | undefined
+      : undefined;
+    const geometry = known ?? buildCanvasAnchorGeometry(sourceDocument, preview === undefined ? measured : {
       ...measured, [preview.id]: { ...measured[preview.id], rotation: preview.rotation },
-    });
+    }, scene);
     // Native edges on a turned or shaped node, which the host draws to the
     // middle of a side of the upright box.
     const rectangle = shapeOutline("rectangle");
@@ -1975,39 +2075,24 @@ export class SourceRenderer {
     });
     const runtimeOfItem = (item: RenderedItem): unknown => runtimeOf(item.kind, item.id);
     const lines: LineDrawing = { sourceDocument, scene, descriptors, nativeEdges, nativeRoutes, edges, geometry, routeNode, moving };
-    let signature: string | undefined;
-    let movingCards: string | undefined;
-    let linesDrawnFor: LinesDrawnFor | undefined;
-    if (moving) {
-      // While a selection is dragged its cards only move: what is drawn on
-      // them stays, and only the lines that follow them are drawn again.  The
-      // cards are drawn again, as always, when anything else about them changes.
-      movingCards = safeSignature({
-        descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, diagnostics, fittedTexts,
-        sizes: [...descriptors.keys()].map((id) => [id, documentSizes.get(id) ?? null]),
-      });
-      linesDrawnFor = { document: sourceDocument, measured: safeSignature(measured) };
-      if (movingCards !== undefined && movingCards === this.movingCards && this.decorationsIntact(runtimeOfItem, "node")) {
-        const drawn = this.linesDrawnFor;
-        if (drawn !== undefined && drawn.document === linesDrawnFor.document && drawn.measured === linesDrawnFor.measured
-          && this.decorationsIntact(runtimeOfItem, "edge")) {
-          return this.diagnosticList;
-        }
-        return this.redrawLines(lines, linesDrawnFor, diagnostics);
-      }
-    } else {
-      signature = safeSignature({
-        descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, moving, geometry, diagnostics, fittedTexts,
-      });
-      if (signature !== undefined && signature === this.lastSignature && this.decorationsIntact(runtimeOfItem)) {
-        return this.diagnosticList;
-      }
+    // A card that only moves - dragged by a selection or by native Canvas - keeps
+    // what is drawn on it: only the lines that follow it are drawn again.  The
+    // cards are drawn again when anything else about them changes.
+    const cardSignature = safeSignature({
+      descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, diagnostics, fittedTexts,
+      sizes: [...descriptors.keys()].map((id) => [id, documentSizes.get(id) ?? null]),
+    });
+    const linesDrawnFor: LinesDrawnFor = {
+      moving, document: sourceDocument, measured: moving ? safeSignature(measured) : undefined, geometry,
+    };
+    if (cardSignature !== undefined && cardSignature === this.drawnCards && this.decorationsIntact(runtimeOfItem, "node")) {
+      if (this.linesDrawnAre(linesDrawnFor) && this.decorationsIntact(runtimeOfItem, "edge")) return this.diagnosticList;
+      return this.redrawLines(lines, linesDrawnFor, diagnostics);
     }
     this.restoreOwnedPatches();
     this.cardItems = [];
     this.lineItems = [];
-    this.lastSignature = signature;
-    this.movingCards = movingCards;
+    this.drawnCards = cardSignature;
     this.linesDrawnFor = linesDrawnFor;
     const cardPatches: RestorePatch[] = [];
     const cardItems: RenderedItem[] = [];
@@ -2058,6 +2143,15 @@ export class SourceRenderer {
     return this.diagnosticList;
   }
 
+  /** Whether the lines on the page already follow the cards as they stand. */
+  private linesDrawnAre(next: LinesDrawnFor): boolean {
+    const drawn = this.linesDrawnFor;
+    if (drawn === undefined || drawn.moving !== next.moving) return false;
+    // A dragged selection projects a new board on every move: its identity is the change.
+    if (next.moving) return drawn.document === next.document && drawn.measured === next.measured;
+    return sameRoundedData(drawn.geometry, next.geometry);
+  }
+
   /**
    * Draw the lines again over the cards as they are drawn: the connectors
    * this module styles, their stacking, and native edges drawn its way.
@@ -2089,6 +2183,14 @@ export class SourceRenderer {
   }
 
   private drawLines(lines: LineDrawing, cardItems: readonly RenderedItem[], patches: RestorePatch[], diagnostics: string[]): RenderedItem[] {
+    // Native Canvas takes the lines it does not show off the page, and every
+    // move of a dragged selection draws the lines again: one it does not show
+    // is drawn on the move that brings it back.
+    const offPage = (runtime: unknown, keys: readonly string[]): boolean => {
+      if (!lines.moving) return false;
+      const element = elementFor(runtime, keys);
+      return element !== undefined && safeGet(element, "isConnected") === false;
+    };
     const connectorItems: RenderedItem[] = [];
     for (const [id, descriptor] of lines.descriptors) {
       if (lines.nativeRoutes.has(id) || descriptor.kind !== "connector") continue;
@@ -2097,6 +2199,7 @@ export class SourceRenderer {
         diagnostics.push(`connector-runtime-missing: ${id}.`);
         continue;
       }
+      if (offPage(runtime, EDGE_TARGET_KEYS)) continue;
       const native = lines.nativeEdges.get(id);
       const live = lines.moving ? undefined : liveConnectorGeometry(lines.sourceDocument, id, runtime, native, lines.routeNode, descriptor);
       const item = applyConnector(this.document, lines.geometry.edges?.[id], native, runtime, id, descriptor, patches, diagnostics, live);
@@ -2110,6 +2213,7 @@ export class SourceRenderer {
         diagnostics.push(`connector-runtime-missing: ${id}.`);
         continue;
       }
+      if (offPage(runtime, ["lineGroupEl"])) continue;
       const item = applyNativeRoute(runtime, id, route.edge, route.anchors, lines.routeNode, lines.moving, patches, diagnostics);
       if (item !== undefined) routeItems.push(item);
     }
@@ -2208,8 +2312,7 @@ export class SourceRenderer {
     this.cardItems = [];
     this.lineItems = [];
     this.cardDiagnostics = [];
-    this.lastSignature = undefined;
-    this.movingCards = undefined;
+    this.drawnCards = undefined;
     this.linesDrawnFor = undefined;
     this.movingMeasured = undefined;
   }
