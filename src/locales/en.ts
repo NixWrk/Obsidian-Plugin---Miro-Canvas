@@ -300,6 +300,9 @@ export const EN = {
 		toolBarHeading: "Tool bar",
 		toolBarDesc: "Choose which tools sit on the bottom bar and in what order; the rest stay under the “+” menu.",
 		toolBarArrangeHint: "This list is one way to do it; the board's menu also has an “Arrange panels” mode that drags the bar, the dock and the minimap in place.",
+		toolBarLayoutKept: (kindName: string) =>
+			`The bar and the panels are kept separately for computer, tablet and phone, so a synced vault can lay each out its own way. This is the layout of this device: a ${kindName}.`,
+		layoutKinds: { desktop: "computer", tablet: "tablet", phone: "phone" },
 		toolBarReset: "Reset to default",
 		toolBarOnBar: "On the bar",
 		toolBarMoveUp: "Move up",

@@ -7,7 +7,15 @@ import {
   DEFAULT_COMMENT_AUTHOR,
   DEFAULT_SETTINGS,
   addToFontList,
+  LAYOUT_KINDS,
   commentAuthorName,
+  layoutKindFor,
+  mergeSettings,
+  sameOnThisDevice,
+  settingsForStorage,
+  settingsFromExternalChange,
+  withOtherKindsFromDisk,
+  useLayoutKind,
   moveFontListEntry,
   obsidianAccountName,
   navigationCommands,
@@ -315,5 +323,178 @@ describe("plugin settings", () => {
     expect(moveFontListEntry(pool, "A", "up")).toBe(pool);
     expect(moveFontListEntry(pool, "C", "down")).toBe(pool);
     expect(moveFontListEntry(pool, "Nowhere", "up")).toBe(pool);
+  });
+});
+
+describe("a panel layout for each kind of device", () => {
+  const upright = { toolbar: { anchor: "left-middle", dx: 8, dy: 0, orientation: "vertical" } } as const;
+  const oldFile = {
+    toolbarItems: ["select", "frame"],
+    panelLayout: upright,
+    minimapVisible: false,
+  };
+
+  it("names the kind of device from Obsidian's own flags", () => {
+    expect(layoutKindFor({ isPhone: true, isTablet: false })).toBe("phone");
+    expect(layoutKindFor({ isPhone: false, isTablet: true })).toBe("tablet");
+    expect(layoutKindFor({ isPhone: false, isTablet: false })).toBe("desktop");
+    expect(layoutKindFor({})).toBe("desktop");
+  });
+
+  it("gives every kind the one layout an older file held, so nothing moves", () => {
+    for (const kind of LAYOUT_KINDS) {
+      const settings = normalizeSettings(oldFile, kind);
+      expect(settings.layoutKind).toBe(kind);
+      expect(settings.toolbarItems).toEqual(["select", "frame"]);
+      expect(settings.panelLayout).toEqual(upright);
+      expect(settings.layouts[kind].toolbarItems).toEqual(["select", "frame"]);
+    }
+    expect(normalizeSettings(oldFile, "tablet").minimapVisible).toBe(false);
+  });
+
+  it("starts on the default layout for a file that has none", () => {
+    for (const kind of LAYOUT_KINDS) {
+      const settings = normalizeSettings({}, kind);
+      expect(settings.toolbarItems).toEqual(DEFAULT_TOOLBAR_ITEMS);
+      expect(settings.panelLayout).toEqual({});
+    }
+    expect(normalizeSettings(undefined, "phone").layoutKind).toBe("phone");
+  });
+
+  it("reads and writes the layout of the device in use", () => {
+    const onTablet = normalizeSettings(oldFile, "tablet");
+    const rearranged = mergeSettings(onTablet, { toolbarItems: ["card"], panelLayout: {} });
+    expect(rearranged.toolbarItems).toEqual(["card"]);
+    expect(rearranged.layouts.tablet).toEqual({ toolbarItems: ["card"], panelLayout: {} });
+    // Seen from the same device after a round trip through the file.
+    const reread = normalizeSettings(JSON.parse(JSON.stringify(settingsForStorage(rearranged))), "tablet");
+    expect(reread.toolbarItems).toEqual(["card"]);
+    expect(reread.panelLayout).toEqual({});
+  });
+
+  it("leaves the other kinds alone when one is arranged", () => {
+    const onPhone = normalizeSettings(oldFile, "phone");
+    const rearranged = mergeSettings(onPhone, { toolbarItems: ["card"], panelLayout: { minimap: { anchor: "top-left", dx: 1, dy: 2 } } });
+    expect(rearranged.layouts.desktop).toEqual(onPhone.layouts.desktop);
+    expect(rearranged.layouts.tablet).toEqual(onPhone.layouts.tablet);
+    expect(rearranged.layouts.phone.toolbarItems).toEqual(["card"]);
+    // The computer, opening the same file, still has its old layout.
+    const onDesktop = normalizeSettings(JSON.parse(JSON.stringify(settingsForStorage(rearranged))), "desktop");
+    expect(onDesktop.toolbarItems).toEqual(["select", "frame"]);
+    expect(onDesktop.panelLayout).toEqual(upright);
+    // And switching kind inside one session shows each kind's own.
+    expect(useLayoutKind(rearranged, "desktop").toolbarItems).toEqual(["select", "frame"]);
+    expect(useLayoutKind(rearranged, "phone").toolbarItems).toEqual(["card"]);
+    expect(useLayoutKind(rearranged, "phone")).toBe(rearranged);
+  });
+
+  it("shares every other setting between the kinds", () => {
+    const onTablet = normalizeSettings(oldFile, "tablet");
+    const changed = mergeSettings(onTablet, { zoomStep: 1.5, minimapVisible: true });
+    expect(useLayoutKind(changed, "desktop")).toMatchObject({ zoomStep: 1.5, minimapVisible: true });
+    expect(changed.layouts).toEqual(onTablet.layouts);
+  });
+
+  it("resets only the layout of the device in use", () => {
+    const base = normalizeSettings(oldFile, "tablet");
+    const phoneDone = mergeSettings(useLayoutKind(base, "phone"), { toolbarItems: ["card"] });
+    const tabletReset = mergeSettings(useLayoutKind(phoneDone, "tablet"), { toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {} });
+    expect(tabletReset.layouts.tablet).toEqual({ toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {} });
+    expect(tabletReset.layouts.phone.toolbarItems).toEqual(["card"]);
+    expect(tabletReset.layouts.desktop.toolbarItems).toEqual(["select", "frame"]);
+    expect(tabletReset.layouts.desktop.panelLayout).toEqual(upright);
+  });
+
+  it("stores the layouts, not the kind, and the computer's layout where the older release reads it", () => {
+    const onPhone = mergeSettings(normalizeSettings(oldFile, "phone"), { toolbarItems: ["card"] });
+    const stored = settingsForStorage(onPhone);
+    expect(stored).not.toHaveProperty("layoutKind");
+    expect(stored.toolbarItems).toEqual(["select", "frame"]);
+    expect(stored.panelLayout).toEqual(upright);
+    expect((stored.layouts as { phone: { toolbarItems: string[] } }).phone.toolbarItems).toEqual(["card"]);
+  });
+
+  it("falls back safely on an unknown or broken shape", () => {
+    for (const layouts of ["tablet", 7, null, [], { desktop: "x", tablet: null, phone: [1] }, { desktop: { toolbarItems: "x", panelLayout: 5 } }]) {
+      const settings = normalizeSettings({ ...oldFile, layouts }, "tablet");
+      expect(settings.toolbarItems).toEqual(["select", "frame"]);
+      expect(settings.panelLayout).toEqual(upright);
+    }
+    // One broken kind does not spoil a good one.
+    const mixed = normalizeSettings({
+      ...oldFile,
+      layouts: { phone: { toolbarItems: ["card", "nonsense"], panelLayout: { toolbar: { anchor: "bad" } } }, laptop: { toolbarItems: ["text"] } },
+    }, "phone");
+    expect(mixed.toolbarItems).toEqual(["card"]);
+    expect(mixed.panelLayout).toEqual({});
+    expect(mixed.layouts).not.toHaveProperty("laptop");
+    expect(normalizeSettings({ layoutKind: "watch" }).layoutKind).toBe("desktop");
+    expect(normalizeSettings("junk", "tablet").layoutKind).toBe("tablet");
+  });
+
+  describe("two devices sharing one file", () => {
+    const tabletBar = { toolbar: { anchor: "top-left", dx: 3, dy: 4 } } as const;
+    /** What the file holds after the tablet saved its own layout and the sync brought it here. */
+    function diskWithTablet(): Record<string, unknown> {
+      const onTablet = mergeSettings(normalizeSettings(oldFile, "tablet"), { toolbarItems: ["text"], panelLayout: tabletBar });
+      return JSON.parse(JSON.stringify(settingsForStorage(onTablet)));
+    }
+
+    it("keeps another kind's newer layout from the file when this device saves", () => {
+      const onDesktop = normalizeSettings(oldFile, "desktop");
+      const arranged = mergeSettings(onDesktop, { toolbarItems: ["card"] });
+      const saved = withOtherKindsFromDisk(arranged, diskWithTablet());
+      expect(saved.layouts.tablet).toEqual({ toolbarItems: ["text"], panelLayout: tabletBar });
+      expect(saved.layouts.desktop.toolbarItems).toEqual(["card"]);
+      expect(saved.toolbarItems).toEqual(["card"]);
+      expect(saved.layoutKind).toBe("desktop");
+      // The file written holds both.
+      const written = normalizeSettings(JSON.parse(JSON.stringify(settingsForStorage(saved))), "tablet");
+      expect(written.toolbarItems).toEqual(["text"]);
+    });
+
+    it("takes every other setting from memory, not from the file", () => {
+      const memory = mergeSettings(normalizeSettings(oldFile, "desktop"), { zoomStep: 1.7 });
+      expect(withOtherKindsFromDisk(memory, { ...diskWithTablet(), zoomStep: 1.1 }).zoomStep).toBe(1.7);
+    });
+
+    it("keeps this kind from memory when the file is corrupt, missing or from before the split", () => {
+      const memory = mergeSettings(normalizeSettings(oldFile, "desktop"), { toolbarItems: ["card"] });
+      for (const disk of [undefined, null, "junk", 5, [], {}, { layouts: "x" }, { toolbarItems: ["text"] }]) {
+        expect(withOtherKindsFromDisk(memory, disk)).toBe(memory);
+      }
+      const brokenKinds = withOtherKindsFromDisk(memory, { layouts: { desktop: { toolbarItems: ["text"] }, tablet: 3 } });
+      expect(brokenKinds.layouts.desktop.toolbarItems).toEqual(["card"]);
+      expect(brokenKinds.layouts.tablet).toEqual(memory.layouts.tablet);
+    });
+
+    it("reloads an external change of the file", () => {
+      const current = normalizeSettings(oldFile, "desktop");
+      const reloaded = settingsFromExternalChange(current, { ...diskWithTablet(), zoomStep: 1.4 });
+      expect(reloaded.layoutKind).toBe("desktop");
+      expect(reloaded.zoomStep).toBe(1.4);
+      expect(reloaded.layouts.tablet.toolbarItems).toEqual(["text"]);
+      expect(settingsFromExternalChange(current, "junk")).toBe(current);
+      expect(settingsFromExternalChange(current, null)).toBe(current);
+    });
+
+    it("leaves this device's panels alone when only another kind changed", () => {
+      const current = normalizeSettings(oldFile, "desktop");
+      const reloaded = settingsFromExternalChange(current, diskWithTablet());
+      expect(reloaded.toolbarItems).toEqual(["select", "frame"]);
+      expect(reloaded.panelLayout).toEqual(upright);
+      expect(sameOnThisDevice(current, reloaded)).toBe(true);
+      // A change of this kind's own layout, or of a shared setting, is seen.
+      const ownChange = settingsFromExternalChange(current, mergeSettings(current, { toolbarItems: ["card"] }));
+      expect(sameOnThisDevice(current, ownChange)).toBe(false);
+      const sharedChange = settingsFromExternalChange(current, { ...oldFile, zoomStep: 1.4 });
+      expect(sameOnThisDevice(current, sharedChange)).toBe(false);
+    });
+  });
+
+  it("reads this release's file back without loss", () => {
+    const arranged = mergeSettings(useLayoutKind(normalizeSettings(oldFile), "phone"), { toolbarItems: ["card"], panelLayout: {} });
+    const reread = normalizeSettings(JSON.parse(JSON.stringify(settingsForStorage(arranged))), "phone");
+    expect(reread).toEqual(arranged);
   });
 });

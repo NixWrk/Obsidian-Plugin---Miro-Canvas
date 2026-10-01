@@ -351,6 +351,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     const labels = words().settings;
     new Setting(containerEl).setName(labels.toolBarHeading).setDesc(labels.toolBarDesc).setHeading();
     new Setting(containerEl).setDesc(labels.toolBarArrangeHint);
+    new Setting(containerEl).setDesc(labels.toolBarLayoutKept(labels.layoutKinds[this.host.settings.layoutKind]));
     new Setting(containerEl)
       .addButton((button) => button
         .setButtonText(labels.toolBarReset)

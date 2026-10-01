@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- The bar's tools and where the bar, the dock and the minimap sit are now kept
+  separately for a computer, a tablet and a phone (by Obsidian's own device
+  kind), so a vault synced between a PC and a tablet can have a vertical bar on
+  one and a horizontal on the other. Your saved layout becomes the layout of
+  every kind at first, so nothing moves until you arrange panels on one device.
+  Arranging, Reset and the settings' Tool bar list change only the device's
+  own kind; all other settings stay shared. `data.json` holds the layouts
+  under `layouts`, and still writes the computer's as `toolbarItems` and
+  `panelLayout` where the previous release reads them. A save reads the file
+  first and keeps the other kinds' layouts it holds, and a change of the file
+  by a sync is picked up at once, so two devices open on one vault never
+  overwrite each other's layout.
 - A double click or a double tap on the empty board is now Escape and never
   makes a card: it puts the armed tool, the selection, an open comment and
   the open bar menus away, whatever tool was armed. Canvas's own double click

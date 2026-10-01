@@ -32,12 +32,19 @@ import {
 import {
   DEFAULT_SETTINGS,
   addToFontList,
+  layoutKindFor,
+  mergeSettings,
+  sameOnThisDevice,
+  settingsFromExternalChange,
+  withOtherKindsFromDisk,
   moveFontListEntry,
   navigationCommands,
   normalizeSettings,
   obsidianAccountName,
   removeFromFontList,
+  settingsForStorage,
   shouldAskImportQuestion,
+  useLayoutKind,
   type MiroCanvasSettings,
   type PanDirection,
 } from "./settings";
@@ -162,7 +169,7 @@ export default class MiroCanvasPlugin extends Plugin {
     this.shellDisposed = false;
     // A stored settings file is user-editable and may predate this release,
     // so it is normalized rather than trusted.
-    this.canvasSettings = normalizeSettings(await this.loadData());
+    this.canvasSettings = normalizeSettings(await this.loadData(), layoutKindFor(Platform));
     setAuthorColors(this.canvasSettings.commentAuthorColors);
     // Every window that can show a Canvas gets the plugin's own font-face
     // sheet; a popout gets one as it opens, and loses it as it closes.  A
@@ -180,7 +187,7 @@ export default class MiroCanvasPlugin extends Plugin {
     }));
     await this.loadFontPacks();
     this.addSettingTab(new MiroCanvasSettingTab(this.app, this, {
-      get settings(): MiroCanvasSettings { return self.canvasSettings; },
+      get settings(): MiroCanvasSettings { return self.settingsOfThisDevice(); },
       saveSettings: (patch) => this.saveCanvasSettings(patch),
       commentAuthors: () => this.m1Session?.commentAuthors() ?? [],
       accountName: () => obsidianAccountName(window.localStorage),
@@ -482,6 +489,7 @@ export default class MiroCanvasPlugin extends Plugin {
     attempt = 0,
   ): void => {
     if (this.shellDisposed) return;
+    this.settingsOfThisDevice();
     if (this.initializationRetry !== null) clearTimeout(this.initializationRetry);
     this.initializationRetry = null;
     const view = leaf?.view;
@@ -571,9 +579,9 @@ export default class MiroCanvasPlugin extends Plugin {
 
   /** Persist a settings change and rebuild the session so it takes effect. */
   public async saveCanvasSettings(patch: Partial<MiroCanvasSettings>): Promise<void> {
-    this.canvasSettings = normalizeSettings({ ...this.canvasSettings, ...patch });
+    this.canvasSettings = mergeSettings(this.settingsOfThisDevice(), patch);
     setAuthorColors(this.canvasSettings.commentAuthorColors);
-    await this.saveData(this.canvasSettings);
+    await this.persistSettings();
     const leaf = this.app.workspace.activeLeaf;
     if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
       this.handleActiveLeafChange(leaf);
@@ -582,8 +590,52 @@ export default class MiroCanvasPlugin extends Plugin {
 
   /** A settings change that needs no rebuilt session: when updates were last checked, or a panel's new place. */
   private async saveSettingsQuietly(patch: Partial<MiroCanvasSettings>): Promise<void> {
-    this.canvasSettings = normalizeSettings({ ...this.canvasSettings, ...patch });
-    await this.saveData(this.canvasSettings);
+    this.canvasSettings = mergeSettings(this.settingsOfThisDevice(), patch);
+    await this.persistSettings();
+  }
+
+  /**
+   * Write the settings.  The file is read first: another device's sync may
+   * have changed its own kind's layout there since this one last read it,
+   * and a save must not take that back.
+   */
+  private async persistSettings(): Promise<void> {
+    let onDisk: unknown;
+    try {
+      onDisk = await this.loadData();
+    } catch {
+      onDisk = undefined;
+    }
+    this.canvasSettings = withOtherKindsFromDisk(this.canvasSettings, onDisk);
+    await this.saveData(settingsForStorage(this.canvasSettings));
+  }
+
+  /**
+   * Obsidian calls this when `data.json` changed on disk, by a sync from
+   * another device.  The settings are read again and applied; nothing is
+   * written back.  The session is rebuilt only when something this device
+   * shows changed, so another kind's new layout leaves the panels alone.
+   */
+  override async onExternalSettingsChange(): Promise<void> {
+    if (this.shellDisposed) return;
+    const before = this.settingsOfThisDevice();
+    this.canvasSettings = settingsFromExternalChange(before, await this.loadData());
+    setAuthorColors(this.canvasSettings.commentAuthorColors);
+    if (sameOnThisDevice(before, this.canvasSettings)) return;
+    const leaf = this.app.workspace.activeLeaf;
+    if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
+      this.handleActiveLeafChange(leaf);
+    }
+  }
+
+  /**
+   * The settings as this kind of device sees them.  The kind is read each
+   * time, not once at start: a window can turn into a phone's (Obsidian's
+   * mobile emulation), and the bar and panels then take that kind's layout.
+   */
+  private settingsOfThisDevice(): MiroCanvasSettings {
+    this.canvasSettings = useLayoutKind(this.canvasSettings, layoutKindFor(Platform));
+    return this.canvasSettings;
   }
 
   /** Once a day at start, unless turned off, ask GitHub whether a newer release is out. */
@@ -949,7 +1001,7 @@ export default class MiroCanvasPlugin extends Plugin {
         fontPacks: survivingIds,
         fontList: prunedFontList.length > 0 ? prunedFontList : this.canvasSettings.fontList,
       });
-      await this.saveData(this.canvasSettings);
+      await this.persistSettings();
     }
     this.syncFontCatalog();
   }

@@ -1098,7 +1098,11 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   board into a mode with a banner ("Drag the panels and tools", Reset,
   Done); the tool bar, the dock's icon row and the minimap - now its own
   panel, apart from the icon row - can be dragged to a new place, stored as
-  the nearest corner or edge plus an offset (`panelLayout`, one entry per
+  the nearest corner or edge plus an offset (`panelLayout`, kept per kind of
+  device - `layouts.desktop|tablet|phone` of `data.json`, each with its own
+  `toolbarItems` and `panelLayout`, chosen by `Platform.isPhone`/`isTablet`;
+  an older file's single layout seeds every kind; the top-level keys are still
+  written from the computer's layout for the previous release - one entry per
   panel; a panel with none keeps its own CSS default) so a resized window
   keeps each one inside the view and in place, snapping to the edges and
   centre lines within 12px and turning vertical near a side edge. The bar's

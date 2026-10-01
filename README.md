@@ -290,6 +290,13 @@ mode with a banner across the top:
 another board leaves the mode. The selection toolbar always keeps following
 the selection.
 
+The layout is kept separately for a computer, a tablet and a phone, so a vault
+synced between them can be laid out for each: a vertical bar set on the tablet
+does not turn the computer's bar upright. Arranging, **Reset** and the **Tool
+bar** list in the settings change only the layout of the device you are on.
+A vault that already had a layout starts with that layout on every device. All
+other settings are shared.
+
 Until you move them, the bottom bar and the corner dock make room for each
 other on a narrow board - with a sidebar open, say: the bar moves to the
 left edge, and when even that is too tight the dock and the minimap rise

@@ -16,6 +16,34 @@ import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, type ToolbarItem } from "./qu
 import { readAvailableUpdate, type AvailableUpdate } from "./update-check";
 export type WheelZoomModifier = "none" | "ctrl" | "shift" | "alt";
 
+/**
+ * The kinds of device that keep their own panel layout.  A vault synced
+ * between a computer and a tablet shares one `data.json`, and a bar turned
+ * upright for a finger is wrong under a mouse; each kind arranges its own.
+ * To keep only two kinds, change this list and `layoutKindFor`.
+ */
+export const LAYOUT_KINDS = ["desktop", "tablet", "phone"] as const;
+export type LayoutKind = typeof LAYOUT_KINDS[number];
+
+/** Which kind of device this is, from Obsidian's own `Platform` flags. */
+export function layoutKindFor(platform: { readonly isPhone?: boolean; readonly isTablet?: boolean }): LayoutKind {
+  if (platform.isPhone === true) return "phone";
+  if (platform.isTablet === true) return "tablet";
+  return "desktop";
+}
+
+/** What one kind of device arranges: the bar's items and where each panel sits. */
+export interface DeviceLayout {
+  /** The bottom tool bar's own content, in order; whatever is missing sits under More, in `ALL_TOOLBAR_ITEMS` order. */
+  readonly toolbarItems: readonly ToolbarItem[];
+  /**
+   * Where the "arrange panels" mode has moved the tool bar, the dock's icon
+   * row or the minimap; a panel missing here keeps its own CSS default, so
+   * an empty layout is exactly today's places.
+   */
+  readonly panelLayout: PanelLayout;
+}
+
 /** A font file added by hand, kept under the plugin's own `fonts/custom` folder. */
 export interface CustomFontFile {
   readonly family: string;
@@ -68,13 +96,16 @@ export interface MiroCanvasSettings {
   readonly lassoBinding: PointerBinding;
   readonly panBinding: PointerBinding;
   readonly lineBinding: PointerBinding;
-  /** The bottom tool bar's own content, in order; whatever is missing sits under More, in `ALL_TOOLBAR_ITEMS` order. */
-  readonly toolbarItems: readonly ToolbarItem[];
   /**
-   * Where the "arrange panels" mode has moved the tool bar, the dock's icon
-   * row or the minimap; a panel missing here keeps its own CSS default, so
-   * an empty layout is exactly today's places.
+   * The panel layout of every kind of device.  This is what is stored: a
+   * change made on one kind of device touches only that kind's entry.
    */
+  readonly layouts: Readonly<Record<LayoutKind, DeviceLayout>>;
+  /** The kind of device in use; not stored, it is read from `Platform` each session. */
+  readonly layoutKind: LayoutKind;
+  /** The bottom tool bar's items on this kind of device: `layouts[layoutKind].toolbarItems`. */
+  readonly toolbarItems: readonly ToolbarItem[];
+  /** The panels' places on this kind of device: `layouts[layoutKind].panelLayout`. */
   readonly panelLayout: PanelLayout;
   /**
    * The warning badge listing what the plugin could not do as asked.  It is
@@ -134,6 +165,11 @@ export const SETTING_BOUNDS: Readonly<Record<
 
 export const WHEEL_ZOOM_MODIFIERS: readonly WheelZoomModifier[] = ["none", "ctrl", "shift", "alt"];
 
+const DEFAULT_DEVICE_LAYOUT: DeviceLayout = Object.freeze({
+  toolbarItems: DEFAULT_TOOLBAR_ITEMS,
+  panelLayout: Object.freeze({}),
+});
+
 export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   zoomStep: 1.2,
   minZoom: 0.0625,
@@ -156,6 +192,12 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   lassoBinding: "alt+left",
   panBinding: "none",
   lineBinding: "right",
+  layouts: Object.freeze({
+    desktop: DEFAULT_DEVICE_LAYOUT,
+    tablet: DEFAULT_DEVICE_LAYOUT,
+    phone: DEFAULT_DEVICE_LAYOUT,
+  }),
+  layoutKind: "desktop",
   toolbarItems: DEFAULT_TOOLBAR_ITEMS,
   panelLayout: Object.freeze({}),
   developerDiagnostics: false,
@@ -252,6 +294,33 @@ function readToolbarItems(value: unknown, legacyShowLasso: unknown, legacyShowCo
   }));
 }
 
+/**
+ * Every kind's layout.  A file from before the layouts were split holds one
+ * `toolbarItems` and one `panelLayout` at the top: that layout becomes every
+ * kind's, so nothing moves for anyone until they rearrange on one kind of
+ * device.  A kind whose entry is missing or broken takes the same fallback.
+ */
+function readLayouts(source: Record<string, unknown>): Readonly<Record<LayoutKind, DeviceLayout>> {
+  const shared: DeviceLayout = Object.freeze({
+    toolbarItems: readToolbarItems(source.toolbarItems, source.showLassoTool, source.showConnectorTool),
+    panelLayout: normalizePanelLayout(source.panelLayout),
+  });
+  const stored = isRecord(source.layouts) ? source.layouts : {};
+  const layouts = {} as Record<LayoutKind, DeviceLayout>;
+  for (const kind of LAYOUT_KINDS) {
+    const entry = stored[kind];
+    if (!isRecord(entry)) {
+      layouts[kind] = shared;
+      continue;
+    }
+    layouts[kind] = Object.freeze({
+      toolbarItems: Array.isArray(entry.toolbarItems) ? readToolbarItems(entry.toolbarItems, undefined, undefined) : shared.toolbarItems,
+      panelLayout: isRecord(entry.panelLayout) ? normalizePanelLayout(entry.panelLayout) : shared.panelLayout,
+    });
+  }
+  return Object.freeze(layouts);
+}
+
 /** The pack ids `tools/build_font_packs.py` mints: lower-case words joined by hyphens. */
 const SAFE_FONT_PACK_ID = /^[a-z][a-z0-9-]{0,63}$/u;
 /** A custom font's own file name under `fonts/custom/`: no path, so it cannot climb out of that folder. */
@@ -346,11 +415,17 @@ export function removeFromFontList(fontList: readonly FontListEntry[], families:
   return Object.freeze(fontList.filter((entry) => !dropped.has(entry.family)));
 }
 
-/** Accepts any stored value and always returns usable settings. */
-export function normalizeSettings(value: unknown): MiroCanvasSettings {
+/**
+ * Accepts any stored value and always returns usable settings.  `kind` is
+ * the kind of device in use; left out, the value's own `layoutKind` (an
+ * earlier result passed back in) or else a computer is taken.
+ */
+export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvasSettings {
+  const wanted = kind ?? (isRecord(value) && LAYOUT_KINDS.includes(value.layoutKind as LayoutKind) ? value.layoutKind as LayoutKind : "desktop");
   if (!isRecord(value)) {
-    return DEFAULT_SETTINGS;
+    return wanted === DEFAULT_SETTINGS.layoutKind ? DEFAULT_SETTINGS : Object.freeze({ ...DEFAULT_SETTINGS, layoutKind: wanted });
   }
+  const layouts = readLayouts(value);
   const modifier = value.wheelZoomModifier;
   const minZoom = readNumber(value, "minZoom", DEFAULT_SETTINGS.minZoom);
   const maxZoom = readNumber(value, "maxZoom", DEFAULT_SETTINGS.maxZoom);
@@ -379,8 +454,10 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     lassoBinding: POINTER_BINDINGS.includes(value.lassoBinding as PointerBinding) ? value.lassoBinding as PointerBinding : DEFAULT_SETTINGS.lassoBinding,
     panBinding: POINTER_BINDINGS.includes(value.panBinding as PointerBinding) ? value.panBinding as PointerBinding : DEFAULT_SETTINGS.panBinding,
     lineBinding: POINTER_BINDINGS.includes(value.lineBinding as PointerBinding) ? value.lineBinding as PointerBinding : DEFAULT_SETTINGS.lineBinding,
-    toolbarItems: readToolbarItems(value.toolbarItems, value.showLassoTool, value.showConnectorTool),
-    panelLayout: normalizePanelLayout(value.panelLayout),
+    layouts,
+    layoutKind: wanted,
+    toolbarItems: layouts[wanted].toolbarItems,
+    panelLayout: layouts[wanted].panelLayout,
     developerDiagnostics: readBoolean(value, "developerDiagnostics", DEFAULT_SETTINGS.developerDiagnostics),
     commentAuthor: typeof value.commentAuthor === "string" ? value.commentAuthor.trim().slice(0, MAX_AUTHOR_NAME) : DEFAULT_SETTINGS.commentAuthor,
     commentAuthorColors: readAuthorColors(value.commentAuthorColors),
@@ -393,6 +470,85 @@ export function normalizeSettings(value: unknown): MiroCanvasSettings {
     customFonts: readCustomFonts(value.customFonts),
     fontList: readFontList(value.fontList),
   });
+}
+
+/** The same settings seen from another kind of device: its own bar and panel places, everything else shared. */
+export function useLayoutKind(settings: MiroCanvasSettings, kind: LayoutKind): MiroCanvasSettings {
+  return settings.layoutKind === kind ? settings : normalizeSettings({ ...settings, layoutKind: kind }, kind);
+}
+
+/**
+ * A settings change.  The bar's items and the panels' places go to this
+ * kind of device's layout only; every other setting is shared by all.
+ */
+export function mergeSettings(current: MiroCanvasSettings, patch: Partial<MiroCanvasSettings>): MiroCanvasSettings {
+  const { toolbarItems, panelLayout, ...shared } = patch;
+  const kind = current.layoutKind;
+  const own = current.layouts[kind];
+  const layouts = {
+    ...current.layouts,
+    [kind]: { toolbarItems: toolbarItems ?? own.toolbarItems, panelLayout: panelLayout ?? own.panelLayout },
+  };
+  return normalizeSettings({ ...current, layouts, ...shared }, kind);
+}
+
+/**
+ * The settings about to be saved, with the other kinds' layouts taken from
+ * what `data.json` holds now.  The file may have been changed by a sync from
+ * another device since this one read it; this device's own kind and every
+ * other setting stay as in memory, so a save never overwrites another
+ * device's layout.  A file that is missing, corrupt or from before the split
+ * (no `layouts`) changes nothing.
+ */
+export function withOtherKindsFromDisk(memory: MiroCanvasSettings, disk: unknown): MiroCanvasSettings {
+  if (!isRecord(disk) || !isRecord(disk.layouts)) {
+    return memory;
+  }
+  const fromDisk = normalizeSettings(disk, memory.layoutKind);
+  const layouts = { ...memory.layouts };
+  for (const kind of LAYOUT_KINDS) {
+    if (kind !== memory.layoutKind && isRecord(disk.layouts[kind])) {
+      layouts[kind] = fromDisk.layouts[kind];
+    }
+  }
+  return normalizeSettings({ ...memory, layouts }, memory.layoutKind);
+}
+
+/**
+ * The settings after `data.json` changed on disk (a sync, say): everything
+ * is read again, for the kind of device in use.  A corrupt file changes
+ * nothing, so a half-written sync cannot reset the settings.
+ */
+export function settingsFromExternalChange(current: MiroCanvasSettings, disk: unknown): MiroCanvasSettings {
+  return isRecord(disk) ? normalizeSettings(disk, current.layoutKind) : current;
+}
+
+/**
+ * True when two settings look the same on this device: every setting alike
+ * and this kind's layout alike.  Another kind's layout does not count, so a
+ * sync of the tablet's layout leaves the computer's panels where they are.
+ */
+export function sameOnThisDevice(before: MiroCanvasSettings, after: MiroCanvasSettings): boolean {
+  const seen = (settings: MiroCanvasSettings): string => JSON.stringify(settingsForStorage({
+    ...settings,
+    layouts: { ...DEFAULT_SETTINGS.layouts, [settings.layoutKind]: settings.layouts[settings.layoutKind] },
+  }));
+  return before.layoutKind === after.layoutKind && seen(before) === seen(after);
+}
+
+/**
+ * What is written to `data.json`.  The device kind is not stored.  The
+ * computer's layout is also written as the old top-level `toolbarItems` and
+ * `panelLayout`, which the release before the split reads; this release
+ * reads only `layouts` once it is there.
+ */
+export function settingsForStorage(settings: MiroCanvasSettings): Record<string, unknown> {
+  const { layoutKind: _kind, ...stored } = settings;
+  return {
+    ...stored,
+    toolbarItems: settings.layouts.desktop.toolbarItems,
+    panelLayout: settings.layouts.desktop.panelLayout,
+  };
 }
 
 /** True while the first-run "Import boards from Miro?" question has not yet been put to the person. */
