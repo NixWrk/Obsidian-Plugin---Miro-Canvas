@@ -332,6 +332,14 @@ export function isDrawingTool(tool: QuickTool): boolean {
   return DRAWING_TOOL_ICONS.some((spec) => spec.tool === tool);
 }
 
+/**
+ * The settings a press of a tool's button opens in a layer of the bar: the
+ * pen's (for the pen, the highlighter, smart drawing and the erasers) and the
+ * lines'.  The shape tool's picker is a popover of its own button, which a
+ * repeat press closes the same way.
+ */
+type SettingsLayer = "drawing" | "connector";
+
 function isEraser(tool: QuickTool): boolean {
   return tool === "eraser" || tool === "erase-part";
 }
@@ -381,6 +389,10 @@ export class QuickTools {
   private sizeNumber: HTMLInputElement | undefined;
   private sizePreview: HTMLElement | undefined;
   private armed: QuickTool = "select";
+  /** False in review mode: the settings stay closed. */
+  private editable = true;
+  /** The settings layer a repeat press on its armed tool folded away, until another tool is picked. */
+  private foldedSettings: SettingsLayer | undefined;
   /** The drawing tool the pen button goes back to. */
   private drawingTool: QuickTool = "pen";
   private readonly panels: { readonly button: HTMLButtonElement; readonly panel: HTMLElement }[] = [];
@@ -518,8 +530,13 @@ export class QuickTools {
   }
 
   public update(state: QuickToolsState): void {
-    if (state.armed !== this.armed) this.closePanels();
-    this.connectorBar.hidden = state.armed !== "connector" || !state.editable;
+    if (state.armed !== this.armed) {
+      this.closePanels();
+      // A tool picked afresh opens its settings, however the last one left them.
+      this.foldedSettings = undefined;
+    }
+    this.armed = state.armed;
+    this.editable = state.editable;
     this.connectorColor.value = state.connectorColor ?? "#1a1a1a";
     this.connectorHeadSize.disabled = !state.editable;
     if(this.document.activeElement!==this.connectorHeadSize)this.connectorHeadSize.value=state.connectorHeadSize===undefined?"":String(state.connectorHeadSize);
@@ -544,22 +561,12 @@ export class QuickTools {
     }
     // The pen button carries the colour it draws with, and stays marked while
     // any of the drawing tools is the armed one; so does the pen's row.
-    this.armed = state.armed;
     const drawing = isDrawingTool(state.armed);
     if (drawing) this.drawingTool = state.armed;
     this.penButton?.style?.setProperty?.("--miro-canvas-swatch", state.penColor);
     this.penButton?.setAttribute("aria-pressed", drawing ? "true" : "false");
-    if (this.drawingBar !== undefined) this.drawingBar.hidden = !drawing || !state.editable;
-    // An eraser has a size but no colour; a line has both.
+    this.showSettings();
     const erasing = isEraser(state.armed);
-    if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
-    // A column beside a vertical bar is placed again when it opens, closes
-    // or gains or loses the colours, which changes its height.
-    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${erasing}|${this.connectorBar.hidden}`;
-    if (rowsOpen !== this.sideRowsOpen) {
-      this.sideRowsOpen = rowsOpen;
-      this.placeSideRows();
-    }
     if (this.sizeInput !== undefined && this.sizeNumber !== undefined) {
       const range = erasing ? ERASER_SIZE_RANGE : PEN_WIDTH_RANGE;
       const value = erasing ? state.eraserSize : state.penWidth;
@@ -595,6 +602,41 @@ export class QuickTools {
       this.shownShape = state.shape;
     }
     if (!state.editable) this.closePanels();
+  }
+
+  /**
+   * Shows the pen's settings while one of the pen's tools is armed and the
+   * lines' while the lines are, unless a repeat press on the armed tool has
+   * folded them away.  The pen's and the lines' buttons say whether their
+   * settings are open, which a screen reader reads as expanded.
+   */
+  private showSettings(): void {
+    const drawingShown = isDrawingTool(this.armed) && this.editable && this.foldedSettings !== "drawing";
+    const linesShown = this.armed === "connector" && this.editable && this.foldedSettings !== "connector";
+    if (this.drawingBar !== undefined) this.drawingBar.hidden = !drawingShown;
+    this.connectorBar.hidden = !linesShown;
+    this.penButton?.setAttribute("aria-expanded", drawingShown ? "true" : "false");
+    this.buttons.get("connector")?.setAttribute("aria-expanded", linesShown ? "true" : "false");
+    // An eraser has a size but no colour; a line has both.
+    const erasing = isEraser(this.armed);
+    if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
+    // A column beside a vertical bar is placed again when it opens, closes
+    // or gains or loses the colours, which changes its height.
+    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${erasing}|${this.connectorBar.hidden}`;
+    if (rowsOpen !== this.sideRowsOpen) {
+      this.sideRowsOpen = rowsOpen;
+      this.placeSideRows();
+    }
+  }
+
+  /**
+   * A press on the button of the tool that is already armed folds its
+   * settings away and another brings them back; the tool stays armed either
+   * way.  Picking another tool, or this one again afterwards, opens them.
+   */
+  private toggleSettings(layer: SettingsLayer): void {
+    this.foldedSettings = this.foldedSettings === layer ? undefined : layer;
+    this.showSettings();
   }
 
   /**
@@ -746,7 +788,8 @@ export class QuickTools {
       button.appendChild(this.make("span", "miro-canvas-tools__item-label", spec.label));
     }
     this.listen(button, "click", () => {
-      this.actions.onArm(this.drawingTool);
+      if (isDrawingTool(this.armed)) this.toggleSettings("drawing");
+      else this.actions.onArm(this.drawingTool);
       if (withLabel) this.closePanels();
     });
     this.penButton = button;
@@ -764,7 +807,8 @@ export class QuickTools {
     if (spec.tool !== "shape") {
       this.listen(button, "click", () => {
         if (this.consumeDragSuppression()) return;
-        this.actions.onArm(spec.tool);
+        if (spec.tool === "connector" && this.armed === "connector") this.toggleSettings("connector");
+        else this.actions.onArm(spec.tool);
       });
     }
     if (isDragCreateTool(spec.tool)) this.installDragCreate(button, spec.tool);

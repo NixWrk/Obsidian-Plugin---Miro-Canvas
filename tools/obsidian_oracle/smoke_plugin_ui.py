@@ -396,6 +396,7 @@ def main() -> int:
                   }
                   // A short view: the column keeps every control its size and scrolls inside itself, wholly in view.
                   placeBars('left-middle',0,'right-middle');
+                  s.armTool('select');
                   settingsOf('[data-tool="connector"]').click();
                   const row=tools.querySelector('.miro-canvas-tools__connectors');
                   const sizes=()=>[...row.querySelectorAll('button,input')].filter(seen).map((control)=>Math.round(control.getBoundingClientRect().height));
@@ -540,6 +541,53 @@ def main() -> int:
                   for(const name of ['--interactive-accent','--background-modifier-active-hover','--background-modifier-hover','--icon-color','--icon-color-hover','--text-normal','--text-muted'])
                     document.documentElement.style.removeProperty(name);
                 }""")
+                # A repeat press on the armed tool folds its settings away and leaves the tool
+                # armed; one more shows them; another tool, then this one again, opens them.
+                # The pen's kinds share the pen's button, the lines have their own, and the
+                # shape tool's settings are the picker under its button.  Both orientations.
+                drawing_layer = '.miro-canvas-tools__drawing'
+                folding = [
+                    ('pen', '[data-tool-group="drawing"]', drawing_layer, False),
+                    ('highlighter', '[data-tool-group="drawing"]', drawing_layer, True),
+                    ('smart', '[data-tool-group="drawing"]', drawing_layer, True),
+                    ('eraser', '[data-tool-group="drawing"]', drawing_layer, True),
+                    ('erase-part', '[data-tool-group="drawing"]', drawing_layer, True),
+                    ('connector', '[data-tool="connector"]', '.miro-canvas-tools__connectors', False),
+                    ('shape', '[data-tool="shape"]', '.miro-canvas-toolbar__panel--shapes', False),
+                ]
+                armed_tool = lambda: page.evaluate("miroBrowser.root.getAttribute('data-miro-canvas-tool')")
+                folds = 0
+                for orientation in ('horizontal', 'vertical'):
+                    turn_bar(orientation)
+                    for tool, button, layer, armed_by_key in folding:
+                        shown = page.locator('.miro-canvas-tools ' + layer)
+                        press = page.locator('.miro-canvas-tools ' + button).first
+                        # The pen's button arms the kind of drawing used last.
+                        arm(tool)
+                        arm('select')
+                        assert not shown.is_visible(), (orientation, tool)
+                        if armed_by_key:
+                            arm(tool)
+                        else:
+                            press.click()
+                        assert armed_tool() == tool and shown.is_visible(), f'{tool} did not open its settings ({orientation})'
+                        press.click()
+                        assert not shown.is_visible() and armed_tool() == tool, f'A repeat press on {tool} did not fold its settings ({orientation})'
+                        press.click()
+                        assert shown.is_visible() and armed_tool() == tool, f'One more press on {tool} did not show its settings ({orientation})'
+                        press.click()
+                        assert not shown.is_visible() and armed_tool() == tool, (orientation, tool)
+                        arm('text')
+                        assert not shown.is_visible()
+                        if armed_by_key:
+                            arm(tool)
+                        else:
+                            press.click()
+                        assert armed_tool() == tool and shown.is_visible(), f'{tool} picked again after another did not open its settings ({orientation})'
+                        folds += 1
+                assert folds == 2 * len(folding), folds
+                turn_bar('horizontal')
+                arm('select')
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,c=b.runtime.getData().miroCanvas.connectors['menu-line'];
                   const at=s.viewportPoint(c.from),first={x:at.x-12,y:at.y-12},last={x:at.x+12,y:at.y+12};

@@ -173,8 +173,10 @@ ends, its kind, thickness, arrowhead size and colour, and its label.
   where it began, and its end follows the pen until you lift it. The setting
   "Hold to draw a straight line" turns this off.
 - **Erasers** - a whole stroke, or the part under the pointer.
-- **Armed tools.** The tool that is on is marked the same way on every
-  button, in the accent colour.
+- **Armed tools and their settings.** The tool that is on is marked the same
+  way on every button, in the accent colour. Press the button of a tool that is
+  already on - the pen's, the lines' or the shape button - and its settings fold
+  away, the tool staying on; press it again and they come back.
 - **With a stylus** the pen's pressure sets the line's width and a hand
   resting on the screen is ignored; while a drawing tool is on, a finger pans
   the board (see [Phones and tablets](#phones-and-tablets)).

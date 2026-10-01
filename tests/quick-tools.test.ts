@@ -570,6 +570,176 @@ describe("moving items on and off the bar - what the arrange mode and the settin
   });
 });
 
+describe("a repeat press on the armed tool folds its settings away", () => {
+  /** A bar wired as the session wires it: arming a tool updates the bar with that tool armed. */
+  function live() {
+    const calls: Call[] = [];
+    const tools: QuickTools = new QuickTools(
+      {
+        onArm: (tool) => {
+          calls.push({ kind: "arm", tool });
+          tools.update({ ...STATE, armed: tool });
+        },
+        onShape: (shape) => calls.push({ kind: "shape", shape }),
+        onPen: (settings) => calls.push({ kind: "pen", settings }),
+      },
+      { document: new FakeDocument() as unknown as Document },
+    );
+    tools.update(STATE);
+    const root = tools.element as unknown as FakeElement;
+    const rowOf = (name: string) => root.children.find((child) => child.classes.has(name))!;
+    const pen = descendants(root).find((item) => item.attributes.get("data-tool-group") === "drawing")!;
+    return { tools, root, calls, pen, drawing: rowOf("miro-canvas-tools__drawing"), connectors: rowOf("miro-canvas-tools__connectors") };
+  }
+
+  const DRAWING_TOOLS = ["pen", "highlighter", "smart", "eraser", "erase-part"] as const;
+
+  for (const kind of DRAWING_TOOLS) {
+    it(`folds the settings of the armed ${kind} on a repeat press of the pen, and shows them on the next`, () => {
+      const { tools, root, calls, pen, drawing } = live();
+      tools.update({ ...STATE, armed: kind });
+      expect(drawing.hidden).toBe(false);
+      expect(pen.getAttribute("aria-expanded")).toBe("true");
+      pen.dispatch("click");
+      expect(drawing.hidden).toBe(true);
+      expect(pen.getAttribute("aria-expanded")).toBe("false");
+      // The tool stays armed: nothing was armed again, and its buttons still say so.
+      expect(calls).toEqual([]);
+      expect(pen.getAttribute("aria-pressed")).toBe("true");
+      expect(toolButton(root, kind).getAttribute("aria-pressed")).toBe("true");
+      // The board tells the bar again and again; the fold holds.
+      tools.update({ ...STATE, armed: kind, penWidth: 9 });
+      expect(drawing.hidden).toBe(true);
+      pen.dispatch("click");
+      expect(drawing.hidden).toBe(false);
+      expect(pen.getAttribute("aria-expanded")).toBe("true");
+      pen.dispatch("click");
+      expect(drawing.hidden).toBe(true);
+      expect(calls).toEqual([]);
+    });
+
+    it(`opens the settings of the ${kind} again once another tool was picked and this one is back`, () => {
+      const { tools, pen, drawing } = live();
+      tools.update({ ...STATE, armed: kind });
+      pen.dispatch("click");
+      expect(drawing.hidden).toBe(true);
+      tools.update({ ...STATE, armed: "text" });
+      tools.update({ ...STATE, armed: kind });
+      expect(drawing.hidden).toBe(false);
+      expect(pen.getAttribute("aria-expanded")).toBe("true");
+    });
+  }
+
+  it("arms the drawing tool used last, and opens its settings, when the pen is pressed with nothing of the pen's armed", () => {
+    const { tools, calls, pen, drawing } = live();
+    tools.update({ ...STATE, armed: "highlighter" });
+    tools.update({ ...STATE, armed: "select" });
+    expect(drawing.hidden).toBe(true);
+    pen.dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "highlighter" }]);
+    expect(drawing.hidden).toBe(false);
+  });
+
+  it("opens the settings of a drawing tool picked in place of another while they were folded", () => {
+    const { tools, pen, drawing } = live();
+    tools.update({ ...STATE, armed: "pen" });
+    pen.dispatch("click");
+    expect(drawing.hidden).toBe(true);
+    // A letter, or any other way the board arms a tool, counts as picking it.
+    tools.update({ ...STATE, armed: "highlighter" });
+    expect(drawing.hidden).toBe(false);
+  });
+
+  it("leaves the settings as they are when the tool that is already armed is armed again", () => {
+    const { tools, pen, drawing } = live();
+    tools.update({ ...STATE, armed: "pen" });
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.hidden).toBe(false);
+    pen.dispatch("click");
+    // A letter for the armed tool changes nothing, folded or not.
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.hidden).toBe(true);
+  });
+
+  it("does not fold the settings when a kind of drawing inside them is pressed again", () => {
+    const { tools, root, calls, drawing } = live();
+    tools.update({ ...STATE, armed: "highlighter" });
+    toolButton(root, "highlighter").dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "highlighter" }]);
+    expect(drawing.hidden).toBe(false);
+    toolButton(root, "eraser").dispatch("click");
+    expect(drawing.hidden).toBe(false);
+  });
+
+  it("folds the lines' settings on a repeat press of the lines button, and shows them on the next", () => {
+    const { tools, root, calls, connectors } = live();
+    const lines = toolButton(root, "connector");
+    lines.dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "connector" }]);
+    expect(connectors.hidden).toBe(false);
+    expect(lines.getAttribute("aria-expanded")).toBe("true");
+    lines.dispatch("click");
+    expect(connectors.hidden).toBe(true);
+    expect(lines.getAttribute("aria-expanded")).toBe("false");
+    expect(lines.getAttribute("aria-pressed")).toBe("true");
+    expect(calls).toHaveLength(1);
+    tools.update({ ...STATE, armed: "connector", connectorWidth: 4 });
+    expect(connectors.hidden).toBe(true);
+    lines.dispatch("click");
+    expect(connectors.hidden).toBe(false);
+    expect(calls).toHaveLength(1);
+    // Another tool, then the lines again: open, as ever.
+    lines.dispatch("click");
+    tools.update({ ...STATE, armed: "text" });
+    lines.dispatch("click");
+    expect(calls).toHaveLength(2);
+    expect(connectors.hidden).toBe(false);
+  });
+
+  it("keeps the lines' settings open when a kind of line is picked", () => {
+    const { tools, root, calls, connectors } = live();
+    tools.update({ ...STATE, armed: "connector" });
+    shapeOption(root, "elbow").dispatch("click");
+    expect(calls.map((call) => call.kind)).toEqual(["shape", "arm"]);
+    expect(connectors.hidden).toBe(false);
+  });
+
+  it("folds the shape picker on a repeat press of the shape button, and shows it on the next", () => {
+    const { tools, root, calls } = live();
+    const shape = toolButton(root, "shape");
+    const picker = panelOf(shape);
+    shape.dispatch("click");
+    expect(picker.hidden).toBe(false);
+    expect(calls).toEqual([{ kind: "arm", tool: "shape" }]);
+    expect(shape.getAttribute("aria-pressed")).toBe("true");
+    shape.dispatch("click");
+    expect(picker.hidden).toBe(true);
+    // The shape tool stays armed.
+    expect(shape.getAttribute("aria-pressed")).toBe("true");
+    tools.update({ ...STATE, armed: "shape" });
+    expect(picker.hidden).toBe(true);
+    shape.dispatch("click");
+    expect(picker.hidden).toBe(false);
+    expect(shape.getAttribute("aria-pressed")).toBe("true");
+    // Another tool, then the shape again: the picker opens.
+    tools.update({ ...STATE, armed: "text" });
+    expect(picker.hidden).toBe(true);
+    shape.dispatch("click");
+    expect(picker.hidden).toBe(false);
+  });
+
+  it("keeps every settings layer closed in review mode, and opens the one left unfolded when editing is back", () => {
+    const { tools, pen, drawing, connectors } = live();
+    tools.update({ ...STATE, armed: "pen", editable: false });
+    expect(drawing.hidden).toBe(true);
+    expect(pen.getAttribute("aria-expanded")).toBe("false");
+    tools.update({ ...STATE, armed: "pen" });
+    expect(drawing.hidden).toBe(false);
+    tools.update({ ...STATE, armed: "connector", editable: false });
+    expect(connectors.hidden).toBe(true);
+  });
+});
+
 describe("quick tools in Russian", () => {
   afterEach(() => setLocale("en"));
 

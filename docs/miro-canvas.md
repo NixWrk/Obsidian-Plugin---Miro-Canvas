@@ -571,6 +571,10 @@ selected card, it also covers that card's outline and resize handles.
   and the `--controls` smoke compares every tool armed (on the bar, under More,
   in the settings; both orientations; resting, hovered, and with a touch
   screen's stale hover forced) with Select.
+- A repeat press on the armed tool's button folds its settings (`QuickTools`:
+  `foldedSettings`, cleared when the armed tool changes; `aria-expanded` on the
+  pen's and the lines' buttons; the shape picker is the popover it always was).
+  The kinds of drawing inside the pen's settings do not fold them.
 
 ### Files and documents
 

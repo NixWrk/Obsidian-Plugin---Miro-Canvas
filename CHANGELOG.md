@@ -102,6 +102,13 @@
   armed one. Hover styles of the bars and the dock now apply only where a
   pointer can hover (`@media (hover: hover)`), and the armed look outweighs
   them where it can.
+- A repeat press on the armed tool folds its settings away and leaves the tool
+  armed; one more press shows them again. This is the pen's button for the
+  pen's settings (whichever of the pen, the highlighter, smart drawing and the
+  erasers is armed), the lines' button for the lines' settings and the shape
+  button for its picker, in either orientation. Picking another tool, or this
+  one again after another, opens its settings as before; the letters work as
+  before.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a
