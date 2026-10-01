@@ -116,6 +116,7 @@ import {
 import { CommentMarkers } from "./comment-markers";
 import { matchesPointer } from "./pointer-bindings";
 import { PalmRewind, pressedPressure, strokeWidthScale, StylusWatch } from "./stylus";
+import { PickedCardMarks, type BoardWatcher, type CardChange } from "./picked-cards";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
@@ -1557,6 +1558,8 @@ export class M1CanvasSession {
 	/** Watches the native node layer for DOM Obsidian replaces without the scene or the appearance changing, so a re-created card still gets its look. */
 	private appearanceObserver: { observe(target: unknown, options: unknown): void; disconnect(): void } | undefined;
 	private appearanceObserverTarget: HTMLElement | undefined;
+	/** Tells the styles which cards a finger may drag by their text: the picked ones, marked as they are picked. */
+	private pickedCards: PickedCardMarks | undefined;
 	/** Shape kind of each selected element, kept while the document is the same object. */
 	private shapeCache: { readonly document: unknown; readonly shapes: Map<string, string | undefined> } | undefined;
 	private commentThreadCache: { readonly document: unknown; readonly threads: ReturnType<typeof listCommentThreads> } | undefined;
@@ -3488,6 +3491,7 @@ export class M1CanvasSession {
 		this.nativeEditReading = undefined;
 		this.attachNativeGuards();
 		this.ensureAppearanceObserver();
+		this.followPickedCards();
 		// Described again only when native Canvas saved a change or a press is
 		// held: describing every card of a large board is not free.
 		const signedFor = this.pointerHeld || this.selectionMovePreview !== undefined ? undefined : this.savedBoard?.document;
@@ -7606,6 +7610,41 @@ export class M1CanvasSession {
 			// A canvasEl mid-teardown needs no watching.
 		}
 	}
+
+	/**
+	 * Keeps the picked cards marked for the styles, which stop a finger's
+	 * move on their text from being taken for a scroll (see `picked-cards.ts`).
+	 * Made once the board's card layer exists, and moved to watch a new one if
+	 * the runtime ever swaps it.
+	 */
+	private followPickedCards(): void {
+		const canvasEl = readRuntime(this.nativeCanvas(), "canvasEl");
+		if (!isElement(canvasEl)) return;
+		if (this.pickedCards === undefined) {
+			const marks = new PickedCardMarks(this.watchBoard);
+			this.pickedCards = marks;
+			this.disposers.push(() => {
+				marks.dispose();
+				this.pickedCards = undefined;
+			});
+		}
+		this.pickedCards.watch(canvasEl);
+	}
+
+	/** A MutationObserver on the board, where the window has one. */
+	private readonly watchBoard: BoardWatcher = (board, options, onChange) => {
+		const Observer = readRuntime(readRuntime(ownerDocument(this.root), "defaultView"), "MutationObserver");
+		if (typeof Observer !== "function") return undefined;
+		try {
+			const observer = Reflect.construct(Observer, [
+				(records: unknown) => onChange(records as readonly CardChange[]),
+			]) as MutationObserver;
+			observer.observe(board as unknown as Node, options);
+			return observer;
+		} catch {
+			return undefined;
+		}
+	};
 
 	/**
 	 * Record which node shells a mutation batch added, without touching their

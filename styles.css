@@ -1295,12 +1295,22 @@
    there for a scroll of its own and calls the pointer back (pointercancel)
    after three moves - native mobile Canvas does the same - so a selected card
    could be picked with a tap but never dragged.  The session moves the card
-   (`attachSelectionDrag`).  A card that shows a web page or another frame
-   keeps its own touch handling: what happens inside a frame never reaches the
-   board, and its page must stay scrollable. */
-.miro-canvas-root .canvas-node:is(.is-focused, .is-selected):not(.is-editing) .canvas-node-content:not(:has(iframe, webview)),
-.miro-canvas-root .canvas-node:is(.is-focused, .is-selected):not(.is-editing) .canvas-node-content:not(:has(iframe, webview)) * {
-  touch-action: none;
+   (`attachSelectionDrag`) and marks each card it may move so
+   (`data-miro-canvas-picked`, see `src/picked-cards.ts`): picked, not being
+   written in, and holding no web page or other frame, which keeps its own
+   touch handling - what happens inside a frame never reaches the board, and
+   its page must stay scrollable.  Every element of the card's content is
+   named, not only the ones that scroll: the browser looks for the touch action
+   only as far up as the nearest scroll container, and a card's text holds
+   several (the preview itself, a code block, a table cell, a callout).
+   Reading the mark, rather than asking of every element of every card whether
+   its card is picked and holds a frame (`:has()`), keeps a move of any drag on
+   a large board as cheap as it was; and only a touch screen needs the rule. */
+@media (any-pointer: coarse) {
+  .miro-canvas-root [data-miro-canvas-picked] .canvas-node-content,
+  .miro-canvas-root [data-miro-canvas-picked] .canvas-node-content * {
+    touch-action: none;
+  }
 }
 
 /* A line takes presses on its course only: the rest of its box lets them

@@ -314,19 +314,74 @@ def main() -> int:
                   const shown=getComputedStyle(grip).display;
                   layer.remove();style.remove();document.body.classList.remove('is-mobile');
                   if(shown!=='none')throw Error('The mobile styles show a native corner square next to the frame: '+shown);
-                  const card=document.createElement('div');
-                  const content=card.appendChild(document.createElement('div'));content.className='canvas-node-content';
-                  const text=content.appendChild(document.createElement('div'));
-                  b.root.appendChild(card);
-                  const touchAction=(classes)=>{card.className=classes;return getComputedStyle(text).touchAction;};
-                  for(const classes of ['canvas-node is-focused','canvas-node is-selected'])
-                    if(touchAction(classes)!=='none')throw Error('A picked card lets the browser scroll under a finger: '+classes);
-                  for(const classes of ['canvas-node','canvas-node is-focused is-editing'])
-                    if(touchAction(classes)==='none')throw Error('A card not picked, or being written in, cannot scroll its text: '+classes);
-                  const frame=content.appendChild(document.createElement('iframe'));
-                  if(touchAction('canvas-node is-focused')==='none'||getComputedStyle(frame).touchAction==='none'||getComputedStyle(content).touchAction==='none')
-                    throw Error('A picked card that shows a web page cannot scroll it');
-                  card.remove();
+                }""")
+                # A finger's move on a picked card's text must stay on the page, or the
+                # browser takes it for a scroll and calls the pointer back.  The session
+                # marks each card that is picked, not being written in and holding no
+                # frame as native Canvas changes its classes; the styles read the mark
+                # and carry it on a touch screen only.  A computer with a mouse does not.
+                page.evaluate("""() => {
+                  const b=miroBrowser;
+                  const make=()=>{
+                    const card=document.createElement('div');
+                    const content=card.appendChild(document.createElement('div'));content.className='canvas-node-content';
+                    const text=content.appendChild(document.createElement('div'));
+                    // Native Canvas lays its cards on the canvas element.
+                    b.runtime.canvasEl.appendChild(card);
+                    return {card,content,text};
+                  };
+                  window.__pickedCards=[make(),make()];
+                }""")
+                page.evaluate("""async () => {
+                  const settled=()=>new Promise(done=>setTimeout(done,0));
+                  const {card,text}=window.__pickedCards[0];
+                  card.className='canvas-node is-focused';
+                  await settled();
+                  if(!card.hasAttribute('data-miro-canvas-picked'))throw Error('A picked card was not marked');
+                  if(getComputedStyle(text).touchAction==='none')throw Error('A computer with a mouse carries the touch rule');
+                  card.className='canvas-node';
+                  await settled();
+                }""")
+                touch = page.context.new_cdp_session(page)
+                touch.send("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5})
+                try:
+                    page.evaluate("""async () => {
+                      const settled=()=>new Promise(done=>setTimeout(done,0));
+                      const [{card,content,text},second]=window.__pickedCards;
+                      const marked=(element)=>element.hasAttribute('data-miro-canvas-picked');
+                      const touchAction=async(classes)=>{card.className=classes;await settled();return getComputedStyle(text).touchAction;};
+                      for(const classes of ['canvas-node is-focused','canvas-node is-selected']){
+                        if(await touchAction(classes)!=='none'||!marked(card))throw Error('A picked card lets the browser scroll under a finger: '+classes);
+                      }
+                      for(const classes of ['canvas-node','canvas-node is-focused is-editing']){
+                        if(await touchAction(classes)==='none'||marked(card))throw Error('A card not picked, or being written in, cannot scroll its text: '+classes);
+                      }
+                      // One of several picked cards is let go: only the others keep the mark.
+                      card.className='canvas-node is-selected';
+                      second.card.className='canvas-node is-selected';
+                      await settled();
+                      if(!marked(card)||!marked(second.card)||getComputedStyle(second.text).touchAction!=='none')throw Error('A selection of several cards was not all marked');
+                      card.className='canvas-node';
+                      await settled();
+                      if(marked(card)||!marked(second.card))throw Error('Letting one card go changed the marks of the others');
+                      second.card.className='canvas-node';
+                      await settled();
+                      // A card that shows a web page keeps its own touch handling: no mark, and its page stays scrollable.
+                      const frame=content.appendChild(document.createElement('iframe'));
+                      card.className='canvas-node is-focused';
+                      await settled();
+                      if(marked(card)||getComputedStyle(text).touchAction==='none'||getComputedStyle(frame).touchAction==='none'||getComputedStyle(content).touchAction==='none')
+                        throw Error('A picked card that shows a web page cannot scroll it');
+                      frame.remove();
+                      card.className='canvas-node is-selected';
+                      await settled();
+                      if(!marked(card)||getComputedStyle(text).touchAction!=='none')throw Error('A picked card is not marked once its frame is gone');
+                    }""")
+                finally:
+                    touch.send("Emulation.setTouchEmulationEnabled", {"enabled": False})
+                page.evaluate("""() => {
+                  for(const {card} of window.__pickedCards)card.remove();
+                  delete window.__pickedCards;
                 }""")
                 # A bar turned vertical holds one control to a row wherever a control
                 # sits - native Canvas's own buttons too, which the tablet's Obsidian

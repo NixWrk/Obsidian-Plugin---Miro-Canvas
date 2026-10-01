@@ -1749,6 +1749,44 @@ press with 5,000 cards takes 1.1 s against 0.5 s without the plugin, and has not
 been profiled (the per-card lock check itself takes 15-30 ms for 5,000 cards,
 timed in the unit test host).
 
+A regression in the one-card row, found and removed (2026-09-30). Dragging a
+selected card with a finger or the pen (f72b8b2) had added one style rule:
+`touch-action: none` on every element of a selected card's content, except in a
+card holding an iframe or a webview, which it found with `:has()`. With the
+plugin on, that rule made one card take 108-138 ms a move on the 2,000-card
+board and 281-352 ms on the 5,000-card one (52 and 105 ms before it, 31 ms with
+the plugin off): the browser matched every element of every card against it on
+each style recalculation, and every move of a drag causes one. Taking only that
+rule out of the stylesheet gave 51.5 ms back, so it was the cause. The session
+now marks the picked cards itself: `data-miro-canvas-picked` goes on a card
+that is picked, is not being written in and holds no iframe or webview, and
+comes off when it stops being so (`src/picked-cards.ts`; native Canvas's class
+changes on a card say when, and the frame is looked for once, when the card is
+marked). The rule reads that mark and applies only on a touch screen
+(`@media (any-pointer: coarse)`), so a computer with a mouse carries none of it.
+A finger sent over `Input.dispatchTouchEvent` onto a heading, a paragraph, a
+list item, a code block, a table cell or a callout of a picked card still drags
+it, in one history step and one undo, and the browser takes back no pointer; a
+card that shows a web page is not marked. One card at zoom 100 %, plugin on,
+the build before this fix (f919a4d) against after it, two passes each: ms a
+move / 95th-percentile frame during the drag.
+
+| Board | Before | After | Plugin off |
+| --- | --- | --- | --- |
+| 2,000 cards | 108 / 260, 134 / 290 | 53 / 90, 52 / 90 | 31 / 10 |
+| 5,000 cards | 317 / 710, 281 / 640 | 106 / 210, 111 / 220 | 31 / 10 |
+
+The rows for 50 and for all cards are as they were. Passes of the whole matrix
+for one build and then the other showed the fitted 50-card and all-card rows
+5-15 % slower after the fix in both orders; with the builds alternated run by
+run, five runs of each (fitted view, median ms a move, before / after), they came out
+alike: 2,000 cards 50 selected 211 / 217, all 509 / 505; 5,000 cards 50 selected
+198 / 205, all 653 / 637. The passes ran on a machine shared with other
+measurements, and the gap was not reproduced. What the plugin adds to a drag is a
+MutationObserver on the classes of the cards, which sees the many class writes
+the plugin's own decoration pass makes to every card on each refresh, so a few
+per cent on the 50-card rows are possible.
+
 The first production release is ready when:
 
 1. ordinary Canvas boards gain the promised editing features without

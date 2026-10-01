@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { M1CanvasSession } from "../src/m1-session";
+import { PICKED_ATTRIBUTE } from "../src/picked-cards";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
 
 // Only the presentation is replaced; the adapter, the authoring transaction
 // and the metadata store are the real ones, matching the other m1-session
-// fixtures. Unlike those fixtures this one gives the session a real (if
-// minimal) document, so the observer under test can find a MutationObserver
-// on it - real UI panels the other fixtures never build with a document at
-// all are therefore mocked too, the same way M1Controls always is.
+// fixtures. The session gets a document with a MutationObserver that tests
+// feed by hand, so the watch on the board's cards (picked-cards.ts) can be
+// driven the way native Canvas's own class changes would drive it.
 vi.mock("../src/m1-controls", () => ({
 	M1Controls: class {
 		element = new HostElement("miro-canvas-panel");
@@ -66,8 +66,6 @@ vi.mock("../src/quick-tools", async (importOriginal) => ({
 	},
 }));
 
-const APPEARANCE_ATTRIBUTE = "data-miro-canvas-appearance";
-
 // canvas-elements.ts's readCanvasElementDom only trusts a real HTMLElement
 // (it guards against a host object merely shaped like one), and vitest's
 // plain "node" environment has no such global. This file's fixture needs
@@ -120,17 +118,27 @@ class HostElement extends HTMLElementStub {
 		return this.parentElement?.closest(selector) ?? null;
 	}
 	querySelectorAll(): HostElement[] { return []; }
+	// A card holds a frame when an element of one of the named tags lies below it.
+	querySelector(selectors: string): HostElement | null {
+		const tags = selectors.split(",").map((value) => value.trim().toUpperCase());
+		for (const child of this.children) {
+			if (tags.includes(child.tagName)) return child;
+			const deeper = child.querySelector(selectors);
+			if (deeper !== null) return deeper;
+		}
+		return null;
+	}
 }
 
-// The board's node layer, watched by the plugin's own MutationObserver; kept
-// distinct from the panel root the way real Canvas keeps canvasEl distinct
-// from wrapperEl.
+// Stands for every MutationObserver the session makes on the board's node
+// layer, which is kept distinct from the panel root the way real Canvas keeps
+// canvasEl distinct from wrapperEl.
 class FakeObserver {
 	public connected = true;
 	public target: unknown;
-	public options: { readonly childList?: boolean; readonly subtree?: boolean } | undefined;
+	public options: { readonly childList?: boolean; readonly subtree?: boolean; readonly attributes?: boolean; readonly attributeFilter?: string[] } | undefined;
 	public constructor(public readonly callback: (records: readonly unknown[]) => void) { instances.push(this); }
-	public observe(target: unknown, options?: { readonly childList?: boolean; readonly subtree?: boolean }): void {
+	public observe(target: unknown, options?: { readonly childList?: boolean; readonly subtree?: boolean; readonly attributes?: boolean; readonly attributeFilter?: string[] }): void {
 		this.target = target;
 		this.options = options;
 		this.connected = true;
@@ -139,18 +147,15 @@ class FakeObserver {
 }
 let instances: FakeObserver[] = [];
 
-/**
- * The session also runs a follow observer (retargetFollow) and the picked-card
- * marks' observers through the same fake constructor; find the one this test's
- * decoration logic actually built: it watches every descendant's child list,
- * where the marks' only watches the cards laid directly on the board.
- */
-function appearanceObserverInstance(): FakeObserver {
-	const found = [...instances].reverse().find((observer) => observer.options?.childList === true && observer.options.subtree === true);
-	if (found === undefined) {
-		throw new Error("no appearance-decoration MutationObserver was constructed");
+/** The observers the picked-card marks made on the board's card layer: one for the classes of cards, one for cards put on the layer. */
+function pickedObservers(nodeLayer: HostElement): { readonly classes: FakeObserver; readonly children: FakeObserver } {
+	const onLayer = instances.filter((observer) => observer.target === nodeLayer);
+	const classes = onLayer.find((observer) => observer.options?.attributeFilter?.includes("class") === true);
+	const children = onLayer.find((observer) => observer.options?.childList === true && observer.options.subtree !== true);
+	if (classes === undefined || children === undefined) {
+		throw new Error("the picked-card marks made no observers on the card layer");
 	}
-	return found;
+	return { classes, children };
 }
 
 // The window and document the session finds through root.ownerDocument: real
@@ -173,7 +178,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-/** A board with one styled card and one plain card, wired the way real Canvas exposes canvasEl and a MutationObserver-capable document. */
+/** A board with two cards, wired the way real Canvas exposes canvasEl and a MutationObserver-capable document. */
 function fixture() {
 	const root = new HostElement("canvas-wrapper");
 	const nodeLayer = new HostElement("canvas-node-layer");
@@ -217,60 +222,81 @@ function fixture() {
 	return { root, nodeLayer, canvas, session, nodes };
 }
 
-/** Swap a node's DOM the way Obsidian does when it re-creates a card without touching the board: same runtime node, a fresh element. */
-function replaceNodeDom(nodeLayer: HostElement, node: { nodeEl: HostElement }): HostElement {
-	const next = nodeLayer.appendChild(new HostElement("canvas-node"));
-	node.nodeEl.remove();
-	node.nodeEl = next;
-	return next;
+/** Native Canvas puts `is-focused` on a card picked alone and `is-selected` on one of several, and `is-editing` while its editor is open. */
+function setClass(card: HostElement, name: string, on: boolean): void {
+	if (on) card.classList.add(name);
+	else card.classList.remove(name);
 }
 
-async function flushMutationPass(): Promise<void> {
-	// The pass is coalesced onto a microtask when no requestAnimationFrame is
-	// available (this fixture's fake document offers none), so one await is
-	// enough to let it run.
-	await Promise.resolve();
-	await Promise.resolve();
+function classChanged(observers: { readonly classes: FakeObserver }, card: HostElement): void {
+	observers.classes.callback([{ type: "attributes", target: card } as unknown as MutationRecord]);
 }
 
-describe("appearance decoration follows Obsidian's own DOM replacement", () => {
-	it("decorates a styled card's new DOM once the observer fires and the frame runs, without a full refresh", async () => {
+describe("the session marks the cards a finger may drag by their text", () => {
+	it("watches the board's card layer for class changes and for cards put on it", () => {
+		const { nodeLayer } = fixture();
+		const { classes, children } = pickedObservers(nodeLayer);
+		expect(classes.options).toEqual({ attributes: true, attributeFilter: ["class"], subtree: true });
+		expect(children.options).toEqual({ childList: true });
+	});
+
+	it("marks a card when it is picked, without a refresh, and takes the mark back when it is let go", () => {
 		const { nodeLayer, session, nodes } = fixture();
-		const observer = appearanceObserverInstance();
-		expect(observer).toBeDefined();
-
+		const observers = pickedObservers(nodeLayer);
 		const refreshSpy = vi.spyOn(session, "refresh");
-		const styled = nodes.get("styled")!;
-		const freshDom = replaceNodeDom(nodeLayer, styled);
-		expect(freshDom.hasAttribute(APPEARANCE_ATTRIBUTE)).toBe(false);
-
-		observer.callback([{ addedNodes: [freshDom] } as unknown as MutationRecord]);
-		await flushMutationPass();
-
-		expect(freshDom.hasAttribute(APPEARANCE_ATTRIBUTE)).toBe(true);
-		expect(freshDom.style.values.get("font-size")).toBe("40px");
-		// The cheap per-shell pass did the work; no full-board refresh ran.
+		const card = nodes.get("styled")!.nodeEl;
+		setClass(card, "is-focused", true);
+		classChanged(observers, card);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(true);
+		setClass(card, "is-focused", false);
+		classChanged(observers, card);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(false);
 		expect(refreshSpy).not.toHaveBeenCalled();
 	});
 
-	it("never touches a plain card's replaced DOM", async () => {
+	it("marks every card of a selection of several", () => {
 		const { nodeLayer, nodes } = fixture();
-		const observer = appearanceObserverInstance();
-		const plain = nodes.get("plain")!;
-		const freshDom = replaceNodeDom(nodeLayer, plain);
-
-		observer.callback([{ addedNodes: [freshDom] } as unknown as MutationRecord]);
-		await flushMutationPass();
-
-		expect(freshDom.hasAttribute(APPEARANCE_ATTRIBUTE)).toBe(false);
-		expect(freshDom.style.values.size).toBe(0);
+		const observers = pickedObservers(nodeLayer);
+		const cards = [...nodes.values()].map((node) => node.nodeEl);
+		for (const card of cards) setClass(card, "is-selected", true);
+		observers.classes.callback(cards.map((card) => ({ type: "attributes", target: card }) as unknown as MutationRecord));
+		expect(cards.map((card) => card.hasAttribute(PICKED_ATTRIBUTE))).toEqual([true, true]);
 	});
 
-	it("disconnects the observer on dispose", () => {
-		const { session } = fixture();
-		const observer = appearanceObserverInstance();
-		expect(observer.connected).toBe(true);
+	it("takes the mark off a card whose editor opens", () => {
+		const { nodeLayer, nodes } = fixture();
+		const observers = pickedObservers(nodeLayer);
+		const card = nodes.get("plain")!.nodeEl;
+		setClass(card, "is-focused", true);
+		classChanged(observers, card);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(true);
+		setClass(card, "is-editing", true);
+		card.appendChild(new HostElement("", "IFRAME"));
+		classChanged(observers, card);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(false);
+	});
+
+	it("does not mark a card that holds a web page", () => {
+		const { nodeLayer, nodes } = fixture();
+		const observers = pickedObservers(nodeLayer);
+		const card = nodes.get("plain")!.nodeEl;
+		const content = card.appendChild(new HostElement("canvas-node-content"));
+		content.appendChild(new HostElement("", "IFRAME"));
+		setClass(card, "is-focused", true);
+		classChanged(observers, card);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(false);
+	});
+
+	it("takes every mark back and disconnects its observers when the session ends", () => {
+		const { nodeLayer, session, nodes } = fixture();
+		const observers = pickedObservers(nodeLayer);
+		const card = nodes.get("styled")!.nodeEl;
+		setClass(card, "is-focused", true);
+		classChanged(observers, card);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(true);
 		session.dispose();
-		expect(observer.connected).toBe(false);
+		expect(card.hasAttribute(PICKED_ATTRIBUTE)).toBe(false);
+		expect(observers.classes.connected).toBe(false);
+		expect(observers.children.connected).toBe(false);
 	});
 });
