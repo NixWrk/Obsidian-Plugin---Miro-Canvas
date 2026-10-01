@@ -92,6 +92,16 @@
   and note buttons, which on the tablet's Obsidian come with a slide and a
   group button of their own, had stood two to a row, and the rule before the "+"
   that opens More lay upright in a vertical bar.
+- An armed tool shows it the same way on every button of the bars: the accent
+  icon on the active background Select has. The pen, the highlighter, smart
+  drawing, the erasers, the lasso, text, sticky notes, shapes, lines,
+  comments, frames and the rest, on the bar, under More and among the pen's
+  kinds and the lines' kinds in the settings, in both orientations. On a tablet
+  the pen looked grey instead: a pen or a finger leaves the last control it
+  touched "hovered" until the next touch, and the hover rule outweighed the
+  armed one. Hover styles of the bars and the dock now apply only where a
+  pointer can hover (`@media (hover: hover)`), and the armed look outweighs
+  them where it can.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

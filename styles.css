@@ -164,13 +164,24 @@
   height: var(--icon-s, 16px);
 }
 
-.miro-canvas-dock .miro-canvas-dock__button:hover:not(:disabled),
+/* Hover styles are for a pointer that can hover.  A finger or a pen leaves the
+   last control it touched "hovered" until the next touch, and that stale
+   hover, which outweighs a rule for the pressed state, painted a control
+   that is on like one that is merely under the pointer. */
+@media (hover: hover) {
+  .miro-canvas-dock .miro-canvas-dock__button:hover:not(:disabled) {
+    color: var(--icon-color-hover, var(--text-normal));
+    background: var(--background-modifier-hover);
+  }
+}
+
 .miro-canvas-dock .miro-canvas-dock__button[aria-expanded="true"] {
   color: var(--icon-color-hover, var(--text-normal));
   background: var(--background-modifier-hover);
 }
 
-.miro-canvas-dock .miro-canvas-dock__button[aria-pressed="true"] {
+/* The class twice, so this outweighs the hover rule above wherever it applies. */
+.miro-canvas-dock .miro-canvas-dock__button.miro-canvas-dock__button[aria-pressed="true"] {
   color: var(--interactive-accent);
 }
 
@@ -246,8 +257,10 @@
   font-size: inherit;
 }
 
-.miro-canvas-dock .miro-canvas-dock__item:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
+@media (hover: hover) {
+  .miro-canvas-dock .miro-canvas-dock__item:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+  }
 }
 
 .miro-canvas-dock .miro-canvas-dock__item:disabled {
@@ -334,9 +347,11 @@
   font-size: var(--font-ui-smaller, 11px);
 }
 
-.miro-canvas-dock .miro-canvas-dock__segment:hover {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
+@media (hover: hover) {
+  .miro-canvas-dock .miro-canvas-dock__segment:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+  }
 }
 
 .miro-canvas-dock .miro-canvas-dock__segment[aria-pressed="true"] {
@@ -989,9 +1004,14 @@
   stroke-width: var(--icon-s-stroke-width, 2px);
 }
 
-.miro-canvas-toolbar .miro-canvas-toolbar__button:hover:not(:disabled) {
-  color: var(--icon-color-hover, var(--text-normal));
-  background: var(--background-modifier-hover);
+/* Only where a pointer can hover: see the dock's buttons above.  The hover
+   rule is (0,4,0) and outweighed the armed one, so a tool just tapped on a
+   tablet looked grey instead of accent until the next touch. */
+@media (hover: hover) {
+  .miro-canvas-toolbar .miro-canvas-toolbar__button:hover:not(:disabled) {
+    color: var(--icon-color-hover, var(--text-normal));
+    background: var(--background-modifier-hover);
+  }
 }
 
 .miro-canvas-toolbar .miro-canvas-toolbar__button[aria-expanded="true"] {
@@ -999,9 +1019,15 @@
   background: var(--background-modifier-active-hover, var(--background-modifier-hover));
 }
 
-/* The current choice is marked the way Obsidian marks an active icon. */
-.miro-canvas-toolbar .miro-canvas-toolbar__button[aria-pressed="true"],
-.miro-canvas-toolbar .miro-canvas-toolbar__button[data-active="true"] {
+/* The armed tool and the current choice are marked the way Obsidian marks an
+   active icon, by one rule for every button of the bars: a tool on the bar or
+   under More, a kind of pen or of line in the settings, a choice in the
+   selection toolbar.  It is as specific as the hover rule and comes after it,
+   so a pointer resting on the armed tool does not grey it, and it outweighs
+   the colour More gives its items.  A colour swatch shows its choice with a
+   ring of its own, below. */
+.miro-canvas-toolbar .miro-canvas-toolbar__button:not(.miro-canvas-toolbar__button--swatch)[aria-pressed="true"],
+.miro-canvas-toolbar .miro-canvas-toolbar__button:not(.miro-canvas-toolbar__button--swatch)[data-active="true"] {
   color: var(--interactive-accent);
   background: var(--background-modifier-active-hover, var(--background-modifier-hover));
 }
@@ -1089,9 +1115,11 @@
   cursor: grab;
 }
 
-.miro-canvas-toolbar .canvas-card-menu-button:hover {
-  color: var(--icon-color-hover);
-  background: var(--background-modifier-hover);
+@media (hover: hover) {
+  .miro-canvas-toolbar .canvas-card-menu-button:hover {
+    color: var(--icon-color-hover);
+    background: var(--background-modifier-hover);
+  }
 }
 
 .miro-canvas-toolbar .canvas-card-menu-button svg {
@@ -1560,6 +1588,7 @@
   touch-action: none;
 }
 
+
 .miro-canvas-link-prompt {
   position: absolute;
   z-index: 110;
@@ -1581,7 +1610,13 @@
 }
 
 /* Delete stands apart as a danger item, coloured only once it might be pressed. */
-.miro-canvas-toolbar__button--delete:hover:not(:disabled),
+@media (hover: hover) {
+  .miro-canvas-toolbar__button--delete:hover:not(:disabled) {
+    color: var(--text-error);
+    background: var(--background-modifier-error, var(--background-modifier-error-hover));
+  }
+}
+
 .miro-canvas-toolbar__button--delete:focus-visible {
   color: var(--text-error);
   background: var(--background-modifier-error, var(--background-modifier-error-hover));
@@ -1638,7 +1673,13 @@
   -webkit-appearance: none;
 }
 
-.miro-canvas-toolbar .miro-canvas-toolbar__number:hover:not(:disabled),
+@media (hover: hover) {
+  .miro-canvas-toolbar .miro-canvas-toolbar__number:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+    box-shadow: none;
+  }
+}
+
 .miro-canvas-toolbar .miro-canvas-toolbar__number:focus {
   background: var(--background-modifier-hover);
   box-shadow: none;
@@ -1823,16 +1864,20 @@
   width: 48px;
 }
 
-.miro-canvas-toolbar .miro-canvas-toolbar__button--picture:hover:not(:disabled):not([aria-pressed="true"]) {
-  color: var(--interactive-accent);
+@media (hover: hover) {
+  .miro-canvas-toolbar .miro-canvas-toolbar__button--picture:hover:not(:disabled):not([aria-pressed="true"]) {
+    color: var(--interactive-accent);
+  }
 }
 
 .miro-canvas-toolbar__button--picture > svg {
   transition: transform 80ms ease-out;
 }
 
-.miro-canvas-toolbar__button--picture:hover:not(:disabled) > svg {
-  transform: scale(1.15);
+@media (hover: hover) {
+  .miro-canvas-toolbar__button--picture:hover:not(:disabled) > svg {
+    transform: scale(1.15);
+  }
 }
 
 .miro-canvas-shape-icon {
@@ -1907,9 +1952,11 @@
   box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover, rgb(128 128 128 / 40%));
 }
 
-.miro-canvas-toolbar .miro-canvas-toolbar__button--swatch:hover:not(:disabled) {
-  background: var(--miro-canvas-swatch, transparent);
-  box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover, rgb(128 128 128 / 40%)), 0 0 0 2px var(--background-modifier-border-hover, var(--miro-canvas-toolbar-border));
+@media (hover: hover) {
+  .miro-canvas-toolbar .miro-canvas-toolbar__button--swatch:hover:not(:disabled) {
+    background: var(--miro-canvas-swatch, transparent);
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover, rgb(128 128 128 / 40%)), 0 0 0 2px var(--background-modifier-border-hover, var(--miro-canvas-toolbar-border));
+  }
 }
 
 .miro-canvas-toolbar .miro-canvas-toolbar__button--swatch[aria-pressed="true"] {
@@ -3158,11 +3205,18 @@
   paint-order: stroke;
 }
 
-/* Hovered, focused or selected, the bubble's outline takes the accent. */
-.miro-canvas-comment-markers .miro-canvas-comment-marker:hover .miro-canvas-comment-marker__shape path,
+/* Focused or selected, the bubble's outline takes the accent; hovered, it does
+   too, but only where a pointer can hover - a touch screen leaves the last pin
+   touched "hovered" until the next touch. */
 .miro-canvas-comment-markers .miro-canvas-comment-marker:focus-visible .miro-canvas-comment-marker__shape path,
 .miro-canvas-comment-marker[data-comment-selected="true"] .miro-canvas-comment-marker__shape path {
   stroke: var(--interactive-accent);
+}
+
+@media (hover: hover) {
+  .miro-canvas-comment-markers .miro-canvas-comment-marker:hover .miro-canvas-comment-marker__shape path {
+    stroke: var(--interactive-accent);
+  }
 }
 
 .miro-canvas-comment-marker[data-comment-selected="true"] .miro-canvas-comment-marker__shape path {
@@ -4475,9 +4529,11 @@
   cursor: pointer;
 }
 
-.miro-canvas-search .miro-canvas-search__button:hover:not(:disabled) {
-  color: var(--icon-color-hover, var(--text-normal));
-  background: var(--background-modifier-hover);
+@media (hover: hover) {
+  .miro-canvas-search .miro-canvas-search__button:hover:not(:disabled) {
+    color: var(--icon-color-hover, var(--text-normal));
+    background: var(--background-modifier-hover);
+  }
 }
 
 .miro-canvas-search .miro-canvas-search__button:disabled {

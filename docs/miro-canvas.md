@@ -558,6 +558,19 @@ selected card, it also covers that card's outline and resize handles.
   connector gestures must be configurable without taking global hotkeys.
 - Let users show or hide the lasso, line, and connector buttons independently
   while keeping every action available through commands and assignable hotkeys.
+- The armed tool is marked by one rule for every button of the bars
+  (`.miro-canvas-toolbar__button[aria-pressed="true"]`, the accent icon on the
+  active background), stated as strongly as the hover rule and after it, and
+  hover styles of the bars and the dock apply only under `@media (hover:
+  hover)`.  Found on the tablet: a tapped control stays `:hover` until the
+  next touch (the stylus too), the hover rule (0,4,0) outweighed the armed one
+  (0,3,0) and the pen looked grey; the tablet's WebView reports `hover: none`
+  and `any-hover: none`.  Under More the armed item had never taken the accent
+  colour, `miro-canvas-tools__item` setting its own.  `tests/stylesheet-
+  hover.test.ts` checks every hover rule of a bar sits under the media query,
+  and the `--controls` smoke compares every tool armed (on the bar, under More,
+  in the settings; both orientations; resting, hovered, and with a touch
+  screen's stale hover forced) with Select.
 
 ### Files and documents
 

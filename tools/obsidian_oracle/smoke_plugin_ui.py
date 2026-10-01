@@ -429,6 +429,117 @@ def main() -> int:
                   document.documentElement.style.removeProperty('--background-modifier-border');
                   b.root.querySelector('.miro-canvas-tools [data-tool="select"]').click();
                 }""")
+                # The armed tool is marked the way Select is, on every tool of the bars: the
+                # tools on the bar, those under More, the pen's kinds and the lines' kinds in
+                # the settings.  Both orientations; with a pointer resting on the armed tool
+                # or not; and on a screen that cannot hover, where a finger or a pen leaves
+                # its last touch "hovered" until the next one - that must neither grey the
+                # armed tool nor light an idle one.
+                page.evaluate("""() => {
+                  const theme={'--interactive-accent':'#8a5cf5','--background-modifier-active-hover':'rgba(138,92,245,0.1)','--background-modifier-hover':'rgba(255,255,255,0.15)','--icon-color':'#b3b3b3','--icon-color-hover':'#dadada','--text-normal':'#dadada','--text-muted':'#b3b3b3'};
+                  for(const [name,value] of Object.entries(theme))document.documentElement.style.setProperty(name,value);
+                  miroBrowser.originalSettings=miroBrowser.session.settings;
+                }""")
+                cdp = page.context.new_cdp_session(page)
+                cdp.send('DOM.enable')
+                cdp.send('CSS.enable')
+                accent, idle = 'rgb(138, 92, 245)', 'rgba(0, 0, 0, 0)'
+
+                def turn_bar(orientation):
+                    page.evaluate("""(orientation) => {
+                      const s=miroBrowser.session,original=miroBrowser.originalSettings;
+                      s.settings=orientation==='vertical'
+                        ?{...original,panelLayout:{...original.panelLayout,toolbar:{anchor:'left-middle',dx:0,dy:0,orientation:'vertical'},dockBar:{anchor:'right-middle',dx:0,dy:0,orientation:'vertical'}}}
+                        :original;
+                      s.updatePanelPositions();
+                    }""", orientation)
+
+                def look(selector, hover=False, forced=False):
+                    # `hover`: the mouse rests on the control.  `forced`: the browser takes the control
+                    # for hovered whatever the mouse does, as a touch screen does after a touch.
+                    control = page.locator('.miro-canvas-tools ' + selector + ':visible').first
+                    if hover:
+                        control.hover()
+                    else:
+                        page.mouse.move(2, 2)
+                    found = None
+                    if forced:
+                        control.evaluate("el => el.setAttribute('data-smoke-hover', '')")
+                        document = cdp.send('DOM.getDocument', {'depth': 0})
+                        found = cdp.send('DOM.querySelector', {'nodeId': document['root']['nodeId'], 'selector': '[data-smoke-hover]'})
+                        cdp.send('CSS.forcePseudoState', {'nodeId': found['nodeId'], 'forcedPseudoClasses': ['hover']})
+                    style = control.evaluate("el => { const style = getComputedStyle(el); return { color: style.color, background: style.backgroundColor }; }")
+                    if found is not None:
+                        cdp.send('CSS.forcePseudoState', {'nodeId': found['nodeId'], 'forcedPseudoClasses': []})
+                        control.evaluate("el => el.removeAttribute('data-smoke-hover')")
+                    return style
+
+                def arm(tool):
+                    page.evaluate("tool => miroBrowser.session.armTool(tool)", tool)
+
+                def more_menu(open_it):
+                    shown = page.locator('.miro-canvas-tools__more .miro-canvas-toolbar__panel').is_visible()
+                    if shown != open_it:
+                        page.locator('.miro-canvas-tools__more > button').click()
+
+                on_bar = [(tool, f'[data-tool="{tool}"]') for tool in ('select', 'lasso', 'text', 'sticky', 'shape', 'connector', 'comment', 'frame')]
+                on_bar.append(('pen', '[data-tool-group="drawing"]'))
+                in_settings = [(tool, f'.miro-canvas-tools__drawing [data-tool="{tool}"]') for tool in ('pen', 'highlighter', 'smart', 'eraser', 'erase-part')]
+                under_more = [(tool, f'[data-tool="{tool}"]') for tool in ('code', 'table', 'link')]
+                line_kinds = ['arrow', 'elbow', 'block', 'line', 'curve', 'polyline', 'spline']
+                looks = 0
+                for orientation in ('horizontal', 'vertical'):
+                    turn_bar(orientation)
+                    arm('select')
+                    select_look = look('[data-tool="select"]')
+                    assert select_look['color'] == accent and select_look['background'] != idle, (orientation, select_look)
+                    for mode in ('at rest', 'hovered', 'cannot hover'):
+                        resting_on = {'at rest': {}, 'hovered': {'hover': True}, 'cannot hover': {'forced': True}}[mode]
+                        if mode == 'cannot hover':
+                            # A touch screen: no hovering pointer, and a coarse one.
+                            cdp.send('Emulation.setTouchEmulationEnabled', {'enabled': True, 'maxTouchPoints': 5})
+                            assert page.evaluate("matchMedia('(hover: hover)').matches") is False
+                            page.evaluate("miroBrowser.session.updatePanelPositions()")
+                            arm('select')
+                            select_look = look('[data-tool="select"]')
+                        for tool, selector in on_bar + in_settings + under_more:
+                            arm(tool)
+                            if (tool, selector) in under_more:
+                                more_menu(True)
+                            armed_look = look(selector, **resting_on)
+                            assert armed_look == select_look, f'{tool} armed does not look like Select ({orientation}, {mode}): {armed_look} against {select_look}'
+                            looks += 1
+                            if (tool, selector) in under_more:
+                                more_menu(False)
+                        # The tool that is not armed stays plain - and, where a pointer can hover, lights up under it.
+                        arm('text')
+                        idle_look = look('[data-tool="lasso"]')
+                        assert idle_look['color'] != accent and idle_look['background'] == idle, (orientation, mode, idle_look)
+                        resting = look('[data-tool="lasso"]', **resting_on)
+                        if mode == 'cannot hover':
+                            assert resting == idle_look, f'A tool a pen or a finger rests on looks lit on a screen that cannot hover: {resting}'
+                        elif mode == 'hovered':
+                            assert resting['background'] != idle and resting['color'] != accent, resting
+                        # The lines' kinds, each armed in turn with the pointer still on it.
+                        arm('connector')
+                        for kind in line_kinds:
+                            page.locator(f'.miro-canvas-tools__connectors [data-shape="{kind}"]').click()
+                            chosen = look(f'.miro-canvas-tools__connectors [data-shape="{kind}"]', **resting_on)
+                            assert chosen == select_look, f'The line kind {kind} chosen does not look like Select ({orientation}, {mode}): {chosen}'
+                            looks += 1
+                        other = look('.miro-canvas-tools__connectors [data-shape="arrow"]')
+                        assert other['background'] == idle, f'A line kind not chosen looks lit ({orientation}, {mode}): {other}'
+                        if mode == 'cannot hover':
+                            cdp.send('Emulation.setTouchEmulationEnabled', {'enabled': False})
+                            page.evaluate("miroBrowser.session.updatePanelPositions()")
+                assert looks == 2 * 3 * (len(on_bar + in_settings + under_more) + len(line_kinds)), looks
+                turn_bar('horizontal')
+                arm('select')
+                page.mouse.move(2, 2)
+                page.evaluate("""() => {
+                  for(const name of ['--interactive-accent','--background-modifier-active-hover','--background-modifier-hover','--icon-color','--icon-color-hover','--text-normal','--text-muted'])
+                    document.documentElement.style.removeProperty(name);
+                }""")
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,c=b.runtime.getData().miroCanvas.connectors['menu-line'];
                   const at=s.viewportPoint(c.from),first={x:at.x-12,y:at.y-12},last={x:at.x+12,y:at.y+12};
