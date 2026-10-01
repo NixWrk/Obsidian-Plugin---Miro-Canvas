@@ -813,6 +813,46 @@ def main() -> int:
                   if(JSON.stringify(b.runtime.getData())!==JSON.stringify(before))throw Error('Mixed move undo did not restore all items');
                   nativeBox.remove();s.resetTools();b.select('n1');
                 }""")
+                # The lasso armed from the bar stays armed: after a catch, and after the catch
+                # is moved, which is one step of history.  A press on the catch moves it, as
+                # with the select tool; a press anywhere else is a new lasso, which replaces it.
+                page.evaluate("miroBrowser.session.resetTools();miroBrowser.session.armTool('lasso')")
+
+                def lasso_round(left, top, right, bottom):
+                    ring = page.evaluate("""([left, top, right, bottom]) => {
+                      const s=miroBrowser.session;
+                      return [[left,top],[right,top],[right,bottom],[left,bottom],[left,top]].map(([x,y])=>s.viewportPoint({x,y}));
+                    }""", [left, top, right, bottom])
+                    page.mouse.move(ring[0]['x'], ring[0]['y'])
+                    page.mouse.down()
+                    for corner in ring[1:]:
+                        page.mouse.move(corner['x'], corner['y'], steps=3)
+                    page.mouse.up()
+
+                caught = "[...miroBrowser.runtime.selection].map(node => node.getData().id).sort()"
+                lasso_round(20, 60, 680, 330)
+                assert page.evaluate("miroBrowser.session.armedTool") == 'lasso'
+                assert page.evaluate("miroBrowser.root.getAttribute('data-miro-canvas-tool')") == 'lasso'
+                selected = page.evaluate(caught)
+                assert 'n1' in selected and 'file' in selected and 'image' not in selected, selected
+                frame = page.locator('.miro-canvas-mixed-selection-frame')
+                assert frame.is_visible(), 'The catch has no shared frame'
+                before = page.evaluate("({x: miroBrowser.runtime.nodes.get('n1').x, saves: miroBrowser.getSaves()})")
+                box = frame.bounding_box()
+                page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                page.mouse.down()
+                page.mouse.move(box['x'] + box['width'] / 2 + 40, box['y'] + box['height'] / 2 + 20, steps=5)
+                page.mouse.up()
+                after = page.evaluate("({x: miroBrowser.runtime.nodes.get('n1').x, saves: miroBrowser.getSaves(), tool: miroBrowser.session.armedTool})")
+                assert abs(after['x'] - before['x'] - 40) < 1 and after['saves'] == before['saves'] + 1, (before, after)
+                assert after['tool'] == 'lasso', after
+                assert page.evaluate(caught) == selected
+                # A press anywhere else, with a ring round the card below, takes the selection from the first catch.
+                lasso_round(380, 330, 680, 570)
+                assert page.evaluate("miroBrowser.session.armedTool") == 'lasso'
+                assert page.evaluate(caught) == ['image'], page.evaluate(caught)
+                page.evaluate("miroBrowser.runtime.undo();miroBrowser.session.refresh();miroBrowser.session.resetTools();miroBrowser.select('n1')")
+                assert page.evaluate("miroBrowser.session.armedTool") == 'select'
                 marker = page.locator('.miro-canvas-comment-marker').first
                 before = marker.bounding_box()
                 assert before is not None

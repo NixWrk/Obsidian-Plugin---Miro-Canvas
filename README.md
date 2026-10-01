@@ -177,6 +177,12 @@ ends, its kind, thickness, arrowhead size and colour, and its label.
   way on every button, in the accent colour. Press the button of a tool that is
   already on - the pen's, the lines' or the shape button - and its settings fold
   away, the tool staying on; press it again and they come back.
+- **Lasso** - draw a ring round items to select them. From the bar the lasso
+  stays on after a catch, after Delete and after any other action on it, until
+  you pick another tool or press **Escape**. A press on the catch moves it, and
+  a press on a grip resizes or turns it, as with Select; a press anywhere else
+  is a new lasso, which takes the selection's place - with **Shift** it adds to
+  it.
 - **With a stylus** the pen's pressure sets the line's width and a hand
   resting on the screen is ignored; while a drawing tool is on, a finger pans
   the board (see [Phones and tablets](#phones-and-tablets)).

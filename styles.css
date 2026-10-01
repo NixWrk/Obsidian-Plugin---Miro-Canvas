@@ -1588,6 +1588,12 @@
   touch-action: none;
 }
 
+/* With the lasso armed a press on what is selected moves it, as with the select
+   tool, and the pointer says so; anywhere else it is the cross of a new lasso. */
+.miro-canvas-root[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused),
+.miro-canvas-root[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused) * {
+  cursor: move !important;
+}
 
 .miro-canvas-link-prompt {
   position: absolute;

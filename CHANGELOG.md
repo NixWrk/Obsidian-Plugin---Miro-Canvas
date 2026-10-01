@@ -119,6 +119,16 @@
   the pen leaves the control or the screen's range, or touches the screen; a
   finger never gets one, and on a computer nothing changes: the mouse keeps
   Obsidian's own tooltips.
+- The lasso stays armed after a lasso, after Delete, Cut, Paste and Undo, until
+  another tool is picked or Escape is pressed; before, it handed the board back
+  to the select tool after every catch, and the catch lost the tool it was
+  made with the first time something was done to it. A press on the catch (the
+  shared frame, a selected card or line) moves it, in one undo step, and a
+  press on a grip resizes or turns it, as with the select tool; by finger or
+  pen too. A press anywhere else is a new lasso, which takes the place of the
+  selection; with Shift held it adds to it. The board takes the keyboard focus
+  after a lasso, so Delete and the arrows reach the catch. A lasso that the
+  select tool's own mouse gesture starts still hands the board back to select.
 - A card picked on the board no longer makes the plugin build its session
   anew. Obsidian reports "file opened" each time a card's editor takes the
   focus, one card picked for one, and the plugin answered each with a new

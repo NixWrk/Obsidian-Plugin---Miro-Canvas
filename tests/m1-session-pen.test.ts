@@ -80,6 +80,8 @@ afterEach(() => {
 /** The parts of the session the board's tool bar and pen reach, which these tests drive directly. */
 interface ToolHooks {
 	armTool(tool: string): void;
+	/** The tool a press on the board uses now. */
+	armedTool: string;
 	startToolGesture(event: Event): void;
 	stylus: StylusWatch;
 	toolGesture: unknown;
@@ -775,5 +777,173 @@ describe("a finger or a pen on a selected card", () => {
 		expect(released).toEqual([]);
 		expect(card.data.x).toBe(0);
 		expect(history).toHaveLength(1);
+	});
+});
+
+describe("the lasso tool, armed", () => {
+	// The lasso used to hand the board back to the select tool after every
+	// catch, so a selection jumped off the lasso after the first thing done to
+	// it.  Armed from the bar it stays armed - after the catch, after Delete -
+	// until another tool is picked or Escape is pressed.  Beside it a press on
+	// the selection works as with the select tool, and a press anywhere else is
+	// a new lasso.
+	const NOTE = { x: 900, y: 360 };
+	const EMPTY = { x: 700, y: 560 };
+
+	/** A board with the lasso armed; the first card, "plan", is selected, and "note" is to the right of it. */
+	const lassoBoard = (options: FixtureOptions = {}) => {
+		const board = fixture(options);
+		board.hooks.armTool("lasso");
+		return board;
+	};
+
+	/** A lasso drawn round a screen point with a mouse: down at one corner, round the other three, back to the first. */
+	const lassoAround = (pointer: ReturnType<typeof fixture>["pointer"], centre: { x: number; y: number }, extra: Data = {}, pointerId = 61): void => {
+		const corners = [[-70, -70], [70, -70], [70, 70], [-70, 70], [-70, -70]] as const;
+		const at = ([dx, dy]: readonly [number, number]) => ({ x: centre.x + dx, y: centre.y + dy });
+		pointer("pointerdown", pointerId, "mouse", at(corners[0]), extra);
+		for (const corner of corners.slice(1)) pointer("pointermove", pointerId, "mouse", at(corner));
+		pointer("pointerup", pointerId, "mouse", at(corners[0]));
+	};
+
+	/** The card "note", marked as native Canvas marks one that is selected. */
+	const pickNote = (board: ReturnType<typeof fixture>) => {
+		const note = board.nodes.get("note")!;
+		note.nodeEl.classes.add("is-focused");
+		return note;
+	};
+
+	it("stays armed after a catch, which selects what the ring went round", () => {
+		const { hooks, pointer, selected, root } = lassoBoard();
+		expect(selected()).toEqual(["plan"]);
+		lassoAround(pointer, NOTE);
+		expect(selected()).toEqual(["note"]);
+		expect(hooks.armedTool).toBe("lasso");
+		expect(root.getAttribute("data-miro-canvas-tool")).toBe("lasso");
+	});
+
+	it("gives the board the focus after a catch, so that Delete and the other keys reach it", () => {
+		const { pointer, root } = lassoBoard();
+		const focus = vi.fn();
+		(root as unknown as { focus: unknown }).focus = focus;
+		lassoAround(pointer, NOTE);
+		expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+	});
+
+	it("stays armed after what was caught is deleted, and goes round the next catch", () => {
+		const { canvas, hooks, pointer, selected, session } = lassoBoard();
+		lassoAround(pointer, NOTE);
+		expect(selected()).toEqual(["note"]);
+		// Native Canvas takes the catch away, as Delete does; nothing of the plugin's puts the tool away.
+		const data = canvas.getData();
+		canvas.importData({ ...data, nodes: data.nodes.filter((node: Data) => node.id !== "note") });
+		canvas.deselectAll();
+		session.refresh();
+		expect(hooks.armedTool).toBe("lasso");
+		lassoAround(pointer, { x: 500, y: 360 }, {}, 62);
+		expect(selected()).toEqual(["plan"]);
+		expect(hooks.armedTool).toBe("lasso");
+	});
+
+	it("goes back to select on Escape, as every other tool does", () => {
+		const { hooks, pointer, session } = lassoBoard();
+		lassoAround(pointer, NOTE);
+		session.resetTools();
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("leaves a press on the selected card alone: no new lasso, nothing taken from native Canvas", () => {
+		const board = lassoBoard();
+		const note = pickNote(board);
+		board.canvas.selectOnly(note);
+		const press = board.pointer("pointerdown", 63, "mouse", NOTE, { target: note.nodeEl });
+		expect(board.hooks.toolGesture).toBeUndefined();
+		expect(press.defaultPrevented).toBe(false);
+		expect(press.cancelBubble).toBe(false);
+		expect(board.hooks.armedTool).toBe("lasso");
+		expect(board.selected()).toEqual(["note"]);
+	});
+
+	it("starts a new lasso with a press anywhere else, selected card or no", () => {
+		const board = lassoBoard();
+		pickNote(board);
+		const press = board.pointer("pointerdown", 64, "mouse", EMPTY);
+		expect(board.hooks.toolGesture).toBeDefined();
+		expect(press.defaultPrevented).toBe(true);
+		board.pointer("pointercancel", 64, "mouse", EMPTY);
+		// A card that is not selected is not the selection's: a press on it is a lasso too.
+		const plan = board.nodes.get("plan")!;
+		const onPlan = board.pointer("pointerdown", 65, "mouse", { x: 500, y: 360 }, { target: plan.nodeEl });
+		expect(board.hooks.toolGesture).toBeDefined();
+		expect(onPlan.defaultPrevented).toBe(true);
+		board.pointer("pointercancel", 65, "mouse", { x: 500, y: 360 });
+	});
+
+	it("leaves a press on the shared frame, or on native Canvas's selection box, to the selection", () => {
+		const board = lassoBoard();
+		for (const [index, name] of ["miro-canvas-mixed-selection-frame", "canvas-selection"].entries()) {
+			const frame = new HostElement(name);
+			board.root.appendChild(frame);
+			const press = board.pointer("pointerdown", 66 + index, "mouse", NOTE, { target: frame });
+			expect(board.hooks.toolGesture).toBeUndefined();
+			expect(press.defaultPrevented).toBe(false);
+		}
+	});
+
+	/** The catch, picked: a lasso round "note", then one press on it as a pen or a finger makes, moved by (dx, dy). */
+	const dragCatch = (pointerType: "pen" | "touch", pointerId: number, dx: number, dy: number) => {
+		vi.spyOn(Date, "now").mockReturnValue(5_000);
+		const board = lassoBoard();
+		lassoAround(board.pointer, NOTE);
+		const note = pickNote(board);
+		const onNote = (type: string, at: { x: number; y: number }) =>
+			board.pointer(type, pointerId, pointerType, at, { target: note.nodeEl, isPrimary: pointerType === "touch" });
+		onNote("pointerdown", NOTE);
+		onNote("pointermove", { x: NOTE.x + dx / 2, y: NOTE.y + dy / 2 });
+		onNote("pointermove", { x: NOTE.x + dx, y: NOTE.y + dy });
+		onNote("pointerup", { x: NOTE.x + dx, y: NOTE.y + dy });
+		return { ...board, note };
+	};
+
+	it("moves the catch with a pen, in one history step, as with the select tool", () => {
+		const { note, history, hooks } = dragCatch("pen", 68, 40, 20);
+		expect([note.data.x, note.data.y]).toEqual([440, 20]);
+		expect(history).toHaveLength(1);
+		expect(hooks.armedTool).toBe("lasso");
+		expect(hooks.toolGesture).toBeUndefined();
+	});
+
+	it("moves the catch with a finger, in one history step, as with the select tool", () => {
+		const { note, history, hooks } = dragCatch("touch", 69, 60, 40);
+		expect([note.data.x, note.data.y]).toEqual([460, 40]);
+		expect(history).toHaveLength(1);
+		expect(hooks.armedTool).toBe("lasso");
+	});
+
+	it("takes the catch for the selection, and a lasso made with Shift held adds to it", () => {
+		const { hooks, pointer, selected } = lassoBoard();
+		expect(selected()).toEqual(["plan"]);
+		lassoAround(pointer, NOTE, { shiftKey: true });
+		expect(selected().sort()).toEqual(["note", "plan"]);
+		expect(hooks.armedTool).toBe("lasso");
+		// Without it the ring replaces what was selected.
+		lassoAround(pointer, NOTE, {}, 62);
+		expect(selected()).toEqual(["note"]);
+	});
+
+	it("still hands the board back to select after a lasso the select tool's own binding began", () => {
+		const { hooks, pointer, selected } = fixture();
+		expect(hooks.armedTool).toBe("select");
+		lassoAround(pointer, NOTE, { altKey: true });
+		expect(selected()).toEqual(["note"]);
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("is not dropped by picking the lasso again, and gives way to the tool picked after it", () => {
+		const { hooks } = lassoBoard();
+		hooks.armTool("lasso");
+		expect(hooks.armedTool).toBe("lasso");
+		hooks.armTool("pen");
+		expect(hooks.armedTool).toBe("pen");
 	});
 });

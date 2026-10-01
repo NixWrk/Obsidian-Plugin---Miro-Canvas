@@ -306,6 +306,10 @@ function cssString(value: string): string {
 /** What a press starts no rectangle selection on: the things it would select, and text. */
 const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.miro-canvas-mixed-selection-frame,"
 	+ ".miro-board-connector,.miro-canvas-connector-labels,input,textarea,[contenteditable=true]";
+/** The shared frame round the selection, and native Canvas's own selection box with its corner squares. */
+const SELECTION_FRAME_SELECTOR = ".miro-canvas-mixed-selection-frame, .canvas-selection, .canvas-node-resizer";
+/** A card, a native line or one of the board's own, which is selected when it carries one of the two classes below. */
+const SELECTABLE_SELECTOR = ".canvas-node, .canvas-edge, .miro-board-connector";
 const PANEL_SELECTOR = ".miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
 	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray";
 
@@ -1008,12 +1012,13 @@ export class M1CanvasSession {
 	 * edge between cards: it selects the connector, Shift adding it or taking
 	 * it out.  Dragged, it moves the whole selection when there is more than
 	 * one thing in it, bends a connector something holds, and carries one
-	 * that holds on to nothing.
+	 * that holds on to nothing.  With the lasso armed only a press on a
+	 * selected connector gets here; a press on any other starts a lasso.
 	 */
 	private pressConnector(event: PointerEvent, id: string): void {
 		const layer = this.connectorLayer;
 		// With the Lines and arrows tool armed too: a line pressed is edited, not drawn over.
-		if (layer === undefined || (this.armedTool !== "select" && this.armedTool !== "connector") || this.isSpacePanHeld()) return;
+		if (layer === undefined || (this.armedTool !== "select" && this.armedTool !== "connector" && this.armedTool !== "lasso") || this.isSpacePanHeld()) return;
 		const selected = layer.selection();
 		if (event.button === 2) {
 			// The context menu acts on what was right-clicked.
@@ -4045,7 +4050,7 @@ export class M1CanvasSession {
 		// A second finger is a pinch and is left to native Canvas.  A pen is never one of several
 		// fingers, and the S Pen of a Galaxy Tab reports itself as no primary pointer.
 		if ((touch && !press.isPrimary) || press.button !== 0 || press.shiftKey) return false;
-		if (this.armedTool !== "select" || !root.contains(press.target as Node) || this.inControls(press)) return false;
+		if ((this.armedTool !== "select" && this.armedTool !== "lasso") || !root.contains(press.target as Node) || this.inControls(press)) return false;
 		// The hand that holds the pen is not a finger.
 		if (touch && this.stylus.near(Date.now())) return false;
 		const card = this.closestElementOf(press, ".canvas-node");
@@ -4423,7 +4428,7 @@ export class M1CanvasSession {
 				|| this.isSpacePanHeld() || this.closestTarget(event, "input,textarea,[contenteditable=true],.cm-editor")) return;
 			if (root.hasAttribute("data-miro-rectangle-selecting") || this.selectionMoveEnd !== undefined
 				|| (this.armedTool === "select" && matchesPointer(this.settings.lassoBinding, event))
-				|| (this.armedTool === "lasso" && event.button === 0)) {
+				|| (this.armedTool === "lasso" && event.button === 0 && !this.pressOnSelection(event))) {
 				event.preventDefault(); event.stopImmediatePropagation();
 			}
 		};
@@ -4559,6 +4564,10 @@ export class M1CanvasSession {
 		const tool = lasso ? "lasso" : this.armedTool;
 		const root = this.root;
 		if (root === undefined || this.inControls(event) || this.closestTarget(event, "input, textarea, [contenteditable=true], .cm-editor")) return;
+		// With the lasso armed, a press on what is selected moves or reshapes it as
+		// it does with the select tool; a press anywhere else makes a new lasso.
+		// (A lasso the select tool's binding starts goes round whatever it starts on.)
+		if (tool === "lasso" && !lasso && this.pressOnSelection(event)) return;
 		if (!lasso && tool === "select" && matchesPointer(this.settings.panBinding, event)) {
 			event.preventDefault(); event.stopImmediatePropagation();
 			this.panGestureEnd?.();
@@ -4763,7 +4772,7 @@ export class M1CanvasSession {
 			const pointer = released as PointerEvent;
 			const gesture = this.toolGesture;
 			end();
-			if (gesture !== undefined) this.finishToolGesture(gesture.tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from);
+			if (gesture !== undefined) this.finishToolGesture(gesture.tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from, event.shiftKey === true);
 		};
 		const cancel = (cancelled: Event): void => {
 			if (!own(cancelled)) return;
@@ -4792,13 +4801,16 @@ export class M1CanvasSession {
 		start: { readonly x: number; readonly y: number },
 		end: { readonly x: number; readonly y: number },
 		from: { readonly nodeId: string; readonly anchor: CanvasAnchor; readonly board: { readonly x: number; readonly y: number } } | undefined,
+		additive = false,
 	): void {
 		// The click that ends the press must not reach the board, which would end
 		// the new item's editing or clear the selection.
 		this.swallowClickUntil = Date.now() + 400;
-		// A drawing tool stays armed for the next stroke, as in Miro; every
-		// other tool is used once and hands the board back to the select tool.
-		if (!isDrawingTool(tool)) this.armedTool = "select";
+		// A drawing tool stays armed for the next stroke, as in Miro, and so does
+		// the lasso, for the next catch or whatever is done with this one; every
+		// other tool is used once and hands the board back to the select tool.  A
+		// lasso that the select tool's pointer binding began leaves select armed.
+		if (!isDrawingTool(tool) && tool !== "lasso") this.armedTool = "select";
 		this.updateQuickTools();
 		const a = this.boardPoint(start);
 		const b = this.boardPoint(end);
@@ -4820,7 +4832,7 @@ export class M1CanvasSession {
 			return;
 		}
 		if (tool === "lasso") {
-			this.selectLassoed();
+			this.selectLassoed(additive);
 			return;
 		}
 		const dragged = Math.hypot(end.x - start.x, end.y - start.y) > 6;
@@ -5162,15 +5174,16 @@ export class M1CanvasSession {
 	}
 
 	/**
-	 * Selects what a lasso went round, as Miro's does, and hands the board back
-	 * to the select tool so the catch can be moved at once.
+	 * Selects what a lasso went round, as Miro's does.  The tool the lasso was
+	 * made with stays as it was: the lasso, armed, for the next catch - a press
+	 * on this one moves it as with the select tool - or select, when the select
+	 * tool's own binding made it.  `additive` (Shift held at the press) keeps
+	 * what was selected and adds the catch.
 	 */
-	private selectLassoed(): void {
+	private selectLassoed(additive = false): void {
 		const ring = this.penPoints;
 		this.penPoints = [];
-		this.selectedRouteEnds.clear();
-		this.armedTool = "select";
-		this.updateQuickTools();
+		if (!additive) this.selectedRouteEnds.clear();
 		if (ring.length < 3) return;
 		const geometry = this.landingGeometry().geometry;
 		const caught: unknown[] = [];
@@ -5204,11 +5217,21 @@ export class M1CanvasSession {
 			if (id !== undefined && ringed(id)) caught.push(edge);
 		}
 		const connectors = boardConnectors(this.currentRawDocument).filter((connector) => ringed(connector.id));
-		this.selectedCommentKeys = new Set(Object.entries(geometry.comments ?? {})
-			.filter(([, point]) => pointInLasso(ring, point)).map(([key]) => key));
-		this.callNative("deselectAll");
+		const pins = Object.entries(geometry.comments ?? {}).filter(([, point]) => pointInLasso(ring, point)).map(([key]) => key);
+		if (additive) {
+			// A line caught whole is selected whole, whatever end of it an earlier rectangle took alone.
+			for (const edge of caught) this.selectedRouteEnds.delete(readCanvasElementId(edge) ?? "");
+			for (const connector of connectors) this.selectedRouteEnds.delete(connector.id);
+		} else {
+			this.callNative("deselectAll");
+		}
+		this.selectedCommentKeys = new Set([...(additive ? this.selectedCommentKeys : []), ...pins]);
 		for (const node of caught) this.callNative("select", [node]);
-		this.connectorLayer?.select(connectors.map((connector) => connector.id));
+		const kept = additive ? this.connectorLayer?.selection() ?? [] : [];
+		this.connectorLayer?.select([...new Set([...kept, ...connectors.map((connector) => connector.id)])]);
+		// The lasso took the press, so the board never got the focus a press gives it: keys - Delete, copy,
+		// the arrows - go to the catch from here, as they do after a press with the select tool.
+		this.root?.focus?.({ preventScroll: true });
 		this.refresh();
 	}
 
@@ -8624,6 +8647,17 @@ export class M1CanvasSession {
 
 	private inControls(event: Event): boolean {
 		return this.closestTarget(event, PANEL_SELECTOR);
+	}
+
+	/**
+	 * Whether a press lands on what is selected: the shared frame, native
+	 * Canvas's selection box, or a selected card or line of either kind.  (A
+	 * selected comment pin and the grips are under `PANEL_SELECTOR`.)
+	 */
+	private pressOnSelection(event: Event): boolean {
+		if (this.closestTarget(event, SELECTION_FRAME_SELECTOR)) return true;
+		const item = this.closestElementOf(event, SELECTABLE_SELECTOR);
+		return item !== undefined && (item.classList.contains("is-focused") || item.classList.contains("is-selected"));
 	}
 
 	/** The element of the event's target's own ancestry that matches, if any. */

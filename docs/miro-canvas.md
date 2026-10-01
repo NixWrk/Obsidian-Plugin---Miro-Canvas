@@ -575,6 +575,18 @@ selected card, it also covers that card's outline and resize handles.
   `foldedSettings`, cleared when the armed tool changes; `aria-expanded` on the
   pen's and the lines' buttons; the shape picker is the popover it always was).
   The kinds of drawing inside the pen's settings do not fold them.
+- The lasso, armed from the bar, stays armed: `finishToolGesture` no longer
+  hands the board to select after one (only the lasso the select tool's binding
+  starts has select armed, and keeps it).  With it armed a press on the
+  selection (`pressOnSelection`: the shared frame, native Canvas's selection
+  box, a selected card or line) is left to the select tool's own handlers,
+  as are grips and pins (`PANEL_SELECTOR`); anything else is a new lasso, with
+  Shift adding.  `attachSelectionDrag` and `pressConnector` take the lasso as
+  they take select.  The board takes the focus after a catch so that Delete
+  reaches it.  Found in real Obsidian 1.13.7: Obsidian fires `file-open` when a
+  single card is picked, and the plugin rebuilt its session on each, which
+  dropped the armed tool; `src/board-binding.ts` lets a ready session for the
+  same view, file and runtime stand.
 - A stylus's hover text (`src/pen-tooltips.ts`, attached to every window by
   `main.ts`, on phones and tablets only): Obsidian's tooltips wait for mouse
   events and the mobile app shows none.  A pen over a labelled control of the
