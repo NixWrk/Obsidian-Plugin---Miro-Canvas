@@ -1435,6 +1435,35 @@ def main() -> int:
                 print("OK: shared menus, connector marquee and first-press comment drag (synthetic host)")
                 return 0
             if args.interactions:
+                # A double press on the empty board is Escape and makes no card, whatever tool is
+                # armed, while a card still opens for writing.  Real mouse events.
+                empty = page.evaluate("""() => {
+                  const b = miroBrowser, box = b.root.getBoundingClientRect();
+                  b.session.resetTools();
+                  return {x: box.left + 900, y: box.top + 450};
+                }""")
+                assert page.evaluate("([x, y]) => document.elementFromPoint(x, y) === miroBrowser.root", [empty["x"], empty["y"]]), \
+                    "The point chosen for the empty board is covered"
+                node_count = lambda: page.evaluate("miroBrowser.runtime.nodes.size")
+                armed_now = lambda: page.evaluate("miroBrowser.session.armedTool")
+                cards_before = node_count()
+                for tool in ("select", "lasso", "connector"):
+                    page.evaluate("(tool) => miroBrowser.session.armTool(tool)", tool)
+                    page.mouse.dblclick(empty["x"], empty["y"])
+                    assert node_count() == cards_before, f"A double click on the empty board made a card with {tool} armed"
+                    assert armed_now() == "select", f"A double click on the empty board left {armed_now()} armed, not select, with {tool} armed"
+                # A press with the lines tool swallows the next double click for half a second,
+                # for the polyline it may be finishing.
+                page.wait_for_timeout(600)
+                card_at = page.evaluate("""() => {
+                  const b = miroBrowser, r = b.node.nodeEl.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+                  return {x, y, covered: document.elementFromPoint(x, y)?.closest('.canvas-node') !== b.node.nodeEl};
+                }""")
+                assert not card_at["covered"], "The middle of the card is covered"
+                page.mouse.dblclick(card_at["x"], card_at["y"])
+                assert page.evaluate("miroBrowser.node.nodeEl.classList.contains('is-editing')"), "A double click on a card did not open it for writing"
+                assert node_count() == cards_before, "A double click on a card made a card"
+                page.evaluate("miroBrowser.node.nodeEl.classList.remove('is-editing')")
                 page.evaluate("""async () => {
                   const b = miroBrowser;
                   const check = (ok, message) => { if (!ok) throw Error(message); };

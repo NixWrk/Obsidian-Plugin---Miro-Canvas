@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- A double click or a double tap on the empty board is now Escape and never
+  makes a card: it puts the armed tool, the selection, an open comment and
+  the open bar menus away, whatever tool was armed. Canvas's own double click
+  made a text card there. A card still opens for writing on a double click,
+  a line's label still edits, and the double click that finishes a polyline
+  or a spline is still that line's own. A finger's or a pen's double tap is
+  timed by the plugin, since the browser sends no double click for a touch
+  that Canvas has taken for itself. With a drawing tool armed the two taps
+  leave the dots they draw, then act as Escape.
 - Comments: a thread is resolved with a tick button and no caption, with a
   "?" beside it that explains resolving in a tooltip and, on a touch
   screen, under the header on a press. The long caption had squeezed the

@@ -117,6 +117,7 @@ import { CommentMarkers } from "./comment-markers";
 import { matchesPointer } from "./pointer-bindings";
 import { PalmRewind, pressedPressure, strokeWidthScale, StylusWatch } from "./stylus";
 import { PickedCardMarks, type BoardWatcher, type CardChange } from "./picked-cards";
+import { DoubleTapWatch } from "./double-tap";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
@@ -239,6 +240,8 @@ const HOLD_STRAIGHT_REACH = 24;
 const CARD_DRAG_SLOP = 5;
 /** How long native Canvas waits for a finger to stay put before it takes it for a long press. */
 const NATIVE_LONG_PRESS_MS = 600;
+/** How long the double-click that finished a polyline or a spline stays that line's own, and is no Escape. */
+const LINE_FINISH_DOUBLE_CLICK_MS = 500;
 
 /** Whether two views of the board show the same place at the same zoom. */
 function sameViewport(left: ViewportTransform, right: ViewportTransform): boolean {
@@ -1604,6 +1607,8 @@ export class M1CanvasSession {
 	private lastPointer: { readonly x: number; readonly y: number; readonly at: number } | undefined;
 	private panGestureEnd: (() => void) | undefined;
 	private suppressContextUntil = 0;
+	/** When a polyline or a spline last finished: the double-click that closed it is that line's own, not an Escape. */
+	private lineFinishedAt = 0;
 	/** A polyline or spline being placed a click at a time. */
 	private linePlacing: {
 		readonly spec: LineKindSpec;
@@ -3380,6 +3385,7 @@ export class M1CanvasSession {
 		this.attachRectangleSelection();
 		this.attachHandAndPen();
 		this.attachSelectionDrag();
+		this.attachDoubleTap();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
 		// A press on the plugin's own bars and cards is theirs alone and ends at
@@ -4044,6 +4050,57 @@ export class M1CanvasSession {
 		};
 		this.listen(view, "pointerup", settled, true);
 		this.listen(view, "pointercancel", settled, true);
+	}
+
+	/**
+	 * A double tap on the board is Escape and never makes a card.  A mouse's
+	 * double click arrives as `dblclick` (see `escapesOnDoublePress`); a finger
+	 * and a pen are timed here from their own presses, because native Canvas
+	 * takes the press of a touch for itself and the browser then counts no
+	 * click for it - a double tap is two taps and nothing more.  The Escape
+	 * waits for the second tap to be over, so the board has finished with it:
+	 * a pen leaves the dot that one tap would.
+	 */
+	private attachDoubleTap(): void {
+		const view = this.root?.ownerDocument?.defaultView;
+		if (view === undefined || view === null) return;
+		const taps = new DoubleTapWatch();
+		this.listen(view, "pointerdown", (event) => {
+			const press = event as PointerEvent;
+			if (press.pointerType === "mouse" || this.ownPointerEvents.has(press)) return;
+			taps.press(press.pointerId, { x: press.clientX, y: press.clientY }, Date.now(), this.doublePressCounts(press));
+		}, true);
+		this.listen(view, "pointerup", (event) => {
+			const lift = event as PointerEvent;
+			if (lift.pointerType === "mouse" || this.ownPointerEvents.has(lift)) return;
+			if (!taps.release(lift.pointerId, { x: lift.clientX, y: lift.clientY }, Date.now())) return;
+			view.setTimeout(() => {
+				if (!this.disposed) this.resetTools();
+			}, 0);
+		}, true);
+		this.listen(view, "pointercancel", (event) => {
+			if (!this.ownPointerEvents.has(event)) taps.cancel((event as PointerEvent).pointerId);
+		}, true);
+		this.listen(view, "blur", () => taps.reset());
+	}
+
+	/**
+	 * Whether a press may be one of a double press that is Escape: one on the
+	 * empty board, or anywhere while a drawing tool is armed, which takes every
+	 * press for a stroke - a pen's first dot lies under its second tap.  A
+	 * polyline or a spline being placed is not: its double click finishes it.
+	 */
+	private doublePressCounts(press: Event): boolean {
+		const root = this.root;
+		if (root === undefined || !root.contains(eventTarget(press) as Node) || this.inControls(press)) return false;
+		if (this.linePlacing !== undefined || Date.now() - this.lineFinishedAt < LINE_FINISH_DOUBLE_CLICK_MS) return false;
+		return eventTarget(press) === root || isDrawingTool(this.armedTool);
+	}
+
+	/** Whether a double click is Escape: the same press as `doublePressCounts`, seen as the browser's own `dblclick`. */
+	private escapesOnDoublePress(event: Event): boolean {
+		if (Date.now() - this.lineFinishedAt < LINE_FINISH_DOUBLE_CLICK_MS) return false;
+		return eventTarget(event) === this.root || isDrawingTool(this.armedTool);
 	}
 
 	/** Whether a press lands on a card that is selected and not being written in, or on the frame round several. */
@@ -4957,7 +5014,7 @@ export class M1CanvasSession {
 			this.toolGesture = undefined;
 			this.linePlacing = undefined;
 			// The double-click that finishes a line must not make a card as well.
-			view?.setTimeout(() => root.removeEventListener("dblclick", swallow, true), 500);
+			view?.setTimeout(() => root.removeEventListener("dblclick", swallow, true), LINE_FINISH_DOUBLE_CLICK_MS);
 		};
 		root.addEventListener("dblclick", swallow, true);
 		const move = (moved: Event): void => {
@@ -4991,6 +5048,7 @@ export class M1CanvasSession {
 		this.toolGesture = { tool: "shape", start: { x: event.clientX, y: event.clientY }, ghost: ghost as unknown as HTMLElement, end };
 		if (spec.input !== "points") return;
 		const finish = (): void => {
+			this.lineFinishedAt = Date.now();
 			end();
 			this.createLine(spec, points);
 		};
@@ -8834,8 +8892,16 @@ export class M1CanvasSession {
 				if (this.selectedIds.length === 1 && this.selectedIds[0] === connector) this.editSelectedConnectorLabel();
 				return;
 			}
+			// A double click on the empty board is Escape, never a new card: it
+			// puts the tools and the selection away, in review mode too.
+			if (this.escapesOnDoublePress(event)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				this.resetTools();
+				return;
+			}
 			const id = this.eventElementId(eventTarget(event));
-			this.blockIfNeeded(event, id === undefined ? "create" : "edit-text", id === undefined ? [] : this.eventIds(event));
+			if (id !== undefined) this.blockIfNeeded(event, "edit-text", this.eventIds(event));
 		});
 		for (const type of ["pointerdown", "mousedown"]) {
 			listen(type, (event) => {

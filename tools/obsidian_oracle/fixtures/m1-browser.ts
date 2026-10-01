@@ -41,6 +41,7 @@ const NATIVE_CARD_MENU = [
   ["Drag to add note from vault", "lucide-file-text"],
   ["Drag to add media from vault", "lucide-file-image"],
 ] as const;
+const NATIVE_CARD_SIZE = { width: 250, height: 60 };
 const makeCardMenu = (): HTMLElement => {
   const menu = document.createElement("div");
   menu.className = "canvas-card-menu";
@@ -222,6 +223,7 @@ rebuildGraph(initial as unknown as Record<string, unknown>, ["n1"]);
 const history = [clone(initial) as unknown as Record<string, unknown>];
 let historyIndex = 0;
 let saves = 0;
+let nativeCards = 0;
 const runtime = {
   wrapperEl: root, canvasEl, nodes, edges, selection,
   menu: { menuEl: nativeMenu, containerEl: nativeMenuContainer },
@@ -255,6 +257,23 @@ const runtime = {
     }
   },
   setReadonly(value: boolean) { this.readonly = value; },
+  // Native Canvas's own placement: a screen point on the board.
+  posFromClient(point: { x: number; y: number }) {
+    const board = (session as unknown as { boardPoint(point: { x: number; y: number }): { x: number; y: number } | undefined }).boardPoint(point);
+    return board ?? { x: 0, y: 0 };
+  },
+  /** As native Canvas's `createTextNode`: an empty card, in its editor, one history step. */
+  createTextNode({ pos, size, position }: { pos: { x: number; y: number }; size?: { width: number; height: number }; position?: string }) {
+    const dimensions = size ?? NATIVE_CARD_SIZE;
+    const origin = position === "center" ? { x: pos.x - dimensions.width / 2, y: pos.y - dimensions.height / 2 } : pos;
+    const id = `native-card-${nativeCards += 1}`;
+    const next = this.getData();
+    next.nodes.push({ id, type: "text", text: "", ...origin, ...dimensions });
+    this.data = next;
+    rebuildGraph(next, [id]);
+    this.requestSave(true);
+    nodes.get(id)?.nodeEl?.classList.add("is-editing");
+  },
   select(node: RuntimeElement) { selection.add(node); },
   deselectAll() { selection.clear(); },
   deleteSelection() {
@@ -269,6 +288,18 @@ const runtime = {
   redo() { if (historyIndex + 1 < history.length) this.importData(history[++historyIndex]); },
 };
 const view = { canvas: runtime, getViewType: () => "canvas" };
+// Native Canvas's own double click: a card opens for writing; the empty board
+// makes a card there, unless the double click was already taken.
+root.addEventListener("dblclick", (event) => {
+  if (event.defaultPrevented) return;
+  const card = (event.target as Element).closest(".canvas-node");
+  if (card !== null) {
+    card.classList.add("is-editing");
+    return;
+  }
+  if (event.target !== root) return;
+  runtime.createTextNode({ pos: runtime.posFromClient({ x: event.clientX, y: event.clientY }), position: "center" });
+});
 const writer = new MetadataWriter(createObsidianMetadataStore(view).store!);
 const session = new M1CanvasSession(view, writer, { settings: normalizeSettings({ connectorAllowFree: true, connectorAttachConnectors: true }) });
 placeCanvas = () => {

@@ -597,6 +597,27 @@ selected card, it also covers that card's outline and resize handles.
   `Input.dispatchMouseEvent` with `pointerType: "pen"`) also makes a mouse
   pointer of it; other pointers neither show nor take away the pen's tooltip.
 
+- A double press on the empty board is Escape, never a card (2026-10-01).
+  In Obsidian 1.13.7's `app.js` the board's wrapper listens for `dblclick`
+  (`onDoubleClick`: not default-prevented, the target the wrapper itself, the
+  board not readonly) and makes a text card at the point.  A touch has no such
+  event there: `onTouchdown` calls `preventDefault` on the touch's pointerdown,
+  after which Chromium sends the tap's click with detail 0 and no `dblclick`
+  (checked with CDP's `Input.dispatchTouchEvent`: a plain element gets two
+  clicks and the `dblclick`, the board only two clicks of detail 0, and no
+  card is made); whether an Android WebView differs is for the pointer log of a
+  real tablet.  The guard's `dblclick` listener takes the empty board (its
+  target is the wrapper, `this.root`), or any target while a drawing tool is
+  armed - a pen's first dot lies under its second click - prevents it and runs
+  `resetTools()`, the very path Escape takes.  `DoubleTapWatch`
+  (`src/double-tap.ts`) times a finger's and a pen's taps - a press up to 300
+  ms and 10 px, the second down within 300 ms and 40 px of the first's lift,
+  no other pointer down, neither on a card or a panel - and `attachDoubleTap`
+  runs `resetTools()` once the second tap's events are over, so a pen leaves
+  the dot each tap draws.  A polyline's or a spline's finishing double click
+  (`linePlacing`, `lineFinishedAt`) is that line's own and not an Escape; a
+  card, a line's label and a line keep their double click.
+
 ### Files and documents
 
 - Preserve native open, reveal, rename, drag/drop, and link behavior.

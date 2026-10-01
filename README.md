@@ -416,7 +416,8 @@ A letter arms its tool whether the bar shows it or not. Code block, table,
 web link and Canvas's own card, note and file from the vault have no letter.
 
 The letters work while the board has focus; editors keep their own keys.
-Escape resets the tools and the selection.
+Escape resets the tools and the selection, and so does a double click or
+double tap on the empty board, which never makes a card.
 
 </details>
 
