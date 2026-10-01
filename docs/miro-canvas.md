@@ -617,6 +617,29 @@ selected card, it also covers that card's outline and resize handles.
   the dot each tap draws.  A polyline's or a spline's finishing double click
   (`linePlacing`, `lineFinishedAt`) is that line's own and not an Escape; a
   card, a line's label and a line keep their double click.
+- Canvas's own card-menu buttons only arm (2026-10-01).  In `app.js`
+  `cardMenuEl` holds the buttons; each has a click that makes the item at
+  `posCenter()` (the card at once; the note and media pickers read it when a
+  file is picked, later) and a pointerdown calling `dragTempNode(event, size,
+  callback)`, which after five pixels of travel shows a ghost, snaps it unless
+  Alt is held (Ctrl on a Mac), and on the release calls the callback with the
+  ghost's position: `createTextNode`, or the picker whose own callback calls
+  `createFileNode` there.  The bar's capture listener (`QuickTools`) stops that
+  click and calls `onNativeArm`; the session arms the `native` tool (the button
+  is `aria-pressed`, lit by the rule every armed tool has), the next press on
+  the board (`startNativePlacement`, taken like any tool's, a palm excepted)
+  waits for its click, then `replayNativeDrag` (`src/native-drag.ts`) sends the
+  button a pointerdown and the window a move and a release at the point - Alt
+  and Ctrl held, so the item lands on the point - and Canvas makes its own
+  item in its own way, one history step, and Select is armed again.  The
+  replay works for any button that is dragged, so the tablet's slide and group
+  buttons need no code of their own.  Chosen over native's `showCreationMenu`
+  (each item's callback keeps the position, but it is a menu with items of
+  its own, and 1.13.7's lists no slide) and over pointing `posCenter` at the
+  press (the pickers read it later, not in the call).  A drag that starts on a button and ends over it is no click
+  (`watchNativePress`); review mode and a board locked in Canvas's quick
+  settings arm nothing (`aria-disabled` on the buttons).  Drag-to-add from the
+  button is left as it was, review mode included.
 
 ### Files and documents
 

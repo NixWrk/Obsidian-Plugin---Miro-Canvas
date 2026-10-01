@@ -1127,6 +1127,24 @@
   height: var(--icon-m, 18px);
 }
 
+/* A press on one of them arms it, like any tool: lit as the armed tool is,
+   until the next press on the board places its item.  After the hover rule,
+   so the armed look holds under the pointer too. */
+.miro-canvas-toolbar .canvas-card-menu-button[aria-pressed="true"] {
+  color: var(--interactive-accent);
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+}
+
+.miro-canvas-tools .miro-canvas-tools__native[data-armed="true"] .miro-canvas-tools__item-label {
+  color: var(--interactive-accent);
+}
+
+/* Review mode makes nothing, so they cannot be armed. */
+.miro-canvas-toolbar .canvas-card-menu-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 /* Room for a finger, and for the smaller screens of a tablet or a phone:
    bigger controls where there is no mouse, and the bars out of each other's
    way where the board is narrow. */

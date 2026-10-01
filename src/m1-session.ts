@@ -124,8 +124,9 @@ import { CommentThreadCard, threadMessages } from "./comment-thread";
 import { buildSearchIndex, findMatches, focusRect, stepMatch, type SearchEntry, type SearchKind } from "./board-search";
 import { BoardSearchBar } from "./board-search-bar";
 import {
-	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
+	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type ArmedTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "./quick-tools";
+import { replayNativeDrag } from "./native-drag";
 import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
 import { applyPanelPositionSettled, defaultPanelsFit, hostFootInset, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
@@ -242,6 +243,8 @@ const CARD_DRAG_SLOP = 5;
 const NATIVE_LONG_PRESS_MS = 600;
 /** How long the double-click that finished a polyline or a spline stays that line's own, and is no Escape. */
 const LINE_FINISH_DOUBLE_CLICK_MS = 500;
+/** How long a native item waits for the click that ends the press which places it, before it is placed without. */
+const NATIVE_PLACE_WAIT_MS = 350;
 
 /** Whether two views of the board show the same place at the same zoom. */
 function sameViewport(left: ViewportTransform, right: ViewportTransform): boolean {
@@ -1591,7 +1594,9 @@ export class M1CanvasSession {
 	private searchOpenedThread: { readonly id: string; readonly origin: CommentOrigin } | undefined;
 	private readonly quickTools: QuickTools | undefined;
 	private readonly arrangeMode: PanelArrangeMode | undefined;
-	private armedTool: QuickTool = "select";
+	private armedTool: ArmedTool = "select";
+	/** The native Canvas button armed while the armed tool is "native": the next press on the board places its item. */
+	private armedNative: HTMLElement | undefined;
 	private toolShape = "rectangle";
 	/** An export being set up or run: its panel, the pages over the board, and where it stands. */
 	private exporting: {
@@ -1633,10 +1638,11 @@ export class M1CanvasSession {
 	private readonly ownPointerEvents = new WeakSet<Event>();
 	/** A tool being used on the board: where the press began and what it draws meanwhile. */
 	private toolGesture: {
-		readonly tool: QuickTool;
+		readonly tool: ArmedTool;
 		readonly start: { readonly x: number; readonly y: number };
 		readonly from?: { readonly nodeId: string; readonly anchor: CanvasAnchor; readonly board: { readonly x: number; readonly y: number } };
-		readonly ghost: HTMLElement;
+		/** What the gesture draws on the board meanwhile, if anything. */
+		readonly ghost?: HTMLElement;
 		readonly end: () => void;
 	} | undefined;
 	private minimapDragStart: MinimapPoint | undefined;
@@ -1757,6 +1763,7 @@ export class M1CanvasSession {
 		}, { document: controlDocument });
 		this.quickTools = controlDocument === undefined ? undefined : new QuickTools({
 			onArm: (tool) => this.armTool(tool),
+			onNativeArm: (button) => this.armNative(button),
 			onShape: (shape) => {
 				const wasBlock = lineKind(this.toolShape)?.block === true;
 				const isBlock = lineKind(shape)?.block === true;
@@ -4469,6 +4476,7 @@ export class M1CanvasSession {
 			});
 			root.classList.add("miro-canvas-has-tools");
 			this.disposers.push(() => {
+				this.armedNative = undefined;
 				root.classList.remove("miro-canvas-has-tools");
 				for (const child of moved) {
 					try {
@@ -4560,21 +4568,24 @@ export class M1CanvasSession {
 	private updateQuickTools(): void {
 		const editable = this.appearance.settings.reviewMode !== true;
 		if (!editable && this.armedTool !== "select" && this.armedTool !== "lasso") this.armedTool = "select";
+		if (this.armedTool !== "native") this.armedNative = undefined;
 		if (!isDrawingTool(this.armedTool)) this.hideBrush();
 		this.quickTools?.update({
 			connectorColor: this.connectorColor ?? this.boardInk(),
 			connectorWidth: this.connectorWidth,
 			...(this.connectorHeadSize === undefined ? {} : { connectorHeadSize: this.connectorHeadSize }),
-			editable, armed: this.armedTool, shape: this.toolShape,
+			editable, armed: this.armedTool, ...(this.armedNative === undefined ? {} : { armedNative: this.armedNative }),
+			shape: this.toolShape,
 			penColor: this.penInk(), penWidth: this.penWidth, eraserSize: this.eraserSize,
 		});
 		if (this.root !== undefined) writeAttribute(this.root, "data-miro-canvas-tool", this.armedTool);
 	}
 
-	private armTool(tool: QuickTool): void {
+	private armTool(tool: ArmedTool): void {
 		this.toolGesture?.end();
 		// Review mode keeps the tools that only select.
 		this.armedTool = this.appearance.settings.reviewMode === true && tool !== "lasso" ? "select" : tool;
+		if (this.armedTool !== "native") this.armedNative = undefined;
 		// Only a tool that really took over puts an open comment away.
 		if (this.armedTool !== "select") this.closeCommentThread();
 		this.updateQuickTools();
@@ -4591,6 +4602,86 @@ export class M1CanvasSession {
 		const root = this.root;
 		if (root === undefined || !pointLandsOnBoard(point, root)) return;
 		this.finishToolGesture(tool, point, point, undefined);
+	}
+
+	/**
+	 * A click on one of native Canvas's own card-menu buttons arms it: the next
+	 * press on the board places its item there, as dragging the button there
+	 * would.  A board that refuses edits - review mode, a lock set in Canvas's
+	 * own quick settings, a policy that could not be verified - arms nothing.
+	 */
+	private armNative(button: HTMLElement): void {
+		this.readInteractionState();
+		if (this.readNativeReadonly() === true || !this.editAllowed("create", [])) return;
+		this.armedNative = button;
+		this.armTool("native");
+	}
+
+	/**
+	 * A press on the board with one of native Canvas's own buttons armed.  The
+	 * item is placed where the press began, once the press and the click that
+	 * ends it are over: a picker that opened sooner would take that click, which
+	 * a finger sends to whatever lies under it by then.
+	 */
+	private startNativePlacement(event: PointerEvent): void {
+		const view = this.root?.ownerDocument?.defaultView;
+		const button = this.armedNative;
+		if (view === undefined || view === null || button === undefined) return;
+		// A touch with the pen near is the hand that holds it, as with every tool.
+		if (event.pointerType === "touch" && this.stylus.touchIsHand(Date.now(), false)) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		const pressed = { x: event.clientX, y: event.clientY };
+		const own = (other: Event): boolean => (other as PointerEvent).pointerId === event.pointerId;
+		const end = (): void => {
+			view.removeEventListener("pointerup", up, true);
+			view.removeEventListener("pointercancel", cancel, true);
+			this.toolGesture = undefined;
+		};
+		const up = (released: Event): void => {
+			if (!own(released)) return;
+			end();
+			let waiting = true;
+			let timer: number | undefined;
+			const place = (): void => {
+				if (!waiting) return;
+				waiting = false;
+				view.removeEventListener("click", place, true);
+				if (timer !== undefined) view.clearTimeout(timer);
+				if (!this.disposed && this.armedNative === button) this.placeNativeItem(button, pressed);
+			};
+			view.addEventListener("click", place, true);
+			timer = view.setTimeout(place, NATIVE_PLACE_WAIT_MS);
+		};
+		const cancel = (cancelled: Event): void => {
+			if (own(cancelled)) end();
+		};
+		view.addEventListener("pointerup", up, true);
+		view.addEventListener("pointercancel", cancel, true);
+		this.toolGesture = { tool: "native", start: pressed, end };
+	}
+
+	/**
+	 * Places the item of the armed native button at the pressed point: native
+	 * Canvas's own drag-to-add, replayed to there (see `replayNativeDrag`), so
+	 * the item is the native one - a card open for writing, the note or the
+	 * media picker - and one step of native Canvas's own history.  The button is
+	 * used once, as the plugin's other creation tools are.
+	 */
+	private placeNativeItem(button: HTMLElement, point: { readonly x: number; readonly y: number }): void {
+		// The click that ends the press must not reach the board, which would end the new card's editing.
+		this.swallowClickUntil = Date.now() + 400;
+		this.armTool("select");
+		this.readInteractionState();
+		if (this.readNativeReadonly() === true || !this.editAllowed("create", [])) return;
+		const replayed = replayNativeDrag(button, point, (event) => {
+			this.ownPointerEvents.add(event);
+		});
+		if (!replayed) {
+			this.addDiagnostic("Native Canvas's drag-to-add could not be replayed; nothing was placed.");
+			return;
+		}
+		this.refresh();
 	}
 
 	/** Letters arm tools on the active board, never while text is being written. */
@@ -4669,6 +4760,10 @@ export class M1CanvasSession {
 			return;
 		}
 		if (tool === "select" || root === undefined || (!lasso && event.button !== 0) || this.toolGesture !== undefined) return;
+		if (tool === "native") {
+			this.startNativePlacement(event);
+			return;
+		}
 		const shapeLine = tool === "connector" ? lineKind(this.toolShape) ?? lineKind("arrow") : tool === "shape" ? lineKind(this.toolShape) : undefined;
 		if (shapeLine !== undefined) {
 			if (pointer === "touch" && this.stylus.near(Date.now())) return;
@@ -4833,7 +4928,7 @@ export class M1CanvasSession {
 			const pointer = released as PointerEvent;
 			const gesture = this.toolGesture;
 			end();
-			if (gesture !== undefined) this.finishToolGesture(gesture.tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from, event.shiftKey === true);
+			if (gesture !== undefined) this.finishToolGesture(tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from, event.shiftKey === true);
 		};
 		const cancel = (cancelled: Event): void => {
 			if (!own(cancelled)) return;

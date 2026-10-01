@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setLocale } from "../src/i18n";
 import {
@@ -70,6 +70,10 @@ class FakeElement {
 
   public setAttribute(name: string, value: string): void {
     this.attributes.set(name, value);
+  }
+
+  public removeAttribute(name: string): void {
+    this.attributes.delete(name);
   }
 
   public getAttribute(name: string): string | null {
@@ -853,5 +857,125 @@ describe("the pen's and the lines' settings as a second column of a vertical bar
     (root as unknown as { getBoundingClientRect: unknown }).getBoundingClientRect = box(0, 0, 0, 0);
     tools.update({ ...STATE, armed: "pen" });
     expect(drawing.style["--miro-canvas-side-row-max-height"]).toBeUndefined();
+  });
+});
+
+describe("native Canvas's own buttons on the bar", () => {
+  /** A bar with one native button in the card's slot, and what it was told to arm. */
+  function nativeBar(toolbarItems: readonly ToolbarItem[] = ["select", "card", "text"]) {
+    const document = new FakeDocument();
+    const armed: unknown[] = [];
+    const tools = new QuickTools(
+      { onArm: () => {}, onShape: () => {}, onPen: () => {}, onNativeArm: (button) => armed.push(button) },
+      { document: document as unknown as Document, toolbarItems },
+    );
+    const root = tools.element as unknown as FakeElement;
+    const button = new FakeElement("div");
+    button.className = "canvas-card-menu-button mod-draggable";
+    const picture = new FakeElement("svg");
+    button.appendChild(picture);
+    tools.placeNativeButton("card", button as unknown as HTMLElement);
+    return { tools, root, document, button, picture, armed };
+  }
+
+  /** A click as the bar's own listener on the capture phase sees it. */
+  function click(root: FakeElement, target: FakeElement, props: Record<string, unknown> = {}) {
+    const stopped = vi.fn();
+    root.dispatch("click", { target, stopPropagation: stopped, stopImmediatePropagation: stopped, clientX: 400, clientY: 700, ...props });
+    return stopped;
+  }
+
+  const pressOn = (root: FakeElement, target: FakeElement, x = 400, y = 700) => root.dispatch("pointerdown", { target, clientX: x, clientY: y, stopPropagation: () => {} });
+
+  it("arms on a click, as any tool does, and stops native Canvas's own click, which would place the item mid-view", () => {
+    const { root, button, armed } = nativeBar();
+    const stopped = click(root, button);
+    expect(armed).toEqual([button]);
+    // Stopped for the button's own listener, not just kept from bubbling on.
+    expect(stopped).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts a click on the picture inside the button as a click on the button", () => {
+    const { root, button, picture, armed } = nativeBar();
+    click(root, picture);
+    expect(armed).toEqual([button]);
+  });
+
+  it("leaves every other button of the bar to its own click", () => {
+    const { root, armed } = nativeBar();
+    const stopped = click(root, toolButton(root, "text"));
+    expect(stopped).not.toHaveBeenCalled();
+    expect(armed).toEqual([]);
+  });
+
+  it("keeps native Canvas's drag-to-add: a press that went on to drag is no click, wherever the drag ended", () => {
+    const { root, button, document, armed } = nativeBar();
+    pressOn(root, button);
+    document.dispatch("pointermove", { clientX: 460, clientY: 640 });
+    // The drag came back and ended over its own button: native Canvas already made the item.
+    const stopped = click(root, button, { clientX: 400, clientY: 700 });
+    expect(armed).toEqual([]);
+    expect(stopped).toHaveBeenCalled();
+  });
+
+  it("takes a press that wobbled less than native Canvas's five pixels for a click", () => {
+    const { root, button, document, armed } = nativeBar();
+    pressOn(root, button);
+    document.dispatch("pointermove", { clientX: 403, clientY: 702 });
+    click(root, button, { clientX: 403, clientY: 702 });
+    expect(armed).toEqual([button]);
+    // The next press starts afresh: a drag before it does not count against it.
+    pressOn(root, button);
+    click(root, button);
+    expect(armed).toEqual([button, button]);
+  });
+
+  it("arms nothing in review mode, though native Canvas's click is still stopped, and says so on the button", () => {
+    const { tools, root, button, armed } = nativeBar();
+    tools.update({ ...STATE, editable: false });
+    const stopped = click(root, button);
+    expect(stopped).toHaveBeenCalled();
+    expect(armed).toEqual([]);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    tools.update({ ...STATE, editable: true });
+    expect(button.getAttribute("aria-disabled")).toBe("false");
+  });
+
+  it("shows the armed button as pressed, and its slot as armed, until another tool takes over", () => {
+    const { tools, root, button } = nativeBar();
+    const slot = descendants(root).find((item) => item.attributes.get("data-native") === "card")!;
+    tools.update({ ...STATE });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    tools.update({ ...STATE, armed: "native", armedNative: button as unknown as HTMLElement });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(slot.getAttribute("data-armed")).toBe("true");
+    // Select is not armed as well: one tool at a time.
+    expect(toolButton(root, "select").getAttribute("aria-pressed")).toBe("false");
+    tools.update({ ...STATE, armed: "text" });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(slot.getAttribute("data-armed")).toBe("false");
+    // A native button armed in the state but not the tool: nothing is lit.
+    tools.update({ ...STATE, armed: "select", armedNative: button as unknown as HTMLElement });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("takes its marks off the buttons again when the bar goes", () => {
+    const { tools, button } = nativeBar();
+    tools.update({ ...STATE, armed: "native", armedNative: button as unknown as HTMLElement });
+    tools.dispose();
+    expect(button.getAttribute("aria-pressed")).toBeNull();
+    expect(button.getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("works under More as on the bar, and closes More as any item chosen there does", () => {
+    const { root, button, armed } = nativeBar(["select"]);
+    const more = byLabel(root, "More tools");
+    more.dispatch("click");
+    expect(panelOf(more).hidden).toBe(false);
+    const noteSlot = descendants(root).find((item) => item.attributes.get("data-native") === "card")!;
+    expect(noteSlot.classes.has("miro-canvas-tools__native")).toBe(true);
+    click(root, button);
+    expect(armed).toEqual([button]);
+    expect(panelOf(more).hidden).toBe(true);
   });
 });

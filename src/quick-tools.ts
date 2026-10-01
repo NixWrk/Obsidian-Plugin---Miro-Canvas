@@ -7,7 +7,9 @@
  * creation.  Native Canvas's own card, note and media buttons live among
  * these too, as slots this module builds but the session fills: the real
  * button elements move in from `cardMenuEl`, carrying their own drag-to-add
- * and click behaviour with them.
+ * with them.  Their click is not native Canvas's, which would make the item
+ * at the middle of the view: a click arms the button like any tool, and the
+ * next press on the board places the item there.
  */
 import { words } from "./i18n";
 import { SHAPE_CATALOG, shapeCatalogEntry, shapeCatalogLabel } from "./shape-catalog";
@@ -27,6 +29,13 @@ export const QUICK_TOOLS = [
 export type QuickTool = (typeof QUICK_TOOLS)[number];
 
 /**
+ * What the board's next press may use: one of the tools above, or one of
+ * native Canvas's own card-menu buttons, which a click arms and the next
+ * press on the board places (`QuickToolsActions.onNativeArm`).
+ */
+export type ArmedTool = QuickTool | "native";
+
+/**
  * The tools that make one item, so pressing their button and dragging onto
  * the board creates it there, the way Canvas's own card, note and file
  * buttons already do.  Select and the lasso only choose; the pen's tools
@@ -41,6 +50,10 @@ export function isDragCreateTool(tool: QuickTool): boolean {
 
 /** Screen pixels a press must move before it counts as a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
+/** Where native Canvas's own buttons start dragging their item: five screen pixels from the press. */
+const NATIVE_DRAG_START = 5;
+/** The class native Canvas gives each button of its card menu. */
+export const NATIVE_BUTTON_CLASS = "canvas-card-menu-button";
 /** The custom property a column opened beside a vertical bar takes its height limit from; see `QuickTools.placeSideRows`. */
 const SIDE_ROW_MAX_HEIGHT = "--miro-canvas-side-row-max-height";
 
@@ -243,7 +256,9 @@ export interface QuickToolsState {
   readonly connectorHeadSize?: number;
   /** False in review mode: nothing can be made. */
   readonly editable: boolean;
-  readonly armed: QuickTool;
+  readonly armed: ArmedTool;
+  /** The native Canvas button armed, while `armed` is "native". */
+  readonly armedNative?: HTMLElement;
   /** The shape the shape tool makes. */
   readonly shape: string;
   /** What the pen draws with. */
@@ -256,6 +271,8 @@ export interface QuickToolsState {
 export interface QuickToolsActions {
   readonly onConnector?: (settings: {color?:string;width?:number;headSize?:number}) => void;
   readonly onArm: (tool: QuickTool) => void;
+  /** A click on one of native Canvas's own card, note, media, slide or group buttons: arms it, so the next press on the board places its item. */
+  readonly onNativeArm?: (button: HTMLElement) => void;
   readonly onShape: (shape: string) => void;
   readonly onPen: (settings: { readonly color?: string; readonly width?: number; readonly eraserSize?: number }) => void;
   /** A tool dragged off the bar and dropped at a screen point: the host creates it there, or does nothing if the drop missed the board. */
@@ -327,7 +344,7 @@ function shapesPicture(document: Document): SVGSVGElement | undefined {
 const MAX_PREVIEW = 28;
 
 /** Whether a tool is one of the pen's, which keep their panel open while armed. */
-export function isDrawingTool(tool: QuickTool): boolean {
+export function isDrawingTool(tool: ArmedTool): boolean {
   return DRAWING_TOOL_ICONS.some((spec) => spec.tool === tool);
 }
 
@@ -339,7 +356,7 @@ export function isDrawingTool(tool: QuickTool): boolean {
  */
 type SettingsLayer = "drawing" | "connector";
 
-function isEraser(tool: QuickTool): boolean {
+function isEraser(tool: ArmedTool): boolean {
   return tool === "eraser" || tool === "erase-part";
 }
 
@@ -377,7 +394,7 @@ export class QuickTools {
   private sizeInput: HTMLInputElement | undefined;
   private sizeNumber: HTMLInputElement | undefined;
   private sizePreview: HTMLElement | undefined;
-  private armed: QuickTool = "select";
+  private armed: ArmedTool = "select";
   /** False in review mode: the settings stay closed. */
   private editable = true;
   /** The settings layer a repeat press on its armed tool folded away, until another tool is picked. */
@@ -396,6 +413,10 @@ export class QuickTools {
   private readonly connectorColors=new Map<string,HTMLButtonElement>();
   /** True right after a button's press turned into a drag: the click that follows must not also arm or open it. */
   private justDragged = false;
+  /** The press on one of native Canvas's own buttons, until its click: where it landed and whether it has gone far enough to be a drag. */
+  private nativePress: { readonly x: number; readonly y: number; dragged: boolean } | undefined;
+  /** Every native button given an armed state, so that disposal can take it off again. */
+  private readonly markedNative = new Set<HTMLElement>();
 
   public constructor(private readonly actions: QuickToolsActions, private readonly options: QuickToolsOptions = {}) {
     const document = options.document ?? globalThis.document;
@@ -512,6 +533,10 @@ export class QuickTools {
       this.justDragged = false;
       event.stopPropagation();
     });
+    // Native Canvas's own buttons keep their drag-to-add; their click arms.
+    this.listen(root, "pointerdown", (event) => this.notePress(event), true);
+    this.listen(document, "pointermove", (event) => this.watchNativePress(event), true);
+    this.listen(root, "click", (event) => this.pressNativeButton(event), true);
     this.listen(root, "keydown", (event) => {
       if ((event as KeyboardEvent).key === "Escape") this.closePanels();
     });
@@ -545,13 +570,14 @@ export class QuickTools {
     for (const [kind, button] of this.shapeButtons) {
       button.setAttribute("aria-pressed", kind === state.shape ? "true" : "false");
     }
+    this.markNativeButtons(state.armed === "native" ? state.armedNative : undefined, state.editable);
     for (const [color, button] of this.penColors) {
       button.setAttribute("aria-pressed", color === state.penColor ? "true" : "false");
     }
     // The pen button carries the colour it draws with, and stays marked while
     // any of the drawing tools is the armed one; so does the pen's row.
     const drawing = isDrawingTool(state.armed);
-    if (drawing) this.drawingTool = state.armed;
+    if (drawing && state.armed !== "native") this.drawingTool = state.armed;
     this.penButton?.style?.setProperty?.("--miro-canvas-swatch", state.penColor);
     this.penButton?.setAttribute("aria-pressed", drawing ? "true" : "false");
     this.showSettings();
@@ -676,7 +702,71 @@ export class QuickTools {
 
   public dispose(): void {
     for (const remove of this.listeners.splice(0)) remove();
+    for (const button of this.markedNative) {
+      button.removeAttribute("aria-pressed");
+      button.removeAttribute("aria-disabled");
+    }
+    this.markedNative.clear();
     this.element.remove();
+  }
+
+  /** The native Canvas button an event's target is or lies inside, if it is one on this bar. */
+  private nativeButtonOf(target: EventTarget | null): HTMLElement | undefined {
+    let node = target as HTMLElement | null;
+    while (node !== null && node !== undefined && node !== this.element) {
+      if (node.classList?.contains(NATIVE_BUTTON_CLASS) === true) return node;
+      node = node.parentElement;
+    }
+    return undefined;
+  }
+
+  /** Where a press on one of native Canvas's own buttons landed, to tell its click from the end of a drag. */
+  private notePress(event: Event): void {
+    const press = event as PointerEvent;
+    this.nativePress = this.nativeButtonOf(event.target) === undefined ? undefined : { x: press.clientX, y: press.clientY, dragged: false };
+  }
+
+  /** Native Canvas starts dragging the item five pixels from the press; however the drag ends, the click that may follow it is no press. */
+  private watchNativePress(event: Event): void {
+    const press = this.nativePress;
+    if (press === undefined || press.dragged) return;
+    const move = event as PointerEvent;
+    if (Math.hypot(move.clientX - press.x, move.clientY - press.y) >= NATIVE_DRAG_START) press.dragged = true;
+  }
+
+  /**
+   * A click on one of native Canvas's own buttons arms it; the next press on
+   * the board places its item there.  The button's own click, which would make
+   * the item at the middle of the view, is stopped before it reaches the
+   * button.  Dragging the button onto the board is native Canvas's own and is
+   * left alone: a drag that ends over its own button is not a click either.
+   */
+  private pressNativeButton(event: Event): void {
+    const button = this.nativeButtonOf(event.target);
+    if (button === undefined) return;
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    const dragged = this.nativePress?.dragged === true;
+    this.nativePress = undefined;
+    this.closePanels();
+    if (!this.editable || dragged) return;
+    this.actions.onNativeArm?.(button);
+  }
+
+  /** Marks which of native Canvas's own buttons is armed, and that none is available in review mode. */
+  private markNativeButtons(armed: HTMLElement | undefined, editable: boolean): void {
+    for (const slot of this.nativeSlots.values()) {
+      let slotArmed = false;
+      for (const child of Array.from(slot.children)) {
+        if (!child.classList.contains(NATIVE_BUTTON_CLASS)) continue;
+        const pressed = child === armed;
+        child.setAttribute("aria-pressed", pressed ? "true" : "false");
+        child.setAttribute("aria-disabled", editable ? "false" : "true");
+        this.markedNative.add(child as HTMLElement);
+        slotArmed ||= pressed;
+      }
+      slot.setAttribute("data-armed", slotArmed ? "true" : "false");
+    }
   }
 
   /** Where the session puts one of native Canvas's own card, note or media buttons, wherever it currently sits. */
@@ -945,8 +1035,8 @@ export class QuickTools {
     return element;
   }
 
-  private listen(target: EventTarget, type: string, handler: EventListener): void {
-    target.addEventListener(type, handler);
-    this.listeners.push(() => target.removeEventListener(type, handler));
+  private listen(target: EventTarget, type: string, handler: EventListener, capture = false): void {
+    target.addEventListener(type, handler, { capture });
+    this.listeners.push(() => target.removeEventListener(type, handler, { capture }));
   }
 }

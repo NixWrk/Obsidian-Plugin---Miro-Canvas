@@ -11,6 +11,14 @@
   timed by the plugin, since the browser sends no double click for a touch
   that Canvas has taken for itself. With a drawing tool armed the two taps
   leave the dots they draw, then act as Escape.
+- Canvas's own card, note and file buttons (and the slide and group buttons
+  on a tablet) now only pick the tool: a press arms the button, lit as the
+  other tools are, and the next press on the board places the item there, once,
+  and gives Select back - a card open for writing, or the picker of a note or
+  a file. Before, the press made a card in the middle of the view. Escape and
+  the double tap put the button away; review mode and a board locked in
+  Canvas's quick settings arm nothing. Dragging a button onto the board works
+  as before.
 - Comments: a thread is resolved with a tick button and no caption, with a
   "?" beside it that explains resolving in a tooltip and, on a touch
   screen, under the header on a press. The long caption had squeezed the

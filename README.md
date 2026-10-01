@@ -66,6 +66,7 @@ way of working onto it.
 | --- | --- | --- |
 | **The board** | The tool bar at the bottom, one letter per tool, the toolbar over a selection, the minimap | The `.canvas` file in your vault, which opens without the plugin too; panning, zooming, selecting, undo and redo, copy and paste |
 | **Things on it** | Sticky notes, shapes and flowchart shapes, named frames, code blocks, tables, comments | Cards, notes, pictures, PDFs and other files from the vault, web pages, groups |
+| **Making them** | Pick a tool, then press the board where the item goes; a double click or double tap on empty board is Escape | The card, the note and the file are still made by Canvas itself, now where you press, or where you drag its button |
 | **Text** | Font, size, bold, italic, underline, strike, alignment, colour, highlight, bullet list and link, all from one toolbar; Miro's own fonts as a download | Markdown in every card, with links, embeds, formulas and everything else Obsidian shows in a note |
 | **Lines and arrows** | Straight, elbow, curved, block arrows, polylines and splines; ends anywhere on the board; labels with their own font | A line between two cards is still Canvas's own edge |
 | **Drawing** | Pen, highlighter, smart drawing, erasers | - |
@@ -80,6 +81,8 @@ Found in neither, and added here:
   to any edge or corner, and the bars turn into columns.
 - **Drag to create** - every tool that makes an item can be dragged off the
   bar onto the board, the way Canvas's own card, note and file buttons work.
+  Pressing a button, then the board, does the same, Canvas's own buttons
+  included.
 - **Your own fonts** - font packs to download, font files of your own, and
   one list of the fonts you want to see.
 - **Miro boards in your vault** - with a separate free program, whole boards
@@ -97,7 +100,9 @@ Found in neither, and added here:
    **N** sticky note, **S** shape, **P** pen, **L** lines and arrows, **C**
    comment, **F** frame.
 4. Click the board to put the item there - or press the tool's button and
-   drag it onto the board, and let go where the item should be.
+   drag it onto the board, and let go where the item should be. Canvas's own
+   card, note and file buttons work the same way: press one, then press the
+   board where the item should go.
 5. Select the item to style it.
 
 Code block, table and web link start under the **+** menu at the end of the
@@ -781,8 +786,8 @@ push after every commit, no tags."
   holds.
 - [ ] `code-table-link` - a code block, a table and a web link from the **+**
   menu.
-- [ ] `vault-items` - Canvas's own card, note and file from the vault, dragged
-  from the bar.
+- [ ] `vault-items` - Canvas's own card, note and file from the vault: the
+  button pressed and then the board, and the button dragged from the bar.
 - [ ] `drag-to-create` - dragging a tool off the bar onto the board.
 - [ ] `selection-toolbar` - each group in turn: shape, font and size, text
   style and alignment, list and link, colours and border, comment, lock, More.

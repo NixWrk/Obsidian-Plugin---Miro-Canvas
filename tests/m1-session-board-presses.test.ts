@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { M1CanvasSession } from "../src/m1-session";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
+import { replayNativeDrag } from "../src/native-drag";
 import { StylusWatch } from "../src/stylus";
 import type { M1ControlsActions } from "../src/m1-controls";
 
-// Only the presentation is replaced; the adapter, the viewport, the policy
-// and the writer are the real ones.
+// Only the presentation and the replay of native Canvas's drag are replaced;
+// the adapter, the viewport, the policy and the writer are the real ones.
 vi.mock("../src/m1-controls", () => ({
 	M1Controls: class {
 		element = new HostElement("miro-canvas-dock");
@@ -17,6 +18,7 @@ vi.mock("../src/m1-controls", () => ({
 		dispose() { this.element.remove(); this.minimapElement.remove(); }
 	},
 }));
+vi.mock("../src/native-drag", () => ({ replayNativeDrag: vi.fn(() => true) }));
 
 class HostElement extends EventTarget {
 	nodeType = 1;
@@ -71,6 +73,7 @@ const sessions: M1CanvasSession[] = [];
 beforeEach(() => {
 	vi.useFakeTimers();
 	vi.setSystemTime(100_000);
+	vi.mocked(replayNativeDrag).mockClear();
 });
 afterEach(() => {
 	sessions.splice(0).forEach((session) => session.dispose());
@@ -81,9 +84,15 @@ afterEach(() => {
 /** The parts of the session these gestures reach, which the tests drive directly. */
 interface Hooks {
 	armTool(tool: string): void;
+	armNative(button: unknown): void;
+	resetTools(): void;
+	startToolGesture(event: Event): void;
 	armedTool: string;
+	armedNative: unknown;
+	toolGesture: unknown;
 	linePlacing: unknown;
 	lineFinishedAt: number;
+	swallowClickUntil: number;
 	stylus: StylusWatch;
 }
 
@@ -346,5 +355,140 @@ describe("a double tap of a finger or a pen", () => {
 		tap(2, "touch", dock);
 		vi.advanceTimersByTime(10);
 		expect(hooks.armedTool).toBe("lasso");
+	});
+});
+
+describe("a native Canvas button armed on the bar", () => {
+	const button = { dataset: "the card button" };
+	const BOARD = { x: 500, y: 400 };
+
+	it("arms as a tool of its own, and the tool bar's armed state follows", () => {
+		const { hooks } = fixture();
+		hooks.armNative(button);
+		expect(hooks.armedTool).toBe("native");
+		expect(hooks.armedNative).toBe(button);
+		// Another tool takes over, and the button is let go.
+		hooks.armTool("text");
+		expect(hooks.armedTool).toBe("text");
+		expect(hooks.armedNative).toBeUndefined();
+	});
+
+	it("places its item where the board was pressed, once the click that ends the press has come", () => {
+		const { window, root, hooks, pointer, make } = fixture();
+		hooks.armNative(button);
+		const down = make("pointerdown", root, { pointerId: 1, pointerType: "mouse", button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false });
+		hooks.startToolGesture(down);
+		// The press is the tool's alone: native Canvas never starts a selection under it.
+		expect(down.defaultPrevented).toBe(true);
+		expect(hooks.toolGesture).toBeDefined();
+		pointer("pointerup", 1, "mouse", root, BOARD);
+		expect(replayNativeDrag).not.toHaveBeenCalled();
+		window.dispatchEvent(make("click", root, { clientX: BOARD.x, clientY: BOARD.y }));
+		expect(replayNativeDrag).toHaveBeenCalledOnce();
+		expect(vi.mocked(replayNativeDrag).mock.calls[0]!.slice(0, 2)).toEqual([button, BOARD]);
+		// Used once: Select is armed again, and the click that ended the press is kept from the board.
+		expect(hooks.armedTool).toBe("select");
+		expect(hooks.armedNative).toBeUndefined();
+		expect(hooks.toolGesture).toBeUndefined();
+		expect(hooks.swallowClickUntil).toBeGreaterThan(Date.now());
+		// The next press is a press on the board as any.
+		const next = make("pointerdown", root, { pointerId: 2, pointerType: "mouse", button: 0, clientX: 100, clientY: 100, shiftKey: false });
+		hooks.startToolGesture(next);
+		expect(hooks.toolGesture).toBeUndefined();
+		window.dispatchEvent(make("click", root));
+		expect(replayNativeDrag).toHaveBeenCalledOnce();
+	});
+
+	it("tells its own pointer events from a person's, which its other listeners must not take for a finger", () => {
+		const { window, root, hooks, pointer, make } = fixture();
+		hooks.armNative(button);
+		hooks.startToolGesture(make("pointerdown", root, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 1, clientY: 2, shiftKey: false }));
+		pointer("pointerup", 1, "mouse", root, BOARD);
+		window.dispatchEvent(make("click", root));
+		const mark = vi.mocked(replayNativeDrag).mock.calls[0]![2]!;
+		expect(typeof mark).toBe("function");
+		expect(() => mark(new Event("pointerdown"))).not.toThrow();
+	});
+
+	it("places it without the click when none comes, a moment after the press ended", () => {
+		const { root, hooks, pointer, make } = fixture();
+		hooks.armNative(button);
+		hooks.startToolGesture(make("pointerdown", root, { pointerId: 1, pointerType: "touch", isPrimary: true, button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false }));
+		pointer("pointerup", 1, "touch", root, BOARD);
+		vi.advanceTimersByTime(349);
+		expect(replayNativeDrag).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(1);
+		expect(replayNativeDrag).toHaveBeenCalledOnce();
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("keeps the button armed when the press is taken back, as Android takes back a palm", () => {
+		const { root, hooks, pointer, make } = fixture();
+		hooks.armNative(button);
+		hooks.startToolGesture(make("pointerdown", root, { pointerId: 1, pointerType: "touch", isPrimary: true, button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false }));
+		pointer("pointercancel", 1, "touch", root, BOARD);
+		vi.advanceTimersByTime(1_000);
+		expect(replayNativeDrag).not.toHaveBeenCalled();
+		expect(hooks.armedTool).toBe("native");
+		expect(hooks.toolGesture).toBeUndefined();
+	});
+
+	it("is put away by Escape, and nothing is placed by the press that follows", () => {
+		const { window, root, hooks, pointer, make } = fixture();
+		hooks.armNative(button);
+		hooks.startToolGesture(make("pointerdown", root, { pointerId: 1, pointerType: "mouse", button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false }));
+		pointer("pointerup", 1, "mouse", root, BOARD);
+		// Escape comes between the release and its click.
+		hooks.resetTools();
+		window.dispatchEvent(make("click", root));
+		vi.advanceTimersByTime(1_000);
+		expect(replayNativeDrag).not.toHaveBeenCalled();
+		const later = make("pointerdown", root, { pointerId: 2, pointerType: "mouse", button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false });
+		hooks.startToolGesture(later);
+		expect(later.defaultPrevented).toBe(false);
+	});
+
+	it("takes only a press of the main button on the board, never one on a panel or from a hand beside a pen", () => {
+		const { root, hooks, make } = fixture();
+		hooks.armNative(button);
+		const right = make("pointerdown", root, { pointerId: 1, pointerType: "mouse", button: 2, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false });
+		hooks.startToolGesture(right);
+		expect(right.defaultPrevented).toBe(false);
+		const dock = root.appendChild(new HostElement("miro-canvas-dock"));
+		const onPanel = make("pointerdown", dock, { pointerId: 1, pointerType: "mouse", button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false });
+		hooks.startToolGesture(onPanel);
+		expect(onPanel.defaultPrevented).toBe(false);
+		// A pen was near a moment ago: the touch is the hand that holds it.
+		hooks.stylus.notePen(Date.now());
+		const palm = make("pointerdown", root, { pointerId: 3, pointerType: "touch", isPrimary: true, button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false });
+		hooks.startToolGesture(palm);
+		expect(palm.defaultPrevented).toBe(false);
+		expect(hooks.toolGesture).toBeUndefined();
+		expect(hooks.armedTool).toBe("native");
+	});
+
+	it("refuses in review mode, and on a board locked in Canvas's own quick settings", () => {
+		const { canvas, session, hooks } = fixture();
+		session.toggleReviewMode();
+		hooks.armNative(button);
+		expect(hooks.armedTool).toBe("select");
+		expect(hooks.armedNative).toBeUndefined();
+		session.toggleReviewMode();
+		canvas.readonly = true;
+		hooks.armNative(button);
+		expect(hooks.armedTool).toBe("select");
+	});
+
+	it("places nothing when review mode came on after it was armed", () => {
+		const { window, root, session, hooks, pointer, make } = fixture();
+		hooks.armNative(button);
+		hooks.startToolGesture(make("pointerdown", root, { pointerId: 1, pointerType: "mouse", button: 0, clientX: BOARD.x, clientY: BOARD.y, shiftKey: false }));
+		pointer("pointerup", 1, "mouse", root, BOARD);
+		// A review of the board begins between the release and the click.
+		session.toggleReviewMode();
+		window.dispatchEvent(make("click", root));
+		vi.advanceTimersByTime(1_000);
+		expect(replayNativeDrag).not.toHaveBeenCalled();
+		expect(hooks.armedTool).toBe("select");
 	});
 });

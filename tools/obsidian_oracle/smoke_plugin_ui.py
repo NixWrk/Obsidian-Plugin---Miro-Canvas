@@ -1436,7 +1436,9 @@ def main() -> int:
                 return 0
             if args.interactions:
                 # A double press on the empty board is Escape and makes no card, whatever tool is
-                # armed, while a card still opens for writing.  Real mouse events.
+                # armed, while a card still opens for writing.  A click on one of native Canvas's own
+                # buttons only arms it; the next press on the board places its item there, within a
+                # few pixels, and native drag-to-add from the button stays.  Real mouse events.
                 empty = page.evaluate("""() => {
                   const b = miroBrowser, box = b.root.getBoundingClientRect();
                   b.session.resetTools();
@@ -1464,6 +1466,34 @@ def main() -> int:
                 assert page.evaluate("miroBrowser.node.nodeEl.classList.contains('is-editing')"), "A double click on a card did not open it for writing"
                 assert node_count() == cards_before, "A double click on a card made a card"
                 page.evaluate("miroBrowser.node.nodeEl.classList.remove('is-editing')")
+                card_button = page.locator('.miro-canvas-tools .canvas-card-menu-button[aria-label="Drag to add card"]')
+                card_button.click()
+                assert node_count() == cards_before, "A click on the card button made a card"
+                assert armed_now() == "native" and card_button.get_attribute("aria-pressed") == "true", "A click on the card button did not arm it"
+                steps_before = page.evaluate("miroBrowser.getHistoryLength()")
+                page.mouse.click(empty["x"], empty["y"])
+                assert node_count() == cards_before + 1, "The press on the board after the card button made no card"
+                placed = page.evaluate("""([x, y]) => {
+                  const b = miroBrowser, node = b.runtime.getData().nodes.at(-1), board = b.session.boardPoint({x, y});
+                  return {dx: node.x + node.width / 2 - board.x, dy: node.y + node.height / 2 - board.y,
+                    writing: b.runtime.nodes.get(node.id).nodeEl.classList.contains('is-editing')};
+                }""", [empty["x"], empty["y"]])
+                assert abs(placed["dx"]) < 3 and abs(placed["dy"]) < 3, f"The card was not placed where the board was pressed: {placed}"
+                assert placed["writing"], "The new card did not open for writing"
+                assert armed_now() == "select" and card_button.get_attribute("aria-pressed") == "false", "The card button stayed armed after placing"
+                assert page.evaluate("miroBrowser.getHistoryLength()") == steps_before + 1, "Placing the card was not one history step"
+                button_box = card_button.bounding_box()
+                page.mouse.move(button_box["x"] + button_box["width"] / 2, button_box["y"] + button_box["height"] / 2)
+                page.mouse.down()
+                page.mouse.move(empty["x"] - 250, empty["y"], steps=6)
+                page.mouse.up()
+                assert node_count() == cards_before + 2 and armed_now() == "select", "Dragging the card button onto the board no longer makes a card"
+                page.evaluate("miroBrowser.session.toggleReviewMode()")
+                card_button.click()
+                assert armed_now() == "select" and card_button.get_attribute("aria-disabled") == "true", "The card button armed in review mode"
+                page.evaluate("miroBrowser.session.toggleReviewMode()")
+                page.evaluate("() => { const b = miroBrowser; b.runtime.importData(b.initial); b.session.resetTools(); b.session.refresh(); }")
+                assert node_count() == cards_before, "Putting the board back left the new cards"
                 page.evaluate("""async () => {
                   const b = miroBrowser;
                   const check = (ok, message) => { if (!ok) throw Error(message); };

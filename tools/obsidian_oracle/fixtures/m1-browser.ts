@@ -42,6 +42,30 @@ const NATIVE_CARD_MENU = [
   ["Drag to add media from vault", "lucide-file-image"],
 ] as const;
 const NATIVE_CARD_SIZE = { width: 250, height: 60 };
+/**
+ * As native Canvas's `dragTempNode`: a press that moves five pixels and is
+ * let go on the window makes the item, with its centre where it was let go.
+ */
+const dragToAdd = (press: PointerEvent, size: { width: number; height: number }, make: (position: { x: number; y: number }) => void): void => {
+  if (!press.isPrimary || press.button !== 0) return;
+  press.preventDefault();
+  const view = press.view ?? window;
+  const start = { x: press.clientX, y: press.clientY };
+  let last = start;
+  const move = (event: PointerEvent): void => {
+    if (event.pointerId === press.pointerId) last = { x: event.clientX, y: event.clientY };
+  };
+  const up = (event: PointerEvent): void => {
+    if (event.button !== press.button || event.pointerId !== press.pointerId) return;
+    view.removeEventListener("pointermove", move as EventListener);
+    view.removeEventListener("pointerup", up as EventListener);
+    if (Math.hypot(last.x - start.x, last.y - start.y) < 5) return;
+    const centre = nativeCanvas.posFromClient(last);
+    make({ x: centre.x - size.width / 2, y: centre.y - size.height / 2 });
+  };
+  view.addEventListener("pointermove", move as EventListener);
+  view.addEventListener("pointerup", up as EventListener);
+};
 const makeCardMenu = (): HTMLElement => {
   const menu = document.createElement("div");
   menu.className = "canvas-card-menu";
@@ -51,6 +75,14 @@ const makeCardMenu = (): HTMLElement => {
     button.setAttribute("aria-label", label);
     const picture = button.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
     picture.setAttribute("class", `svg-icon ${icon}`);
+    if (icon !== "lucide-sticky-note") continue;
+    // The card button as native Canvas wires it: a click makes a card at the
+    // middle of the view, a drag makes one where it is let go.
+    button.addEventListener("click", () => nativeCanvas.createTextNode({ pos: nativeCanvas.posCenter(), position: "center" }));
+    button.addEventListener("pointerdown", (press) => dragToAdd(press as PointerEvent, NATIVE_CARD_SIZE, (position) => {
+      nativeCanvas.deselectAll();
+      nativeCanvas.createTextNode({ pos: position, size: NATIVE_CARD_SIZE });
+    }));
   }
   return menu;
 };
@@ -257,10 +289,14 @@ const runtime = {
     }
   },
   setReadonly(value: boolean) { this.readonly = value; },
-  // Native Canvas's own placement: a screen point on the board.
+  // Native Canvas's own placement: a screen point on the board, and the board's middle.
   posFromClient(point: { x: number; y: number }) {
     const board = (session as unknown as { boardPoint(point: { x: number; y: number }): { x: number; y: number } | undefined }).boardPoint(point);
     return board ?? { x: 0, y: 0 };
+  },
+  posCenter() {
+    const box = root.getBoundingClientRect();
+    return this.posFromClient({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
   },
   /** As native Canvas's `createTextNode`: an empty card, in its editor, one history step. */
   createTextNode({ pos, size, position }: { pos: { x: number; y: number }; size?: { width: number; height: number }; position?: string }) {
@@ -287,6 +323,7 @@ const runtime = {
   undo() { if (historyIndex > 0) this.importData(history[--historyIndex]); },
   redo() { if (historyIndex + 1 < history.length) this.importData(history[++historyIndex]); },
 };
+const nativeCanvas = runtime;
 const view = { canvas: runtime, getViewType: () => "canvas" };
 // Native Canvas's own double click: a card opens for writing; the empty board
 // makes a card there, unless the double click was already taken.
