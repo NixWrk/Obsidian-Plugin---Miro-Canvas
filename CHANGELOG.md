@@ -119,6 +119,11 @@
   the pen leaves the control or the screen's range, or touches the screen; a
   finger never gets one, and on a computer nothing changes: the mouse keeps
   Obsidian's own tooltips.
+- A card picked on the board no longer makes the plugin build its session
+  anew. Obsidian reports "file opened" each time a card's editor takes the
+  focus, one card picked for one, and the plugin answered each with a new
+  session, which forgot the armed tool. A board that is another file, or whose
+  runtime is new, still gets a session of its own.
 - The minimap follows its setting and each board's own choice on phones,
   tablets and narrow windows too; before, a screen narrower than 900px always
   hid it and the dock's map button did nothing there. It is drawn smaller on a

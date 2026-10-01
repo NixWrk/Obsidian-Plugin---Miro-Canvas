@@ -47,6 +47,7 @@ import { layerActions } from "./layer-order";
 import { localeFor, setLocale, words } from "./i18n";
 import { createWelcomeBoard } from "./welcome-board";
 import { PenTooltips } from "./pen-tooltips";
+import { bindingOf, stillTheBoard, type BoardBinding } from "./board-binding";
 import { canImportFile, importIntoBoard, showImportPreview } from "./import-command";
 import { automaticCheckDue, checkForUpdate, isNewerVersion, type ReleaseRequest, type UpdateCheck } from "./update-check";
 
@@ -137,6 +138,8 @@ export default class MiroCanvasPlugin extends Plugin {
   private metadataStoreProbe: ObsidianMetadataStoreProbe | null = null;
   private metadataWriter: MetadataWriter | null = null;
   private currentCanvasView: unknown = null;
+  /** What the session now standing was built for, to tell a board still on screen from another; see `board-binding.ts`. */
+  private currentCanvasBinding: BoardBinding | null = null;
   private m1Session: M1CanvasSession | null = null;
   private toolsModal: Modal | null = null;
   private importGuideModal: Modal | null = null;
@@ -446,7 +449,12 @@ export default class MiroCanvasPlugin extends Plugin {
     // A Canvas view can be reused for another file, or finish constructing its
     // private runtime after active-leaf-change. Never bind permanently to the
     // half-initialized object or carry a previous file's review overlay across.
-    this.registerEvent(this.app.workspace.on("file-open", () => this.handleActiveLeafChange(this.app.workspace.activeLeaf)));
+    this.registerEvent(this.app.workspace.on("file-open", () => {
+      const leaf = this.app.workspace.activeLeaf;
+      // Obsidian says a file was opened whenever a card's editor takes the focus - one card picked, for one -
+      // with the same board still on screen.  Its session keeps what it holds, an armed lasso among it.
+      if (!stillTheBoard(this.currentCanvasBinding, leaf?.view, this.m1Session?.status === "ready")) this.handleActiveLeafChange(leaf);
+    }));
     this.registerEvent(this.app.workspace.on("layout-change", () => {
       const currentClosed = this.currentCanvasView !== null && !this.currentCanvasStillOpen();
       if (currentClosed || this.m1Session?.status !== "ready") {
@@ -486,6 +494,7 @@ export default class MiroCanvasPlugin extends Plugin {
       this.metadataStoreProbe = null;
       this.metadataWriter = null;
       this.currentCanvasView = null;
+      this.currentCanvasBinding = null;
       this.updateStatus(false);
       return;
     }
@@ -499,6 +508,7 @@ export default class MiroCanvasPlugin extends Plugin {
     this.m1Session?.dispose();
     this.m1Session = null;
     this.currentCanvasView = view;
+    this.currentCanvasBinding = bindingOf(view);
     this.canvasInspection = inspectCanvasView(view);
     this.metadataStoreProbe = createObsidianMetadataStore(view);
     this.metadataWriter = this.metadataStoreProbe.store
@@ -1111,6 +1121,7 @@ export default class MiroCanvasPlugin extends Plugin {
     this.m1Session?.dispose();
     this.m1Session = null;
     this.currentCanvasView = null;
+    this.currentCanvasBinding = null;
     this.advancedInspection = null;
     this.statusBarItem?.remove();
     this.statusBarItem = null;
