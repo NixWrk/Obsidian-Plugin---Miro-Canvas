@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-02
 
 - The bar's tools and where the bar, the dock and the minimap sit are now kept
   separately for a computer, a tablet and a phone (by Obsidian's own device
