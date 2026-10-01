@@ -889,14 +889,26 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   the turned box, and the line ends on the turned outline as on the desktop.
   (3) The pen's and lines' rows carry `miro-canvas-toolbar__bar`, so the
   vertical bar's column and its `max-width: 100%` squeezed them to the bar's
-  own width; beside a vertical bar each is a box of its own, one column
-  parallel to the bar (as Miro's side tool bar does), one control to a row,
-  the widths first, then the colours, then the tools, a rule across between
-  the sections. Its width is that of one control; `placeSideRow`
-  (`src/panel-layout.ts`) chooses its top - level with the tool, wholly in
-  view above the host foot - and, where it is taller than the room, a maximum
-  height it scrolls inside of, never squeezed; `QuickTools.placeSideRows`
-  writes both. (4) Two buttons to a row in the vertical bar: Obsidian on
+  own width.  Beside a vertical bar each is the bar's second column, as it is
+  a second row above a horizontal one: a box of the bar's look (same
+  background, border, radius and shadow), `position: absolute` against the bar
+  with `left`/`right: calc(100% + 5px)` by `data-miro-canvas-panel-side` (the
+  bar's 1px border and its 4px gap) and `top: -1px`, so its top is the bar's;
+  `width: calc(100% + 2px)`, as wide as the bar, one control to a row in the
+  row's own order (the tools, the colours, then the width: sample, upright
+  slider, number), colours at the row's 20px, a rule across between the
+  sections.  The slider is `writing-mode: vertical-lr; direction: rtl` (the
+  thicker line up), with Obsidian's track and thumb redrawn upright - its own
+  assume a level one, with a thumb lifted by `top: -6px` - and
+  `touch-action: none`, so a finger's or a pen's drag moves it and does not
+  scroll the column.  The only number the code gives it is its height limit:
+  `placeSideRow` (`src/panel-layout.ts`) allows from the bar's top to a margin
+  above the foot of the part of the view the host leaves uncovered, and
+  `QuickTools.placeSideRows` writes it as `--miro-canvas-side-row-max-height`,
+  past which the column scrolls inside itself, never wrapped or squeezed.
+  (The first version put the column level with the tool pressed, in a window
+  of its own with the widths first; the bar's second column replaced it.)
+  (4) Two buttons to a row in the vertical bar: Obsidian on
   the tablet (Android) fills `cardMenuEl` with five buttons, where the
   desktop's 1.13.7 holds three - besides card, note and media, "Drag to add slide"
   (`lucide-gallery-vertical`) and "Drag to add group" (`lucide-group`).

@@ -4380,28 +4380,32 @@
   border-top: 1px solid var(--miro-canvas-toolbar-border);
 }
 
-/* Beside a vertical bar the pen's settings and the lines' settings are one
-   column, parallel to the bar as in Miro's own side tool bar: one control to
-   a row, each the size it has above a horizontal bar, in three sections with
-   a rule across between them - the sizes, the colours, then the tools (the
-   pen, the highlighter and the rest, or the kinds of line).  Both carry
-   `miro-canvas-toolbar__bar`, so the column the vertical bar gives its
-   items reached them first and squeezed them into its own 50px.  Nothing in
-   the column shrinks or wraps: where it is taller than the room it scrolls
-   inside itself.  `QuickTools.placeSideRows` puts it level with the tool
-   that opened it and wholly in view: its top and, where it must scroll, the
-   height it scrolls past come from there. */
+/* Beside a vertical bar the pen's settings and the lines' settings are a
+   second column of the bar, as above a horizontal bar they are a second row:
+   a box of the same look, standing against the bar on the side towards the
+   middle of the board with the bar's own gap between, as wide as the bar (one
+   button) and with its top level with the bar's.  It holds what the row does,
+   in the row's order: the tools (the pen's kinds, or the kinds of line), the
+   colours, then the width - a sample, the slider turned upright and the
+   number - with a rule across the column between the sections, where the
+   row has one standing between them.  Both carry `miro-canvas-toolbar__bar`, so the
+   column the vertical bar gives its own items reached them first.  Nothing in
+   the column shrinks or wraps: where it is taller than the bar it runs on
+   below it, and where it is taller than the room it scrolls inside itself
+   (`QuickTools.placeSideRows` gives it the height it scrolls past). */
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing,
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors {
   position: absolute;
-  top: var(--miro-canvas-side-row-top, 0px);
+  top: -1px;
   flex-direction: column;
   flex-wrap: nowrap;
+  justify-content: flex-start;
   align-items: center;
-  width: max-content;
+  box-sizing: border-box;
+  width: calc(100% + 2px);
   max-width: none;
   max-height: var(--miro-canvas-side-row-max-height, none);
-  padding: 3px;
+  padding: 4px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4411,52 +4415,83 @@
   box-shadow: var(--shadow-s, 0 6px 22px rgb(0 0 0 / 22%));
 }
 
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > *,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > * {
-  flex: none;
-  order: 3;
-}
-
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__size,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__size {
-  order: 1;
-}
-
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__swatches,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__swatches {
-  order: 2;
-}
-
-/* Each section is a column of its own, set off from the next by a rule
-   across the column where above a horizontal bar it stood to its left. */
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__size,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__swatches,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__size,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__swatches {
-  flex-direction: column;
-  align-self: stretch;
-  margin: 0;
-  padding: 0 0 3px;
-  border-left: none;
-  border-bottom: 1px solid var(--miro-canvas-toolbar-border);
-}
-
-/* The slider has the width it is drawn with above a horizontal bar. */
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-toolbar__range,
-[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-toolbar__range {
-  flex: none;
-  width: 120px;
-  min-width: 120px;
-}
-
+/* The bar's border and the gap between the two boxes. */
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-tools__drawing,
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="left"] .miro-canvas-tools__connectors {
-  left: calc(100% + 8px);
+  left: calc(100% + 5px);
 }
 
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="right"] .miro-canvas-tools__drawing,
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools[data-miro-canvas-panel-side="right"] .miro-canvas-tools__connectors {
-  right: calc(100% + 8px);
+  right: calc(100% + 5px);
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > *,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > * {
+  flex: none;
+}
+
+/* The tools are as big as the bar's own buttons, the lines' kinds too. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-toolbar__button,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-toolbar__button {
+  width: var(--miro-canvas-toolbar-size);
+  min-width: var(--miro-canvas-toolbar-size);
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__swatches,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__swatches,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing > .miro-canvas-tools__size,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors > .miro-canvas-tools__size {
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  margin: 3px 0 0;
+  padding: 3px 0 0;
+  border-left: none;
+  border-top: 1px solid var(--miro-canvas-toolbar-border);
+}
+
+/* The width: its sample, the slider upright - the thicker line up, as a
+   slider standing in a column goes - and the number, each as wide as a button.
+   The slider keeps a finger's or a pen's drags to itself, which the column's
+   own scrolling would otherwise take. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-toolbar__range,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-toolbar__range {
+  flex: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: var(--miro-canvas-toolbar-size);
+  min-width: 0;
+  height: 80px;
+  min-height: 0;
+  background: transparent;
+  touch-action: none;
+}
+
+/* Obsidian draws a slider for a level one: its track is a bar of the input's
+   own thickness and its thumb is lifted onto the track by an offset from the
+   top.  Upright, the track is as wide as the thumb, with the line drawn
+   down its middle, and the thumb sits on it with no offset. */
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-toolbar__range::-webkit-slider-runnable-track,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-toolbar__range::-webkit-slider-runnable-track {
+  width: var(--slider-thumb-width, 18px);
+  height: 100%;
+  background: linear-gradient(var(--slider-track-background), var(--slider-track-background)) center / var(--slider-track-height, 4px) 100% no-repeat;
+  border-radius: 0;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-toolbar__range::-webkit-slider-thumb,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-toolbar__range::-webkit-slider-thumb,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-toolbar__range:not(:disabled)::-webkit-slider-thumb:active,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-toolbar__range:not(:disabled)::-webkit-slider-thumb:active {
+  top: 0;
+}
+
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__drawing .miro-canvas-tools__size .miro-canvas-tools__number,
+[data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-tools__connectors .miro-canvas-tools__size .miro-canvas-tools__number {
+  width: var(--miro-canvas-toolbar-size);
+  min-width: 0;
+  padding: 0;
 }
 
 /* Search on the board: a bar at the top right, where native Canvas's own

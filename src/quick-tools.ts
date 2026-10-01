@@ -18,7 +18,7 @@ import { defaultPalette } from "./appearance";
 import { miroStickyColors } from "./miro-palette";
 import { LOCAL_ITEM_SIZES } from "./local-items";
 import { BAR_TOOLTIP_DELAY, PICTURE_TOOLTIP_DELAY } from "./tooltips";
-import { placeSideRow, type ViewBox, type ViewSize } from "./panel-layout";
+import { placeSideRow, type ViewSize } from "./panel-layout";
 
 export const QUICK_TOOLS = [
   "select", "text", "sticky", "shape", "pen", "highlighter", "smart", "eraser", "erase-part", "lasso",
@@ -41,8 +41,7 @@ export function isDragCreateTool(tool: QuickTool): boolean {
 
 /** Screen pixels a press must move before it counts as a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
-/** The custom properties a column opened beside a vertical bar takes its place from; see `QuickTools.placeSideRows`. */
-const SIDE_ROW_TOP = "--miro-canvas-side-row-top";
+/** The custom property a column opened beside a vertical bar takes its height limit from; see `QuickTools.placeSideRows`. */
 const SIDE_ROW_MAX_HEIGHT = "--miro-canvas-side-row-max-height";
 
 /**
@@ -356,16 +355,6 @@ export const QUICK_TOOL_KEYS: ReadonlyMap<string, QuickTool> = new Map(
   TOOLBAR_TOOL_ICONS.filter((spec) => spec.key !== undefined).map((spec) => [spec.key!, spec.tool]),
 );
 
-/**
- * A column's own height as if nothing held it back: its whole content and its
- * border, even where an earlier maximum height now makes it scroll.
- */
-function heightWithNothingHoldingItBack(row: HTMLElement): number {
-  const shown = row.getBoundingClientRect?.().height ?? 0;
-  if (typeof row.scrollHeight !== "number" || typeof row.offsetHeight !== "number" || typeof row.clientHeight !== "number") return shown;
-  return Math.max(shown, row.scrollHeight + row.offsetHeight - row.clientHeight);
-}
-
 export class QuickTools {
   public readonly element: HTMLElement;
   /** The bar's own row of items, up to the "+" popover - what the arrange mode drags to reorder, remove or add. */
@@ -620,9 +609,8 @@ export class QuickTools {
     // An eraser has a size but no colour; a line has both.
     const erasing = isEraser(this.armed);
     if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
-    // A column beside a vertical bar is placed again when it opens, closes
-    // or gains or loses the colours, which changes its height.
-    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${erasing}|${this.connectorBar.hidden}`;
+    // A column beside a vertical bar is placed when it opens.
+    const rowsOpen = `${this.drawingBar?.hidden ?? true}|${this.connectorBar.hidden}`;
     if (rowsOpen !== this.sideRowsOpen) {
       this.sideRowsOpen = rowsOpen;
       this.placeSideRows();
@@ -653,28 +641,24 @@ export class QuickTools {
   }
 
   /**
-   * A vertical bar opens the pen's settings and the lines' settings beside
-   * it, as one column parallel to the bar, on the side towards the middle of
-   * the board (the stylesheet's part).  This puts the column level with the
-   * tool that opened it and wholly in view, and where it is taller than the
-   * room, gives it the height past which it scrolls (see `placeSideRow`);
-   * above a horizontal bar they need nothing of the kind, and any place left
-   * from a vertical one is dropped.  `view` is the part of the board the
-   * session leaves uncovered, when it knows; else the whole of the bar's own
-   * parent.
+   * A vertical bar opens the pen's settings and the lines' settings as a
+   * second column of the bar, beside it, on the side towards the middle of the
+   * board, as wide as the bar and with its top level with the bar's (the
+   * stylesheet's part).  Taller than the bar it runs on past the bar's end; so
+   * that it stays in view, this gives it the height past which it scrolls
+   * inside itself: from the bar's top to the foot of the part of the board the
+   * session leaves uncovered (see `placeSideRow`).  Above a horizontal bar
+   * they need nothing of the kind, and any height left from a vertical one is
+   * dropped.  `view` is that part of the board, when the session knows it;
+   * else the whole of the bar's own parent.
    */
   public placeSideRows(view?: ViewSize): void {
     if (view !== undefined) this.sideView = view;
     const bar = this.element;
     const vertical = bar.getAttribute("data-miro-canvas-panel-orientation") === "vertical";
-    const rows = [
-      { row: this.drawingBar, tool: this.penButton },
-      { row: this.connectorBar, tool: this.buttons.get("connector") },
-    ];
-    for (const { row, tool } of rows) {
+    for (const row of [this.drawingBar, this.connectorBar]) {
       if (row === undefined) continue;
       if (!vertical) {
-        row.style.removeProperty(SIDE_ROW_TOP);
         row.style.removeProperty(SIDE_ROW_MAX_HEIGHT);
         continue;
       }
@@ -682,18 +666,11 @@ export class QuickTools {
       const parent = bar.parentElement?.getBoundingClientRect?.();
       const barRect = bar.getBoundingClientRect?.();
       if (parent === undefined || barRect === undefined || barRect.width === 0) continue;
-      const toolRect = tool?.getBoundingClientRect?.();
-      const seen = (rect: DOMRect): ViewBox => ({ left: rect.left - parent.left, top: rect.top - parent.top, width: rect.width, height: rect.height });
       const placement = placeSideRow({
         view: { left: 0, top: 0, width: this.sideView?.width ?? parent.width, height: this.sideView?.height ?? parent.height },
-        bar: seen(barRect),
-        barOrigin: barRect.top - parent.top + (bar.clientTop ?? 0),
-        tool: toolRect === undefined || toolRect.width === 0 ? undefined : seen(toolRect),
-        rowHeight: heightWithNothingHoldingItBack(row),
+        bar: { left: barRect.left - parent.left, top: barRect.top - parent.top, width: barRect.width, height: barRect.height },
       });
-      row.style.setProperty(SIDE_ROW_TOP, `${placement.top}px`);
-      if (placement.maxHeight === undefined) row.style.removeProperty(SIDE_ROW_MAX_HEIGHT);
-      else row.style.setProperty(SIDE_ROW_MAX_HEIGHT, `${placement.maxHeight}px`);
+      row.style.setProperty(SIDE_ROW_MAX_HEIGHT, `${placement.maxHeight}px`);
     }
   }
 

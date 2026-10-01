@@ -77,21 +77,24 @@
   corners of the card's unturned box next to it (and left them where the card
   had been while it was dragged); they are hidden, and the frame's own
   handles, which take a finger from about 40px around, do their work.
-- With the tool bar turned vertical (Arrange panels), the pen's settings
-  (width, colours, then the pen, the highlighter and the other tools) and the
-  lines' settings (width, colours, then the kinds of line) open beside the
-  bar, on the side towards the middle of the board, as one column parallel to
-  the bar: one control to a row, each the size it has above a horizontal bar,
-  with a rule across between the three sections. The column stands level with
-  the tool that opened it and is moved only as far as keeps it wholly on the
-  screen, above the phone's own bars; where it is still taller than the room
-  it scrolls inside itself instead of being squeezed. Before, the settings
-  were squeezed into a column as narrow as the bar, and their colours and
-  width slider could not be reached. The bar itself, and the corner dock when
-  it is vertical, hold one button to a row everywhere: native Canvas's card
-  and note buttons, which on the tablet's Obsidian come with a slide and a
-  group button of their own, had stood two to a row, and the rule before the "+"
-  that opens More lay upright in a vertical bar.
+- With the tool bar turned vertical (Arrange panels), the pen's settings (the
+  pen, the highlighter and the other tools, the colours, then the width: its
+  sample, a slider turned upright - the thicker line up - and the number) and
+  the lines' settings (the kinds of line, the colours, then the width) are a
+  second column of the bar, as they are a second row above a horizontal bar: a
+  box of the bar's own look beside it, on the side towards the middle of the
+  board, as wide as the bar - one button - with the bar's own gap between and
+  its top level with the bar's, one control to a row, the colours as small as
+  in the row. Taller than the bar it runs on past the bar's end but stays on
+  the screen, above the phone's own bars; where the room is short it scrolls
+  inside itself, never wrapping into a second column or squeezing its
+  controls. The slider takes a finger's and a pen's drags to itself. Before,
+  the settings were squeezed into a column as narrow as the bar, and their
+  colours and width slider could not be reached. The bar itself, and the
+  corner dock when it is vertical, hold one button to a row everywhere: native
+  Canvas's card and note buttons, which on the tablet's Obsidian come with a
+  slide and a group button of their own, had stood two to a row, and the rule
+  before the "+" that opens More lay upright in a vertical bar.
 - An armed tool shows it the same way on every button of the bars: the accent
   icon on the active background Select has. The pen, the highlighter, smart
   drawing, the erasers, the lasso, text, sticky notes, shapes, lines,

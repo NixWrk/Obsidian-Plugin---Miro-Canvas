@@ -331,10 +331,12 @@ def main() -> int:
                 # A bar turned vertical holds one control to a row wherever a control
                 # sits - native Canvas's own buttons too, which the tablet's Obsidian
                 # offers more than one of in a slot - and opens the pen's settings and
-                # the lines' settings beside it as one column, parallel to the bar:
-                # one control to a row, sizes, colours, then tools, level with the tool
-                # that opened it and wholly in view, scrolling inside itself when the
-                # room is short.
+                # the lines' settings as a second column of the bar: as wide as the bar,
+                # beside it towards the middle of the board, its top level with the
+                # bar's, one control to a row in the order of the horizontal row (tools,
+                # colours, then the width: its sample, the slider upright and the
+                # number), the colours as small as there, wholly in view, and scrolling
+                # inside itself when the room is short.
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session;
                   const tools=b.root.querySelector('.miro-canvas-toolbar.miro-canvas-tools');
@@ -360,6 +362,10 @@ def main() -> int:
                   };
                   const barItems=(bar)=>bar.querySelector(':scope > .miro-canvas-toolbar__bar:not(.miro-canvas-tools__drawing):not(.miro-canvas-tools__connectors)');
                   const settingsOf=(button)=>[...tools.querySelectorAll(button)].find(seen);
+                  // The colours as small as they are in the horizontal row.
+                  s.armTool('pen');
+                  const swatchSize=tools.querySelector('.miro-canvas-tools__drawing .miro-canvas-toolbar__button--swatch').getBoundingClientRect().width;
+                  s.armTool('select');
                   for(const [anchor,dy,dockAnchor] of [['left-middle',0,'right-middle'],['left-middle',380,'right-middle'],['left-middle',-380,'right-middle'],['right-middle',0,'left-middle'],['right-middle',380,'left-middle']]){
                     placeBars(anchor,dy,dockAnchor);
                     if(tools.getAttribute('data-miro-canvas-panel-orientation')!=='vertical')throw Error('The bar did not turn vertical at '+anchor);
@@ -374,27 +380,31 @@ def main() -> int:
                     for(const [button,rowClass] of [['[data-tool-group="drawing"]','miro-canvas-tools__drawing'],['[data-tool="connector"]','miro-canvas-tools__connectors']]){
                       settingsOf(button).click();
                       const row=tools.querySelector('.'+rowClass);
-                      const at=row.getBoundingClientRect(),bar=tools.getBoundingClientRect(),tool=settingsOf(button).getBoundingClientRect(),board=b.root.getBoundingClientRect();
-                      const where=JSON.stringify({anchor,dy,rowClass,at,bar,tool});
+                      const at=row.getBoundingClientRect(),bar=tools.getBoundingClientRect(),board=b.root.getBoundingClientRect();
+                      const where=JSON.stringify({anchor,dy,rowClass,at,bar});
                       if(row.hidden||getComputedStyle(row).flexDirection!=='column')throw Error('The settings are not laid out as one column: '+where);
-                      if(at.width>220||at.width<60)throw Error('The settings are not one control column wide: '+where);
-                      if(!inside(at,board))throw Error('The settings run off the board: '+where);
-                      if(side==='left'?at.left<bar.right:at.right>bar.left)throw Error('The settings are not beside the bar, towards the middle: '+where);
-                      const level=Math.abs(at.top-tool.top)<1.5;
-                      const held=Math.abs(at.top-(board.top+8))<1.5||Math.abs(at.bottom-(board.bottom-8))<1.5;
-                      if(!level&&!held)throw Error('The settings are neither level with their tool nor held in view: '+where);
+                      if(Math.abs(at.width-bar.width)>1.5)throw Error('The settings are not as wide as the bar: '+where);
+                      const gap=side==='left'?at.left-bar.right:bar.left-at.right;
+                      if(gap<2||gap>8)throw Error('The settings are not beside the bar, towards the middle, with the gap of the bar itself: '+gap+' '+where);
+                      if(Math.abs(at.top-bar.top)>1.5)throw Error('The settings are not level with the top of the bar: '+where);
+                      if(at.top<board.top-0.5||at.bottom>board.bottom+0.5||at.left<board.left-0.5||at.right>board.right+0.5)throw Error('The settings run off the board: '+where);
                       const controls=aloneInItsRow(row,'button,input,.miro-canvas-tools__preview','the settings '+rowClass);
                       if(controls.some((control)=>control.at.left<at.left-0.5||control.at.right>at.right+0.5))throw Error('A control runs out of its column: '+where);
-                      const column=(selector)=>row.querySelector(selector).getBoundingClientRect().top;
-                      if(!(column(':scope > .miro-canvas-tools__size')<column(':scope > .miro-canvas-tools__swatches')&&column(':scope > .miro-canvas-tools__swatches')<column(':scope > button')))
-                        throw Error('The settings are not in the order widths, colours, tools: '+where);
-                      for(const section of [':scope > .miro-canvas-tools__size',':scope > .miro-canvas-tools__swatches']){
+                      // The order of the horizontal row: the tools, the colours, then the width - its sample, the slider and the number.
+                      const top=(selector)=>row.querySelector(selector).getBoundingClientRect().top;
+                      const order=[':scope > button',':scope > .miro-canvas-tools__swatches',':scope > .miro-canvas-tools__size .miro-canvas-tools__preview',':scope > .miro-canvas-tools__size .miro-canvas-toolbar__range',':scope > .miro-canvas-tools__size .miro-canvas-tools__number'].map(top);
+                      if(order.some((value,index)=>index&&value<=order[index-1]))throw Error('The settings are not in the order tools, colours, width: '+order+' '+where);
+                      const swatch=row.querySelector('.miro-canvas-toolbar__button--swatch').getBoundingClientRect();
+                      if(Math.abs(swatch.width-swatchSize)>0.5||Math.abs(swatch.height-swatchSize)>0.5)throw Error('The colours are not as small as in the horizontal row: '+swatch.width+' against '+swatchSize);
+                      const slider=row.querySelector('.miro-canvas-toolbar__range'),sliderBox=slider.getBoundingClientRect();
+                      if(!getComputedStyle(slider).writingMode.startsWith('vertical')||sliderBox.height<=sliderBox.width)throw Error('The slider does not stand upright: '+where);
+                      for(const section of [':scope > .miro-canvas-tools__swatches',':scope > .miro-canvas-tools__size']){
                         const rule=getComputedStyle(row.querySelector(section));
-                        if(rule.borderBottomWidth!=='1px'||rule.borderLeftWidth!=='0px')throw Error('The rule between the settings does not lie across the column: '+section);
+                        if(rule.borderTopWidth!=='1px'||rule.borderLeftWidth!=='0px')throw Error('The rule between the settings does not lie across the column: '+section);
                       }
                     }
                   }
-                  // A short view: the column keeps every control its size and scrolls inside itself, wholly in view.
+                  // A short view: the column keeps every control its size and its top level with the bar's, and scrolls inside itself, wholly in view.
                   placeBars('left-middle',0,'right-middle');
                   s.armTool('select');
                   settingsOf('[data-tool="connector"]').click();
@@ -402,15 +412,22 @@ def main() -> int:
                   const sizes=()=>[...row.querySelectorAll('button,input')].filter(seen).map((control)=>Math.round(control.getBoundingClientRect().height));
                   const before=JSON.stringify(sizes());
                   const height=b.root.style.height;
+                  const room=()=>b.root.getBoundingClientRect().bottom-8-tools.getBoundingClientRect().top;
+                  const limit=()=>parseFloat(row.style.getPropertyValue('--miro-canvas-side-row-max-height'));
                   b.root.style.height='420px';
                   s.updatePanelPositions();
-                  const short=row.getBoundingClientRect(),board=b.root.getBoundingClientRect();
+                  const short=row.getBoundingClientRect(),board=b.root.getBoundingClientRect(),barBox=tools.getBoundingClientRect();
                   if(!(row.scrollHeight>row.clientHeight+1)||getComputedStyle(row).overflowY==='visible')throw Error('A column taller than the room does not scroll: '+JSON.stringify({scroll:row.scrollHeight,client:row.clientHeight}));
-                  if(short.top<board.top+7.5||short.bottom>board.bottom-7.5)throw Error('A column taller than the room leaves the view: '+JSON.stringify({short,board}));
+                  if(Math.abs(short.top-barBox.top)>1.5)throw Error('A column taller than the room is not level with the bar: '+JSON.stringify({short,barBox}));
+                  if(short.bottom>board.bottom-7.5)throw Error('A column taller than the room leaves the view: '+JSON.stringify({short,board}));
+                  if(Math.abs(limit()-room())>1)throw Error('A column is not held to the room from the bar to the foot of the view: '+limit()+' against '+room());
                   if(JSON.stringify(sizes())!==before)throw Error('A column taller than the room squeezes its controls: '+before+' against '+JSON.stringify(sizes()));
                   b.root.style.height=height;
                   s.updatePanelPositions();
-                  if(row.style.getPropertyValue('--miro-canvas-side-row-max-height')!=='')throw Error('A column kept its maximum height after the room came back');
+                  if(Math.abs(limit()-room())>1)throw Error('A column kept the room of a short view after the room came back: '+limit()+' against '+room());
+                  // A bar high in the view leaves the column room to show everything, and it does not scroll.
+                  placeBars('left-middle',-380,'right-middle');
+                  if(row.scrollHeight>row.clientHeight+1)throw Error('A column with room to spare still scrolls: '+JSON.stringify({scroll:row.scrollHeight,client:row.clientHeight}));
                   // Every item a person can put on the bar, all of them on it, stands alone in its row.
                   const full=b.mountFullBar();
                   const items=aloneInItsRow(barItems(full.element),'button,.canvas-card-menu-button','the bar holding every item');
@@ -424,7 +441,7 @@ def main() -> int:
                   full.dispose();
                   s.settings=original;s.updatePanelPositions();
                   const drawing=tools.querySelector('.miro-canvas-tools__drawing');
-                  if(drawing.style.getPropertyValue('--miro-canvas-side-row-top')!==''||getComputedStyle(drawing).flexDirection!=='row')throw Error('A horizontal bar kept the place of a vertical one');
+                  if(drawing.style.getPropertyValue('--miro-canvas-side-row-max-height')!==''||getComputedStyle(drawing).flexDirection!=='row')throw Error('A horizontal bar kept the height of a vertical one');
                   const slot=getComputedStyle(tools.querySelector('.miro-canvas-toolbar__native-slot'));
                   if(slot.flexDirection!=='row')throw Error('A horizontal bar stacks its native slots');
                   document.documentElement.style.removeProperty('--background-modifier-border');
@@ -586,6 +603,29 @@ def main() -> int:
                         assert armed_tool() == tool and shown.is_visible(), f'{tool} picked again after another did not open its settings ({orientation})'
                         folds += 1
                 assert folds == 2 * len(folding), folds
+                turn_bar('horizontal')
+                arm('select')
+                # The same second column on a touch screen, whose bar has finger-sized buttons:
+                # still as wide as the bar, every control inside it and in a row of its own.
+                cdp.send('Emulation.setTouchEmulationEnabled', {'enabled': True, 'maxTouchPoints': 5})
+                # (The page has no Obsidian theme: the boxes have no border colour to be drawn in yet.)
+                page.evaluate("document.documentElement.style.setProperty('--background-modifier-border', '#888')")
+                turn_bar('vertical')
+                for tool in ('pen', 'connector'):
+                    arm(tool)
+                    found = page.evaluate("""(tool) => {
+                      const tools=document.querySelector('.miro-canvas-toolbar.miro-canvas-tools');
+                      const row=tools.querySelector(tool==='pen'?'.miro-canvas-tools__drawing':'.miro-canvas-tools__connectors');
+                      const bar=tools.getBoundingClientRect(),at=row.getBoundingClientRect();
+                      const boxes=[...row.querySelectorAll('button,input,.miro-canvas-tools__preview')].map((control)=>control.getBoundingClientRect()).filter((box)=>box.width>0).sort((a,c)=>a.top-c.top);
+                      return {bar:bar.width,column:at.width,size:getComputedStyle(tools).getPropertyValue('--miro-canvas-toolbar-size').trim(),
+                        outside:boxes.filter((box)=>box.left<at.left-0.5||box.right>at.right+0.5).length,
+                        sharing:boxes.filter((box,index)=>index&&box.top<boxes[index-1].bottom-0.5).length};
+                    }""", tool)
+                    assert found['size'] == '40px' and abs(found['column'] - found['bar']) < 1.5, found
+                    assert found['outside'] == 0 and found['sharing'] == 0, found
+                cdp.send('Emulation.setTouchEmulationEnabled', {'enabled': False})
+                page.evaluate("document.documentElement.style.removeProperty('--background-modifier-border')")
                 turn_bar('horizontal')
                 arm('select')
                 page.evaluate("""() => {

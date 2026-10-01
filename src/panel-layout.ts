@@ -250,7 +250,7 @@ export function hostFootInset(boardTop: number, boardBottom: number, foot: HostF
   return Math.round(Math.min(inset, limit));
 }
 
-/** The room a column that opens beside a vertical bar keeps from the view's own top and foot. */
+/** The room a column that opens beside a vertical bar keeps from the foot of the view. */
 export const SIDE_ROW_MARGIN = 8;
 /** The least a column is squeezed to; past that it stays this tall and scrolls inside itself. */
 export const SIDE_ROW_MIN_HEIGHT = 48;
@@ -267,47 +267,28 @@ export interface ViewBox {
 export interface SideRowInput {
   /** The part of the board's view the column may use: what the phone's own bars leave uncovered. */
   readonly view: ViewBox;
-  /** The vertical bar. */
+  /** The vertical bar, whose top the column's top is level with. */
   readonly bar: ViewBox;
-  /** Where the column's own `top: 0` lies: the top of the bar's padding box, just inside its border. */
-  readonly barOrigin: number;
-  /** The tool that opened the column, on the bar; none when it is not on the bar. */
-  readonly tool: ViewBox | undefined;
-  /** The column's own height with nothing to hold it back: all its controls, one to a row. */
-  readonly rowHeight: number;
 }
 
-/** Where a column opened beside a vertical bar goes: how far below its `top: 0` it stands, and the height past which it scrolls. */
+/** How tall a column opened beside a vertical bar may be before it scrolls inside itself. */
 export interface SideRowPlacement {
-  readonly top: number;
-  /** Only when the column is taller than the room: it then scrolls inside itself instead of leaving the view. */
-  readonly maxHeight: number | undefined;
+  readonly maxHeight: number;
 }
 
 /**
- * Where the pen's settings, or the lines', open when their bar is vertical.
- * They open as one column, parallel to the bar, one control to a row; its
- * width is its own, that of one control, so only its height needs placing.
- * The column stands level with the tool that opened it - its top edge on the
- * tool's - and is moved up or down only as far as keeps it wholly in the
- * view.  Where it is taller than the whole view it keeps its top edge and
- * gets a maximum height: the controls keep their size and scroll inside it,
- * never squeezed together.
+ * Where the pen's settings, or the lines', stop when their bar is vertical.
+ * They are a second column of the bar, beside it and as wide as it, with
+ * their top level with the bar's top - the stylesheet's part.  Taller than
+ * the bar they run on past its end, which is fine so long as they stay in
+ * view; so the room they have is what lies between the bar's top and the foot
+ * of the view (less a margin), and a column taller than that keeps every
+ * control its size and scrolls inside itself.
  */
 export function placeSideRow(input: SideRowInput): SideRowPlacement {
-  const { view, bar, barOrigin, tool, rowHeight } = input;
-  const room = Math.max(view.height - 2 * SIDE_ROW_MARGIN, SIDE_ROW_MIN_HEIGHT);
-  const scrolls = rowHeight > room;
-  const height = scrolls ? room : rowHeight;
-  const wantedTop = tool === undefined ? bar.top : tool.top;
-  const highest = view.top + SIDE_ROW_MARGIN;
-  const lowest = view.top + view.height - height - SIDE_ROW_MARGIN;
-  // A column that scrolls fills the room, so it starts at the head of the view.
-  const top = scrolls ? highest : Math.max(highest, Math.min(wantedTop, lowest));
-  return {
-    top: Math.round((top - barOrigin) * 100) / 100,
-    maxHeight: scrolls ? Math.round(room * 100) / 100 : undefined,
-  };
+  const { view, bar } = input;
+  const room = view.top + view.height - SIDE_ROW_MARGIN - bar.top;
+  return { maxHeight: Math.round(Math.max(room, SIDE_ROW_MIN_HEIGHT) * 100) / 100 };
 }
 
 /** An element whose inline position this module may write; a real `HTMLElement` satisfies it. */
