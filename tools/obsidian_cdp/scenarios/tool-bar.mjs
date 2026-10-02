@@ -1,52 +1,117 @@
-// "Show the tool bar at the bottom and press V T N S P L C F to arm each tool" - demonstrates
-// the creation bar and its letter shortcuts. Runs unchanged in English and Russian: the only
-// lookups are the `data-tool` attributes the bottom bar already sets (src/quick-tools.ts), which
-// never change with the interface language.
+// Tool bar at the bottom - letters V T N S P L C F arm their tools.
+// Shows the bar, each tool's letter, and that picking a tool arms it (accent colour).
 //
-//   node record.mjs --scenario scenarios/tool-bar.mjs --out ../../docs/media/en/tool-bar.gif --port 9336
-//   node record.mjs --scenario scenarios/tool-bar.mjs --out ../../docs/media/ru/tool-bar.gif --port 9336 --lang ru
+//   node record.mjs --scenario scenarios/tool-bar.mjs --out ../../docs/media/en/tool-bar.gif --port 9336 --fps 7 --width 760
+//   node record.mjs --scenario scenarios/tool-bar.mjs --out ../../docs/media/ru/tool-bar.gif --port 9336 --fps 7 --width 760
 export default async function (s) {
-  // A dedicated, empty board rather than the crowded welcome board: any
-  // fixed click point on the welcome board would depend on its zoom/pan on
-  // open, which this tool does not control.
-  await s.eval(`
-    const path = "CDP Tool Bar Demo.canvas";
-    let file = app.vault.getAbstractFileByPath(path);
-    if (!file) file = await app.vault.create(path, JSON.stringify({ nodes: [], edges: [] }));
-    const leaf = app.workspace.getLeaf("tab");
-    await leaf.openFile(file, { active: true });
-    return "opened";
-  `);
-  await s.wait(500);
+  await s.wait(800);
 
+  // 1. Show the tool bar and its letters
   await s.caption({
-    en: "1. The tool bar at the bottom; press V T N S P L C F to arm each tool",
-    ru: "1. Нижняя панель инструментов; нажмите V T N S P L C F, чтобы выбрать каждый инструмент",
+    en: "1. The bottom tool bar — each tool has a letter (V T N S P L C F)",
+    ru: "1. Нижняя панель инструментов — у каждого есть буква (V T N S P L C F)",
   });
+  await s.wait(1200);
 
-  // The tool bar is at the bottom. We'll click each tool button to show it gets armed,
-  // then press its letter shortcut to show the same effect.
-  // Order: select (V), text (T), sticky (N), shape (S), pen (P), connector (L), comment (C), frame (F)
+  // Highlight each tool button in sequence by hovering (human pace)
   const tools = [
-    { tool: "select", key: "V" },
-    { tool: "text", key: "T" },
-    { tool: "sticky", key: "N" },
-    { tool: "shape", key: "S" },
-    { tool: "pen", key: "P" },
-    { tool: "connector", key: "L" },
-    { tool: "comment", key: "C" },
-    { tool: "frame", key: "F" },
+    '[data-tool="select"]',
+    '[data-tool="text"]',
+    '[data-tool="sticky"]',
+    '[data-tool="shape"]',
+    '[data-tool="pen"]',
+    '[data-tool="line"]',
+    '[data-tool="comment"]',
+    '[data-tool="frame"]',
   ];
 
-  for (const { tool, key } of tools) {
-    // Click the tool button
-    await s.click({ selector: `[data-tool="${tool}"]` });
-    await s.wait(300);
-    // Press the letter key
+  for (const sel of tools) {
+    const btn = await s.find({ selector: sel });
+    if (btn) {
+      await s.move(btn);
+      await s.wait(400);
+    }
+  }
+
+  // 2. Demonstrate arming tools by letter key
+  await s.caption({
+    en: "2. Press a letter to arm a tool — it highlights in accent colour",
+    ru: "2. Нажмите букву, чтобы выбрать инструмент — он подсветится акцентным цветом",
+  });
+  await s.wait(800);
+
+  for (const key of ["N", "T", "S", "P", "L", "C", "F", "V"]) {
     await s.key(key);
+    await s.wait(500);
+  }
+
+  // 3. Click a button to arm (sticky note), then click board to create
+  await s.caption({
+    en: "3. Click a button, then click the board — the item appears where you clicked",
+    ru: "3. Кликните по кнопке, потом по доске — элемент появится в точке клика",
+  });
+  await s.wait(800);
+
+  await s.click({ selector: '[data-tool="sticky"]' });
+  await s.wait(400);
+  await s.move({ x: 800, y: 400 });
+  await s.wait(200);
+  await s.click({ x: 800, y: 400 });
+  await s.wait(400);
+  await s.type("Created by clicking");
+  await s.wait(400);
+  await s.key("Escape");
+  await s.wait(500);
+
+  // 4. Drag a tool button onto the board (drag-to-create)
+  await s.caption({
+    en: "4. Drag a tool button onto the board — a ghost follows, release to create",
+    ru: "4. Перетащите кнопку инструмента на доску — призрак следует за курсором, отпустите, чтобы создать",
+  });
+  await s.wait(800);
+
+  const shapeBtn = await s.find({ selector: '[data-tool="shape"]' });
+  if (shapeBtn) {
+    await s.move(shapeBtn);
     await s.wait(300);
+    await s.drag(shapeBtn, { x: 600, y: 300 }, { steps: 24 });
+    await s.wait(600);
+    await s.key("Escape");
+    await s.wait(500);
+  }
+
+  // 5. The More menu (+) holds additional tools
+  await s.caption({
+    en: "5. The + menu holds Code block, Table, Web link, and Canvas's Card, Note, File",
+    ru: "5. Меню + содержит Блок кода, Таблицу, Веб-ссылку, и Карточку, Заметку, Файл Canvas",
+  });
+  await s.wait(800);
+
+  const moreBtn = await s.find({ selector: '[data-tool="more"]' });
+  if (moreBtn) {
+    await s.move(moreBtn);
+    await s.wait(300);
+    await s.click(moreBtn);
+    await s.wait(500);
+    const menuItems = [
+      '[data-tool="code"]',
+      '[data-tool="table"]',
+      '[data-tool="link"]',
+      '[data-tool="card"]',
+      '[data-tool="note"]',
+      '[data-tool="file"]',
+    ];
+    for (const sel of menuItems) {
+      const item = await s.find({ selector: sel });
+      if (item) {
+        await s.move(item);
+        await s.wait(300);
+      }
+    }
+    await s.click({ x: 100, y: 100 });
+    await s.wait(400);
   }
 
   await s.caption({ en: "2. Result", ru: "2. Результат" });
-  await s.wait(1400);
+  await s.wait(2000);
 }
