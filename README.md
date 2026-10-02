@@ -1,6 +1,6 @@
 # Miro Canvas
 
-An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
+Miro tools and Obsidian notes on one board.
 
 [Русская версия](README.ru.md)
 
@@ -9,6 +9,7 @@ An Obsidian plugin: Miro's look and Miro's tools on Obsidian's own Canvas.
 - [What it looks like](#what-it-looks-like)
 - [What comes from Miro, what from Obsidian](#what-comes-from-miro-what-from-obsidian)
 - [Getting started](#getting-started)
+- [Obsidian notes and links](#obsidian-notes-and-links)
 - [Things on the board](#things-on-the-board)
 - [Styling a selection](#styling-a-selection)
 - [Drawing, lines and arrows](#drawing-lines-and-arrows)
@@ -55,6 +56,14 @@ previews, presentations with their slides, and comments pinned where they were.
 Nothing is lost when the plugin is off: the file opens as an ordinary Canvas.
 The plugin goes to the network for two things only, both described in
 [Network use](#network-use).
+
+A sticky note for a quick idea, an Obsidian note for the details, and an arrow
+between them.
+
+![A sticky note beside a real Obsidian note](docs/media/en/sticky-with-note.gif)
+
+Expand the other examples in the relevant sections. Open a GIF at full size
+to see the smaller controls.
 
 ## What comes from Miro, what from Obsidian
 
@@ -119,6 +128,42 @@ also creates a small folder of sample files beside it (a note, a small
 canvas, a picture, a PDF and a Word document), so its "Files and notes" frame
 always points at real files.
 
+## Obsidian notes and links
+
+Choose the note button on the bottom toolbar, click a place on the board and
+select a note from your vault. It is the same file: edits to the note appear
+on the board too.
+
+<details>
+<summary>Watch: add a note from your vault</summary>
+
+![Watch: add a note from your vault](docs/media/en/insert-note.gif)
+
+</details>
+
+Text cards understand familiar Obsidian syntax: `[[Note name]]` for a link
+and `![[Note name]]` to show its contents. Select the card first, then click
+the link to open it. Heading and block links such as `[[Note#Heading]]` and
+`[[Note#^block]]` remain ordinary Obsidian links too.
+
+<details>
+<summary>Watch: link, embed and open a note</summary>
+
+![Watch: link, embed and open a note](docs/media/en/obsidian-links.gif)
+
+</details>
+
+Use `![[Board name.canvas]]` to embed another board. Obsidian shows its
+title and a small diagram; card text is not visible in this preview. Click
+the title in the selected card to open the board itself.
+
+<details>
+<summary>Watch: embed and open another board</summary>
+
+![Watch: embed and open another board](docs/media/en/nested-canvas.gif)
+
+</details>
+
 ## Things on the board
 
 - **Sticky notes** - square notes in Miro's colours. The text shrinks to fit
@@ -149,6 +194,28 @@ still points at the same file in the vault; nothing is duplicated.
 
 Each change is one step of undo.
 
+<details>
+<summary>Watch: create a shape with text</summary>
+
+![Watch: Create a shape with text](docs/media/en/create-shape.gif)
+
+</details>
+
+<details>
+<summary>Watch: move a frame with its tasks</summary>
+
+![Watch: Move a frame with its tasks](docs/media/en/frame-group.gif)
+
+</details>
+
+<details>
+<summary>Watch: select and move several cards</summary>
+
+![Watch: Select and move several cards](docs/media/en/select-together.gif)
+
+</details>
+
+
 ## Styling a selection
 
 Select something and a toolbar appears above it, in the order Miro's own
@@ -168,6 +235,14 @@ uses:
 
 A line or an arrow shows its own controls in that place instead: its two
 ends, its kind, thickness, arrowhead size and colour, and its label.
+
+<details>
+<summary>Watch: change a card’s font and colour</summary>
+
+![Watch: Change a card’s font and colour](docs/media/en/format-card.gif)
+
+</details>
+
 
 ## Drawing, lines and arrows
 
@@ -202,6 +277,21 @@ ends, its kind, thickness, arrowhead size and colour, and its label.
   from the same toolbar a card's text does, and stays the size a card's text
   is however far you zoom out.
 
+<details>
+<summary>Watch: move a connected card and undo</summary>
+
+![Watch: Move a connected card and undo](docs/media/en/move-connected.gif)
+
+</details>
+
+<details>
+<summary>Watch: draw and erase a stroke</summary>
+
+![Watch: Draw and erase a stroke](docs/media/en/draw-and-erase.gif)
+
+</details>
+
+
 ## What is on top of what
 
 Cards can be brought to the front, forward, backward and to the back - from
@@ -224,6 +314,14 @@ reopens it; the "?" beside it says what resolving does. A resolved thread
 stays on the board, and its pin keeps its colour and shows a tick instead of
 the letter. Comments imported from Miro stay read-only and can be hidden. A
 panel lists every comment on the board or in the selection.
+
+<details>
+<summary>Watch: ask, reply and resolve a comment</summary>
+
+![Watch: Ask, reply and resolve a comment](docs/media/en/comment-thread.gif)
+
+</details>
+
 
 ## Locking and review mode
 
@@ -268,6 +366,14 @@ and HTML marks are ignored.
   is being edited: in a card being written it still searches that card, as
   Obsidian does. The setting **Ctrl+F searches the board** turns it off.
 
+<details>
+<summary>Watch: find a card outside the current view</summary>
+
+![Watch: Find a card outside the current view](docs/media/en/board-search.gif)
+
+</details>
+
+
 ## Arranging the panels
 
 The board's menu (the gear in the corner dock) has an **Arrange panels**
@@ -302,6 +408,14 @@ other on a narrow board - with a sidebar open, say: the bar moves to the
 left edge, and when even that is too tight the dock and the minimap rise
 above it. Once you have placed either of them yourself, it stays exactly
 where you put it.
+
+<details>
+<summary>Watch: move the toolbar and turn it into a column</summary>
+
+![Watch: Move the toolbar and turn it into a column](docs/media/en/arrange-panels.gif)
+
+</details>
+
 
 ## Bringing boards over from Miro
 
@@ -370,6 +484,20 @@ around every frame. A presentation's bar has its own export, whose pages are
 its slides. Each page is photographed the way Obsidian's own **Export as
 image** does it and packed into a PDF or a PowerPoint deck; a small window
 shows the progress and can stop it.
+
+Export is available on desktop. Each PDF page or PowerPoint slide is an image
+of the board; the cards and text are not separate editable slide objects.
+
+<details>
+<summary>Watch: pages from frames, PDF and PowerPoint</summary>
+
+![Watch: Pages from frames, PDF and PowerPoint](docs/media/en/export-pages.gif)
+
+The files from this demonstration: [PDF](docs/media/en/export-example.pdf)
+and [PowerPoint](docs/media/en/export-example.pptx).
+
+</details>
+
 
 ## Fonts
 
@@ -743,10 +871,16 @@ and every setting, each showing two things in turn:
 
 1. **How to set it up** - where to click and what to choose. The caption
    starts with "1.", for example "1. Settings → Miro Canvas → Interface".
-2. **The result** on the board. The caption is "2. Result".
+2. **The result** on the board. Name what changed, for example
+   "2. The cards move together".
 
 Each GIF exists in two languages: the English interface for README.md, the
 Russian one for README.ru.md.
+
+**Recorded:** 14 short examples in both languages, placed beside their
+feature descriptions. Coverage, readability review and remaining topics are
+in the [guide review](docs/visual-guide.md). Broad checklist items below stay
+open when a recording covers only part of their actions.
 
 **How**
 
@@ -758,10 +892,12 @@ Russian one for README.ru.md.
    the API and an example are in
    [tools/obsidian_cdp/README.md](tools/obsidian_cdp/README.md). A scenario
    starts with `s.caption({ en: "1. ...", ru: "1. ..." })` and the steps that
-   set the thing up, then `s.caption({ en: "2. Result", ru: "2. Результат" })`
+   set the thing up, then a caption that explains the visible result
    and what it does. One file serves both languages: find elements by class,
-   `data-*` attribute or settings tab id, never by their visible text. Keep a
-   GIF to 5-15 seconds.
+   `data-*` attribute or settings tab id where available; otherwise provide
+   both `textEn` and `textRu`. Keep a
+   GIF to about 8–15 seconds; allow 20–30 seconds for typing or export when
+   shorter timing would hide the result.
 3. Record:
    `node tools/obsidian_cdp/record.mjs --scenario tools/obsidian_cdp/scenarios/<name>.mjs --out docs/media/en/<name>.gif`.
    Then relaunch with `--lang ru --fresh` and record the same scenario into
@@ -829,7 +965,7 @@ push after every commit, no tags."
 - [ ] `tablet-card-drag` - on a tablet: a selected card drags with a finger
   and with a pen; a turned card shows one frame (a tablet or phone; when none
   is at hand, write it down as not recorded).
-- [ ] `export` - Export to PDF or PowerPoint: pages, a page per frame, the
+- [x] `export` - Export to PDF or PowerPoint: pages, a page per frame, the
   export and the file it makes.
 - [ ] `fonts` - downloading a pack and choosing its font on a card.
 - [ ] `welcome-board` - the first-run window and the welcome board.

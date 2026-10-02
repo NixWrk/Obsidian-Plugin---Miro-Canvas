@@ -896,7 +896,13 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
 - [ ] `FUT-012` Write a visual guide to the plugin's features and the order of its settings,
   with screenshots, for users and for the release page. The task is written
   out in the README ("Task: the visual guide"); `tools/obsidian_cdp` records
-  the GIFs in an isolated Obsidian. Left: the GIFs themselves, none recorded yet.
+  the GIFs in an isolated Obsidian. Fourteen focused recordings now exist in
+  both languages, beside their feature descriptions in the READMEs
+  (2026-10-03): Obsidian notes, links and embedded Canvas, shapes, frames,
+  selection, formatting, connections and undo, drawing, comments, search,
+  panel placement and real PDF/PPTX export. See [the guide review](visual-guide.md)
+  for coverage and readability findings. Left: remaining subfeatures, device
+  recordings and settings recordings. The older four recordings remain drafts.
 - [x] `FUT-008` PDF/PPTX export: slides as a deck and marked board areas as pages (done
   2026-09-24, see Export to PDF and PowerPoint).
 - [x] `FUT-002` Move the plugin into its own repository tied to miro2obsidian by a shared

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- PDF and PowerPoint exports no longer include the separately placed minimap.
+- Both READMEs now include fourteen short demonstrations in English and
+  Russian: sticky notes beside real notes, Obsidian links and embeds, another
+  Canvas, shapes, frames, selection, formatting, connected cards and undo,
+  drawing, comments, search, panel placement and PDF/PowerPoint export.
+  Recordings use smooth pointer motion, readable captions and pauses; most
+  examples expand beside their feature descriptions. Export documentation
+  explains that pages and slides are images of the board.
+
 ## 0.2.0 - 2026-10-02
 
 - The bar's tools and where the bar, the dock and the minimap sit are now kept
