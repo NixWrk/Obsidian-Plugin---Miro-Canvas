@@ -32,6 +32,7 @@ function fakeHost(existing: Iterable<string> = []): {
   readonly create: ReturnType<typeof vi.fn>;
   readonly createBinary: ReturnType<typeof vi.fn>;
   readonly openFile: ReturnType<typeof vi.fn>;
+  readonly zoomToBbox: ReturnType<typeof vi.fn>;
 } {
   const files = new Map<string, { readonly path: string }>();
   for (const path of existing) files.set(path, { path });
@@ -47,6 +48,7 @@ function fakeHost(existing: Iterable<string> = []): {
     return file;
   });
   const openFile = vi.fn(async () => {});
+  const zoomToBbox = vi.fn();
   const app = {
     vault: {
       getAbstractFileByPath: (path: string) => files.get(path) ?? null,
@@ -54,11 +56,11 @@ function fakeHost(existing: Iterable<string> = []): {
       create,
       createBinary,
     },
-    workspace: { getLeaf: () => ({ openFile }) },
+    workspace: { getLeaf: () => ({ openFile, view: { canvas: { zoomToBbox } } }) },
   } as unknown as App;
   const isFile = (value: unknown): value is TFile =>
     typeof value === "object" && value !== null && "path" in value;
-  return { host: { app, isFile }, files, createFolder, create, createBinary, openFile };
+  return { host: { app, isFile }, files, createFolder, create, createBinary, openFile, zoomToBbox };
 }
 
 interface CanvasEdge {
@@ -84,10 +86,10 @@ afterEach(() => {
 });
 
 describe("buildWelcomeBoard", () => {
-  it("lays out twelve frames in reading order", () => {
+  it("lays out an introduction, eight sections and a sandbox in reading order", () => {
     const document = buildWelcomeBoard();
     const frames = nodesOf(document).filter((node) => node.type === "group");
-    expect(frames).toHaveLength(12);
+    expect(frames).toHaveLength(10);
     // Reading order: left to right, then top to bottom.
     for (let index = 1; index < frames.length; index += 1) {
       const previous = frames[index - 1]!;
@@ -96,7 +98,7 @@ describe("buildWelcomeBoard", () => {
       expect(sameRow ? current.x > previous.x : current.y > previous.y).toBe(true);
     }
     frames.forEach((frameNode, index) => {
-      expect(frameNode.label).toContain(`${index + 1}.`);
+      if (index > 0 && index < 9) expect(frameNode.label).toContain(`${index}.`);
     });
   });
 
@@ -142,7 +144,7 @@ describe("buildWelcomeBoard", () => {
     }
   });
 
-  it("lays an export page over Welcome and Sticky notes", () => {
+  it("lays export pages over the introduction and the meeting plan", () => {
     const document = buildWelcomeBoard();
     const frames = nodesOf(document).filter((node) => node.type === "group");
     const metadata = document.miroCanvas as { readonly export: { readonly pages: readonly CanvasNode[] } };
@@ -151,7 +153,7 @@ describe("buildWelcomeBoard", () => {
       page.x <= target.x && page.y <= target.y
       && page.x + page.width >= target.x + target.width && page.y + page.height >= target.y + target.height;
     expect(covers(metadata.export.pages[0]!, frames[0]!)).toBe(true);
-    expect(covers(metadata.export.pages[1]!, frames[3]!)).toBe(true);
+    expect(covers(metadata.export.pages[1]!, frames[2]!)).toBe(true);
   });
 
   it("never puts an HTML tag in a card's text", () => {
@@ -171,24 +173,22 @@ describe("buildWelcomeBoard", () => {
     const overrides = Object.values((document.miroCanvas as { readonly localOverrides: Record<string, Record<string, unknown>> }).localOverrides);
     const typography = overrides.map((entry) => entry.typography as Record<string, unknown> | undefined).filter((entry) => entry !== undefined);
     const colors = overrides.map((entry) => entry.colors as Record<string, unknown> | undefined).filter((entry) => entry !== undefined);
-    expect(typography.map((entry) => entry!.fontFamily)).toEqual(expect.arrayContaining(["Inter", "Source Code Pro", "sans-serif", "serif"]));
-    for (const mark of ["bold", "italic", "underline", "strike"]) {
-      expect(typography.some((entry) => (entry!.format as Record<string, unknown> | undefined)?.[mark] === true), mark).toBe(true);
-    }
-    expect(typography.map((entry) => entry!.verticalAlign)).toEqual(expect.arrayContaining(["top", "center", "bottom"]));
+    expect(typography.some((entry) => entry!.fontFamily === "Inter")).toBe(true);
+    expect(typography.some((entry) => (entry!.format as Record<string, unknown> | undefined)?.bold === true)).toBe(true);
     expect(colors.some((entry) => typeof entry!.highlight === "string")).toBe(true);
     expect(colors.some((entry) => typeof entry!.fill === "string")).toBe(true);
-    expect(overrides.map((entry) => entry.borderStyle)).toEqual(expect.arrayContaining(["solid", "dashed", "dotted", "none"]));
+    expect(overrides.some((entry) => entry.locked === true)).toBe(true);
+
   });
 
   it("writes Russian titles once the locale is Russian", () => {
     setLocale("ru");
     const document = buildWelcomeBoard();
     const frames = nodesOf(document).filter((node) => node.type === "group");
-    expect(frames[0]!.label).toContain("Знакомство");
-    expect(frames[3]!.label).toContain("Стикеры");
-    expect(frames[10]!.label).toContain("Файлы");
-    expect(frames[11]!.label).toContain("Экспорт");
+    expect(frames[0]!.label).toContain("Miro и Obsidian");
+    expect(frames[2]!.label).toContain("Стикеры");
+    expect(frames[7]!.label).toContain("файлы");
+    expect(frames[8]!.label).toContain("поделиться");
   });
 
   it("points the files frame at the board's five sample files by default", () => {
@@ -200,9 +200,11 @@ describe("buildWelcomeBoard", () => {
     expect(fileNodes.map((node) => node.file).sort()).toEqual(
       [paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx].sort(),
     );
-    const filesFrame = nodes.filter((node) => node.type === "group")[10]!;
+    const frames = nodes.filter((node) => node.type === "group");
+    const filesFrame = frames[7]!;
+    const planFrame = frames[2]!;
     for (const fileNode of fileNodes) {
-      expect(frame(filesFrame, fileNode.x, fileNode.y, fileNode.width, fileNode.height)).toBe(true);
+      expect(frame(fileNode.file === paths.note ? planFrame : filesFrame, fileNode.x, fileNode.y, fileNode.width, fileNode.height)).toBe(true);
     }
   });
 
@@ -225,7 +227,7 @@ describe("sampleNoteContent and sampleCanvasContent", () => {
     expect(note).not.toMatch(/^#/m);
     expect(note).toContain("This is an ordinary note");
     expect(note.match(/^- /gm)).toHaveLength(2);
-    expect(note).toContain("[[Miro Canvas - Welcome]]");
+    expect(note).toContain("[[Miro Canvas - Start here]]");
   });
 
   it("builds a small canvas with two cards joined by one native edge", () => {
@@ -239,6 +241,21 @@ describe("sampleNoteContent and sampleCanvasContent", () => {
 });
 
 describe("createWelcomeBoard", () => {
+  it("starts a new board at the introduction and preserves the old welcome board", async () => {
+    const oldPath = "Miro Canvas - Welcome.canvas";
+    const { host, files, create, zoomToBbox } = fakeHost([oldPath]);
+    const oldBoard = files.get(oldPath);
+    await createWelcomeBoard(host);
+    expect(files.get(oldPath)).toBe(oldBoard);
+    expect(create).not.toHaveBeenCalledWith(oldPath, expect.anything());
+    expect(zoomToBbox).toHaveBeenCalledWith({ minX: -40, minY: -40, maxX: 940, maxY: 740 });
+  });
+
+  it("keeps the viewport when reopening an existing board", async () => {
+    const { host, zoomToBbox } = fakeHost([words().welcome.fileName]);
+    await createWelcomeBoard(host);
+    expect(zoomToBbox).not.toHaveBeenCalled();
+  });
   it("creates the sample folder and every sample file, then the board, when nothing exists yet", async () => {
     const paths = welcomeSamplePaths();
     const boardPath = words().welcome.fileName;

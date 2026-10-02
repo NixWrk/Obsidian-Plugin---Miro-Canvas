@@ -97,7 +97,8 @@ Obsidian и не снимок страницы GitHub.
 Записи с пальцем, настоящим пером, силой нажатия и ладонью **не сделаны**.
 Для них нужны настоящие устройства. Здесь нет записей macOS/Linux и
 телефона/планшета; серия не выдаётся за проверку всех ОС и устройств.
-Новая доска знакомства пока остаётся отдельной согласованной задачей.
+Новая доска знакомства включена в сборку на русском и английском. Её отдельная
+запись для руководства пока не сделана.
 
 ## English review
 
@@ -140,7 +141,8 @@ and block links, navigation, snapping, themes, imports, plugin-off behaviour,
 font packs, onboarding and individual settings still need recordings.
 The older four recordings remain drafts. Physical touch, stylus pressure
 and palm behaviour were not recorded; there are no macOS/Linux or mobile
-recordings here. The revised welcome board remains a separate agreed task.
+recordings here. The revised welcome board ships in both languages; its own
+guide recording is still pending.
 
 ## Reproduce the review
 

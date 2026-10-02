@@ -892,7 +892,13 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   picture, a PDF and a Word document - and creating the board also creates
   that small sample folder beside it, on the same press, writing only what
   is missing; the binaries live as base64 in `src/welcome-samples.ts`, built
-  and checked by `tools/make_welcome_samples.py`).
+  and checked by `tools/make_welcome_samples.py`). Revised 2026-10-03: the
+  bundled English/Russian board now has an introduction, eight practical
+  sections in two columns and a sandbox. It joins Miro tools with real
+  Obsidian notes, wiki links and another Canvas, explains device layouts,
+  customization and desktop export, and opens new boards at the introduction.
+  New board and sample-folder names preserve older boards and examples;
+  reopening an existing board preserves its contents and viewport.
 - [ ] `FUT-012` Write a visual guide to the plugin's features and the order of its settings,
   with screenshots, for users and for the release page. The task is written
   out in the README ("Task: the visual guide"); `tools/obsidian_cdp` records

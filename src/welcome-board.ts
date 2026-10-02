@@ -1,7 +1,6 @@
 /**
- * The optional welcome board: every tool of the plugin shown on real items,
- * so a new board is not a blank page.  Most frames show rather than tell: a
- * font is written in itself, a colour is painted, a line style is drawn.
+ * The optional welcome board: eight practical sections and a sandbox,
+ * with real notes, cards, lines and files to try.
  *
  * `buildWelcomeBoard` is a pure builder.  It never hand-invents a shape of
  * data: a card's look is the override the selection toolbar writes
@@ -30,7 +29,6 @@
 import type { App, TFile } from "obsidian";
 
 import type { CanvasAnchor } from "./anchors";
-import { OFFERED_FONT_FAMILIES, fontLabel } from "./appearance";
 import { readBoardConnector, nativeEdgeOf, fitsNativeEdge, type BoardConnector } from "./board-connectors";
 import type { CanvasShapeDescriptor } from "./canvas-authoring";
 import { exportRecord, pageAround, paperRatio, type ExportPageRecord, type ExportState } from "./export-pages";
@@ -40,7 +38,6 @@ import { readLocalItem, type LocalItem } from "./local-items";
 import { addLocalComment, addReply } from "./local-comments";
 import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata } from "./metadata";
 import { readableInk } from "./miro-palette";
-import type { ShapeKind } from "./shape-catalog";
 import { WELCOME_SAMPLE_DOCX_BASE64, WELCOME_SAMPLE_PDF_BASE64, WELCOME_SAMPLE_PNG_BASE64, decodeWelcomeSample } from "./welcome-samples";
 
 export interface WelcomeBoardOptions {
@@ -134,17 +131,11 @@ interface CardStyle {
 	readonly locked?: true;
 }
 
-/** The frames, in reading order: four columns, left to right, top to bottom. */
-const FRAMES = [
-	"welcome", "text", "colours", "stickies",
-	"shapes", "lines", "drawing", "layers",
-	"comments", "code", "files", "exportAndMiro",
-] as const;
+/** Introduction, eight sections in two columns, and a place to try things. */
+const FRAMES = ["welcome", "start", "plan", "appearance", "drawing", "comments", "settings", "files", "exportAndMiro", "sandbox"] as const;
 type FrameName = (typeof FRAMES)[number];
-
-const COLUMNS = 4;
-const FRAME_WIDTH = 720;
-const FRAME_HEIGHT = 520;
+const FRAME_WIDTH = 900;
+const FRAME_HEIGHT = 700;
 const GAP = 80;
 
 /** Miro's own colours, the ones the toolbar offers first. */
@@ -164,10 +155,10 @@ const PAPER = {
 const FIXED_TIMESTAMP = "2026-01-01T00:00:00.000Z";
 
 function frameRect(frame: FrameName): Rect {
-	const index = FRAMES.indexOf(frame);
-	const column = index % COLUMNS;
-	const row = Math.floor(index / COLUMNS);
-	return { x: column * (FRAME_WIDTH + GAP), y: row * (FRAME_HEIGHT + GAP), width: FRAME_WIDTH, height: FRAME_HEIGHT };
+	if (frame === "welcome") return { x: 0, y: 0, width: FRAME_WIDTH, height: FRAME_HEIGHT };
+	if (frame === "sandbox") return { x: 0, y: 3900, width: FRAME_WIDTH * 2 + GAP, height: FRAME_HEIGHT };
+	const index = FRAMES.indexOf(frame) - 1;
+	return { x: (index % 2) * (FRAME_WIDTH + GAP), y: 780 + Math.floor(index / 2) * (FRAME_HEIGHT + GAP), width: FRAME_WIDTH, height: FRAME_HEIGHT };
 }
 
 /** A rectangle inside a frame, `dx`/`dy` from its corner. */
@@ -222,10 +213,6 @@ function stroke(color: string, width: number, box: { readonly width: number; rea
 /** The document the welcome board writes: nodes, edges and the plugin's own `miroCanvas` record. */
 export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<string, unknown> {
 	const strings = words().welcome;
-	const tools = words().tools;
-	const toolbar = words().toolbar;
-	const palette = words().palette.builtin;
-	const markerNames = words().palette.highlight;
 	const nextId = idFactory(options.seed ?? 1);
 
 	const nodes: Record<string, unknown>[] = [];
@@ -234,14 +221,14 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	const connectors: Record<string, BoardConnector> = {};
 
 	const titles: Readonly<Record<FrameName, string>> = {
-		welcome: strings.welcomeTitle, text: strings.textTitle, colours: strings.coloursTitle, stickies: strings.stickiesTitle,
-		shapes: strings.shapesTitle, lines: strings.linesTitle, drawing: strings.drawingTitle, layers: strings.layersTitle,
-		comments: strings.commentsTitle, code: strings.codeTitle, files: strings.filesTitle, exportAndMiro: strings.exportAndMiroTitle,
+		welcome: strings.hero, start: strings.startTitle, plan: strings.planTitle, appearance: strings.appearanceTitle,
+		drawing: strings.drawingTitle, comments: strings.discussionTitle, settings: strings.settingsTitle,
+		files: strings.notesTitle, exportAndMiro: strings.shareTitle, sandbox: strings.sandboxTitle,
 	};
 	FRAMES.forEach((frame, index) => {
 		const rect = frameRect(frame);
 		const id = nextId();
-		nodes.push({ id, type: "group", x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: `${index + 1}. ${titles[frame]}` });
+		nodes.push({ id, type: "group", x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: index > 0 && index < 9 ? `${index}. ${titles[frame]}` : titles[frame] });
 		overrides[id] = itemOverride({ type: "frame" });
 	});
 
@@ -278,189 +265,55 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 		}
 	};
 
-	// 1. Welcome: a banner, one line of words, and the tools by their letters.
-	card(within("welcome", 40, 40, 640, 100), "Miro Canvas", {
-		typography: { ...centred(44), format: { bold: true } }, colors: { fill: MIRO.blue, text: "#ffffff" },
+	const samples = options.samples ?? welcomeSamplePaths();
+	const fileNode = (rect: Rect, path: string): void => {
+		nodes.push({ id: nextId(), type: "file", file: path, ...rect });
+	};
+	const explanation = (frame: FrameName, text: string, dy = 360, height = 280): void => {
+		const id = caption(within(frame, 40, dy, 820, height), text);
+		overrides[id] = { ...overrides[id], typography: { fontSize: 22, verticalAlign: "top" } };
+	};
+	card(within("welcome", 40, 30, 820, 130), strings.hero, { typography: { ...centred(36), format: { bold: true } }, colors: painted(PAPER.blue) });
+	explanation("welcome", strings.heroIntro, 180, 90);
+	const origins = [[strings.fromMiro, strings.miroIntro, PAPER.yellow], [strings.fromObsidian, strings.obsidianIntro, PAPER.blue], [strings.yourWay, strings.deviceIntro, PAPER.green]] as const;
+	origins.forEach(([title, body, fill], index) => {
+		card(within("welcome", 40 + index * 285, 290, 250, 290), `**${title}**\n\n${body}`, { typography: { fontSize: 20 }, colors: painted(fill) });
 	});
-	caption(within("welcome", 40, 160, 640, 60), strings.welcomeIntro);
-	const letters: readonly (readonly [string, string, string])[] = [
-		["V", tools.select, MARKER.yellow], ["T", tools.text, MARKER.orange], ["N", tools.sticky, MARKER.pink], ["S", tools.shape, MARKER.violet],
-		["P", tools.pen, MARKER.blue], ["L", tools.connector, MARKER.cyan], ["C", tools.comment, MARKER.green], ["F", tools.frame, MARKER.lime],
-	];
-	letters.forEach(([letter, name, fill], index) => {
-		const column = index % 4;
-		const row = Math.floor(index / 4);
-		card(within("welcome", 40 + column * 165, 240 + row * 110, 145, 90), `**${letter}**\n${name}`, { typography: centred(14), colors: painted(fill) });
-	});
-
-	// 2. Text: each font the toolbar offers, written in itself; sizes; the four
-	// marks; and where text sits in its card.
-	OFFERED_FONT_FAMILIES.forEach((fontFamily, index) => {
-		card(within("text", 40 + index * 165, 40, 145, 60), fontLabel(fontFamily), { typography: { ...centred(14), fontFamily } });
-	});
-	[14, 20, 28, 40].forEach((fontSize, index) => {
-		card(within("text", 40 + index * 165, 120, 145, 90), String(fontSize), { typography: centred(fontSize) });
-	});
-	const marks = [["bold", toolbar.bold], ["italic", toolbar.italic], ["underline", toolbar.underline], ["strike", toolbar.strikethrough]] as const;
-	marks.forEach(([mark, name], index) => {
-		card(within("text", 40 + index * 165, 230, 145, 60), name, { typography: { ...centred(13), format: { [mark]: true } } });
-	});
-	const placements = [["left", "top", toolbar.alignLeft], ["center", "center", toolbar.alignCenter], ["right", "bottom", toolbar.alignRight]] as const;
-	placements.forEach(([alignment, verticalAlign, name], index) => {
-		card(within("text", 40 + index * 220, 310, 200, 130), name, { typography: { fontSize: 16, alignment, verticalAlign } });
-	});
-
-	// 3. Colours: text in its colour, marker colours, fills, borders, and Markdown's own marks.
-	const inks = [[palette.red, MIRO.red], [palette.orange, MIRO.orange], [palette.blue, MIRO.blue], [palette.purple, MIRO.purple]] as const;
-	inks.forEach(([name, text], index) => {
-		card(within("colours", 40 + index * 165, 40, 145, 60), name, { typography: { ...centred(15), format: { bold: true } }, colors: { text } });
-	});
-	const markers = [[markerNames.yellow, MARKER.yellow], [markerNames.green, MARKER.green], [markerNames.pink, MARKER.pink], [markerNames.blue, MARKER.blue]] as const;
-	markers.forEach(([name, highlight], index) => {
-		card(within("colours", 40 + index * 165, 120, 145, 60), `==${name}==`, { typography: centred(20), colors: { highlight } });
-	});
-	const fills = [[palette.yellow, MIRO.yellow], [palette.green, MIRO.green], [palette.blue, MIRO.blue], [palette.purple, MIRO.purple]] as const;
-	fills.forEach(([name, fill], index) => {
-		card(within("colours", 40 + index * 165, 200, 145, 70), name, { typography: centred(15), colors: painted(fill) });
-	});
-	const borders = [
-		["solid", 2, MIRO.blue, toolbar.solidBorder], ["dashed", 4, MIRO.red, toolbar.dashedBorder],
-		["dotted", 4, MIRO.green, toolbar.dottedBorder], ["none", 0, undefined, toolbar.noBorder],
-	] as const;
-	borders.forEach(([borderStyle, borderWidth, border, name], index) => {
-		card(within("colours", 40 + index * 165, 290, 145, 70), name, {
-			typography: centred(14), borderStyle, ...(border === undefined ? {} : { borderWidth, colors: { border } }),
-		});
-	});
-	card(within("colours", 40, 390, 640, 70), strings.markdownSample);
-
-	// 4. Sticky notes: Miro's colours, and a longer note that fits its text by itself.
-	const stickies = [
-		["yellow", strings.sticky1], ["orange", strings.sticky2], ["light_pink", strings.sticky3], ["light_green", strings.sticky4],
-		["light_blue", strings.sticky5], ["red", strings.sticky6], ["violet", strings.sticky7], ["cyan", strings.stickyLong],
-	] as const;
-	stickies.forEach(([color, text], index) => {
-		const column = index % 4;
-		const row = Math.floor(index / 4);
-		item(within("stickies", 40 + column * 165, 100 + row * 165, 145, 145), text, { type: "sticky_note", color });
-	});
-
-	// 5. Shapes and flowcharts: a gallery of outlines, and a small flow with a loop.
-	// Kinds and their flowchart meaning come from shape-catalog.ts's SHAPE_CATALOG.
-	const gallery: readonly (readonly [ShapeKind, string])[] = [
-		["rectangle", PAPER.blue], ["round_rectangle", PAPER.green], ["circle", PAPER.orange],
-		["triangle", PAPER.pink], ["rhombus", PAPER.yellow], ["star", PAPER.gold],
-		["hexagon", PAPER.cyan], ["cloud", PAPER.violet], ["right_arrow", PAPER.red],
-	];
-	gallery.forEach(([kind, fill], index) => {
-		const column = index % 3;
-		const row = Math.floor(index / 3);
-		card(within("shapes", 40 + column * 120, 60 + row * 120, 100, 100), "", { shape: { kind, fallback: "text" }, colors: painted(fill) });
-	});
-	const flow: readonly (readonly [ShapeKind, string, number, number, string])[] = [
-		["flow_chart_terminator", strings.flowStart, 40, 60, PAPER.green],
-		["rectangle", strings.flowStep, 150, 60, PAPER.blue],
-		["rhombus", strings.flowDecision, 260, 120, PAPER.yellow],
-		["flow_chart_terminator", strings.flowDone, 420, 60, PAPER.green],
-	];
-	const flowIds = flow.map(([kind, text, dy, height, fill]) =>
-		card(within("shapes", 400, dy, 220, height), text, { shape: { kind, fallback: "text" }, typography: centred(16), colors: painted(fill) }));
-	const flowEdges: readonly (readonly [number, string, number, string, string | undefined])[] = [
-		[0, "bottom", 1, "top", strings.flowNext],
-		[1, "bottom", 2, "top", undefined],
-		[2, "bottom", 3, "top", strings.flowYes],
-		[2, "right", 1, "right", strings.flowNo],
-	];
-	for (const [from, fromSide, to, toSide, label] of flowEdges) {
-		edges.push({
-			id: nextId(), fromNode: flowIds[from], fromSide, toNode: flowIds[to], toSide,
-			...(label === undefined ? {} : { label }),
-		});
+	card(within("welcome", 40, 610, 820, 60), strings.route, { typography: centred(20), borderStyle: "none" });
+	explanation("start", strings.startSteps, 40, 600);
+	const first = item(within("plan", 40, 40, 210, 170), strings.meetingIdea, { type: "sticky_note", color: "yellow" });
+	const second = item(within("plan", 345, 40, 210, 170), strings.meetingStep, { type: "sticky_note", color: "light_blue" });
+	const third = item(within("plan", 650, 40, 210, 170), strings.meetingDone, { type: "sticky_note", color: "light_green" });
+	for (const [from, to] of [[first, second], [second, third]]) {
+		connect({ from: { type: "node", nodeId: from, u: 1, v: 0.5 }, to: { type: "node", nodeId: to, u: 0, v: 0.5 } });
 	}
-
-	// 6. Lines and arrows: a labelled line between two cards, then line styles
-	// drawn from point to point - dashes, dots, ends, widths, elbows and curves.
-	const fromId = card(within("lines", 40, 40, 180, 80), strings.lineFrom, { typography: centred(18) });
-	const toId = card(within("lines", 500, 40, 180, 80), strings.lineTo, { typography: centred(18) });
-	connect({
-		from: { type: "node", nodeId: fromId, u: 1, v: 0.5 }, to: { type: "node", nodeId: toId, u: 0, v: 0.5 },
-		label: strings.lineConnects,
-	});
-	const styles: readonly Partial<BoardConnector>[] = [
-		{},
-		{ strokeStyle: "dashed", color: MIRO.red, width: 3, endCap: "arrow" },
-		{ strokeStyle: "dotted", color: MIRO.green, width: 3, startCap: "filled_oval", endCap: "filled_triangle" },
-		{ color: MIRO.purple, width: 6, startCap: "stealth", endCap: "stealth" },
-	];
-	styles.forEach((style, index) => {
-		const dy = 190 + index * 65;
-		connect({ from: pointIn("lines", 60, dy), to: pointIn("lines", 320, dy), ...style });
-	});
-	connect({ from: pointIn("lines", 400, 180), to: pointIn("lines", 660, 290), route: "elbowed", color: MIRO.orange, label: strings.lineElbowed });
-	connect({ from: pointIn("lines", 400, 330), to: pointIn("lines", 660, 400), route: "curved", color: MIRO.purple, width: 3, label: strings.lineCurved });
-	caption(within("lines", 40, 440, 640, 40), strings.linesHint);
-
-	// 7. Drawing: pen strokes in three colours, then highlighter strokes, each
-	// row named by its tool.  A stroke is an item of its own: nothing here
-	// lies over a card, where it would look like part of it.
-	{
-		const box = { width: 300, height: 120 };
-		const points: number[] = [];
-		for (let index = 0; index <= 12; index += 1) {
-			const t = index / 12;
-			points.push(t * box.width, box.height / 2 - Math.sin(t * Math.PI * 2) * box.height * 0.35);
-		}
-		item(within("drawing", 60, 40, box.width, box.height), "", stroke(MIRO.blue, 4, box, points));
-	}
-	{
-		const box = { width: 110, height: 90 };
-		item(within("drawing", 410, 55, box.width, box.height), "", stroke(MIRO.green, 6, box, [0, 50, 40, 90, 110, 0]));
-	}
-	{
-		const box = { width: 110, height: 110 };
-		const points: number[] = [];
-		for (let index = 0; index <= 24; index += 1) {
-			const angle = (index / 24) * Math.PI * 2;
-			points.push(55 + Math.cos(angle) * 50, 55 + Math.sin(angle) * 50);
-		}
-		item(within("drawing", 560, 45, box.width, box.height), "", stroke(MIRO.red, 4, box, points));
-	}
-	caption(within("drawing", 40, 170, 640, 36), tools.pen);
-	{
-		const box = { width: 280, height: 60 };
-		item(within("drawing", 60, 240, box.width, box.height), "", stroke(MIRO.yellow, 22, box, [0, 45, 70, 15, 140, 45, 210, 15, 280, 45], 0.5));
-	}
-	{
-		const box = { width: 280, height: 60 };
-		item(within("drawing", 400, 240, box.width, box.height), "", stroke(MIRO.green, 22, box, [0, 30, 280, 30], 0.5));
-	}
-	caption(within("drawing", 40, 320, 640, 36), tools.highlighter);
-	caption(within("drawing", 40, 420, 640, 40), strings.drawingHint);
-
-	// 8. Layers and locking: three overlapping cards, back to front by their
-	// order in `nodes`, and a locked one beside them.
-	const layers = [[strings.layerBack, PAPER.blue], [strings.layerMiddle, PAPER.yellow], [strings.layerFront, PAPER.rose]] as const;
-	layers.forEach(([text, fill], index) => {
-		card(within("layers", 60 + index * 100, 40 + index * 70, 240, 150), text, { typography: { fontSize: 18 }, colors: painted(fill) });
-	});
-	card(within("layers", 510, 60, 170, 110), strings.lockedCard, { typography: centred(15), colors: painted(MARKER.gray), locked: true });
-	caption(within("layers", 40, 400, 640, 60), strings.layersHint);
-
-	// 9. Comments: one pinned to a card, with a reply, and one on the empty
-	// board - built with the same mutations the comments panel calls.
-	const commentCardId = card(within("comments", 200, 120, 320, 140), strings.commentCard, { typography: centred(18) });
+	fileNode(within("plan", 40, 250, 820, 210), samples.note);
+	explanation("plan", strings.planHint, 490, 160);
+	card(within("appearance", 40, 40, 270, 220), strings.important, { typography: { fontSize: 30, fontFamily: "Inter", format: { bold: true } }, colors: { highlight: MARKER.yellow } });
+	card(within("appearance", 365, 70, 200, 160), strings.meetingStep, { shape: { kind: "rhombus", fallback: "text" }, typography: centred(22), colors: painted(PAPER.green) });
+	item(within("appearance", 630, 40, 230, 220), strings.myIdea, { type: "sticky_note", color: "light_pink" });
+	explanation("appearance", strings.appearanceHint);
+	connect({ from: pointIn("drawing", 40, 70), to: pointIn("drawing", 340, 70), color: MIRO.blue });
+	connect({ from: pointIn("drawing", 480, 40), to: pointIn("drawing", 820, 120), route: "elbowed", color: MIRO.orange });
+	connect({ from: pointIn("drawing", 40, 180), to: pointIn("drawing", 340, 250), route: "curved", color: MIRO.purple });
+	item(within("drawing", 480, 180, 340, 100), "", stroke(MIRO.blue, 4, { width: 340, height: 100 }, [0, 60, 50, 20, 100, 70, 160, 25, 230, 75, 340, 15]));
+	item(within("drawing", 40, 285, 300, 24), "", stroke(MIRO.yellow, 22, { width: 300, height: 24 }, [0, 12, 300, 12], 0.5));
+	explanation("drawing", strings.drawingPractice, 320, 330);
+	const commentCardId = card(within("comments", 40, 70, 390, 180), strings.meetingPlace, { typography: centred(28), colors: painted(PAPER.blue) });
+	card(within("comments", 480, 70, 380, 180), strings.lockedCard, { typography: centred(24), locked: true, colors: painted(MARKER.gray) });
+	explanation("comments", strings.discussionHint, 330, 320);
 	let commentsMetadata: Record<string, unknown> = { schemaVersion: MIRO_CANVAS_SCHEMA_VERSION };
 	const commentOptions = { idFactory: () => nextId(), now: () => FIXED_TIMESTAMP };
 	const addedComment = addLocalComment(
 		commentsMetadata,
-		{ text: strings.comment, anchor: { type: "node", nodeId: commentCardId, u: 0.9, v: 0.1 } },
+		{ text: strings.meetingComment, anchor: { type: "node", nodeId: commentCardId, u: 0.9, v: 0.1 } },
 		commentOptions,
 	);
 	if (!addedComment.ok || addedComment.metadata === undefined || addedComment.comment === undefined) {
 		throw new Error("welcome board: the pinned comment was rejected");
 	}
 	commentsMetadata = addedComment.metadata;
-	const addedReply = addReply(commentsMetadata, addedComment.comment.id, strings.reply, commentOptions);
+	const addedReply = addReply(commentsMetadata, addedComment.comment.id, strings.meetingReply, commentOptions);
 	if (!addedReply.ok || addedReply.metadata === undefined) {
 		throw new Error("welcome board: the reply was rejected");
 	}
@@ -471,44 +324,21 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	}
 	commentsMetadata = addedAnywhere.metadata;
 
-	// 10. Code and tables: a code block with a title, and a Markdown table.
-	item(within("code", 40, 40, 640, 120), "```js\n" + strings.codeBody + "\n```", { type: "code", title: strings.codeFileName });
-	{
-		const table = [
-			`| ${strings.tableStep} | ${strings.tableStatus} |`,
-			"| --- | --- |",
-			`| ${strings.tableImport} | ${strings.tableImportStatus} |`,
-			`| ${strings.tableStyle} | ${strings.tableStyleStatus} |`,
-		].join("\n");
-		item(within("code", 40, 200, 640, 160), table, { type: "table", title: strings.tableTitle });
-	}
-
-	// 11. Files and notes: native Canvas file nodes, pointing at the sample
-	// folder `createWelcomeBoard` writes alongside this board - a note,
-	// another canvas, and the three attachment kinds Canvas already knows how
-	// to show.  Sizes stay "about" the ones asked for: the frame has no room
-	// to spare once a page-tall PDF preview sits beside everything else.
-	const samples = options.samples ?? welcomeSamplePaths();
-	const fileNode = (rect: Rect, path: string): void => {
-		nodes.push({ id: nextId(), type: "file", file: path, x: round(rect.x), y: round(rect.y), width: round(rect.width), height: round(rect.height) });
-	};
-	fileNode(within("files", 40, 40, 300, 160), samples.note);
-	fileNode(within("files", 380, 40, 300, 160), samples.canvas);
-	fileNode(within("files", 40, 220, 200, 140), samples.picture);
-	fileNode(within("files", 260, 220, 200, 200), samples.pdf);
-	fileNode(within("files", 480, 220, 200, 120), samples.docx);
-	caption(within("files", 40, 430, 640, 60), strings.filesHint);
-
-	// 12. Export and Miro import: where each one lives, one card apiece,
-	// stacked in the frame that used to hold "Export" and "Bring your Miro
-	// boards" on their own.
-	card(within("exportAndMiro", 40, 40, 640, 140), strings.exportHint, { typography: centred(20) });
-	card(within("exportAndMiro", 40, 220, 640, 140), strings.fromMiroHint, { typography: { ...centred(22), format: { bold: true } }, colors: painted(MIRO.yellow) });
-
-	// The export pages: one A4 sheet over Welcome, one over Sticky notes, so
-	// the export panel opens with something to show.
+	card(within("settings", 40, 40, 820, 100), strings.devices, { typography: centred(24), colors: painted(PAPER.green) });
+	explanation("settings", strings.settingsSteps, 180, 470);
+	fileNode(within("files", 40, 40, 380, 170), samples.canvas);
+	card(within("files", 460, 40, 400, 170), `[[${samples.note.replace(/\.md$/, "")}|${strings.openSampleNote}]]`, { typography: centred(22) });
+	fileNode(within("files", 40, 250, 200, 160), samples.picture);
+	fileNode(within("files", 270, 250, 210, 220), samples.pdf);
+	fileNode(within("files", 520, 250, 160, 140), samples.docx);
+	item(within("files", 520, 420, 340, 140), `| ${strings.tableStep} | ${strings.tableStatus} |\n| --- | --- |\n| ${strings.meetingPlace} | ${strings.tableStyleStatus} |`, { type: "table", title: strings.tableTitle });
+	const filesHint = caption(within("files", 40, 560, 820, 120), strings.notesPractice);
+	overrides[filesHint] = { ...overrides[filesHint], typography: { fontSize: 18, verticalAlign: "top" } };
+	explanation("exportAndMiro", strings.shareSteps, 40, 610);
+	explanation("sandbox", strings.sandboxHint, 40, 130);
+	item(within("sandbox", 80, 250, 250, 250), strings.myIdea, { type: "sticky_note", color: "yellow" });
 	const ratio = paperRatio("a4", "landscape");
-	const exportPages: ExportPageRecord[] = (["welcome", "stickies"] as const).map((frame) => ({
+	const exportPages: ExportPageRecord[] = (["welcome", "plan"] as const).map((frame) => ({
 		id: nextId(), ...pageAround(frameRect(frame), ratio, 40), name: titles[frame],
 	}));
 	const exportState: ExportState = { format: "a4", orientation: "landscape", quality: "standard", pages: exportPages };
@@ -600,5 +430,13 @@ export async function createWelcomeBoard(host: WelcomeBoardHost): Promise<TFile>
 	if (!host.isFile(file)) throw new Error("welcome board: the written file is not a TFile");
 	const leaf = host.app.workspace.getLeaf("tab");
 	await leaf.openFile(file, { active: true });
+	if (existing === null) {
+		// Native Canvas fits the whole board on first open; start at readable text.
+		const view = leaf.view as unknown as { readonly canvas?: { zoomToBbox?: (bounds: { minX: number; minY: number; maxX: number; maxY: number }) => void } };
+		const canvas = view?.canvas;
+		if (typeof canvas?.zoomToBbox === "function") {
+			canvas.zoomToBbox({ minX: -40, minY: -40, maxX: FRAME_WIDTH + 40, maxY: FRAME_HEIGHT + 40 });
+		}
+	}
 	return file;
 }

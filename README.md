@@ -96,7 +96,7 @@ Found in neither, and added here:
   one list of the fonts you want to see.
 - **Miro boards in your vault** - with a separate free program, whole boards
   come over with their look; the Miro data rides along untouched.
-- **A welcome board** that shows every tool on real items.
+- **A welcome board** with short tasks, real notes and examples to try.
 - **A documented file** - everything the plugin adds sits under one key of
   the Canvas file and follows a published schema, so other programs and AI
   agents can read it.
@@ -118,15 +118,19 @@ Code block, table and web link start under the **+** menu at the end of the
 bar. Settings → Miro Canvas → **Tool bar** chooses which tools sit on the bar
 and in what order; the rest stay under **+**.
 
-The first time the plugin starts it offers a **welcome board** - twelve frames
-with every tool on real items: text in several fonts and marks, colours and
-markers, sticky notes, shapes and a flowchart, lines of every style, drawing,
-layers, comments, code and tables, a note and other files, export pages - and
-asks whether you want to import boards from Miro. Any answer is fine: both
+The first time the plugin starts it offers a **welcome board** in English or
+Russian: eight short sections, an introduction and a space to try things.
+Start with a sticky note, then explore a meeting plan, formatting, drawing,
+comments, device settings, real Obsidian notes and files, and export.
+The introduction shows what Miro's tools and Obsidian's files bring together.
+The plugin also asks whether you want to import boards from Miro. Both
 stay under Settings → Miro Canvas → **Getting started**. Creating the board
 also creates a small folder of sample files beside it (a note, a small
-canvas, a picture, a PDF and a Word document), so its "Files and notes" frame
-always points at real files.
+canvas, a picture, a PDF and a Word document), so its notes and files section
+always points at real files. A new board opens with the introduction in view.
+Use the minimap to move between sections. The revised board is named
+**Miro Canvas - Start here.canvas**; older welcome boards and existing sample
+files are preserved.
 
 ## Obsidian notes and links
 

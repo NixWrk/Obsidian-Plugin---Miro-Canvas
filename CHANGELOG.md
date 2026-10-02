@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The welcome board now ships in English and Russian with an introduction,
+  eight practical sections and a sandbox: Miro tools beside Obsidian notes,
+  links and another Canvas, device layouts, customization and desktop export.
+  New boards open at a readable introduction. The new Start here filename
+  preserves older welcome boards and never overwrites existing samples.
 - PDF and PowerPoint exports no longer include the separately placed minimap.
 - Both READMEs now include fourteen short demonstrations in English and
   Russian: sticky notes beside real notes, Obsidian links and embeds, another
