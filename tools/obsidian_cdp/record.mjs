@@ -25,11 +25,12 @@ const INJECT_OVERLAY_JS = `
     const style = document.createElement('style');
     style.id = '__cdp_overlay_style__';
     style.textContent = \`
-      #__cdp_cursor__ { position:fixed; left:0; top:0; z-index:2147483647; width:16px; height:16px; pointer-events:none; }
-      #__cdp_cursor__::before { content:''; position:absolute; inset:0; background:#fff; border:1.5px solid #1a1a1a; border-radius:2px 60% 60% 60%; transform:rotate(-45deg); box-shadow:0 1px 3px rgba(0,0,0,.7); }
+      #__cdp_cursor__ { position:fixed; left:0; top:0; z-index:2147483647; width:18px; height:24px; pointer-events:none; filter:drop-shadow(0 1px 1px #000); }
+      #__cdp_cursor__::before { content:''; position:absolute; inset:0; background:#fff; clip-path:polygon(0 0,0 85%,25% 65%,45% 100%,65% 90%,45% 57%,90% 57%); }
       #__cdp_cursor__.__cdp_click__::after { content:''; position:absolute; left:8px; top:8px; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%; background:rgba(255,80,80,.9); animation:__cdp_ripple__ .5s ease-out; }
       @keyframes __cdp_ripple__ { from { transform:scale(1); opacity:1; } to { transform:scale(5); opacity:0; } }
-      #__cdp_caption__ { position:fixed; left:0; top:0; right:0; z-index:2147483647; box-sizing:border-box; padding:10px 18px; background:rgba(20,20,20,.85); color:#fff; font:600 15px/1.4 sans-serif; text-align:center; display:none; }
+      body:has(.miro-canvas-exporting) :is(#__cdp_cursor__, #__cdp_caption__) { visibility:hidden !important; }
+      #__cdp_caption__ { position:fixed; left:0; top:0; right:0; z-index:2147483647; box-sizing:border-box; padding:10px 18px; background:rgba(20,20,20,.85); color:#fff; font:600 20px/1.4 sans-serif; text-align:center; display:none; }
     \`;
     document.head.appendChild(style);
     const cursor = document.createElement('div');
@@ -71,6 +72,7 @@ class WindowConnection {
     this.unsubscribe = unsubscribe;
     this.recording = false;
     this.sessionId = null;
+    this.cursor = null;
   }
 }
 
@@ -93,7 +95,10 @@ class Recorder {
       if (connection) connection.sessionId = params.sessionId;
       // Timestamp is seconds since epoch (CDP's Page.ScreencastFrameMetadata);
       // frames_to_gif.py only needs the *differences* between them.
-      this.frames.push({ dataBase64: params.data, timestampMs: params.metadata.timestamp * 1000 });
+      const timestampMs = params.metadata.timestamp * 1000;
+      if (connection?.recording && timestampMs >= connection.startedAt) {
+        this.frames.push({ dataBase64: params.data, timestampMs });
+      }
       // Ack without waiting - waiting would just delay the next frame.
       void send("Page.screencastFrameAck", { sessionId: params.sessionId });
     });
@@ -106,14 +111,15 @@ class Recorder {
   async startScreencast(connection) {
     if (connection.recording) return;
     await connection.send("Page.bringToFront");
-    await connection.send("Page.startScreencast", { format: "png", everyNthFrame: 1 });
+    connection.startedAt = Date.now();
     connection.recording = true;
+    await connection.send("Page.startScreencast", { format: "png", everyNthFrame: 1 });
   }
 
   async stopScreencast(connection) {
     if (!connection.recording) return;
-    await connection.send("Page.stopScreencast");
     connection.recording = false;
+    await connection.send("Page.stopScreencast");
   }
 
   /** Switches which window is recorded and receives input: stops the old screencast, starts the new one - the same open connections are kept, so switching back and forth is cheap. */
@@ -155,6 +161,8 @@ async function findElement(recorder, { selector = "*", textEn, textRu, controlSe
     const controlSelector = ${JSON.stringify(controlSelector ?? null)};
     const nodes = Array.from(document.querySelectorAll(${JSON.stringify(selector)}));
     const match = nodes.find((el) => {
+      const box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0 || el.closest('[hidden]')) return false;
       if (wanted.length === 0) return true;
       const text = (el.textContent || "").trim();
       return wanted.some((want) => text === want || text.includes(want));
@@ -162,7 +170,8 @@ async function findElement(recorder, { selector = "*", textEn, textRu, controlSe
     if (!match) return null;
     const scoped = controlSelector ? match.querySelector(controlSelector) : match;
     if (!scoped) return null;
-    scoped.scrollIntoView({ block: "center", inline: "center" });
+    // Canvas places cards with transforms; scrolling them shifts the whole board.
+    if (!scoped.closest(".canvas-wrapper")) scoped.scrollIntoView({ block: "center", inline: "center" });
     const rect = scoped.getBoundingClientRect();
     return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2), width: rect.width, height: rect.height };
   `;
@@ -171,6 +180,25 @@ async function findElement(recorder, { selector = "*", textEn, textRu, controlSe
 
 async function moveCursor(recorder, x, y, click = false) {
   await evaluate(recorder.current.send, `window.__cdpMoveCursor(${x}, ${y}, ${click ? "true" : "false"}); return true;`);
+  recorder.current.cursor = { x, y };
+}
+
+/** A visible approach to the next card or button, with a gentle start and stop. */
+async function approach(recorder, target, duration = 0, buttons = 0) {
+  const end = await resolvePoint(recorder, target);
+  const start = recorder.current.cursor ?? end;
+  const started = performance.now();
+  let progress = 0;
+  do {
+    progress = duration > 0 ? Math.min(1, (performance.now() - started) / duration) : 1;
+    const eased = progress * progress * (3 - 2 * progress);
+    const x = start.x + (end.x - start.x) * eased;
+    const y = start.y + (end.y - start.y) * eased;
+    await moveCursor(recorder, x, y);
+    await dispatchMouse(recorder, "mouseMoved", x, y, { buttons });
+    if (progress < 1) await sleep(16);
+  } while (progress < 1);
+  return end;
 }
 
 async function dispatchMouse(recorder, type, x, y, extra = {}) {
@@ -189,31 +217,29 @@ function buildScenarioApi(recorder, lang) {
 
     find: (target) => findElement(recorder, target),
 
-    click: async (target) => {
+    click: async (target, { count = 1 } = {}) => {
       const { x, y } = await resolvePoint(recorder, target);
       await moveCursor(recorder, x, y);
       await dispatchMouse(recorder, "mouseMoved", x, y);
       await sleep(120);
-      await dispatchMouse(recorder, "mousePressed", x, y);
+      await dispatchMouse(recorder, "mousePressed", x, y, { clickCount: count });
       await moveCursor(recorder, x, y, true);
       await sleep(80);
-      await dispatchMouse(recorder, "mouseReleased", x, y);
+      await dispatchMouse(recorder, "mouseReleased", x, y, { clickCount: count });
     },
 
-    move: async (target) => {
-      const { x, y } = await resolvePoint(recorder, target);
-      await moveCursor(recorder, x, y);
-      await dispatchMouse(recorder, "mouseMoved", x, y);
-    },
+    move: (target, { duration = 0 } = {}) => approach(recorder, target, duration),
 
-    drag: async (from, to, { steps = 12 } = {}) => {
+    drag: async (from, to, { steps = 12, duration } = {}) => {
       const start = await resolvePoint(recorder, from);
       const end = await resolvePoint(recorder, to);
       await moveCursor(recorder, start.x, start.y);
       await dispatchMouse(recorder, "mouseMoved", start.x, start.y);
       await sleep(100);
       await dispatchMouse(recorder, "mousePressed", start.x, start.y);
-      for (let step = 1; step <= steps; step += 1) {
+      if (duration !== undefined) {
+        await approach(recorder, end, duration, 1);
+      } else for (let step = 1; step <= steps; step += 1) {
         const x = Math.round(start.x + (end.x - start.x) * (step / steps));
         const y = Math.round(start.y + (end.y - start.y) * (step / steps));
         await moveCursor(recorder, x, y);
@@ -223,8 +249,14 @@ function buildScenarioApi(recorder, lang) {
       await dispatchMouse(recorder, "mouseReleased", end.x, end.y);
     },
 
-    type: (text) => insertText(recorder.current.send, text),
-    key: (name) => pressKey(recorder.current.send, name),
+    type: async (text, { interval = 0 } = {}) => {
+      if (interval <= 0) return insertText(recorder.current.send, text);
+      for (const character of text) {
+        await insertText(recorder.current.send, character);
+        await sleep(interval);
+      }
+    },
+    key: (name, options) => pressKey(recorder.current.send, name, options),
     wait: (ms) => sleep(ms),
     eval: (code) => evaluate(recorder.current.send, code),
 
@@ -288,9 +320,24 @@ async function runScenario(scenarioPath, port, outPath, fps, width) {
 
   const scenarioModule = await import(pathToFileURL(path.resolve(scenarioPath)).href);
   try {
+    if (scenarioModule.prepare) {
+      await recorder.stopScreencast(recorder.current);
+      await scenarioModule.prepare(s);
+      frames.length = 0;
+      const initialFrame = await recorder.current.send("Page.captureScreenshot", { format: "png" });
+      if (initialFrame.result?.data) frames.push({ dataBase64: initialFrame.result.data, timestampMs: Date.now() });
+      await recorder.startScreencast(recorder.current);
+    }
     await scenarioModule.default(s);
+    // A still page sends no screencast frames. Keep the final reading pause.
+    const finalFrame = await recorder.current.send("Page.captureScreenshot", { format: "png" });
+    if (finalFrame.result?.data) frames.push({ dataBase64: finalFrame.result.data, timestampMs: Date.now() });
   } finally {
-    await recorder.close();
+    try {
+      await scenarioModule.cleanup?.(s);
+    } finally {
+      await recorder.close();
+    }
   }
 
   if (frames.length === 0) throw new Error("no frames were captured; the scenario ran but nothing was recorded");

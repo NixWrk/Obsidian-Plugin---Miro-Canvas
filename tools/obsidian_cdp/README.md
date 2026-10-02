@@ -188,9 +188,12 @@ Requires an instance already running on `--port` (start one with
 preserved), pads any frame shorter than the tallest onto one shared canvas
 size (relevant when the scenario visits a differently-sized window, such as
 Settings), times each frame from its neighbours' real timestamps (thinned to
-roughly `--fps`, clamped between 20ms and 1200ms, with the last frame held
+roughly `--fps`, clamped between 20ms and 10000ms, with the last frame held
 for at least 900ms so the final state is readable), and saves a
-looping (`loop=0`), optimized GIF. It prints the frame count and file size,
+looping (`loop=0`), optimized GIF. One palette sampled across the recording
+keeps colours stable; unchanged pixels are reused instead of clearing each
+frame. A final screenshot preserves a reading pause even on a still board.
+It prints the frame count and file size,
 and warns on stderr above 4 MiB - GIFs are inherently large for anything but
 a short, low-motion scenario; keep scenarios brief and captions few if you
 are near the limit.
@@ -213,6 +216,21 @@ python tools/obsidian_cdp/stop.py --port 9336
 GIFs go at `docs/media/<lang>/<scenario-name>.gif`. Embed one in a README
 with plain Markdown: `![Sticky note](docs/media/en/sticky-note.gif)`.
 
+The published series and its remaining coverage are listed in
+[the guide review](../../docs/visual-guide.md). `_guide.mjs` prepares native
+demo boards and resets panel placement between scenarios. It moves the cursor
+away from the minimap when a result is held, to avoid a hover hint.
+`export-pages.mjs` exercises the actual PDF/PPTX exporters; only the operating
+system's save location is predetermined inside the isolated vault. Cleanup
+restores the save-dialog function. The recording overlay hides while the
+plugin captures a page, so captions and the cursor never enter exported files.
+
+After recording both languages, run `python tools/obsidian_cdp/audit_guide.py`
+to check their README references, dimensions, durations and file sizes, and
+write start/middle/end contact sheets for manual review into `.out/guide-review`.
+Test the recording helpers with `node --test tools/obsidian_cdp/tests/cdp-key-events.test.mjs`
+and `python -m pytest -q tools/obsidian_cdp/tests`.
+
 ## Writing a scenario
 
 A scenario is a `.mjs` file whose default export is `async function (s) { ... }`.
@@ -230,14 +248,23 @@ A scenario is a `.mjs` file whose default export is `async function (s) { ... }`
   along with the fake cursor - a scenario never has to clean these up itself.
 - `s.click(target)`, `s.move(target)` - `target` is `{ x, y }`,
   `{ selector: "css selector" }`, or the object `s.find` returns.
+- `s.click(target, { count: 2 })` - a double click.
+- `s.move(target, { duration: 700 })` - approach the target smoothly over
+  700 ms. Without a duration, movement stays immediate for older scenarios.
 - `s.drag(from, to, { steps })` - `from`/`to` are the same kind of target;
   `steps` (default 12) is how many intermediate `mousemove` points to send.
+- `s.drag(from, to, { duration: 1000 })` - a smooth drag lasting about a
+  second, with a gentle start and stop, independent of the number of steps.
 - `s.type(text)` - `Input.insertText` into whatever has focus (one native
   insert, not a key per character).
+- `s.type(text, { interval: 95 })` - insert characters with a 95 ms pause
+  between them, so a viewer can follow the text being written.
 - `s.key(name)` - one key press. Named keys: `Escape`, `Enter`, `Tab`,
   `Backspace`, `Delete`, `Space`, `ArrowLeft/Up/Right/Down` (see
   `KEY_TABLE` in `cdp.mjs`); a single letter or digit (`"N"`, `"5"`) also
   works, for the board's own tool hotkeys.
+- `s.key("A", { modifiers: 2 })` - Ctrl+A. CDP modifier bits are Alt=1,
+  Ctrl=2, Meta=4, Shift=8; modified shortcuts do not insert a character.
 - `s.wait(ms)`.
 - `s.eval(code)` - runs `code`'s statements in the recorded window (wrapped
   in `(async () => { ... })()`, so `return` and top-level `await` both work),
@@ -245,6 +272,11 @@ A scenario is a `.mjs` file whose default export is `async function (s) { ... }`
   itself be part of the recording (see the sticky-note example: it creates a
   private, empty board first, since a fixed click point on the busy welcome
   board would depend on that board's own zoom/pan).
+- Export `prepare(s)` alongside the default scenario to create files, open
+  the board and settle its view before recording. Optional `cleanup(s)` runs
+  afterward, including when the scenario fails. See `sticky-with-note.mjs`.
+  The first frame is captured after preparation; late screencast frames from
+  a previous board are ignored. Captions use 20 px text before resizing.
 - `s.find({ selector, textEn, textRu, controlSelector })` - finds an element
   and returns `{ x, y, width, height }` (a point + size you can pass straight
   to `s.click`), or `null`. `selector` narrows a `querySelectorAll` (default

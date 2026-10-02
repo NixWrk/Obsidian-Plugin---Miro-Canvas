@@ -200,6 +200,9 @@ def obsidian_arguments(executable: Path, profile_dir: Path, port: int, lang: str
         f"--user-data-dir={profile_dir}",
         f"--remote-debugging-port={port}",
         f"--lang={lang}",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-background-timer-throttling",
     ]
 
 

@@ -127,11 +127,11 @@ function charKeyEvent(char) {
 }
 
 /** Presses (keyDown + keyUp) one named key (KEY_TABLE) or one letter/digit. */
-export async function pressKey(send, name) {
+export async function pressKey(send, name, { modifiers = 0 } = {}) {
   const fields = KEY_TABLE[name] ?? charKeyEvent(name);
-  await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...fields });
-  if (fields.text) await send("Input.dispatchKeyEvent", { type: "char", ...fields });
-  await send("Input.dispatchKeyEvent", { type: "keyUp", ...fields });
+  await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...fields, modifiers });
+  if (fields.text && modifiers === 0) await send("Input.dispatchKeyEvent", { type: "char", ...fields });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", ...fields, modifiers });
 }
 
 /** Types `text` into whatever has focus, as one native input - not a per-character key sequence. */

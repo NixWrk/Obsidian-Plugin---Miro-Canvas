@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 MIN_FRAME_MS = 20
-MAX_FRAME_MS = 1200
+MAX_FRAME_MS = 10000
 TAIL_MS = 900
 WARN_BYTES = 4 * 1024 * 1024
 BACKGROUND = (24, 24, 24)
@@ -112,6 +112,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def shared_palette(frames):
+    """Keep colours stable between frames and let GIF store only changed pixels."""
+    from PIL import Image
+
+    indices = sorted({round(index * (len(frames) - 1) / 11) for index in range(12)})
+    samples = []
+    for index in indices:
+        sample = frames[index].copy()
+        sample.thumbnail((256, 160))
+        samples.append(sample)
+    atlas = Image.new("RGB", (256, 160 * len(samples)), BACKGROUND)
+    for index, sample in enumerate(samples):
+        atlas.paste(sample, (0, 160 * index))
+    palette = atlas.quantize(colors=256)
+    return [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in frames]
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     frames = load_manifest(args.manifest)
@@ -120,12 +137,13 @@ def main(argv: list[str] | None = None) -> int:
     kept_indices = thin_by_fps(timestamps, args.fps)
     durations = frame_durations(timestamps, kept_indices)
     composed = compose_frames(args.manifest.parent, frames, kept_indices, args.width)
+    composed = shared_palette(composed)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     first, *rest = composed
     first.save(
         args.out, format="GIF", save_all=True, append_images=rest,
-        duration=durations, loop=0, optimize=True, disposal=2,
+        duration=durations, loop=0, optimize=True, disposal=1,
     )
 
     size = args.out.stat().st_size

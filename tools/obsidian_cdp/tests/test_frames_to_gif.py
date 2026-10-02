@@ -10,6 +10,7 @@ from tools.obsidian_cdp.frames_to_gif import (
     compose_frames,
     frame_durations,
     load_manifest,
+    shared_palette,
     thin_by_fps,
 )
 
@@ -67,6 +68,10 @@ def test_frame_durations_empty_input() -> None:
     assert frame_durations([], []) == []
 
 
+def test_frame_durations_preserves_a_reading_pause_on_a_still_board() -> None:
+    assert frame_durations([0, 2500, 5000], [0, 1, 2]) == [2500, 2500, TAIL_MS]
+
+
 def test_load_manifest_reads_frame_list(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.json"
     manifest.write_text(json.dumps({"frames": [{"file": "frame-0.png", "t": 1.0}]}), encoding="utf-8")
@@ -103,3 +108,23 @@ def test_compose_frames_pads_a_smaller_frame_onto_the_shared_canvas(tmp_path: Pa
     assert len(composed) == 2
     assert all(image.width == 100 for image in composed)
     assert composed[0].height == composed[1].height  # one shared canvas size
+
+
+def test_shared_palette_animation_leaves_no_cursor_trail(tmp_path: Path) -> None:
+    from PIL import Image, ImageDraw, ImageSequence
+
+    frames = []
+    for x in [4, 16, 28]:
+        image = Image.new("RGB", (40, 20), (30, 30, 30))
+        ImageDraw.Draw(image).rectangle((x, 5, x + 3, 9), fill=(255, 255, 255))
+        frames.append(image)
+    encoded = shared_palette(frames)
+    path = tmp_path / "cursor.gif"
+    encoded[0].save(path, save_all=True, append_images=encoded[1:], duration=100, disposal=1, optimize=True)
+    with Image.open(path) as animation:
+        decoded = [frame.convert("RGB") for frame in ImageSequence.Iterator(animation)]
+    assert len(decoded) == 3
+    for index, frame in enumerate(decoded):
+        assert frame.getpixel(([4, 16, 28][index], 5)) == (255, 255, 255)
+        for previous_x in [4, 16, 28][:index]:
+            assert frame.getpixel((previous_x, 5)) == (30, 30, 30)
