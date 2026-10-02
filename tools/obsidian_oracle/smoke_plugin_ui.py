@@ -51,6 +51,20 @@ def main() -> int:
             assert page.evaluate("miroBrowser.mounted"), "M1 controls did not mount on real DOM"
             if args.controls:
                 page.evaluate("""() => {
+                  const b=miroBrowser;
+                  const map=b.root.querySelector('.miro-canvas-dock__map');
+                  if(!map)throw Error('The separate minimap did not mount');
+                  const hidden=map.hidden;
+                  map.hidden=false;
+                  const before=getComputedStyle(map).display;
+                  if(before==='none')throw Error('The minimap is not visible before export');
+                  b.root.classList.add('is-screenshotting');
+                  if(getComputedStyle(map).display!=='none')throw Error('The minimap would be captured in an export');
+                  b.root.classList.remove('is-screenshotting');
+                  if(getComputedStyle(map).display!==before)throw Error('The minimap did not return after export');
+                  map.hidden=hidden;
+                }""")
+                page.evaluate("""() => {
                   const b=miroBrowser;b.session.resetTools();
                   b.session.writeBoardConnectors([{id:'menu-line',from:{type:'free',x:-200,y:100},to:{type:'free',x:100,y:100},route:'straight',color:'#334455',width:2,startCap:'none',endCap:'arrow'}]);
                   b.session.connectorLayer.select(['menu-line']);

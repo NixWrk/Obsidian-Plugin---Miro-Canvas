@@ -3080,6 +3080,7 @@
 .is-screenshotting :is(
   .miro-canvas-panel,
   .miro-canvas-dock,
+  .miro-canvas-dock__map,
   .miro-canvas-thread,
   .miro-canvas-slideshow,
   .miro-canvas-toolbar,
