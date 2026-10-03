@@ -1,13 +1,16 @@
 # Наглядное руководство / Visual guide
 
-Проверено 3 октября 2026 года в отдельном Obsidian 1.13.7 на Windows.
+Проверено 3 октября 2026 года в отдельном Obsidian 1.13.7 на Windows,
+а также в тестовых хранилищах Android: Samsung SM-X736B (Obsidian 1.13.8)
+и Galaxy A33 / SM-A336E (Obsidian 1.12.7). Личные хранилища не менялись.
 
 ## Что показано
 
 В [русском README](../README.ru.md) и [английском README](../README.md)
-размещены 14 примеров, по одной записи для каждого языка. Сценарии находятся
+размещены 14 примеров на компьютере и шесть на телефоне и планшете,
+по одной записи для каждого языка. Сценарии находятся
 в [`tools/obsidian_cdp/scenarios`](../tools/obsidian_cdp/scenarios).
-Все 28 GIF вместе занимают около 7 МБ; каждый файл меньше 1 МБ.
+Все 40 GIF вместе занимают около 9,9 МиБ; каждый файл меньше 1 МБ.
 
 | Запись | Что видно в ролике |
 | --- | --- |
@@ -25,6 +28,9 @@
 | `board-search` | Поиск и переход к карточке за пределами текущего вида |
 | `export-pages` | Книжная ориентация, страницы по фреймам, PDF/PPTX и открытие PDF |
 | `arrange-panels` | Перенос панели инструментов и поворот столбцом |
+| `phone-move`, `tablet-move` | Касание карточки и перенос вместе со стрелкой |
+| `phone-navigation`, `tablet-navigation` | Перемещение доски и увеличение двумя пальцами |
+| `phone-layout`, `tablet-layout` | Поворот и перенос навигации или инструментов к краю экрана |
 
 ## Насколько понятно
 
@@ -39,12 +45,13 @@
 без множества одновременно видимых анимаций. Текстовые инструкции остаются
 понятны и без просмотра GIF.
 
-Записи имеют размер 960 × 600. Основная часть длится около 8–15 секунд;
+Записи с компьютера имеют размер 960 × 600. Записи с телефона — 384 × 854,
+с планшета — 600 × 960; сохранены пропорции экрана. Основная часть длится около 8–15 секунд;
 обсуждение и экспорт длиннее, потому что надо успеть прочитать сообщения и
 увидеть готовый файл. На узком экране надписи внутри интерфейса мелкие:
 для подробного просмотра лучше открыть GIF в полном размере. В README
-добавлена такая подсказка. Это просмотр записи с компьютера, а не проверка
-работы на телефоне.
+добавлена такая подсказка. Для просмотра на телефоне добавлены отдельные вертикальные записи
+с более крупными карточками.
 
 Проверка — просмотр начала, середины и конца каждого ролика, а также
 проверки результатов внутри сценариев. Проверяются созданные карточки,
@@ -60,6 +67,18 @@ Obsidian и не снимок страницы GitHub.
 ## Что улучшено после просмотра
 
 - Увеличены подписи; убран случайный первый кадр от предыдущей доски.
+- На телефоне оставлены семь частых инструментов в одной строке, навигация
+  вынесена сбоку; на планшете инструменты стоят столбцом.
+- Исправлена палитра вертикальных GIF: белые подписи больше не получают
+  жёлтый или зелёный оттенок от карточек.
+- Исправлен выход кнопки «Готово» за край телефона в русском режиме настройки
+  панелей. Проверены её доступность и закрытие режима настоящим касанием.
+- Два README сокращены примерно вдвое: сначала знакомство и обычные задачи,
+  затем настройки, устройства и экспорт. Техническая справка, подробности
+  импорта и работа над репозиторием вынесены в отдельные документы.
+- Убраны повторяющиеся сравнения с Miro и обещания полной совместимости.
+  Связь с Obsidian объясняется через заметки, ссылки и общий файл; ограничения
+  оформления без плагина и экспорта указаны рядом с соответствующими действиями.
 - Курсор после действия уходит на пустое место, чтобы подсказка миникарты
   не закрывала результат.
 - Ромб создаётся крупнее, чтобы вопрос внутри не разбивался на мелкие строки.
@@ -94,23 +113,26 @@ Obsidian и не снимок страницы GitHub.
 5. Импорт настоящей доски Miro, выключение плагина и сохранность обычного Canvas.
 6. Шрифты, первый запуск и отдельные настройки из списка в README.
 
-Записи с пальцем, настоящим пером, силой нажатия и ладонью **не сделаны**.
-Для них нужны настоящие устройства. Здесь нет записей macOS/Linux и
-телефона/планшета; серия не выдаётся за проверку всех ОС и устройств.
+Касания автоматизированы через Android, два пальца — через CDP WebView.
+Проверяются реальные изменения доски на физических устройствах, но это
+не проверка нажима настоящего пера и касания ладонью. Записи macOS, Linux
+и iOS пока не сделаны.
 Новая доска знакомства включена в сборку на русском и английском. Её отдельная
 запись для руководства пока не сделана.
 
 ## English review
 
-Fourteen focused demonstrations are embedded in both READMEs. The table
+Fourteen desktop demonstrations and six phone/tablet demonstrations are
+embedded in both READMEs. The table
 above lists their scenario names and exact coverage. They show real input
 in isolated Obsidian 1.13.7 on Windows, with smooth pointer motion, gradual
 typing, readable captions and a pause to inspect the result. One opening
 GIF shows Miro-style sticky notes beside an actual Obsidian note. Other
 recordings expand beside the relevant feature descriptions.
-The 28 GIFs total about 7 MB; each file is under 1 MB.
+The 40 GIFs total about 9.9 MiB; each file is under 1 MB.
 
-The GIFs are 960 × 600. Most last roughly 8–15 seconds; comments and export
+Desktop GIFs are 960 × 600; phone GIFs are 384 × 854 and tablet GIFs
+600 × 960, preserving the portrait screen proportions. Most last roughly 8–15 seconds; comments and export
 take longer to leave time for reading and the completed output. Small
 controls need full-size viewing on a narrow screen. Start, middle and end
 frames were reviewed, and scenarios assert their actual results. This is
@@ -139,9 +161,14 @@ The recording overlay is excluded from export captures too.
 locking, advanced connectors, drawing variants, more file types, heading
 and block links, navigation, snapping, themes, imports, plugin-off behaviour,
 font packs, onboarding and individual settings still need recordings.
-The older four recordings remain drafts. Physical touch, stylus pressure
-and palm behaviour were not recorded; there are no macOS/Linux or mobile
-recordings here. The revised welcome board ships in both languages; its own
+The older four recordings remain drafts. Android recordings now show
+automated touchscreen drag, two-finger zoom and panel arrangement on real
+Samsung phone/tablet devices in separate test vaults. Phone tools use one
+short row; tablet tools use a side column. Review caught and fixed the
+Russian Done button extending off a narrow screen and tinted white GIF labels.
+Both READMEs were shortened around common tasks; technical reference and
+contributor instructions moved to separate documents. Physical stylus
+pressure, palm behaviour, macOS/Linux and iOS remain unverified. The revised welcome board ships in both languages; its own
 guide recording is still pending.
 
 ## Reproduce the review

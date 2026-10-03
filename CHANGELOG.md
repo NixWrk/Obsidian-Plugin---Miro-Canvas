@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- On narrow screens, the panel-arrangement instructions wrap above the
+  buttons so the Russian Done button stays reachable.
+
+- Rewrote both READMEs around common board tasks, with a shorter Russian
+  introduction and separate import, reference and contributor guides. Added
+  twelve GIFs recorded on a real Android phone and tablet in both languages:
+  moving connected cards, panning/zooming and arranging panels. Examples use
+  a compact phone toolbar and a vertical tablet toolbar.
+
 - The welcome board now ships in English and Russian with an introduction,
   eight practical sections and a sandbox: Miro tools beside Obsidian notes,
   links and another Canvas, device layouts, customization and desktop export.
