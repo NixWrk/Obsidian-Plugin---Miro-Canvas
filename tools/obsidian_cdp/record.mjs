@@ -11,7 +11,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   listTargets, connectTarget, evaluate, pressKey, insertText,
 } from "./cdp.mjs";
@@ -56,6 +56,9 @@ const INJECT_OVERLAY_JS = `
 `;
 
 const REMOVE_OVERLAY_JS = `
+  window.__cdpMobileCleanup?.();
+  delete window.__cdpMobileCleanup;
+  document.getElementById('__cdp_mobile_style__')?.remove();
   window.__cdpCaption && window.__cdpCaption("");
   document.getElementById('__cdp_cursor__')?.remove();
   document.getElementById('__cdp_caption__')?.remove();
@@ -88,7 +91,17 @@ class Recorder {
   async connectionFor(target) {
     const existing = this.connections.get(target.id);
     if (existing) return existing;
-    const { send, ws, onEvent } = await connectTarget(target);
+    const { send: rawSend, ws, onEvent } = await connectTarget(target);
+    const send = async (method, params) => {
+      let timeout;
+      try {
+        return await Promise.race([rawSend(method, params), new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error(`${method} timed out`)), 15000);
+        })]);
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
     const unsubscribe = onEvent((method, params) => {
       if (method !== "Page.screencastFrame") return;
       const connection = this.connections.get(target.id);
@@ -100,7 +113,9 @@ class Recorder {
         this.frames.push({ dataBase64: params.data, timestampMs });
       }
       // Ack without waiting - waiting would just delay the next frame.
-      void send("Page.screencastFrameAck", { sessionId: params.sessionId });
+      void send("Page.screencastFrameAck", { sessionId: params.sessionId }).catch((error) => {
+        if (connection?.recording) connection.captureError = error;
+      });
     });
     const connection = new WindowConnection(target, send, ws, unsubscribe);
     this.connections.set(target.id, connection);
@@ -206,9 +221,64 @@ async function dispatchMouse(recorder, type, x, y, extra = {}) {
 }
 
 /** Builds the `s` object a scenario's default export receives. */
-function buildScenarioApi(recorder, lang) {
+function buildScenarioApi(recorder, lang, androidSerial) {
+  const androidInput = async (args) => {
+    if (!androidSerial) throw new Error("touch input needs --android-serial");
+    const executable = process.env.ADB ?? (process.platform === "win32"
+      ? "C:/Program Files/VirtualTablet Server/adb/adb.exe"
+      : "adb");
+    await new Promise((resolve, reject) => {
+      const child = spawn(executable, ["-s", androidSerial, "shell", "input", ...args], { windowsHide: true });
+      const timeout = setTimeout(() => {
+        child.kill();
+        reject(new Error("Android input timed out"));
+      }, 15000);
+      child.once("error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.once("close", (code) => {
+        clearTimeout(timeout);
+        if (code === 0) resolve();
+        else reject(new Error(`Android input exited ${code}`));
+      });
+    });
+  };
+  const screenPoint = async (target) => {
+    const point = await resolvePoint(recorder, target);
+    const ratio = await evaluate(recorder.current.send, "return devicePixelRatio;");
+    return { ...point, screenX: Math.round(point.x * ratio), screenY: Math.round(point.y * ratio) };
+  };
   return {
     lang,
+
+    touchTap: async (target) => {
+      const point = await screenPoint(target);
+      await moveCursor(recorder, point.x, point.y, true);
+      await androidInput(["touchscreen", "tap", String(point.screenX), String(point.screenY)]);
+      await sleep(350);
+    },
+
+    touchDrag: async (from, to, { duration = 1100, stylus = false } = {}) => {
+      const first = await screenPoint(from);
+      const last = await screenPoint(to);
+      await moveCursor(recorder, first.x, first.y, true);
+      await androidInput([stylus ? "stylus" : "touchscreen", "swipe", String(first.screenX), String(first.screenY), String(last.screenX), String(last.screenY), String(duration)]);
+      await moveCursor(recorder, last.x, last.y);
+      await sleep(350);
+    },
+
+    touchPinch: async (point, from = 80, to = 150) => {
+      const { x, y } = await resolvePoint(recorder, point);
+      const fingers = (gap) => [{ x: x - gap / 2, y, id: 1, radiusX: 8, radiusY: 8, force: 1 }, { x: x + gap / 2, y, id: 2, radiusX: 8, radiusY: 8, force: 1 }];
+      await recorder.current.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: fingers(from) });
+      for (let step = 1; step <= 40; step += 1) {
+        await sleep(25);
+        await recorder.current.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: fingers(from + (to - from) * step / 40) });
+      }
+      await recorder.current.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await sleep(350);
+    },
 
     caption: async (text) => {
       const resolved = typeof text === "string" ? text : (lang === "ru" ? (text.ru ?? text.en) : (text.en ?? text.ru));
@@ -306,17 +376,41 @@ function buildScenarioApi(recorder, lang) {
   };
 }
 
-async function runScenario(scenarioPath, port, outPath, fps, width) {
+async function runScenario(scenarioPath, port, outPath, fps, width, androidSerial) {
   const frames = [];
   const recorder = new Recorder(port, frames);
   const targets = await listTargets(port);
-  const main = targets.find((t) => t.type === "page" && t.url.startsWith("app://obsidian.md"));
+  const main = targets.find((t) => t.type === "page" && (androidSerial ? t.title.includes("Obsidian") && t.url === "http://localhost/" : t.url.startsWith("app://obsidian.md")));
   if (!main) throw new Error("no Obsidian page target; is launch.py's instance running on this port?");
   recorder.mainTargetId = main.id;
   await recorder.switchTo(main);
 
   const lang = await evaluate(recorder.current.send, "return localStorage.getItem('language') || 'en';");
-  const s = buildScenarioApi(recorder, lang);
+  const s = buildScenarioApi(recorder, lang, androidSerial);
+  if (androidSerial) {
+    const mobileReady = await s.eval(`
+    if (app.vault.getName() !== 'MiroCanvasTest') throw new Error('mobile recordings require MiroCanvasTest');
+    const style = document.createElement('style');
+    style.id = '__cdp_mobile_style__';
+    style.textContent = '#__cdp_cursor__ { width:24px; height:24px; border:2px solid #fff; border-radius:50%; background:#a78bfa55; opacity:0; } #__cdp_cursor__::before { display:none; } #__cdp_caption__ { font-size:16px; padding:8px 10px; animation:__cdp_mobile_frames__ 1s infinite alternate; } @keyframes __cdp_mobile_frames__ { from {opacity:1} to {opacity:.999} }';
+    document.head.appendChild(style);
+    const touch = (event) => {
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+      window.__cdpMoveCursor(event.clientX, event.clientY, event.type === 'pointerdown');
+      const cursor = document.getElementById('__cdp_cursor__');
+      if (cursor) cursor.style.opacity = event.type === 'pointerup' ? '0' : '.7';
+    };
+    for (const name of ['pointerdown', 'pointermove', 'pointerup']) window.addEventListener(name, touch, {capture:true,passive:true});
+    window.__cdpMobileCleanup = () => {
+      for (const name of ['pointerdown', 'pointermove', 'pointerup']) window.removeEventListener(name, touch, {capture:true});
+    };
+    return true;
+    `);
+    if (mobileReady?.error) {
+      await recorder.close();
+      throw new Error(mobileReady.error);
+    }
+  }
 
   const scenarioModule = await import(pathToFileURL(path.resolve(scenarioPath)).href);
   try {
@@ -341,6 +435,9 @@ async function runScenario(scenarioPath, port, outPath, fps, width) {
   }
 
   if (frames.length === 0) throw new Error("no frames were captured; the scenario ran but nothing was recorded");
+  for (const connection of recorder.connections.values()) {
+    if (connection.captureError) throw connection.captureError;
+  }
   writeGif(frames, outPath, fps, width);
 }
 
@@ -379,12 +476,13 @@ function parseArgs(argv) {
     else if (flag === "--port") args.port = Number(argv[++i]);
     else if (flag === "--fps") args.fps = Number(argv[++i]);
     else if (flag === "--width") args.width = Number(argv[++i]);
+    else if (flag === "--android-serial") args.androidSerial = argv[++i];
     else throw new Error(`unknown argument: ${flag}`);
   }
-  if (!args.scenario || !args.out) throw new Error("usage: node record.mjs --scenario <file.mjs> --out <file.gif> [--port 9333] [--fps 10] [--width 960]");
+  if (!args.scenario || !args.out) throw new Error("usage: node record.mjs --scenario <file.mjs> --out <file.gif> [--port 9333] [--fps 10] [--width 960] [--android-serial <serial>]");
   return args;
 }
 
 const args = parseArgs(process.argv.slice(2));
-await runScenario(args.scenario, args.port, args.out, args.fps, args.width);
+await runScenario(args.scenario, args.port, args.out, args.fps, args.width, args.androidSerial);
 console.log(`saved ${args.out}`);

@@ -174,6 +174,29 @@ leaves `adb` waiting.
 
 ## Recording a scenario
 
+For a physical Android device, create and open a separate `MiroCanvasTest`
+vault, deploy the build with `android.mjs deploy`, and forward its WebView.
+The recorder refuses another vault when `--android-serial` is supplied.
+Use the device serial reported by `android.mjs devices`:
+
+```powershell
+node tools/obsidian_cdp/record.mjs --scenario tools/obsidian_cdp/scenarios/mobile-move.mjs --out docs/media/ru/phone-move.gif --port 9341 --android-serial <serial> --width 384 --fps 10
+```
+
+`s.touchTap` and `s.touchDrag` inject touchscreen input through Android's
+`adb input`; they are not mouse events. `s.touchPinch` sends two touch points
+through CDP. These automate gestures on the physical device, without proving
+human pen pressure or palm rejection. A circle follows received touch events;
+it disappears on release. The mobile caption has a nearly constant opacity
+animation to keep WebView screenshots responding on the tested tablet.
+Every CDP recording call has a 15-second timeout; Android input also times out.
+`ADB` can name an existing adb executable; on this Windows machine the default
+is the copy bundled with VirtualTablet Server.
+
+The phone recordings use width 384; the tablet recordings use width 600.
+Both preserve the physical viewport's portrait aspect ratio. Only generated
+demo files in the separate test vault are modified by the mobile scenarios.
+
 ```
 node tools/obsidian_cdp/record.mjs \
   --scenario tools/obsidian_cdp/scenarios/sticky-note.mjs \

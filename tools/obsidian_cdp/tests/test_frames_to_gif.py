@@ -128,3 +128,22 @@ def test_shared_palette_animation_leaves_no_cursor_trail(tmp_path: Path) -> None
         assert frame.getpixel(([4, 16, 28][index], 5)) == (255, 255, 255)
         for previous_x in [4, 16, 28][:index]:
             assert frame.getpixel((previous_x, 5)) == (30, 30, 30)
+
+
+def test_portrait_palette_preserves_white_labels_above_coloured_cards() -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    image = Image.new("RGB", (384, 854), "#202020")
+    drawing = ImageDraw.Draw(image)
+    drawing.rectangle((60, 230, 190, 370), fill="#fff7a1")
+    drawing.rectangle((210, 400, 350, 540), fill="#d5f1a8")
+    drawing.text((30, 12), "Move a card", fill="white", font=ImageFont.load_default(size=20))
+    output = shared_palette([image])[0].convert("RGB")
+    white_pixels = [(x, y) for y in range(12, 40) for x in range(30, 170)
+                    if image.getpixel((x, y)) == (255, 255, 255)]
+    assert white_pixels
+    for point in white_pixels:
+        red, green, blue = output.getpixel(point)
+        assert min(red, green, blue) >= 245
+        assert max(red, green, blue) - min(red, green, blue) <= 5
+    assert output.size == image.size

@@ -11,6 +11,7 @@ NAMES = [
     "move-connected", "draw-and-erase", "comment-thread", "board-search",
     "export-pages", "arrange-panels",
 ]
+MOBILE_NAMES = ["phone-move", "phone-navigation", "tablet-move", "tablet-navigation", "phone-layout", "tablet-layout"]
 
 
 def audit(root: Path, out: Path) -> list[dict]:
@@ -18,16 +19,22 @@ def audit(root: Path, out: Path) -> list[dict]:
     records = []
     for language in ("ru", "en"):
         readme = (root / ("README.ru.md" if language == "ru" else "README.md")).read_text(encoding="utf-8")
-        for chunk in range(0, len(NAMES), 3):
-            names = NAMES[chunk:chunk + 3]
+        names_to_check = NAMES + MOBILE_NAMES
+        for chunk in range(0, len(names_to_check), 3):
+            names = names_to_check[chunk:chunk + 3]
             sheet = Image.new("RGB", (1440, 330 * len(names)), "#eeeeee")
             labels = ImageDraw.Draw(sheet)
             for row, name in enumerate(names):
                 path = root / "docs" / "media" / language / f"{name}.gif"
                 assert f"docs/media/{language}/{name}.gif" in readme, path
-                assert (root / "tools" / "obsidian_cdp" / "scenarios" / f"{name}.mjs").is_file()
+                scenario = "mobile-" + name.split("-", 1)[1] if name in MOBILE_NAMES else name
+                assert (root / "tools" / "obsidian_cdp" / "scenarios" / f"{scenario}.mjs").is_file()
                 with Image.open(path) as gif:
-                    assert gif.size == (960, 600), (path, gif.size)
+                    if name in MOBILE_NAMES:
+                        expected_width = 384 if name.startswith("phone-") else 600
+                        assert gif.width == expected_width and gif.height > gif.width, (path, gif.size)
+                    else:
+                        assert gif.size == (960, 600), (path, gif.size)
                     assert gif.info.get("loop") == 0, path
                     frames = [(frame.convert("RGB"), frame.info.get("duration", 0)) for frame in ImageSequence.Iterator(gif)]
                 duration = sum(timing for _, timing in frames)
@@ -44,7 +51,8 @@ def audit(root: Path, out: Path) -> list[dict]:
                             selected = frame
                             break
                         elapsed += timing
-                    sheet.paste(selected.resize((480, 300)), (column * 480, row * 330 + 25))
+                    selected.thumbnail((480, 300))
+                    sheet.paste(selected, (column * 480 + (480 - selected.width) // 2, row * 330 + 25))
             sheet.save(out / f"review-{language}-{chunk // 3 + 1}.png")
     (out / "metrics.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
     return records

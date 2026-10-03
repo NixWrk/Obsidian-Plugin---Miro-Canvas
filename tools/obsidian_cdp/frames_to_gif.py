@@ -120,11 +120,15 @@ def shared_palette(frames):
     samples = []
     for index in indices:
         sample = frames[index].copy()
-        sample.thumbnail((256, 160))
+        sample.thumbnail((256, 512))
         samples.append(sample)
-    atlas = Image.new("RGB", (256, 160 * len(samples)), BACKGROUND)
+    sample_height = max(sample.height for sample in samples)
+    atlas = Image.new("RGB", (256, sample_height * len(samples) + 4), BACKGROUND)
     for index, sample in enumerate(samples):
-        atlas.paste(sample, (0, 160 * index))
+        atlas.paste(sample, (0, sample_height * index))
+    # Keep small white labels and dark text neutral on colourful cards.
+    atlas.paste("white", (0, atlas.height - 4, 128, atlas.height))
+    atlas.paste("black", (128, atlas.height - 4, 256, atlas.height))
     palette = atlas.quantize(colors=256)
     return [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in frames]
 
