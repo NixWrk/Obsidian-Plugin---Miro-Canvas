@@ -50,6 +50,25 @@ def main() -> int:
             page.add_script_tag(path=str(bundle))
             assert page.evaluate("miroBrowser.mounted"), "M1 controls did not mount on real DOM"
             if args.controls:
+                # Russian arrangement instructions must leave Done reachable on a phone.
+                board_width = page.evaluate("miroBrowser.root.style.width")
+                page.set_viewport_size({"width": 384, "height": 853})
+                page.evaluate("""() => {
+                  const b = miroBrowser;
+                  b.root.style.width = '384px';
+                  b.session.toggleArrangeMode();
+                  b.root.querySelector('.miro-canvas-arrange-banner__text').textContent = 'Перетаскивайте панели и инструменты';
+                  const buttons = b.root.querySelectorAll('.miro-canvas-arrange-banner__button');
+                  buttons[0].textContent = 'Вернуть как было';
+                  buttons[1].textContent = 'Готово';
+                }""")
+                done = page.locator('.miro-canvas-arrange-banner__button--done')
+                bounds = done.bounding_box()
+                assert bounds and bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 384, bounds
+                done.click()
+                assert page.locator('.miro-canvas-arrange-banner').count() == 0
+                page.evaluate("(width) => miroBrowser.root.style.width = width", board_width)
+                page.set_viewport_size({"width": 1600, "height": 900})
                 page.evaluate("""() => {
                   const b=miroBrowser;
                   const map=b.root.querySelector('.miro-canvas-dock__map');

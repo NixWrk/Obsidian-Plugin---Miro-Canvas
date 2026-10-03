@@ -4134,7 +4134,12 @@
   left: 50%;
   z-index: 150;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
   gap: 10px;
   padding: 6px 10px;
   transform: translateX(-50%);
@@ -4147,10 +4152,13 @@
 }
 
 .miro-canvas-arrange-banner__text {
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 
 .miro-canvas-arrange-banner__button {
+  flex-shrink: 0;
   --miro-canvas-button-padding: 4px 10px;
   padding: var(--miro-canvas-button-padding);
   color: var(--text-normal);
