@@ -249,3 +249,11 @@ Code, Codex и другим) как есть. Агент читает его в�
   она показывает.
 
 </details>
+
+## Подача в каталог сообщества
+
+После сборки выполните `npm run submission:check`, а после публикации
+выпуска — `npm run submission:check -- --remote`. Следуйте
+[пакету для подачи](community-submission.md): новые заявки оформляются
+через Community Directory, а не pull request в obsidian-releases.
+Локальная проверка не подтверждает соблюдение всех правил каталога.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.3 - 2026-10-05
+
+- Set the minimum Obsidian version to 1.13.7, the oldest version verified
+  with the current plugin in a real app, instead of claiming untested 1.5 support.
+- Shortened the catalog description and documented selected-file access outside
+  the vault, privacy, licensing, installation status and platform coverage.
+- Added a reproducible community submission check and listing materials for
+  the current Community Directory process. Desktop-only export APIs remain
+  an explicit review question for a mobile-capable listing.
+
 ## 0.2.2 - 2026-10-04
 
 - Fold buttons no longer retain a hover background on tablets with a pen or

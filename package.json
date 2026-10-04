@@ -1,6 +1,6 @@
 {
   "name": "miro-canvas",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "Miro's look and Miro's tools on Obsidian's own Canvas.",
   "main": "main.js",
@@ -12,7 +12,8 @@
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "schema:check": "node scripts/sync-schema.mjs --check",
-    "schema:sync": "node scripts/sync-schema.mjs"
+    "schema:sync": "node scripts/sync-schema.mjs",
+    "submission:check": "node scripts/check-submission.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

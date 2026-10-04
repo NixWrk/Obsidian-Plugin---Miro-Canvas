@@ -23,6 +23,10 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Community submission packaging
+        run: |
+          node --test scripts/check-submission.test.mjs
+          npm run submission:check
       # The MCP server agents run beside a vault: one self-contained file.
       - run: npm run mcp:build
       - name: Release files exist

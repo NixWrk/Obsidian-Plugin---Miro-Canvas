@@ -460,6 +460,16 @@ release, at most once a day at startup, and to download a font pack when you
 request one. You can disable update checks. They announce new releases
 without installing them.
 
+No account, subscription or payment is required. The plugin contains no telemetry
+or advertising and never installs or updates itself.
+
+**Files outside the vault.** Adding device files, custom fonts or a local import
+reads only the files you select in a system picker and copies the chosen data
+into the vault. On desktop, PDF/PowerPoint export writes to the location you
+choose in the save dialog, which can be outside the vault. It can replace an
+existing file after the system overwrite confirmation. The plugin does not
+scan folders outside the vault.
+
 Website links and embeds can contact their sites through Obsidian.
 BRAT, Obsidian Sync and other plugins have their own network behaviour.
 
@@ -471,6 +481,13 @@ Besides desktop-only export, these limitations remain:
 - Testing across all devices and link types is still incomplete.
 
 ## Installing
+
+Miro Canvas is preparing for submission to the [Obsidian Community directory](https://community.obsidian.md/).
+It is not yet available in the in-app catalog. Until it is accepted, use BRAT
+or the manual installation below. Requires Obsidian **1.13.7 or newer**; this
+is the oldest version verified in the current real-app test suite. Desktop
+editing and Android tablet input are tested; iOS, macOS and Linux remain
+unverified. PDF/PowerPoint export currently requires desktop Obsidian.
 
 **With BRAT.** This plugin installs GitHub releases and can update them.
 
@@ -505,6 +522,8 @@ feature does not complete the entire task.
 
 Build with `npm ci`, `npm run check`, `npm test` and `npm run build`.
 See the [contributor guide](docs/contributing.md) for validation and releases.
+The [community submission package](docs/community-submission.md) contains the
+listing text, release checks, policy disclosures and remaining review question.
 
 ### Working on this repository with an AI agent
 
@@ -517,4 +536,9 @@ does not start it.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Adapted LZ-string code and its MIT notice are documented in
+[Third-party notices](THIRD_PARTY_NOTICES.md). Optional font packs carry their
+own font licenses; these are included with each pack.
+
+Miro Canvas is an independent community project by NixWrk, unaffiliated with
+Miro or Obsidian.

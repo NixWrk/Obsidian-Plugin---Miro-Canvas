@@ -2051,3 +2051,10 @@ Minimap dimensions live in the device panel layout, not in board metadata.
 Responsive CSS uses the stored dimensions before its device defaults.
 Plus and fold controls share one separator. The welcome board explains the
 switches and minimap resizing and includes a sample variable-width stroke.
+
+## Community submission readiness (2026-10-05)
+
+The minimum supported Obsidian version is 1.13.7, matching the oldest current
+real-app check. See [the submission package](community-submission.md) for
+the current directory process, disclosures, verification command and the
+unresolved policy question about desktop export APIs in a mobile plugin.

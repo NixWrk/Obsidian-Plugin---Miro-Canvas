@@ -234,3 +234,11 @@ push after every commit, no tags."
 - [ ] `setting-diagnostics` - Developer diagnostics and the badge it shows.
 
 </details>
+
+## Community directory submission
+
+Run `npm run submission:check` after building and
+`npm run submission:check -- --remote` after publishing the release.
+Follow [the submission package](community-submission.md); new submissions
+use Community Directory, not a pull request to obsidian-releases.
+The local checker does not certify developer-policy compliance.
