@@ -17,6 +17,7 @@ interface VisibilityHost {
 export class PanelVisibility {
   private readonly buttons = new Map<CollapsiblePanel, HTMLButtonElement>();
   private readonly listeners: Array<() => void> = [];
+  private readonly placementKeys = new Map<CollapsiblePanel, string>();
   private dragCleanup: (() => void) | undefined;
 
   public constructor(private readonly host: VisibilityHost) {}
@@ -48,44 +49,45 @@ export class PanelVisibility {
         const collapsed = current.collapsed !== true;
         const right = panel.getAttribute("data-panel-button-right") === "true";
         const bottom = panel.getAttribute("data-panel-button-bottom") === "true";
+        const bar = this.bar(id, panel);
+        bar?.style.removeProperty("max-height");
+        bar?.style.removeProperty("overflow-y");
         applyPanelPositionSettled(panel, { ...current, collapsed }, view);
+        this.placeButton(id, button, collapsed, { ...current, buttonRight: right, buttonBottom: bottom });
         const size = panel.getBoundingClientRect();
         const buttonRight = collapsed ? right : pivot.left - board.left + size.width > view.width;
         const above = pivot.bottom - board.top;
         const below = view.height - (pivot.top - board.top);
         const buttonBottom = collapsed ? bottom : size.height > below && above > below;
-        const bar = this.bar(id, panel);
         if (!collapsed && effectivePanelOrientation(current) === "vertical" && bar !== null) {
           // A long column scrolls away from its pivot instead of moving the button.
           bar.style.setProperty("max-height", `${Math.max(44, (buttonBottom ? above : below) - 2)}px`);
           bar.style.setProperty("overflow-y", "auto");
-          this.placeButton(id, button, false, { ...current, buttonRight, buttonBottom });
-          size.height = panel.getBoundingClientRect().height;
         }
-        const left = pivot.left - board.left - (!collapsed && buttonRight ? size.width - 44 : 0);
-        const top = pivot.top - board.top - (!collapsed && buttonBottom ? size.height - 44 : 0);
+        this.placeButton(id, button, collapsed, { ...current, buttonRight, buttonBottom });
+        const panelBox = panel.getBoundingClientRect();
+        const placed = button.getBoundingClientRect();
+        const left = pivot.left - board.left - (placed.left - panelBox.left);
+        const top = pivot.top - board.top - (placed.top - panelBox.top);
         const next: PanelPosition = {
-          ...positionFromPoint({ left, top }, view, size, 0),
+          ...positionFromPoint({ left, top }, view, panelBox, 0),
           orientation: effectivePanelOrientation(current), collapsed, buttonRight, buttonBottom,
         };
         applyPanelPositionSettled(panel, next, view);
-        this.placeButton(id, button, collapsed, next);
-        const placed = button.getBoundingClientRect();
-        const panelBox = panel.getBoundingClientRect();
-        this.host.savePosition(id, {
-          ...next,
-          ...positionFromPoint({ left: panelBox.left - board.left + pivot.left - placed.left, top: panelBox.top - board.top + pivot.top - placed.top }, view, panelBox, 0),
-        });
+        this.host.savePosition(id, next);
         this.refresh();
       };
       const down = (event: PointerEvent): void => {
         event.stopPropagation();
-        suppressClick = false;
         if (event.button !== 0) return;
         event.preventDefault();
         this.dragCleanup?.();
+        suppressClick = false;
         const initial = this.host.position(id);
-        const box = panel.getBoundingClientRect();
+        const pivot = button.getBoundingClientRect();
+        const bar = this.bar(id, panel);
+        const previousHeight = bar?.style.getPropertyValue?.("max-height") ?? "";
+        const previousOverflow = bar?.style.getPropertyValue?.("overflow-y") ?? "";
         const board = this.host.boardRoot.getBoundingClientRect();
         const startX = event.clientX;
         const startY = event.clientY;
@@ -113,9 +115,18 @@ export class PanelVisibility {
           }
           if (!dragged && Math.hypot(pointer.clientX - startX, pointer.clientY - startY) < 8) return;
           dragged = true;
+          const target = { left: pivot.left - board.left + pointer.clientX - startX, top: pivot.top - board.top + pointer.clientY - startY };
+          const orientation = effectivePanelOrientation(this.currentPosition(id, panel));
+          if (initial?.collapsed !== true && orientation === "vertical" && bar !== null) {
+            const room = buttonBottom ? target.top + pivot.height : view.height - target.top;
+            bar.style.setProperty("max-height", `${Math.max(44, room - 2)}px`);
+            bar.style.setProperty("overflow-y", "auto");
+          }
+          const box = panel.getBoundingClientRect();
+          const placed = button.getBoundingClientRect();
           next = {
-            ...positionFromPoint({ left: box.left - board.left + pointer.clientX - startX, top: box.top - board.top + pointer.clientY - startY }, view, box),
-            orientation: effectivePanelOrientation(this.currentPosition(id, panel)),
+            ...positionFromPoint({ left: target.left - (placed.left - box.left), top: target.top - (placed.top - box.top) }, view, box),
+            orientation,
             collapsed: initial?.collapsed === true,
             buttonRight,
             buttonBottom,
@@ -134,6 +145,12 @@ export class PanelVisibility {
         const cancel = (pointer?: PointerEvent): void => {
           if (pointer !== undefined && pointer.pointerId !== event.pointerId) return;
           cleanup();
+          if (bar !== null) {
+            if (previousHeight) bar.style.setProperty("max-height", previousHeight);
+            else bar.style.removeProperty("max-height");
+            if (previousOverflow) bar.style.setProperty("overflow-y", previousOverflow);
+            else bar.style.removeProperty("overflow-y");
+          }
           applyPanelPositionSettled(panel, initial, view);
           suppressClick = ready || swiped || dragged;
         };
@@ -193,14 +210,17 @@ export class PanelVisibility {
     const arranging = this.host.boardRoot.querySelector?.(".miro-canvas-arrange-banner") != null;
     button.hidden = !collapsed && !arranging && (!mobile || this.host.buttonHidden?.(id) === true);
     const grouped = id === "toolbar" && !button.hidden;
-    panel.setAttribute("data-panel-controls-grouped", String(grouped));
     const reserve = button.hidden ? "0px" : grouped ? "100px" : "56px";
     const position = override ?? this.host.position(id);
     const right = position?.buttonRight ?? position?.anchor.includes("right") ?? false;
     const bottom = position?.buttonBottom ?? false;
+    const vertical = panel.getAttribute("data-miro-canvas-panel-orientation") === "vertical";
+    const key = `${collapsed}:${button.hidden}:${grouped}:${right}:${bottom}:${vertical}`;
+    if (this.placementKeys.get(id) === key) return;
+    this.placementKeys.set(id, key);
+    panel.setAttribute("data-panel-controls-grouped", String(grouped));
     panel.setAttribute("data-panel-button-right", String(right));
     panel.setAttribute("data-panel-button-bottom", String(bottom));
-    const vertical = panel.getAttribute("data-miro-canvas-panel-orientation") === "vertical";
     const bar = this.bar(id, panel);
     const more = bar?.querySelector<HTMLElement>(".miro-canvas-tools__more");
     if (more != null) {
@@ -256,5 +276,6 @@ export class PanelVisibility {
     for (const remove of this.listeners.splice(0)) remove();
     for (const button of this.buttons.values()) button.remove();
     this.buttons.clear();
+    this.placementKeys.clear();
   }
 }

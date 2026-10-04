@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { App, TFile } from "obsidian";
 import { setLocale, words } from "../src/i18n";
 import { validateMiroCanvasMetadata } from "../src/metadata";
+import { listCommentThreads } from "../src/local-comments";
 import {
   buildWelcomeBoard,
   createWelcomeBoard,
@@ -86,10 +87,22 @@ afterEach(() => {
 });
 
 describe("buildWelcomeBoard", () => {
-  it("lays out an introduction, eight sections and a sandbox in reading order", () => {
+  it.each(["en", "ru"] as const)("shows an open reply, a completed comment and real export files in %s", (locale) => {
+    setLocale(locale);
     const document = buildWelcomeBoard();
-    const frames = nodesOf(document).filter((node) => node.type === "group");
-    expect(frames).toHaveLength(10);
+    const threads = listCommentThreads(document, { includeResolved: true });
+    expect(threads.some(thread => !thread.resolved && thread.replies.length > 0)).toBe(true);
+    expect(threads.some(thread => thread.resolved && thread.text === words().welcome.resolvedComment)).toBe(true);
+    const paths = welcomeSamplePaths();
+    const files = nodesOf(document).filter(node => node.type === "file").map(node => node.file);
+    expect(files).toContain(paths.exportPdf);
+    expect(files).toContain(paths.exportPptx);
+    expect(nodesOf(document).some(node => node.text?.includes(words().welcome.fileFromDeviceHint))).toBe(true);
+  });
+  it("lays out an introduction, twelve sections and a sandbox in reading order", () => {
+    const document = buildWelcomeBoard();
+    const frames = nodesOf(document).filter((node) => node.type === "group" && node.width >= 900);
+    expect(frames).toHaveLength(14);
     // Reading order: left to right, then top to bottom.
     for (let index = 1; index < frames.length; index += 1) {
       const previous = frames[index - 1]!;
@@ -98,14 +111,14 @@ describe("buildWelcomeBoard", () => {
       expect(sameRow ? current.x > previous.x : current.y > previous.y).toBe(true);
     }
     frames.forEach((frameNode, index) => {
-      if (index > 0 && index < 9) expect(frameNode.label).toContain(`${index}.`);
+      if (index > 0 && index < 13) expect(frameNode.label).toContain(`${index}.`);
     });
   });
 
   it("puts every card inside its own frame", () => {
     const document = buildWelcomeBoard();
     const nodes = nodesOf(document);
-    const frames = nodes.filter((node) => node.type === "group");
+    const frames = nodes.filter((node) => node.type === "group" && node.width >= 900);
     const cards = nodes.filter((node) => node.type !== "group");
     for (const card of cards) {
       const fits = frames.some((frameNode) => frame(frameNode, card.x, card.y, card.width, card.height));
@@ -119,7 +132,7 @@ describe("buildWelcomeBoard", () => {
     for (const node of nodesOf(document)) {
       if (overrides[node.id]?.item?.type === "sticky_note") expect(node.width).toBe(node.height);
     }
-    const frames = nodesOf(document).filter(node => node.type === "group");
+    const frames = nodesOf(document).filter(node => node.type === "group" && node.width >= 900);
     expect(frames[0]!.width).toBe(frames[1]!.width * 2 + 80);
   });
 
@@ -171,7 +184,7 @@ describe("buildWelcomeBoard", () => {
 
   it("lays export pages over the introduction and the meeting plan", () => {
     const document = buildWelcomeBoard();
-    const frames = nodesOf(document).filter((node) => node.type === "group");
+    const frames = nodesOf(document).filter((node) => node.type === "group" && node.width >= 900);
     const metadata = document.miroCanvas as { readonly export: { readonly pages: readonly CanvasNode[] } };
     expect(metadata.export.pages).toHaveLength(2);
     const covers = (page: CanvasNode, target: CanvasNode): boolean =>
@@ -209,27 +222,27 @@ describe("buildWelcomeBoard", () => {
   it("writes Russian titles once the locale is Russian", () => {
     setLocale("ru");
     const document = buildWelcomeBoard();
-    const frames = nodesOf(document).filter((node) => node.type === "group");
+    const frames = nodesOf(document).filter((node) => node.type === "group" && node.width >= 900);
     expect(frames[0]!.label).toContain("Знакомство");
     expect(frames[2]!.label).toContain("Стикеры");
     expect(frames[3]!.label).toContain("файлы");
     expect(frames[8]!.label).toContain("поделиться");
   });
 
-  it("points the files frame at the board's five sample files by default", () => {
+  it("points the files frame at the board's seven sample files by default", () => {
     const document = buildWelcomeBoard();
     const paths = welcomeSamplePaths();
     const nodes = nodesOf(document);
     const fileNodes = nodes.filter((node) => node.type === "file");
-    expect(fileNodes).toHaveLength(5);
+    expect(fileNodes).toHaveLength(7);
     expect(fileNodes.map((node) => node.file).sort()).toEqual(
-      [paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx].sort(),
+      [paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx, paths.exportPdf, paths.exportPptx].sort(),
     );
-    const frames = nodes.filter((node) => node.type === "group");
+    const frames = nodes.filter((node) => node.type === "group" && node.width >= 900);
     const filesFrame = frames[3]!;
     const planFrame = frames[2]!;
     for (const fileNode of fileNodes) {
-      expect(frame(fileNode.file === paths.note ? planFrame : filesFrame, fileNode.x, fileNode.y, fileNode.width, fileNode.height)).toBe(true);
+      expect(frame(fileNode.file === paths.note ? planFrame : fileNode.file === paths.exportPdf || fileNode.file === paths.exportPptx ? frames[8]! : filesFrame, fileNode.x, fileNode.y, fileNode.width, fileNode.height)).toBe(true);
     }
   });
 
@@ -237,11 +250,12 @@ describe("buildWelcomeBoard", () => {
     const samples = {
       folder: "Sample folder", note: "Sample folder/n.md", canvas: "Sample folder/c.canvas",
       picture: "Sample folder/p.png", pdf: "Sample folder/d.pdf", docx: "Sample folder/w.docx",
+      exportPdf: "Sample folder/export.pdf", exportPptx: "Sample folder/export.pptx",
     };
     const document = buildWelcomeBoard({ samples });
     const fileNodes = nodesOf(document).filter((node) => node.type === "file");
     expect(fileNodes.map((node) => node.file).sort()).toEqual(
-      [samples.note, samples.canvas, samples.picture, samples.pdf, samples.docx].sort(),
+      [samples.note, samples.canvas, samples.picture, samples.pdf, samples.docx, samples.exportPdf, samples.exportPptx].sort(),
     );
   });
 });
@@ -266,6 +280,18 @@ describe("sampleNoteContent and sampleCanvasContent", () => {
 });
 
 describe("createWelcomeBoard", () => {
+  it("creates the current guide at a free path when requested, preserving older copies", async () => {
+    const first = words().welcome.fileName;
+    const second = first.replace(/\.canvas$/, " (2).canvas");
+    const third = first.replace(/\.canvas$/, " (3).canvas");
+    const { host, files, create } = fakeHost([first, second]);
+    const before = files.get(first);
+    await createWelcomeBoard(host, true);
+    expect(files.get(first)).toBe(before);
+    expect(create).toHaveBeenCalledWith(third, expect.any(String));
+    expect(create).not.toHaveBeenCalledWith(first, expect.anything());
+    expect(create).not.toHaveBeenCalledWith(second, expect.anything());
+  });
   it("starts a new board at the introduction and preserves the old welcome board", async () => {
     const oldPath = "Miro Canvas - Welcome.canvas";
     const { host, files, create, zoomToBbox } = fakeHost([oldPath]);
@@ -298,7 +324,7 @@ describe("createWelcomeBoard", () => {
     expect(create).toHaveBeenCalledWith(paths.note, sampleNoteContent());
     expect(create).toHaveBeenCalledWith(paths.canvas, sampleCanvasContent());
     expect(create).toHaveBeenCalledWith(boardPath, expect.any(String));
-    expect(createBinary).toHaveBeenCalledTimes(3);
+    expect(createBinary).toHaveBeenCalledTimes(5);
     expect(openFile).toHaveBeenCalled();
   });
 
@@ -306,7 +332,7 @@ describe("createWelcomeBoard", () => {
     const paths = welcomeSamplePaths();
     const boardPath = words().welcome.fileName;
     const { host, createFolder, create, createBinary, openFile, files } = fakeHost(
-      [paths.folder, paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx, boardPath],
+      [paths.folder, paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx, paths.exportPdf, paths.exportPptx, boardPath],
     );
     const boardBefore = files.get(boardPath);
     await createWelcomeBoard(host);
@@ -323,6 +349,6 @@ describe("createWelcomeBoard", () => {
     expect(createFolder).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalledWith(paths.note, expect.any(String));
     expect(create).toHaveBeenCalledWith(paths.canvas, sampleCanvasContent());
-    expect(createBinary).toHaveBeenCalledTimes(3);
+    expect(createBinary).toHaveBeenCalledTimes(5);
   });
 });

@@ -245,3 +245,23 @@ before release, saved widths [10.2, 19.2, 11.1], and reopened the file with
 the same widths. Android runs also found and fixed the spare-tools tray
 covering the Russian Plus menu. The old M0 vault installer still pins 0.1.0;
 release interaction checks use the isolated CDP harness instead.
+
+0.2.2 correction (2026-10-04): the Russian welcome tour had reused an old
+board; the final bundled template was newer. Re-recorded both languages from
+fresh isolated vaults, with an assertion for section 12 and the resolved
+comment. The tour now shows device-file instructions, the checkmark, actual
+export files, a movable frame and Markdown/code/formula examples, and opens
+the exported two-page PDF. See [the feature audit](welcome-board-coverage.md).
+
+New paired `panel-folding` recordings use the Samsung SM-X736B in
+MiroCanvasTest. Taps go through Android; held drags use WebView touch events.
+They check repeated folding, open/folded movement, button positions and
+transparent backgrounds. A separate real desktop script performs 224 toggles
+and 16 held drags at four corners in both orientations. It reproduces the
+hover state with mobile classes and real mouse input, covering hybrid input.
+
+Final gates for 0.2.2: 1,689 Vitest tests passed (one skipped), TypeScript,
+plugin/MCP builds, pinned schema, all three synthetic smoke modes, 63 Python
+tests and two recording-helper tests passed. All 56 GIFs are below 4 MiB
+and 35 seconds. Native Obsidian renders the completed pin and both real export
+examples; pypdf confirms two pages in each language's exported PDF.

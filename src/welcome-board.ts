@@ -1,5 +1,5 @@
 /**
- * The optional welcome board: eight practical sections and a sandbox,
+ * The optional welcome board: twelve practical sections and a sandbox,
  * with real notes, cards, lines and files to try.
  *
  * `buildWelcomeBoard` is a pure builder.  It never hand-invents a shape of
@@ -20,7 +20,8 @@
  * Obsidian's own colours.
  *
  * The "Files and notes" frame points native Canvas file nodes at a small
- * folder of sample files (welcome-samples.ts has the two binary ones' bytes;
+ * folder of sample files (welcome-samples.ts and welcome-export-samples.ts
+ * hold the binary bytes;
  * `sampleNoteContent`/`sampleCanvasContent` below build the text ones) that
  * `createWelcomeBoard` writes next to the board, on the same press, so the
  * frame never points at a file that does not exist.
@@ -32,13 +33,14 @@ import type { CanvasAnchor } from "./anchors";
 import { readBoardConnector, nativeEdgeOf, fitsNativeEdge, type BoardConnector } from "./board-connectors";
 import type { CanvasShapeDescriptor } from "./canvas-authoring";
 import { exportRecord, pageAround, paperRatio, type ExportPageRecord, type ExportState } from "./export-pages";
-import { words } from "./i18n";
+import { currentLocale, words } from "./i18n";
 import { idFactory } from "./importers/board-builder";
 import { readLocalItem, type LocalItem } from "./local-items";
-import { addLocalComment, addReply } from "./local-comments";
+import { addLocalComment, addReply, resolveComment } from "./local-comments";
 import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata } from "./metadata";
 import { readableInk } from "./miro-palette";
 import { WELCOME_SAMPLE_DOCX_BASE64, WELCOME_SAMPLE_PDF_BASE64, WELCOME_SAMPLE_PNG_BASE64, decodeWelcomeSample } from "./welcome-samples";
+import { WELCOME_EXPORTS } from "./welcome-export-samples";
 
 export interface WelcomeBoardOptions {
 	/** Makes every id reproducible, so two builds can be compared in a test. */
@@ -55,6 +57,8 @@ export interface WelcomeSamplePaths {
 	readonly picture: string;
 	readonly pdf: string;
 	readonly docx: string;
+	readonly exportPdf: string;
+	readonly exportPptx: string;
 }
 
 /**
@@ -76,6 +80,8 @@ export function welcomeSamplePaths(): WelcomeSamplePaths {
 		picture: `${folder}/${WELCOME_SAMPLE_ATTACHMENT_NAMES.picture}`,
 		pdf: `${folder}/${WELCOME_SAMPLE_ATTACHMENT_NAMES.pdf}`,
 		docx: `${folder}/${WELCOME_SAMPLE_ATTACHMENT_NAMES.docx}`,
+		exportPdf: `${folder}/Board-export.pdf`,
+		exportPptx: `${folder}/Board-export.pptx`,
 	};
 }
 
@@ -131,8 +137,8 @@ interface CardStyle {
 	readonly locked?: true;
 }
 
-/** Introduction, eight sections in two columns, and a place to try things. */
-const FRAMES = ["welcome", "start", "plan", "files", "appearance", "drawing", "comments", "settings", "exportAndMiro", "sandbox"] as const;
+/** Introduction, twelve sections in two columns, and a place to try things. */
+const FRAMES = ["welcome", "start", "plan", "files", "appearance", "drawing", "comments", "settings", "exportAndMiro", "selection", "content", "navigation", "preferences", "sandbox"] as const;
 type FrameName = (typeof FRAMES)[number];
 const FRAME_WIDTH = 900;
 const FRAME_HEIGHT = 700;
@@ -156,7 +162,7 @@ const FIXED_TIMESTAMP = "2026-01-01T00:00:00.000Z";
 
 function frameRect(frame: FrameName): Rect {
 	if (frame === "welcome") return { x: 0, y: 0, width: FRAME_WIDTH * 2 + GAP, height: 600 };
-	if (frame === "sandbox") return { x: 0, y: 3800, width: FRAME_WIDTH * 2 + GAP, height: FRAME_HEIGHT };
+	if (frame === "sandbox") return { x: 0, y: 5360, width: FRAME_WIDTH * 2 + GAP, height: FRAME_HEIGHT };
 	const index = FRAMES.indexOf(frame) - 1;
 	return { x: (index % 2) * (FRAME_WIDTH + GAP), y: 680 + Math.floor(index / 2) * (FRAME_HEIGHT + GAP), width: FRAME_WIDTH, height: FRAME_HEIGHT };
 }
@@ -224,11 +230,12 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 		welcome: strings.welcomeTitle, start: strings.startTitle, plan: strings.planTitle, appearance: strings.appearanceTitle,
 		drawing: strings.drawingTitle, comments: strings.discussionTitle, settings: strings.settingsTitle,
 		files: strings.notesTitle, exportAndMiro: strings.shareTitle, sandbox: strings.sandboxTitle,
+		selection: strings.selectionTitle, content: strings.contentTitle, navigation: strings.navigationTitle, preferences: strings.preferencesTitle,
 	};
 	FRAMES.forEach((frame, index) => {
 		const rect = frameRect(frame);
 		const id = nextId();
-		nodes.push({ id, type: "group", x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: index > 0 && index < 9 ? `${index}. ${titles[frame]}` : titles[frame] });
+		nodes.push({ id, type: "group", x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: index > 0 && index < FRAMES.length - 1 ? `${index}. ${titles[frame]}` : titles[frame] });
 		overrides[id] = itemOverride({ type: "frame" });
 	});
 
@@ -317,10 +324,11 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	const drawingHint = caption(within("drawing", 40, 535, 820, 155), strings.drawingPractice);
 	overrides[drawingHint] = { ...overrides[drawingHint], typography: { fontSize: 16, verticalAlign: "top" } };
 	const commentCardId = card(within("comments", 40, 70, 390, 180), strings.meetingPlace, { typography: centred(28), colors: painted("#e8edf5") });
-	card(within("comments", 480, 70, 380, 180), strings.lockedCard, { typography: centred(24), locked: true, colors: painted(MARKER.gray) });
+	const lockedCardId = card(within("comments", 480, 70, 380, 180), strings.lockedCard, { typography: centred(24), locked: true, colors: painted(MARKER.gray) });
 	caption(within("comments", 40, 270, 390, 90), strings.tryComment);
-	caption(within("comments", 480, 270, 380, 90), strings.tryLocked);
-	explanation("comments", strings.discussionHint, 410, 240);
+	caption(within("comments", 480, 270, 380, 70), strings.tryLocked);
+	const discussionHint = caption(within("comments", 40, 425, 820, 250), `${strings.discussionHint}\n\n${strings.commentListHint}`);
+	overrides[discussionHint] = { ...overrides[discussionHint], typography: { fontSize: 18, verticalAlign: "top" } };
 	let commentsMetadata: Record<string, unknown> = { schemaVersion: MIRO_CANVAS_SCHEMA_VERSION };
 	const commentOptions = { idFactory: () => nextId(), now: () => FIXED_TIMESTAMP };
 	const addedComment = addLocalComment(
@@ -337,14 +345,24 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 		throw new Error("welcome board: the reply was rejected");
 	}
 	commentsMetadata = addedReply.metadata;
-	const addedAnywhere = addLocalComment(commentsMetadata, { text: strings.commentAnywhere, anchor: pointIn("comments", 560, 380) }, commentOptions);
+	const addedAnywhere = addLocalComment(commentsMetadata, { text: strings.commentAnywhere, anchor: pointIn("comments", 60, 385) }, commentOptions);
 	if (!addedAnywhere.ok || addedAnywhere.metadata === undefined) {
 		throw new Error("welcome board: the comment on the empty board was rejected");
 	}
 	commentsMetadata = addedAnywhere.metadata;
+	const finished = addLocalComment(commentsMetadata, { text: strings.resolvedComment, anchor: { type: "node", nodeId: lockedCardId, u: 0.9, v: 0.1 } }, commentOptions);
+	if (!finished.ok || finished.metadata === undefined || finished.comment === undefined) {
+		throw new Error("welcome board: the completed comment was rejected");
+	}
+	const resolved = resolveComment(finished.metadata, finished.comment.id, commentOptions);
+	if (!resolved.ok || resolved.metadata === undefined) throw new Error("welcome board: resolving the comment failed");
+	commentsMetadata = resolved.metadata;
+	const resolvedHint = caption(within("comments", 480, 350, 380, 70), strings.resolvedHint);
+	overrides[resolvedHint] = { ...overrides[resolvedHint], typography: { fontSize: 16 } };
 
 	card(within("settings", 40, 40, 820, 100), strings.devices, { typography: centred(24), colors: painted("#e7efee") });
-	explanation("settings", strings.settingsSteps, 180, 470);
+	const settingsHint = caption(within("settings", 40, 180, 820, 500), `${strings.settingsSteps}\n\n${strings.panelOptionsHint}`);
+	overrides[settingsHint] = { ...overrides[settingsHint], typography: { fontSize: 18, verticalAlign: "top" } };
 	fileNode(within("files", 40, 40, 380, 170), samples.canvas);
 	card(within("files", 460, 40, 400, 170), `[[${samples.note.replace(/\.md$/, "")}|${strings.openSampleNote}]]`, { typography: centred(22) });
 	caption(within("files", 40, 215, 380, 80), strings.tryCanvas);
@@ -355,13 +373,28 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	item(within("files", 520, 430, 340, 120), `| ${strings.tableStep} | ${strings.tableStatus} |\n| --- | --- |\n| ${strings.meetingPlace} | ${strings.tableStyleStatus} |`, { type: "table" });
 	const filesHint = caption(within("files", 40, 560, 820, 130), `${strings.notesPractice}\n\n${strings.fileFromDeviceHint}`);
 	overrides[filesHint] = { ...overrides[filesHint], typography: { fontSize: 16, verticalAlign: "top" } };
-	card(within("exportAndMiro", 40, 40, 820, 225), "", { borderStyle: "dashed", borderWidth: 1 });
-	caption(within("exportAndMiro", 65, 55, 750, 45), strings.exportPreview);
-	[strings.meetingIdea, strings.meetingStep, strings.meetingDone].forEach((text, index) => {
-		const id = item(within("exportAndMiro", 80 + index * 255, 110, 130, 130), text, { type: "sticky_note", color: "yellow" });
-		overrides[id] = { ...overrides[id], typography: centred(13) };
-	});
-	explanation("exportAndMiro", strings.shareSteps, 295, 375);
+	fileNode(within("exportAndMiro", 40, 40, 390, 245), samples.exportPdf);
+	fileNode(within("exportAndMiro", 470, 40, 390, 155), samples.exportPptx);
+	caption(within("exportAndMiro", 470, 210, 390, 95), strings.exportFilesHint);
+	const exportHint = caption(within("exportAndMiro", 40, 325, 820, 340), strings.shareSteps);
+	overrides[exportHint] = { ...overrides[exportHint], typography: { fontSize: 18, verticalAlign: "top" } };
+	const group = within("selection", 40, 40, 820, 270);
+	nodes.push({ id: nextId(), type: "group", ...group, label: strings.frameTryTitle });
+	const groupStart = item(within("selection", 80, 90, 160, 160), strings.sandboxMove, { type: "sticky_note", color: "yellow" });
+	const groupEnd = item(within("selection", 540, 90, 160, 160), strings.sandboxConnect, { type: "sticky_note", color: "light_blue" });
+	connect({ from: { type: "node", nodeId: groupStart, u: 1, v: 0.5 }, to: { type: "node", nodeId: groupEnd, u: 0, v: 0.5 } });
+	const selectionHint = caption(within("selection", 40, 350, 820, 320), strings.selectionHint);
+	overrides[selectionHint] = { ...overrides[selectionHint], typography: { fontSize: 20, verticalAlign: "top" } };
+	card(within("content", 40, 40, 390, 220), `${strings.markdownSample}\n\n$$E = mc^2$$`);
+	item(within("content", 470, 40, 390, 220), strings.codeSample, { type: "code" });
+	card(within("content", 40, 285, 820, 70), strings.websiteSample);
+	const contentHint = caption(within("content", 40, 390, 820, 270), strings.contentHint);
+	overrides[contentHint] = { ...overrides[contentHint], typography: { fontSize: 20, verticalAlign: "top" } };
+	const navigationHint = caption(within("navigation", 40, 40, 820, 475), strings.navigationHint);
+	overrides[navigationHint] = { ...overrides[navigationHint], typography: { fontSize: 20, verticalAlign: "top" } };
+	caption(within("navigation", 40, 545, 820, 125), strings.lineSettingsHint);
+	const preferencesHint = caption(within("preferences", 40, 40, 820, 620), strings.preferencesHint);
+	overrides[preferencesHint] = { ...overrides[preferencesHint], typography: { fontSize: 20, verticalAlign: "top" } };
 	explanation("sandbox", strings.sandboxHint, 40, 130);
 	item(within("sandbox", 80, 250, 250, 250), strings.sandboxMove, { type: "sticky_note", color: "yellow" });
 	item(within("sandbox", 520, 250, 250, 250), strings.sandboxConnect, { type: "sticky_note", color: "light_blue" });
@@ -426,7 +459,7 @@ async function createSampleFile(host: WelcomeBoardHost, path: string, write: (pa
 /**
  * Writes the sample folder and the files in it that the "Files and notes"
  * frame points at - a note, a small canvas, a picture, a PDF and a Word
- * document - creating only what is missing.  Returns the paths whether or
+ * document and actual PDF/PPTX exports - creating only what is missing. Returns the paths whether or
  * not anything had to be written, so `buildWelcomeBoard` always points at
  * where the samples now are.
  */
@@ -442,6 +475,9 @@ export async function createWelcomeSamples(host: WelcomeBoardHost): Promise<Welc
 	await createSampleFile(host, paths.picture, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_PNG_BASE64)));
 	await createSampleFile(host, paths.pdf, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_PDF_BASE64)));
 	await createSampleFile(host, paths.docx, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_DOCX_BASE64)));
+	const exports = WELCOME_EXPORTS[currentLocale()];
+	await createSampleFile(host, paths.exportPdf, (path) => host.app.vault.createBinary(path, sampleBytes(exports.pdf)));
+	await createSampleFile(host, paths.exportPptx, (path) => host.app.vault.createBinary(path, sampleBytes(exports.pptx)));
 	return paths;
 }
 
@@ -450,11 +486,18 @@ export async function createWelcomeSamples(host: WelcomeBoardHost): Promise<Welc
  * and opens the board.  A file already at its path - the board, or any one
  * sample - is opened or kept exactly as it is, never overwritten or
  * rewritten; a missing one is created.  These, on the person's own press,
- * are the only files this module ever writes.
+ * are the only files this module ever writes. A fresh request picks an unused
+ * numbered path for the board, keeping older copies and their edits.
  */
-export async function createWelcomeBoard(host: WelcomeBoardHost): Promise<TFile> {
+export async function createWelcomeBoard(host: WelcomeBoardHost, fresh = false): Promise<TFile> {
 	await createWelcomeSamples(host);
-	const path = words().welcome.fileName;
+	let path = words().welcome.fileName;
+	if (fresh) {
+		const base = path.replace(/\.canvas$/, "");
+		for (let copy = 2; host.app.vault.getAbstractFileByPath(path) !== null; copy += 1) {
+			path = `${base} (${copy}).canvas`;
+		}
+	}
 	const existing = host.app.vault.getAbstractFileByPath(path);
 	const file = host.isFile(existing) ? existing : await host.app.vault.create(path, JSON.stringify(buildWelcomeBoard(), null, "\t"));
 	if (!host.isFile(file)) throw new Error("welcome board: the written file is not a TFile");

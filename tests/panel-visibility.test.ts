@@ -52,6 +52,18 @@ function setup(collapsed: boolean, hidden = false, inBar = false) {
 afterEach(() => vi.useRealTimers());
 
 describe("panel buttons", () => {
+  it("does not rewrite bar layout when a refresh leaves the control state unchanged", () => {
+    const rig = setup(false, false, true);
+    rig.button.style.setProperty.mockClear();
+    rig.bar.style.setProperty.mockClear();
+    rig.bar.style.removeProperty.mockClear();
+    rig.visibility.refresh();
+    rig.visibility.refresh();
+    expect(rig.button.style.setProperty).not.toHaveBeenCalled();
+    expect(rig.bar.style.setProperty).not.toHaveBeenCalled();
+    expect(rig.bar.style.removeProperty).not.toHaveBeenCalled();
+    rig.visibility.dispose();
+  });
   it("mounts the button inside the panel's own main row", () => {
     const rig = setup(false, false, true);
     expect(rig.panel.children).toHaveLength(0);
@@ -126,6 +138,20 @@ describe("panel buttons", () => {
     rig.button.fire("click");
     expect(rig.save).not.toHaveBeenCalled();
     expect(rig.panel.style.setProperty).toHaveBeenCalledWith("left", "20px");
+    rig.visibility.dispose();
+  });
+
+  it("lets a new short press fold after interrupting a held drag", () => {
+    vi.useFakeTimers();
+    const rig = setup(false);
+    rig.button.fire("pointerdown", 50, 150, 1);
+    vi.advanceTimersByTime(500);
+    rig.document.fire("pointermove", 100, 250, 1);
+    rig.button.fire("pointerdown", 60, 160, 2);
+    vi.advanceTimersByTime(100);
+    rig.document.fire("pointerup", 60, 160, 2);
+    rig.button.fire("click");
+    expect(rig.save).toHaveBeenCalledExactlyOnceWith("toolbar", expect.objectContaining({ collapsed: true }));
     rig.visibility.dispose();
   });
 

@@ -56,7 +56,7 @@ Use these tool shortcuts while you are not editing text:
 double-tapping empty board does the same. Undo with **Ctrl + Z**, or **Cmd + Z**
 on Mac. Code blocks, tables and website links are under **+** at the end of the toolbar.
 
-The first-run prompt offers a **welcome board** with eight practical sections,
+The first-run prompt offers a **welcome board** with twelve practical sections,
 real Obsidian files and room to experiment. It opens at the introduction,
 or at the first steps on a narrow screen;
 use the minimap to visit the other sections. The board and sample files are
@@ -69,7 +69,11 @@ created in your vault and remain available to edit.
 
 </details>
 
-You can also open it from **Settings → Miro Canvas → Getting started**.
+Use **Settings → Miro Canvas → Getting started → Create the welcome board**
+to create a fresh copy of the current guide. An occupied name gets a numbered
+suffix, preserving your previous board and edits. The guide includes open and
+resolved comments, a movable frame, code/formula samples and actual exported
+PDF/PowerPoint files. See the [feature-to-example audit](docs/welcome-board-coverage.md).
 The new board is named **Miro Canvas - Start here.canvas**. Older welcome
 boards and existing examples are preserved.
 
@@ -282,6 +286,13 @@ tool onto the main row: the insertion line shows where it will land.
 
 The button stays at the edge of its panel, clear of the tools. On a computer,
 an open panel shows it only in **Arrange panels** mode.
+
+<details>
+<summary>Fold repeatedly and move an open or folded panel</summary>
+
+![Fold repeatedly and move panels](docs/media/en/panel-folding.gif)
+
+</details>
 
 <details>
 <summary>Move a toolbar to the side</summary>

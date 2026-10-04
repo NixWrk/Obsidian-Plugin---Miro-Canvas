@@ -899,6 +899,10 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   customization and desktop export, and opens new boards at the introduction.
   New board and sample-folder names preserve older boards and examples;
   reopening an existing board preserves its contents and viewport.
+  Revised 2026-10-04 for 0.2.2: twelve practical sections, a resolved comment
+  with a checkmark, actual PDF/PPTX exports and a native movable frame.
+  The settings action creates a fresh numbered copy without rewriting an
+  existing board. See [the coverage audit](welcome-board-coverage.md).
 - [ ] `FUT-012` Write a visual guide to the plugin's features and the order of its settings,
   with screenshots, for users and for the release page. The task is written
   out in [the contributor guide](contributing.md) ("Task: the visual guide"); `tools/obsidian_cdp` records

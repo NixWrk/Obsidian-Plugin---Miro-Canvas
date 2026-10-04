@@ -111,6 +111,13 @@ saved settings in `.obsidian/plugins/miro-canvas/data.json`) is whatever an
 earlier run left behind. **Pass `--fresh` before recording anything you
 intend to keep**, so the state is exactly what `launch.py` itself produces.
 
+`node tools/obsidian_cdp/check-panel-toggle.mjs 9336` checks repeated folding
+at all four corners in both orientations, followed by a held drag and more
+folds. It uses real input in the isolated desktop window and restores its
+settings. `scenarios/panel-folding.mjs` records touch input on Android.
+`scenarios/welcome-board.mjs` refuses an older guide missing section 12 or
+the resolved comment. Use a fresh vault for the current template.
+
 Stop the instance when done:
 
 ```

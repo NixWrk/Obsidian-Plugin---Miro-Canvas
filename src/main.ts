@@ -193,7 +193,7 @@ export default class MiroCanvasPlugin extends Plugin {
       commentAuthors: () => this.m1Session?.commentAuthors() ?? [],
       accountName: () => obsidianAccountName(window.localStorage),
       openImportGuide: () => this.openImportGuide(),
-      createWelcomeBoard: () => this.openWelcomeBoard(),
+      createWelcomeBoard: () => void this.openWelcomeBoard(true),
       pluginVersion: this.manifest.version,
       checkForUpdate: () => this.checkForUpdates(),
       fontPackCatalogue: FONT_PACK_CATALOGUE,
@@ -834,8 +834,8 @@ export default class MiroCanvasPlugin extends Plugin {
   }
 
   /** The same welcome board the first-run question and the settings tab's button write and open. */
-  private openWelcomeBoard(): void {
-    void createWelcomeBoard({ app: this.app, isFile: (value): value is TFile => value instanceof TFile, normalizePath }).catch(
+  private async openWelcomeBoard(fresh = false): Promise<void> {
+    await createWelcomeBoard({ app: this.app, isFile: (value): value is TFile => value instanceof TFile, normalizePath }, fresh).catch(
       () => new Notice(words().importGuide.createWelcomeBoardFailed),
     );
   }

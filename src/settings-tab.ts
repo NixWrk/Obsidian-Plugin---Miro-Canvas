@@ -35,7 +35,7 @@ export interface SettingsTabHost {
   readonly accountName?: () => string | undefined;
   /** Opens the "Import boards from Miro" guide; the same one the first-run question offers. */
   readonly openImportGuide: () => void;
-  /** Writes (or opens, if it already exists) the welcome board; the same action the first-run question offers. */
+  /** Creates a fresh welcome board, preserving any existing board at its path. */
   readonly createWelcomeBoard: () => void;
   /** The installed version, from the plugin's manifest. */
   readonly pluginVersion: string;

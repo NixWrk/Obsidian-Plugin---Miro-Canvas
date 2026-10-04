@@ -4367,10 +4367,14 @@
 }
 
 /* Android retains :hover after a tap. It must not paint a selected tool. */
+.is-mobile .miro-canvas-root .miro-canvas-panel-toggle {
+  background: transparent;
+  box-shadow: none;
+}
 @media (hover: none), (pointer: coarse) {
-  .miro-canvas-root .miro-canvas-tools .miro-canvas-panel-toggle,
-  .miro-canvas-root .miro-canvas-dock .miro-canvas-panel-toggle {
+  .miro-canvas-root .miro-canvas-panel-toggle {
     background: transparent;
+    box-shadow: none;
   }
 }
 

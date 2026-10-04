@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.2 - 2026-10-04
+
+- Fold buttons no longer retain a hover background on tablets with a pen or
+  mouse. Folding measures the actual button offset once instead of correcting
+  an assumed size; moving an open vertical panel recalculates its available
+  height. Unchanged refreshes no longer rewrite its layout styles.
+- The welcome board now has twelve practical sections. It includes a resolved
+  comment with a checkmark, actual exported PDF/PowerPoint examples, a movable
+  frame, code and formula samples, and instructions for selection, layers,
+  partial formatting, touch navigation, drawing tools, review mode and imports.
+  Adding files from a device is described explicitly beside the attachments.
+- Creating the welcome board from settings makes a fresh copy at a free path,
+  preserving older boards and edits. First-run opening still keeps an existing
+  board. Tutorial link syntax is displayed as code rather than executed embeds.
+- Replaced the stale welcome recordings with tours of the current template.
+  Added English/Russian Android recordings of repeated folding and held drags,
+  with checks for button drift and lingering backgrounds. Added a documented
+  feature-to-example audit and a real Obsidian regression script.
+
 ## 0.2.1 - 2026-10-04
 
 - Double-tapping empty board with a pen puts the tool away without leaving
