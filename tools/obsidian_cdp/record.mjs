@@ -259,11 +259,24 @@ function buildScenarioApi(recorder, lang, androidSerial) {
       await sleep(350);
     },
 
-    touchDrag: async (from, to, { duration = 1100, stylus = false } = {}) => {
+    touchDrag: async (from, to, { duration = 1100, stylus = false, hold = 0 } = {}) => {
       const first = await screenPoint(from);
       const last = await screenPoint(to);
       await moveCursor(recorder, first.x, first.y, true);
+      if (hold > 0) {
+        const touch = (x, y) => [{x, y, id: 1, radiusX: 8, radiusY: 8, force: 1}];
+        await recorder.current.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: touch(first.x, first.y)});
+        await sleep(hold);
+        for (let step = 1; step <= 40; step += 1) {
+          const t = step / 40;
+          const ease = t * t * (3 - 2 * t);
+          await recorder.current.send("Input.dispatchTouchEvent", {type: "touchMove", touchPoints: touch(first.x + (last.x - first.x) * ease, first.y + (last.y - first.y) * ease)});
+          await sleep(duration / 40);
+        }
+        await recorder.current.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []});
+      } else {
       await androidInput([stylus ? "stylus" : "touchscreen", "swipe", String(first.screenX), String(first.screenY), String(last.screenX), String(last.screenY), String(duration)]);
+      }
       await moveCursor(recorder, last.x, last.y);
       await sleep(350);
     },
@@ -285,6 +298,19 @@ function buildScenarioApi(recorder, lang, androidSerial) {
       await evaluate(recorder.current.send, `window.__cdpCaption(${JSON.stringify(resolved ?? "")}); return true;`);
     },
 
+    /** Pen input with a pressure sample at each point, for the live-width demonstration. */
+    penStroke: async (points, { duration = 1800 } = {}) => {
+      const first = points[0];
+      await recorder.current.send("Input.dispatchMouseEvent", {type:"mousePressed",x:first.x,y:first.y,button:"left",buttons:1,clickCount:1,pointerType:"pen",force:first.pressure});
+      for (const point of points.slice(1)) {
+        await sleep(duration / Math.max(1, points.length - 1));
+        await moveCursor(recorder, point.x, point.y, true);
+        await recorder.current.send("Input.dispatchMouseEvent", {type:"mouseMoved",x:point.x,y:point.y,button:"left",buttons:1,pointerType:"pen",force:point.pressure});
+      }
+      const last = points.at(-1);
+      await recorder.current.send("Input.dispatchMouseEvent", {type:"mouseReleased",x:last.x,y:last.y,button:"left",buttons:0,clickCount:1,pointerType:"pen",force:0});
+    },
+
     find: (target) => findElement(recorder, target),
 
     click: async (target, { count = 1 } = {}) => {
@@ -300,13 +326,14 @@ function buildScenarioApi(recorder, lang, androidSerial) {
 
     move: (target, { duration = 0 } = {}) => approach(recorder, target, duration),
 
-    drag: async (from, to, { steps = 12, duration } = {}) => {
+    drag: async (from, to, { steps = 12, duration, hold = 0 } = {}) => {
       const start = await resolvePoint(recorder, from);
       const end = await resolvePoint(recorder, to);
       await moveCursor(recorder, start.x, start.y);
       await dispatchMouse(recorder, "mouseMoved", start.x, start.y);
       await sleep(100);
       await dispatchMouse(recorder, "mousePressed", start.x, start.y);
+      if (hold > 0) await sleep(hold);
       if (duration !== undefined) {
         await approach(recorder, end, duration, 1);
       } else for (let step = 1; step <= steps; step += 1) {

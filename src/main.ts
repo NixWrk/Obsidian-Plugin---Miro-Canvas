@@ -13,6 +13,7 @@ import {
   createObsidianMetadataStore,
   type ObsidianMetadataStoreProbe,
 } from "./obsidian-metadata-store";
+import { storeDeviceFiles } from "./device-files";
 import { M1CanvasSession } from "./m1-session";
 import { DEFAULT_TOOLBAR_ITEMS } from "./quick-tools";
 import { M2CanvasTools, type InitialCommentTarget } from "./m2-tools";
@@ -527,6 +528,7 @@ export default class MiroCanvasPlugin extends Plugin {
       onStateChange: () => this.updateStatus(true),
       setIcon: (element, icon) => setIcon(element, icon),
       onOpenSettings: () => this.openOwnSettings(),
+      onAddFile: (button, fromVault) => this.openFileSourceMenu(button, fromVault),
       onConnectorMenu: (event, run) => {
         // The clipboard and danger sections of native Canvas's selection menu.
         const menu = new Menu();
@@ -713,6 +715,45 @@ export default class MiroCanvasPlugin extends Plugin {
     });
     buttons.createEl("button", { text: labels.later }).addEventListener("click", () => modal.close());
     modal.open();
+  }
+
+  private openFileSourceMenu(button: HTMLElement, fromVault: () => void): void {
+    const labels = words().deviceFiles;
+    const session = this.activeM1Session();
+    if (session === null) return;
+    const sourceView = this.currentCanvasView;
+    const sourcePath = this.app.workspace.activeLeaf?.view instanceof obsidian.FileView
+      ? (this.app.workspace.activeLeaf.view as obsidian.FileView).file?.path
+      : undefined;
+    const menu = new Menu();
+    menu.addItem(item => item.setTitle(labels.fromVault).setIcon("vault").onClick(fromVault));
+    menu.addItem(item => item.setTitle(labels.fromDevice).setIcon("upload").onClick(() => {
+      const input = button.ownerDocument.createElement("input");
+      input.type = "file";
+      input.multiple = true;
+      input.hidden = true;
+      const cleanup = (): void => input.remove();
+      input.addEventListener("cancel", cleanup, { once: true });
+      input.addEventListener("change", () => {
+        const files = Array.from(input.files ?? []);
+        cleanup();
+        if (files.length === 0) return;
+        void (async () => {
+          const stored = await storeDeviceFiles(files, {
+            availablePath: name => this.app.fileManager.getAvailablePathForAttachment(name, sourcePath),
+            createBinary: (path, bytes) => this.app.vault.createBinary(path, bytes),
+          });
+          if (this.currentCanvasView !== sourceView || this.m1Session === null || !this.m1Session.addFiles(stored)) {
+            new Notice(labels.savedWithoutBoard);
+          }
+        })().catch(() => new Notice(labels.importFailed));
+      }, { once: true });
+      button.ownerDocument.body.appendChild(input);
+      this.register(cleanup);
+      input.click();
+    }));
+    const rect = button.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom });
   }
 
   /** Obsidian's settings, open on this plugin's page. */

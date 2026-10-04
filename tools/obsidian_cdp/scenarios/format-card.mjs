@@ -16,5 +16,27 @@ export default async function(s){
   await click(s,{selector:'[data-color-palette="fill"] [data-color="#ffd02f"]'});
   await checked(s,`const m=app.workspace.activeLeaf.view.canvas.getData().miroCanvas; const o=m?.localOverrides?.a100000000000001; if(o?.colors?.fill!=='#ffd02f'||o?.typography?.fontFamily!=='serif') throw new Error('formatting was not saved'); return true;`);
   await s.key('Escape');
-  await finish(s,{ru:'Оформление меняется с панели над карточкой',en:'Style a card from the toolbar above it'});
+  await s.caption({ru:'3. Выделим одно слово и сделаем его жирным',en:'3. Select one word and make it bold'});
+  await s.click({selector:'[data-demo-id="a100000000000001"]'}, {count:2});
+  await s.wait(600);
+  const word = await checked(s, `
+    const node=app.workspace.activeLeaf.view.canvas.nodes.get('a100000000000001');
+    const frame=node.nodeEl.querySelector('iframe.embed-iframe');
+    const line=frame?.contentDocument?.querySelector('.cm-line');
+    if(!line) throw Error('native text editor did not open');
+    const walker=frame.contentDocument.createTreeWalker(line,NodeFilter.SHOW_TEXT);
+    const text=walker.nextNode();
+    const range=frame.contentDocument.createRange();
+    range.setStart(text,${s.lang==='ru'?8:5}); range.setEnd(text,${s.lang==='ru'?15:12});
+    const r=range.getBoundingClientRect(), f=frame.getBoundingClientRect();
+    return {x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2};
+  `);
+  await s.move(word,{duration:600});
+  await s.click(word,{count:2});
+  await s.wait(450);
+  await click(s,{selector:`.miro-canvas-toolbar:not(.miro-canvas-tools) button[aria-label="${s.lang==='ru'?'Начертание':'Text style'}"]`});
+  await click(s,{selector:`.miro-canvas-toolbar:not(.miro-canvas-tools) button[aria-label="${s.lang==='ru'?'Полужирный':'Bold'}"]`});
+  await checked(s,`const n=app.workspace.activeLeaf.view.canvas.nodes.get('a100000000000001'); const text=n.child.editor.getValue(); if(!text.includes(${JSON.stringify(s.lang==='ru'?'Встреча **команды**':'Team **meeting**')})) throw Error('selected word formatting missing: '+text);return true;`);
+  await s.key('Escape');
+  await finish(s,{ru:'Можно оформить всю карточку или только выделенные слова',en:'Style the whole card or just the selected words'});
 }

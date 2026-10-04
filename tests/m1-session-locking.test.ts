@@ -3,6 +3,7 @@ import { M1CanvasSession } from "../src/m1-session";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
 import type { M1ControlsActions } from "../src/m1-controls";
+import { APPEARANCE_ACTIONS } from "../src/appearance";
 
 // Only the presentation is replaced. Use the real adapter, policy, writer and
 // native metadata store. EventTarget supplies cancellation/listener ordering;
@@ -54,7 +55,7 @@ class HostElement extends EventTarget {
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 type Data = Record<string, any>;
 const sessions: M1CanvasSession[] = [];
-afterEach(() => { sessions.splice(0).forEach((session) => session.dispose()); vi.restoreAllMocks(); });
+afterEach(() => { sessions.splice(0).forEach((session) => session.dispose()); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 /** A board with a locked card, a free one and, for a large selection, as many more free cards as asked. */
 function fixture(moreCards = 0) {
@@ -119,6 +120,72 @@ function fixture(moreCards = 0) {
 	const actions = (session.controls as unknown as { actions: M1ControlsActions }).actions;
 	return { root, canvas, session, locked, free, selection, initial, history, actions };
 }
+
+describe("selection frame follows the displayed card", () => {
+	it("uses live size and displayed zoom while native resize and camera animation have not committed", () => {
+		vi.stubGlobal("HTMLElement", HostElement);
+		const { root, free, session } = fixture();
+		Object.assign(root, { getBoundingClientRect: () => ({ left: 10, top: 20, right: 810, bottom: 620 }) });
+		Object.assign(free, { id: "free", width: 240, height: 120 });
+		Object.assign(free.nodeEl, { getBoundingClientRect: () => ({ left: 110, top: 120, right: 290, bottom: 210 }) });
+		const internal = session as any;
+		internal.handles.element = Object.assign(new HostElement(), { getBoundingClientRect: () => ({ left: 0, top: 0, right: 0, bottom: 0 }) });
+		vi.spyOn(internal, "displayViewport").mockReturnValue({ x: 0, y: 0, zoom: 0.75 });
+		expect(internal.handleRect("free")).toEqual({ left: 100, top: 100, width: 180, height: 90 });
+	});
+});
+
+describe("formatting a fragment through the native editor", () => {
+	function editing(locked = false) {
+		const rig = fixture();
+		const node = (locked ? rig.locked : rig.free) as any;
+		rig.canvas.selectOnly(node);
+		node.text = "Начало середина конец";
+		node.isEditing = true;
+		let value = node.text;
+		let from = { line: 0, ch: 7 };
+		let to = { line: 0, ch: 15 };
+		const editor = {
+			getSelection: () => value.slice(from.ch, to.ch),
+			getCursor: (end: string) => end === "from" ? from : to,
+			getRange: (start: typeof from, end: typeof to) => value.slice(start.ch, end.ch),
+			replaceRange: vi.fn((text: string, start: typeof from, end: typeof to) => { value = value.slice(0, start.ch) + text + value.slice(end.ch); }),
+			setSelection: (start: typeof from, end: typeof to) => { from = start; to = end; },
+		};
+		node.child = { editor };
+		const session = rig.session as any;
+		session.refresh();
+		return { ...rig, node, editor, internal: session, value: () => value };
+	}
+	it("preserves surrounding text and uses native editor undo instead of card metadata", () => {
+		const rig = editing();
+		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setFormat, format: { bold: true } });
+		expect(rig.value()).toBe("Начало **середина** конец");
+		expect(rig.editor.replaceRange).toHaveBeenCalledTimes(1);
+		expect(rig.canvas.data.miroCanvas.localOverrides.free).toBeUndefined();
+	});
+	it("retains a captured range while the toolbar's size input has focus", () => {
+		const rig = editing();
+		rig.internal.captureTextFragment();
+		rig.node.isEditing = false;
+		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setFontSize, fontSize: 24 });
+		expect(rig.value()).toBe('Начало <span style="font-size: 24px">середина</span> конец');
+	});
+	it("refuses a stale range instead of formatting the whole card", () => {
+		const rig = editing();
+		rig.internal.captureTextFragment();
+		rig.node.isEditing = false;
+		rig.editor.getRange = () => "changed";
+		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setFormat, format: { italic: true } });
+		expect(rig.editor.replaceRange).not.toHaveBeenCalled();
+		expect(rig.canvas.data.miroCanvas.localOverrides.free).toBeUndefined();
+	});
+	it("keeps the locked-card policy for a selected fragment", () => {
+		const rig = editing(true);
+		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setFormat, format: { bold: true } });
+		expect(rig.editor.replaceRange).not.toHaveBeenCalled();
+	});
+});
 
 describe("M1 session lock enforcement", () => {
 	it.each(["pointerdown", "mousedown"])("blocks %s before native drag/resize initialization and permits selection for unlock", (type) => {

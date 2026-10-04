@@ -57,9 +57,17 @@ double-tapping empty board does the same. Undo with **Ctrl + Z**, or **Cmd + Z**
 on Mac. Code blocks, tables and website links are under **+** at the end of the toolbar.
 
 The first-run prompt offers a **welcome board** with eight practical sections,
-real Obsidian files and room to experiment. It opens at the introduction;
+real Obsidian files and room to experiment. It opens at the introduction,
+or at the first steps on a narrow screen;
 use the minimap to visit the other sections. The board and sample files are
 created in your vault and remain available to edit.
+
+<details>
+<summary>Explore the welcome board</summary>
+
+![Explore the welcome board](docs/media/en/welcome-board.gif)
+
+</details>
 
 You can also open it from **Settings → Miro Canvas → Getting started**.
 The new board is named **Miro Canvas - Start here.canvas**. Older welcome
@@ -106,7 +114,13 @@ Click the embedded board's title to open it.
 
 </details>
 
-Pictures, PDFs and other vault files can be added too. Obsidian renders Markdown
+**Add file** offers **From Obsidian vault** or **From device**. The latter opens
+the system file picker on your computer, tablet or phone. Selected images and
+documents are copied into Obsidian's attachment folder and placed on the board.
+Matching names get a new filename; existing files are preserved. On a computer,
+you can also drag files from Obsidian's file list onto the board.
+
+Obsidian renders Markdown
 and formulas inside cards.
 
 ## Cards, shapes and frames
@@ -151,6 +165,11 @@ You can also add titled code blocks, Markdown tables and website links.
 Select a card to open its toolbar. Change the shape, font, text size,
 formatting, alignment, line spacing, fill and border. Highlight words,
 add a list or turn text into a link.
+
+To format part of a card, enter text editing, select the words and choose a
+font, size or style from the toolbar. The surrounding text stays unchanged.
+On a phone, hold a word to select it. With the keyboard open, font and style
+menus open above the toolbar.
 
 <details>
 <summary>Change font and colour</summary>
@@ -246,8 +265,23 @@ Board search does not change content and works in review mode.
 
 The gear opens the board menu. **Arrange panels** lets you move the toolbar,
 navigation buttons and minimap, switch between rows and columns, reorder tools
-and put less-used tools under **+**. **Done** or Escape ends arranging;
-**Reset** restores the default layout.
+and put less-used tools under **+**. The spare-tools list follows the toolbar.
+The drag grip and turn button have separate touch targets. An insertion line
+shows where a tool will land when you reorder it. **Done** or Escape ends
+arranging; **Reset** restores the default layout.
+
+Tools and navigation each have a fold button inside their menu. The toolbar
+groups its fold button and “+” together, with one separator before the tools. A folded panel becomes a small square button.
+Tap to fold or open a panel. Hold until the button gains an outline, then
+drag to move it; this works with an open panel too. Positions and folded
+states are remembered separately for computers, tablets and phones.
+
+In plugin settings, you can hide each panel’s fold button; it remains
+available while arranging panels. In that mode, open “+” and drag a spare
+tool onto the main row: the insertion line shows where it will land.
+
+The button stays at the edge of its panel, clear of the tools. On a computer,
+an open panel shows it only in **Arrange panels** mode.
 
 <details>
 <summary>Move a toolbar to the side</summary>
@@ -264,6 +298,16 @@ you can choose your own placement.
 Settings also cover board theme, zoom limits and steps, wheel behaviour,
 snapping, the minimap and attachment names. The interface follows Obsidian's
 language, with English and Russian available.
+
+In **Arrange panels**, drag the minimap’s corner to resize it. The size is
+saved separately for each device.
+
+<details>
+<summary>Resize the minimap</summary>
+
+![Resize the minimap](docs/media/en/minimap-size.gif)
+
+</details>
 
 **Fonts.** Add a `.ttf`, `.otf`, `.woff` or `.woff2` file, choose the fonts
 offered by the toolbar and reorder them. Optional packs include Miro and
@@ -328,14 +372,29 @@ possible layout: move and turn panels to suit your own workspace.
 
 </details>
 
-Pen pressure can change line width. With a drawing tool selected, a finger
-pans the board; palm protection tracks the pen's presence. Behaviour depends
+**Settings → Miro Canvas → Drawing** has two independent switches:
+**Pen pressure** changes width along the line while you draw with a stylus;
+turn it off for constant width. The highlighter keeps constant width.
+**Draw with a finger** allows drawing on tablets without a stylus. It starts
+off; one finger pans until enabled. Two fingers still pan and zoom, and
+palm protection tracks the pen's presence.
+
+<details>
+<summary>Drawing settings, live pressure and finger drawing</summary>
+
+![Drawing settings, live pressure and finger drawing](docs/media/en/tablet-drawing.gif)
+
+</details>
+
+Double-tapping empty board puts the tool away without leaving dots.
+ Behaviour depends
 on the events the device supplies. The S Pen side button does not reach the
 plugin in the checked Obsidian version.
 
 Mobile recordings use a Samsung SM-X736B and Galaxy A33 (SM-A336E).
 Touches were sent through Android and the two-finger gesture through WebView.
-These recordings do not verify physical pen pressure or palm contact.
+The pressure example supplies changing pen samples through CDP. These
+recordings do not verify physical pen pressure or palm contact.
 iPhone, iPad, macOS and Linux were not checked in this recording series.
 
 ## Export

@@ -9,9 +9,9 @@ NAMES = [
     "sticky-with-note", "insert-note", "obsidian-links", "nested-canvas",
     "create-shape", "frame-group", "select-together", "format-card",
     "move-connected", "draw-and-erase", "comment-thread", "board-search",
-    "export-pages", "arrange-panels",
+    "export-pages", "arrange-panels", "welcome-board",
 ]
-MOBILE_NAMES = ["phone-move", "phone-navigation", "tablet-move", "tablet-navigation", "phone-layout", "tablet-layout"]
+MOBILE_NAMES = ["phone-move", "phone-navigation", "tablet-move", "tablet-navigation", "phone-layout", "tablet-layout", "tablet-drawing", "minimap-size"]
 
 
 def audit(root: Path, out: Path) -> list[dict]:
@@ -27,7 +27,7 @@ def audit(root: Path, out: Path) -> list[dict]:
             for row, name in enumerate(names):
                 path = root / "docs" / "media" / language / f"{name}.gif"
                 assert f"docs/media/{language}/{name}.gif" in readme, path
-                scenario = "mobile-" + name.split("-", 1)[1] if name in MOBILE_NAMES else name
+                scenario = "mobile-" + name.split("-", 1)[1] if name in {"phone-move", "phone-navigation", "tablet-move", "tablet-navigation", "phone-layout", "tablet-layout"} else name
                 assert (root / "tools" / "obsidian_cdp" / "scenarios" / f"{scenario}.mjs").is_file()
                 with Image.open(path) as gif:
                     if name in MOBILE_NAMES:

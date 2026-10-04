@@ -4,13 +4,20 @@
 а также в тестовых хранилищах Android: Samsung SM-X736B (Obsidian 1.13.8)
 и Galaxy A33 / SM-A336E (Obsidian 1.12.7). Личные хранилища не менялись.
 
+Последние исправления панелей и оформление выделенного текста проверены
+в Obsidian на ПК и планшете. Добавление файла с устройства проверено через
+системное окно Android на планшете и смартфоне: проверены изображение и PDF.
+На Galaxy A33 повторно проверены сворачивание и перенос панелей, инструменты
+из «+», скрытие кнопок и оформление выделенного слова с открытой клавиатурой.
+Телефонные записи настройки панелей обновлены для текущего вида меню.
+
 ## Что показано
 
 В [русском README](../README.ru.md) и [английском README](../README.md)
 размещены 14 примеров на компьютере и шесть на телефоне и планшете,
 по одной записи для каждого языка. Сценарии находятся
 в [`tools/obsidian_cdp/scenarios`](../tools/obsidian_cdp/scenarios).
-Все 40 GIF вместе занимают около 9,9 МиБ; каждый файл меньше 1 МБ.
+Все 40 GIF вместе занимают около 12 МиБ; каждый файл меньше 1 МБ.
 
 | Запись | Что видно в ролике |
 | --- | --- |
@@ -21,16 +28,16 @@
 | `create-shape` | Выбор ромба, создание перетаскиванием и ввод вопроса |
 | `frame-group` | Перенос фрейма за название вместе с двумя задачами |
 | `select-together` | Выделение двух карточек рамкой и перенос вместе со связью |
-| `format-card` | Смена шрифта и заливки карточки |
+| `format-card` | Смена шрифта и заливки карточки, жирное начертание одного выделенного слова |
 | `move-connected` | Стрелка следует за карточкой, отмена возвращает их на место |
 | `draw-and-erase` | Красный штрих пером и его удаление ластиком |
 | `comment-thread` | Вопрос, ответ и отметка «решено» |
 | `board-search` | Поиск и переход к карточке за пределами текущего вида |
 | `export-pages` | Книжная ориентация, страницы по фреймам, PDF/PPTX и открытие PDF |
-| `arrange-panels` | Перенос панели инструментов и поворот столбцом |
+| `arrange-panels` | Перенос панели, поворот, линия вставки и перенос свёрнутой панели после удержания |
 | `phone-move`, `tablet-move` | Касание карточки и перенос вместе со стрелкой |
 | `phone-navigation`, `tablet-navigation` | Перемещение доски и увеличение двумя пальцами |
-| `phone-layout`, `tablet-layout` | Поворот и перенос навигации или инструментов к краю экрана |
+| `phone-layout`, `tablet-layout` | Поворот, перенос панелей, линия вставки, сворачивание и перенос после удержания; также перенос инструмента из «+» |
 
 ## Насколько понятно
 
@@ -46,7 +53,7 @@
 понятны и без просмотра GIF.
 
 Записи с компьютера имеют размер 960 × 600. Записи с телефона — 384 × 854,
-с планшета — 600 × 960; сохранены пропорции экрана. Основная часть длится около 8–15 секунд;
+с планшета — 600 × 960, а обновлённый пример настройки панелей — 540 × 864; сохранены пропорции экрана. Основная часть длится около 8–15 секунд;
 обсуждение и экспорт длиннее, потому что надо успеть прочитать сообщения и
 увидеть готовый файл. На узком экране надписи внутри интерфейса мелкие:
 для подробного просмотра лучше открыть GIF в полном размере. В README
@@ -65,6 +72,14 @@
 Obsidian и не снимок страницы GitHub.
 
 ## Что улучшено после просмотра
+
+- После проверки на планшете список убранных инструментов стал следовать за
+  панелью, захват и поворот разнесены, добавлена линия вставки. Записи настройки
+  на ПК и планшете обновлены; проверены отсутствие перекрытия кнопок и порядок после отпускания.
+
+- Кнопка сворачивания получила отдельное место в основном ряду инструментов.
+  Открытое меню навигации не перекрывается миникартой. При повторных касаниях
+  на планшете и смартфоне кнопки остаются в одной точке после раскрытия и сворачивания.
 
 - Увеличены подписи; убран случайный первый кадр от предыдущей доски.
 - На телефоне оставлены семь частых инструментов в одной строке, навигация
@@ -129,7 +144,7 @@ in isolated Obsidian 1.13.7 on Windows, with smooth pointer motion, gradual
 typing, readable captions and a pause to inspect the result. One opening
 GIF shows Miro-style sticky notes beside an actual Obsidian note. Other
 recordings expand beside the relevant feature descriptions.
-The 40 GIFs total about 9.9 MiB; each file is under 1 MB.
+The 40 GIFs total about 12 MiB; each file is under 1 MB.
 
 Desktop GIFs are 960 × 600; phone GIFs are 384 × 854 and tablet GIFs
 600 × 960, preserving the portrait screen proportions. Most last roughly 8–15 seconds; comments and export
@@ -168,8 +183,7 @@ short row; tablet tools use a side column. Review caught and fixed the
 Russian Done button extending off a narrow screen and tinted white GIF labels.
 Both READMEs were shortened around common tasks; technical reference and
 contributor instructions moved to separate documents. Physical stylus
-pressure, palm behaviour, macOS/Linux and iOS remain unverified. The revised welcome board ships in both languages; its own
-guide recording is still pending.
+pressure, palm behaviour, macOS/Linux and iOS remain unverified. The revised welcome board ships in both languages; its tour was added for 0.2.1.
 
 ## Reproduce the review
 
@@ -190,3 +204,44 @@ The export scenario predetermines only the operating system's save location,
 inside the isolated vault. Capture, PDF/PPTX encoding, writing and PDF viewing
 use the actual plugin and Obsidian. The save-dialog function is restored
 in cleanup, including after a failed scenario.
+
+
+Обновление планшетного примера: кнопка сворачивания встроена в ряд меню,
+свёрнутые панели квадратные. В обе записи добавлен перенос блока кода из «+»
+в основной ряд; длительность — около 28 секунд. На планшете отдельно
+проверены перенос штатной карточки Obsidian и выключение кнопки сворачивания
+через настройки. В обычном меню после выключения не остаётся пустого места.
+
+Проверка смартфона после подключения: обновлены русская и английская записи
+настройки панелей, перемещения карточки и навигации. При оформлении выделенного слова обнаружено перекрытие
+меню начертания системной панелью Android; меню перенесены выше панели
+карточки. Проверены все четыре начертания, шрифт и размер, сохранение этих
+изменений после выхода из редактора, выбор файла из
+хранилища Obsidian и добавление изображения и PDF с устройства.
+
+Повторная проверка кнопки сворачивания: убран остающийся после касания фон
+наведения Android. Значок выровнен по центру, кнопка отделена от инструментов
+линией. Диагональные стрелки заменены значком сворачивания панели. Обновлены
+четыре записи настройки меню; на обоих устройствах проверены удержание,
+перенос открытого и свёрнутого меню, поворот и повторное раскрытие.
+
+
+0.2.1 review (2026-10-04): added paired `tablet-drawing`, `minimap-size` and
+`welcome-board` recordings. The drawing example enables both switches through
+the real Android settings, sends changing pen pressure through CDP, then draws
+with touchscreen input, zooms with two fingers and double taps without dots.
+It checks saved widths and the final item count. Physical pressure/palm contact
+remain unverified. The minimap recording exposed responsive CSS overriding
+stored dimensions; it now checks saved size on the actual tablet. Phone and
+tablet panel layout recordings show grouped Plus/fold controls. All mobile
+writes remain inside MiroCanvasTest. The welcome tour uses isolated desktop
+vaults and shows drawing and panel instructions in both languages.
+
+Final gates: TypeScript check, 1,684 Vitest tests (one skipped), all three
+browser smoke modes, pinned schema check, plugin/MCP builds, 63 Python tests
+and the recording helpers passed. Audit covers 46 GIFs, under 4 MiB each.
+An isolated Obsidian 1.13.7 check at 50% zoom inspected the pressure preview
+before release, saved widths [10.2, 19.2, 11.1], and reopened the file with
+the same widths. Android runs also found and fixed the spare-tools tray
+covering the Russian Plus menu. The old M0 vault installer still pins 0.1.0;
+release interaction checks use the isolated CDP harness instead.

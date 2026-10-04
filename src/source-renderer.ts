@@ -15,6 +15,7 @@ import { blockArrowOutline, linePoints, planLine } from "./free-line";
 import { buildSourceScene, type SourceItemDescriptor, type SourceScene } from "./source-model";
 import { TOOLTIP_DELAY } from "./tooltips";
 import { words } from "./i18n";
+import { pressureStrokePath } from "./pressure-stroke";
 
 type UnknownRecord = Record<PropertyKey, unknown>;
 
@@ -502,7 +503,7 @@ function decorateDrawing(document: Document | undefined, layer: DomElementLike, 
   if (document === undefined || stroke === undefined) return false;
   // A stroke erased in the middle is several lines, which one path can draw.
   const pieces = stroke.breaks ?? [];
-  const svg = createSvg(document, "svg"), path = createSvg(document, pieces.length === 0 ? "polyline" : "path");
+  const svg = createSvg(document, "svg"), path = createSvg(document, pieces.length === 0 && stroke.widths === undefined ? "polyline" : "path");
   if (svg === undefined || path === undefined) return false;
   for (const [name, value] of Object.entries({
     viewBox: `0 0 ${stroke.box.width} ${stroke.box.height}`,
@@ -520,8 +521,10 @@ function decorateDrawing(document: Document | undefined, layer: DomElementLike, 
     drawn += `${drawn === "" ? "" : " "}${command}${stroke.points[index]} ${stroke.points[index + 1]}`;
   }
   for (const [name, value] of Object.entries({
-    ...(pieces.length === 0 ? { points: pairs.join(" ") } : { d: drawn }),
-    fill: "none", stroke: stroke.color, "stroke-width": String(stroke.width),
+    ...(stroke.widths !== undefined ? { d: pressureStrokePath(stroke.points, stroke.widths, pieces) }
+      : pieces.length === 0 ? { points: pairs.join(" ") } : { d: drawn }),
+    fill: stroke.widths === undefined ? "none" : stroke.color,
+    stroke: stroke.widths === undefined ? stroke.color : "none", "stroke-width": String(stroke.width),
     "stroke-linecap": "round", "stroke-linejoin": "round",
     ...(stroke.opacity === undefined ? {} : { "stroke-opacity": String(stroke.opacity) }),
   })) setOwnedElementAttribute(path, name, value);

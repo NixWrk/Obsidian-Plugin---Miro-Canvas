@@ -1,10 +1,54 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { dropIndexFromPointer, PanelArrangeMode, pressIsOutside, rectContainsPoint, type PanelArrangeHost } from "../src/panel-arrange";
+import { arrangeTrayPlacement, dropIndexFromPointer, PanelArrangeMode, pressIsOutside, rectContainsPoint, type PanelArrangeHost } from "../src/panel-arrange";
 import type { PanelId, PanelPosition } from "../src/panel-layout";
 import type { ToolbarItem } from "../src/quick-tools";
 
 type Rect = { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number; readonly width: number; readonly height: number };
+
+describe("spare tools stay next to the toolbar", () => {
+  const view = { left: 8, top: 80, width: 737, height: 1000 };
+  const tray = { width: 320, height: 160 };
+
+  it("places the tray beside a left or right column", () => {
+    const left = arrangeTrayPlacement(view, { left: 0, top: 339, width: 50, height: 560 }, tray, true);
+    expect(left.left).toBe(62);
+    expect(left.top).toBe(339);
+    const right = arrangeTrayPlacement(view, { left: 695, top: 339, width: 50, height: 560 }, tray, true);
+    expect(right.left).toBe(363);
+    expect(right.top).toBe(339);
+  });
+
+  it("reserves room for the separated drag and turn controls above or below a row", () => {
+    const bottom = arrangeTrayPlacement(view, { left: 200, top: 1000, width: 400, height: 50 }, tray, false);
+    expect(bottom.top).toBe(776);
+    expect(bottom.left).toBe(240);
+    const top = arrangeTrayPlacement(view, { left: 200, top: 80, width: 400, height: 50 }, tray, false);
+    expect(top.top).toBe(194);
+  });
+
+  it("limits a phone's side tray to the space beside its column", () => {
+    const phone = { left: 8, top: 140, width: 368, height: 600 };
+    const result = arrangeTrayPlacement(phone, { left: 12, top: 240, width: 50, height: 440 }, tray, true);
+    expect(result.left).toBe(74);
+    expect(result.maxWidth).toBe(302);
+    expect(result.top + Math.min(tray.height, result.maxHeight)).toBeLessThanOrEqual(740);
+  });
+
+  it("keeps a large tray inside the available height at a lower corner", () => {
+    const result = arrangeTrayPlacement(view, { left: 0, top: 900, width: 50, height: 120 }, { width: 320, height: 1400 }, true);
+    expect(result.top).toBe(view.top);
+    expect(result.maxHeight).toBe(view.height);
+  });
+
+  it("does not cover the other panel's controls above a phone toolbar", () => {
+    const phone = { left: 8, top: 140, width: 368, height: 600 };
+    const result = arrangeTrayPlacement(phone, { left: 16, top: 695, width: 352, height: 49 }, { width: 320, height: 300 }, false,
+      [{ left: 268, top: 588, width: 100, height: 44 }]);
+    expect(result.top + 300).toBeLessThanOrEqual(580);
+    expect(result.top).toBeGreaterThanOrEqual(phone.top);
+  });
+});
 
 function rect(left: number, top: number, width: number, height: number): Rect {
   return { left, top, right: left + width, bottom: top + height, width, height };
@@ -98,6 +142,17 @@ class FakeNode {
 
   public getBoundingClientRect(): Rect {
     return this.rect;
+  }
+
+  public closest(selector: string): FakeNode | null {
+    if (selector.startsWith(".") && this.classList.contains(selector.slice(1))) return this;
+    return this.parentNode?.closest(selector) ?? null;
+  }
+
+  public querySelector(selector: string): FakeNode | null {
+    if (selector === ".miro-canvas-toolbar__panel") return descendants(this).slice(1).find((node) => node.classList.contains("miro-canvas-toolbar__panel")) ?? null;
+    if (selector !== "[data-tool]") return null;
+    return descendants(this).slice(1).find((node) => node.getAttribute("data-tool") !== null) ?? null;
   }
 
   public addEventListener(type: string, handler: (event: unknown) => void): void {
@@ -219,8 +274,42 @@ function buildRig(initialItems: readonly ToolbarItem[] = ["select", "text", "sti
 /** Lays the bar's item rows out left to right, 40px apart, matching `rig.items`. */
 function layoutBar(rig: Rig): void {
   rig.bar.children.splice(0, rig.bar.children.length);
-  rig.items.forEach((item, index) => rig.bar.appendChild(barItem(item, rig.bar.rect.left + index * 40)));
+  rig.items.forEach((item, index) => {
+    const node = barItem(item, rig.bar.rect.left + index * 40);
+    node.rect = rect(node.rect.left, rig.bar.rect.top, node.rect.width, node.rect.height);
+    rig.bar.appendChild(node);
+  });
 }
+
+describe("resizing the minimap", () => {
+  it("previews the chosen size and saves it only on release", () => {
+    const rig = buildRig();
+    rig.minimap.rect = rect(100, 100, 220, 146);
+    rig.mode.enter();
+    const handle = descendants(rig.minimap).find(child => child.className.includes("arrange-resize"))!;
+    rig.document.dispatch("pointerdown", pointerEvent(handle, 320, 246, { pointerId: 1 }));
+    rig.document.dispatch("pointermove", pointerEvent(handle, 380, 286, { pointerId: 1 }));
+    expect(rig.minimap.style.map.get("--miro-canvas-minimap-width")).toBe("272px");
+    expect(rig.savedPositions).toHaveLength(0);
+    rig.document.dispatch("pointerup", pointerEvent(handle, 380, 286, { pointerId: 1 }));
+    expect(rig.savedPositions[0]).toMatchObject({ id: "minimap", position: { width: 272, height: 178 } });
+    rig.mode.exit();
+    expect(descendants(rig.minimap).some(child => child.className.includes("arrange-resize"))).toBe(false);
+  });
+  it("restores the prior size when the resize is cancelled", () => {
+    const rig = buildRig();
+    rig.positions.minimap = { anchor: "top-left", dx: 100, dy: 100, width: 210, height: 136 };
+    rig.minimap.rect = rect(100, 100, 220, 146);
+    rig.mode.enter();
+    const handle = descendants(rig.minimap).find(child => child.className.includes("arrange-resize"))!;
+    rig.document.dispatch("pointerdown", pointerEvent(handle, 320, 246, { pointerId: 1 }));
+    rig.document.dispatch("pointermove", pointerEvent(handle, 380, 286, { pointerId: 1 }));
+    rig.document.dispatch("pointercancel", pointerEvent(handle, 380, 286, { pointerId: 1 }));
+    expect(rig.minimap.style.map.get("--miro-canvas-minimap-width")).toBe("210px");
+    expect(rig.savedPositions).toHaveLength(0);
+    rig.mode.exit();
+  });
+});
 
 describe("dropIndexFromPointer", () => {
   const rects = [rect(0, 0, 40, 20), rect(40, 0, 40, 20), rect(80, 0, 40, 20)];
@@ -358,6 +447,42 @@ describe("PanelArrangeMode: dragging a panel", () => {
 });
 
 describe("PanelArrangeMode: dragging a bar item", () => {
+  it("shows the insertion slot before release and commits that order", () => {
+    const rig = buildRig(["select", "text", "sticky"]);
+    rig.mode.enter();
+    const text = rig.bar.children[1]!;
+    rig.document.dispatch("pointerdown", pointerEvent(text, text.rect.left + 5, text.rect.top + 5));
+    rig.document.dispatch("pointermove", pointerEvent(text, rig.bar.rect.left + 115, rig.bar.rect.top + 5));
+    const marker = rig.bar.children.find((child) => child.className === "miro-canvas-arrange-insertion")!;
+    expect(marker.getAttribute("data-insert-index")).toBe("2");
+    expect(marker.style.map.get("width")).toBe("3px");
+    expect(rig.savedToolbarItems).toHaveLength(0);
+    rig.document.dispatch("pointerup", pointerEvent(text, rig.bar.rect.left + 115, rig.bar.rect.top + 5));
+    expect(rig.savedToolbarItems).toEqual([["select", "sticky", "text"]]);
+    expect(rig.bar.children).not.toContain(marker);
+  });
+
+  it("uses a horizontal line for a column and clears it on cancellation", () => {
+    const rig = buildRig(["select", "text", "sticky"]);
+    rig.bar.rect = rect(400, 600, 40, 120);
+    rig.toolbar.rect = rig.bar.rect;
+    rig.bar.children.forEach((node, index) => {
+      node.rect = rect(400, 600 + index * 40, 40, 32);
+    });
+    rig.toolbar.setAttribute("data-miro-canvas-panel-orientation", "vertical");
+    rig.mode.enter();
+    const text = rig.bar.children[1]!;
+    rig.document.dispatch("pointerdown", pointerEvent(text, text.rect.left + 5, text.rect.top + 5));
+    const marker = rig.bar.children.find((child) => child.className === "miro-canvas-arrange-insertion")!;
+    expect(marker.style.map.get("height")).toBe("3px");
+    rig.document.dispatch("pointermove", pointerEvent(text, 0, 0));
+    expect((marker as unknown as HTMLElement).hidden).toBe(true);
+    rig.document.dispatch("pointercancel", pointerEvent(text, 0, 0));
+    expect(rig.savedToolbarItems).toHaveLength(0);
+    expect(rig.bar.children).not.toContain(marker);
+    expect(rig.document.body.children.some((child) => child.className === "miro-canvas-arrange-ghost")).toBe(false);
+  });
+
   it("reorders an item dropped back inside the bar", () => {
     const rig = buildRig(["select", "text", "sticky"]);
     rig.mode.enter();
@@ -447,5 +572,55 @@ describe("PanelArrangeMode: Reset", () => {
     const resetButton = banner.children.find((child) => child.className.includes("button") && !child.className.includes("done"))!;
     resetButton.dispatch("click", {});
     expect(rig.resetLayout).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe("arranging tools from More", () => {
+  function spareRig(native: boolean) {
+    const rig = buildRig();
+    const more = rig.bar.appendChild(new FakeNode("span"));
+    more.className = "miro-canvas-tools__more";
+    const plus = more.appendChild(new FakeNode("button"));
+    const choices = more.appendChild(new FakeNode("div"));
+    choices.className = "miro-canvas-toolbar__panel";
+    const spare = choices.appendChild(new FakeNode(native ? "span" : "button"));
+    spare.setAttribute(native ? "data-native" : "data-tool", native ? "media" : "comment");
+    const inner = spare.appendChild(new FakeNode("span"));
+    const close = vi.fn();
+    rig.mode = new PanelArrangeMode({ ...rig.host, closeToolChoices: close });
+    rig.mode.enter();
+    return { rig, plus, inner, close };
+  }
+
+  it("lets the Plus button open its own choices", () => {
+    const { rig, plus } = spareRig(false);
+    const press = pointerEvent(plus, 600, 750);
+    rig.document.dispatch("pointerdown", press);
+    expect(press.prevented).toBe(false);
+    expect(rig.savedPositions).toEqual([]);
+    rig.mode.exit();
+  });
+
+  it.each([false, true])("adds a spare tool from Plus, including native=%s", (native) => {
+    const { rig, inner, close } = spareRig(native);
+    rig.document.dispatch("pointerdown", pointerEvent(inner, 600, 600));
+    rig.document.dispatch("pointermove", pointerEvent(inner, 450, 760));
+    expect(rig.savedToolbarItems).toEqual([]);
+    expect(descendants(rig.bar).find((node) => node.className === "miro-canvas-arrange-insertion")?.getAttribute("data-insert-index")).toBe("1");
+    rig.document.dispatch("pointerup", pointerEvent(inner, 450, 760));
+    expect(close).toHaveBeenCalledOnce();
+    expect(rig.savedPositions).toEqual([]);
+    expect(rig.savedToolbarItems).toEqual([["select", native ? "media" : "comment", "text", "sticky"]]);
+    rig.mode.exit();
+  });
+
+  it("cancels without adding a tool or moving a panel", () => {
+    const { rig, inner } = spareRig(false);
+    rig.document.dispatch("pointerdown", pointerEvent(inner, 600, 600));
+    rig.document.dispatch("pointercancel", pointerEvent(inner, 450, 760));
+    expect(rig.savedToolbarItems).toEqual([]);
+    expect(rig.savedPositions).toEqual([]);
+    rig.mode.exit();
   });
 });

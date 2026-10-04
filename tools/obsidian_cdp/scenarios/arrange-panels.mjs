@@ -13,7 +13,13 @@ export default async function(s){
   await s.drag(grip,{x:220,y:220},{duration:1400});
   await s.caption({ru:'2. Повернём панель столбцом',en:'2. Turn the toolbar into a column'});
   await click(s,{selector:'.miro-canvas-tools .miro-canvas-arrange-flip'});
+  await s.caption({ru:'3. Переставим инструмент по линии вставки',en:'3. Reorder a tool using the insertion line'});
+  await s.drag({selector:'.miro-canvas-tools [data-tool="text"]'},{selector:'.miro-canvas-tools [data-tool="shape"]'},{duration:1600});
+  await s.wait(700);
+  await s.caption({ru:'4. Свернём панель и перенесём её после удержания',en:'4. Fold the panel, then hold to move it'});
+  await click(s,{selector:'.miro-canvas-tools .miro-canvas-panel-toggle'});
+  await s.drag({selector:'.miro-canvas-tools .miro-canvas-panel-toggle'},{x:700,y:250},{duration:1400,hold:650});
+  await checked(s,`if(document.querySelector('.miro-canvas-tools').getAttribute('data-miro-canvas-panel-collapsed')!=='true') throw Error('folded drag expanded panel'); return true;`);
   await click(s,{selector:'.miro-canvas-arrange-banner__button--done'});
-  await checked(s,`if(document.querySelector('.miro-canvas-arrange-banner')) throw new Error('arrange mode still open'); return true;`);
-  await finish(s,{ru:'Панель инструментов — там, где вам удобно',en:'Keep the tools where they suit you'});
+  await finish(s,{ru:'Касание раскрывает, удержание позволяет передвинуть',en:'Tap to open; hold to move'});
 }

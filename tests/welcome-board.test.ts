@@ -25,7 +25,7 @@ interface CanvasNode {
 }
 
 /** A fake vault, just real enough for createWelcomeBoard: paths already in `existing` are there from the start; every write lands in the same map. */
-function fakeHost(existing: Iterable<string> = []): {
+function fakeHost(existing: Iterable<string> = [], width = 1024): {
   readonly host: WelcomeBoardHost;
   readonly files: Map<string, { readonly path: string }>;
   readonly createFolder: ReturnType<typeof vi.fn>;
@@ -56,7 +56,7 @@ function fakeHost(existing: Iterable<string> = []): {
       create,
       createBinary,
     },
-    workspace: { getLeaf: () => ({ openFile, view: { canvas: { zoomToBbox } } }) },
+    workspace: { getLeaf: () => ({ openFile, view: { containerEl: { clientWidth: width }, canvas: { zoomToBbox } } }) },
   } as unknown as App;
   const isFile = (value: unknown): value is TFile =>
     typeof value === "object" && value !== null && "path" in value;
@@ -110,6 +110,31 @@ describe("buildWelcomeBoard", () => {
     for (const card of cards) {
       const fits = frames.some((frameNode) => frame(frameNode, card.x, card.y, card.width, card.height));
       expect(fits).toBe(true);
+    }
+  });
+
+  it("uses square sticky notes and gives the introduction the full reading width", () => {
+    const document = buildWelcomeBoard();
+    const overrides = (document.miroCanvas as { localOverrides: Record<string, { item?: { type: string } }> }).localOverrides;
+    for (const node of nodesOf(document)) {
+      if (overrides[node.id]?.item?.type === "sticky_note") expect(node.width).toBe(node.height);
+    }
+    const frames = nodesOf(document).filter(node => node.type === "group");
+    expect(frames[0]!.width).toBe(frames[1]!.width * 2 + 80);
+  });
+
+  it("demonstrates rotation and different labelled routes in both languages", () => {
+    for (const locale of ["en", "ru"] as const) {
+      setLocale(locale);
+      const document = buildWelcomeBoard();
+      const metadata = document.miroCanvas as { connectors: Record<string, {label?: string; labelT?: number; width: number; endCap: string; route: string}>, localOverrides: Record<string, {rotation?: number}> };
+      const lines = Object.values(metadata.connectors);
+      expect(lines.some(line => line.label === words().welcome.rotateHint)).toBe(true);
+      expect(lines.some(line => line.label === words().welcome.labelMoved && line.labelT === 0.72)).toBe(true);
+      expect(lines.some(line => line.label === words().welcome.labelBent && line.route === "curved")).toBe(true);
+      expect(new Set(lines.map(line => line.width)).size).toBeGreaterThanOrEqual(2);
+      expect(new Set(lines.map(line => line.endCap)).size).toBeGreaterThanOrEqual(2);
+      expect(Object.values(metadata.localOverrides).some(item => item.rotation === -12)).toBe(true);
     }
   });
 
@@ -185,9 +210,9 @@ describe("buildWelcomeBoard", () => {
     setLocale("ru");
     const document = buildWelcomeBoard();
     const frames = nodesOf(document).filter((node) => node.type === "group");
-    expect(frames[0]!.label).toContain("Miro и Obsidian");
+    expect(frames[0]!.label).toContain("Знакомство");
     expect(frames[2]!.label).toContain("Стикеры");
-    expect(frames[7]!.label).toContain("файлы");
+    expect(frames[3]!.label).toContain("файлы");
     expect(frames[8]!.label).toContain("поделиться");
   });
 
@@ -201,7 +226,7 @@ describe("buildWelcomeBoard", () => {
       [paths.note, paths.canvas, paths.picture, paths.pdf, paths.docx].sort(),
     );
     const frames = nodes.filter((node) => node.type === "group");
-    const filesFrame = frames[7]!;
+    const filesFrame = frames[3]!;
     const planFrame = frames[2]!;
     for (const fileNode of fileNodes) {
       expect(frame(fileNode.file === paths.note ? planFrame : filesFrame, fileNode.x, fileNode.y, fileNode.width, fileNode.height)).toBe(true);
@@ -248,11 +273,19 @@ describe("createWelcomeBoard", () => {
     await createWelcomeBoard(host);
     expect(files.get(oldPath)).toBe(oldBoard);
     expect(create).not.toHaveBeenCalledWith(oldPath, expect.anything());
-    expect(zoomToBbox).toHaveBeenCalledWith({ minX: -40, minY: -40, maxX: 940, maxY: 740 });
+    expect(zoomToBbox).toHaveBeenCalledWith({ minX: -40, minY: -40, maxX: 1920, maxY: 1420 });
   });
 
   it("keeps the viewport when reopening an existing board", async () => {
     const { host, zoomToBbox } = fakeHost([words().welcome.fileName]);
+    await createWelcomeBoard(host);
+    expect(zoomToBbox).not.toHaveBeenCalled();
+  });
+  it("starts at the first steps on a phone and keeps its viewport on reopening", async () => {
+    const { host, zoomToBbox } = fakeHost([], 384);
+    await createWelcomeBoard(host);
+    expect(zoomToBbox).toHaveBeenCalledWith({ minX: -40, minY: 640, maxX: 940, maxY: 1420 });
+    zoomToBbox.mockClear();
     await createWelcomeBoard(host);
     expect(zoomToBbox).not.toHaveBeenCalled();
   });

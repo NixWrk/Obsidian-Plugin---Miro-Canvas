@@ -167,7 +167,7 @@ function fixture(options: FixtureOptions = {}) {
 		wrapperEl: root, nodes, edges: new Map(), selection,
 		data: clone(initial), readonly: false,
 		tx: 0, ty: 0, tZoom: 0,
-		getData() { return { ...clone(this.data), nodes: [...nodes.values()].map((node) => node.getData()) }; },
+		getData(): Data { return { ...clone(this.data), nodes: [...nodes.values()].map((node) => node.getData()) }; },
 		setViewport(x: number, y: number, zoom: number) {
 			this.tx = x;
 			this.ty = y;
@@ -199,7 +199,7 @@ function fixture(options: FixtureOptions = {}) {
 	sessions.push(session);
 	root.ownerDocument = document;
 	if (options.toolBar === true) {
-		const toolBar = { element: new HostElement("miro-canvas-toolbar miro-canvas-tools"), update() {}, dispose() {}, placeNativeButton() {}, placeSideRows() {} };
+		const toolBar = { element: new HostElement("miro-canvas-toolbar miro-canvas-tools"), update() {}, closePanels() {}, dispose() {}, placeNativeButton() {}, placeSideRows() {} };
 		(session as unknown as { quickTools: unknown }).quickTools = toolBar;
 	}
 	options.beforeMount?.({ window, document, root });
@@ -243,6 +243,95 @@ function fixture(options: FixtureOptions = {}) {
 	};
 	return { window, canvas, root, board, nodes, history, session, hooks, pointer, runFrames, nativeTakesTouch, selected, screen, preview };
 }
+
+describe("live pen pressure and finger drawing", () => {
+	it.each([["pen", false], ["highlighter", true]] as const)("keeps constant width with pressure disabled or the highlighter: %s", (tool, penPressure) => {
+		const { hooks, pointer, canvas } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure } });
+		hooks.armTool(tool);
+		pointer("pointerdown", 8, "pen", { x: 100, y: 100 }, { pressure: 0.1 });
+		pointer("pointermove", 8, "pen", { x: 200, y: 100 }, { pressure: 0.8 });
+		pointer("pointerup", 8, "pen", { x: 200, y: 100 });
+		const override = Object.values(canvas.getData().miroCanvas.localOverrides)[0] as Data;
+		expect(override.item.stroke.widths).toBeUndefined();
+	});
+	it("leaves no pressure drawing after cancellation at half zoom", () => {
+		const { hooks, pointer, canvas, history } = fixture({ nodes: [] });
+		canvas.setViewport(0, 0, -1);
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 100 }, { pressure: 0.1 });
+		pointer("pointermove", 8, "pen", { x: 200, y: 100 }, { pressure: 0.8 });
+		pointer("pointercancel", 8, "pen", { x: 200, y: 100 });
+		expect(canvas.nodes.size).toBe(0);
+		expect(history).toHaveLength(0);
+		expect(hooks.toolGesture).toBeUndefined();
+	});
+
+	it("changes the outline before release and keeps every sampled width in one history step", () => {
+		const { root, canvas, history, hooks, pointer } = fixture({ nodes: [] });
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 100 }, { pressure: 0.1 });
+		const ghost = root.children.find(child => child.getAttribute("class")?.includes("tool-ghost"))!;
+		const line = ghost.children[0]!;
+		const first = line.getAttribute("d");
+		pointer("pointermove", 8, "pen", { x: 150, y: 110 }, { pressure: 0.8 });
+		expect(line.getAttribute("d")).not.toBe(first);
+		expect(line.getAttribute("fill")).not.toBe("none");
+		expect(history).toHaveLength(0);
+		pointer("pointermove", 8, "pen", { x: 200, y: 100 }, { pressure: 0.15 });
+		pointer("pointerup", 8, "pen", { x: 200, y: 100 });
+		const override = Object.values(canvas.getData().miroCanvas.localOverrides)[0] as Data;
+		expect(override.item.stroke.widths).toEqual([4.25, 8, 4.63]);
+		expect(override.item.stroke.points).toHaveLength(6);
+		expect(history).toHaveLength(1);
+	});
+	it.each([true, false])("finger drawing respects its setting: %s", enabled => {
+		const { hooks, pointer, history } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, fingerDrawing: enabled } });
+		hooks.armTool("pen");
+		pointer("pointerdown", 1, "touch", { x: 100, y: 100 });
+		pointer("pointermove", 1, "touch", { x: 220, y: 100 });
+		pointer("pointerup", 1, "touch", { x: 220, y: 100 });
+		expect(history).toHaveLength(enabled ? 1 : 0);
+	});
+	it("abandons a finger stroke when a second finger starts a pinch", () => {
+		const { hooks, pointer, history } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, fingerDrawing: true } });
+		hooks.armTool("pen");
+		pointer("pointerdown", 1, "touch", { x: 100, y: 100 });
+		pointer("pointermove", 1, "touch", { x: 160, y: 100 });
+		pointer("pointerdown", 2, "touch", { x: 240, y: 100 });
+		expect(hooks.toolGesture).toBeUndefined();
+		pointer("pointerup", 1);
+		pointer("pointerup", 2);
+		expect(history).toHaveLength(0);
+	});
+	it("a double tap with small pen jitter leaves no drawing or history entry", () => {
+		vi.useFakeTimers();
+		const { hooks, pointer, history, canvas } = fixture({ nodes: [], toolBar: true });
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 100 });
+		pointer("pointermove", 8, "pen", { x: 103, y: 102 });
+		pointer("pointerup", 8, "pen", { x: 103, y: 102 });
+		vi.advanceTimersByTime(290);
+		pointer("pointerdown", 8, "pen", { x: 105, y: 100 });
+		vi.advanceTimersByTime(200);
+		pointer("pointerup", 8, "pen", { x: 105, y: 100 });
+		vi.advanceTimersByTime(1000);
+		expect(canvas.nodes.size).toBe(0);
+		expect(history).toHaveLength(0);
+		expect(hooks.armedTool).toBe("select");
+	});
+	it("keeps separate taps far apart instead of losing the first dot", () => {
+		vi.useFakeTimers();
+		const { hooks, pointer, history } = fixture({ nodes: [], toolBar: true });
+		hooks.armTool("pen");
+		for (const x of [100, 300]) {
+			pointer("pointerdown", 8, "pen", { x, y: 100 });
+			pointer("pointerup", 8, "pen", { x, y: 100 });
+			vi.advanceTimersByTime(100);
+		}
+		vi.advanceTimersByTime(1000);
+		expect(history).toHaveLength(2);
+	});
+});
 
 describe("a palm Android takes back", () => {
 	it("leaves the selection and the board's place as they were before it landed", () => {
@@ -348,7 +437,7 @@ describe("a pen and a hand on the same board", () => {
 
 	it("draws nothing for a palm that lands before any pen, with the pen armed", () => {
 		const now = vi.spyOn(Date, "now").mockReturnValue(71_671);
-		const { canvas, history, hooks, pointer, runFrames } = fixture();
+		const { canvas, history, hooks, pointer, runFrames } = fixture({ settings: { ...DEFAULT_SETTINGS, fingerDrawing: true } });
 		hooks.armTool("pen");
 		const before = canvas.getData();
 		// No pen seen yet: the touch starts a stroke, and native Canvas never sees it.
@@ -365,7 +454,7 @@ describe("a pen and a hand on the same board", () => {
 
 	it("erases nothing for a palm that lands on a drawing before any pen, with the eraser armed", () => {
 		const now = vi.spyOn(Date, "now").mockReturnValue(106_494);
-		const { canvas, history, hooks, pointer, runFrames, screen } = fixture({ nodes: [INK], overrides: { ink: INK_STROKE } });
+		const { canvas, history, hooks, pointer, runFrames, screen } = fixture({ nodes: [INK], overrides: { ink: INK_STROKE }, settings: { ...DEFAULT_SETTINGS, fingerDrawing: true } });
 		hooks.armTool("eraser");
 		const before = canvas.getData();
 		// The palm lands right on the line: the eraser has caught it.
@@ -382,7 +471,7 @@ describe("a pen and a hand on the same board", () => {
 
 	it("keeps a pen stroke whole when a palm lands beside it and Android takes the palm back", () => {
 		const now = vi.spyOn(Date, "now").mockReturnValue(72_000);
-		const { canvas, history, hooks, pointer } = fixture({ nodes: [] });
+		const { canvas, history, hooks, pointer } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure: false } });
 		hooks.armTool("pen");
 		pointer("pointerdown", 8, "pen", { x: 100, y: 100 });
 		pointer("pointermove", 8, "pen", { x: 140, y: 110 });
@@ -476,7 +565,7 @@ describe("a pen held still at the end of a stroke", () => {
 
 	it("turns the stroke into one straight line from its start after half a second", () => {
 		vi.useFakeTimers();
-		const { canvas, history, hooks, pointer, preview } = fixture({ nodes: [] });
+		const { canvas, history, hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure: false } });
 		hooks.armTool("pen");
 		wavyStroke(pointer);
 		expect(preview()).toHaveLength(5);
@@ -498,12 +587,12 @@ describe("a pen held still at the end of a stroke", () => {
 		const { nodes, strokes } = drawing(canvas);
 		expect(nodes).toBe(1);
 		expect(strokes[0].points).toHaveLength(4);
-		expect(strokes[0].width).toBe(Math.round(5 * strokeWidthScale([0.17]) * 100) / 100);
+		expect(strokes[0].width).toBe(5);
 	});
 
 	it("moves the line's far end with the pen once straight, and never goes back to freehand", () => {
 		vi.useFakeTimers();
-		const { canvas, hooks, pointer, preview } = fixture({ nodes: [] });
+		const { canvas, hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure: false } });
 		hooks.armTool("highlighter");
 		wavyStroke(pointer);
 		vi.advanceTimersByTime(520);
@@ -518,7 +607,7 @@ describe("a pen held still at the end of a stroke", () => {
 
 	it("does nothing for a hold closer than 24 px to the start, and still straightens a later one", () => {
 		vi.useFakeTimers();
-		const { hooks, pointer, preview } = fixture({ nodes: [] });
+		const { hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure: false } });
 		hooks.armTool("pen");
 		pointer("pointerdown", 8, "pen", { x: 100, y: 300 });
 		pointer("pointermove", 8, "pen", { x: 108, y: 308 });
@@ -534,7 +623,7 @@ describe("a pen held still at the end of a stroke", () => {
 
 	it("keeps drawing freehand while the pen keeps moving, however slowly", () => {
 		vi.useFakeTimers();
-		const { hooks, pointer, preview } = fixture({ nodes: [] });
+		const { hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure: false } });
 		hooks.armTool("pen");
 		wavyStroke(pointer);
 		for (let step = 1; step <= 10; step += 1) {
@@ -547,7 +636,7 @@ describe("a pen held still at the end of a stroke", () => {
 
 	it("leaves the stroke as drawn when the setting is off", () => {
 		vi.useFakeTimers();
-		const { canvas, hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, holdStraightLine: false } });
+		const { canvas, hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, holdStraightLine: false, penPressure: false } });
 		hooks.armTool("pen");
 		wavyStroke(pointer);
 		vi.advanceTimersByTime(1_000);
@@ -559,7 +648,7 @@ describe("a pen held still at the end of a stroke", () => {
 	it("leaves the smart pen, the erasers and the lasso alone", () => {
 		vi.useFakeTimers();
 		for (const tool of ["smart", "eraser", "erase-part", "lasso"]) {
-			const { hooks, pointer, preview } = fixture({ nodes: [] });
+			const { hooks, pointer, preview } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, penPressure: false } });
 			hooks.armTool(tool);
 			wavyStroke(pointer);
 			vi.advanceTimersByTime(1_000);

@@ -112,6 +112,7 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
 export type SelectionStylePatch = SelectionToolbarStyle;
 
 export interface SelectionToolbarActions {
+  readonly onTextSelectionWanted?: () => void;
   readonly onDelete?: () => void;
   readonly onEditConnectorLabel?: () => void;
   readonly onAppearance: (action: AppearanceAction) => void;
@@ -284,16 +285,33 @@ export function keepPanelInView(panel: HTMLElement): void {
   if (typeof panel.getBoundingClientRect !== "function" || typeof panel.style?.setProperty !== "function") return;
   panel.style.removeProperty("translate");
   panel.style.removeProperty("max-height");
+  if (panel.getAttribute?.("data-keyboard-popover") === "true") {
+    panel.style.removeProperty("top");
+    panel.style.removeProperty("bottom");
+    panel.removeAttribute("data-keyboard-popover");
+  }
   const board = panel.closest?.(".miro-canvas-root") ?? panel.ownerDocument?.documentElement;
   if (board == null || typeof board.getBoundingClientRect !== "function") return;
   const bounds = board.getBoundingClientRect();
+  const toolbar = panel.closest?.('[data-miro-canvas-toolbar="true"]');
+  if (board.getAttribute?.("data-miro-canvas-keyboard") === "open"
+    && toolbar?.getAttribute?.("data-miro-canvas-toolbar") === "true"
+    && panel.parentElement != null) {
+    const bar = toolbar.getBoundingClientRect();
+    const host = panel.parentElement.getBoundingClientRect();
+    // Android's text-selection menu sits below the bar. Keep formatting above it.
+    panel.style.setProperty("top", "auto");
+    panel.style.setProperty("bottom", `${Math.round(host.bottom - bar.top + 10)}px`);
+    panel.style.setProperty("max-height", `${Math.round(Math.max(44, bar.top - bounds.top - 18))}px`);
+    panel.setAttribute("data-keyboard-popover", "true");
+  }
   const rect = panel.getBoundingClientRect();
   const margin = 8;
   let shift = 0;
   if (rect.right > bounds.right - margin) shift = bounds.right - margin - rect.right;
   if (rect.left + shift < bounds.left + margin) shift = bounds.left + margin - rect.left;
   if (shift !== 0) panel.style.setProperty("translate", `${Math.round(shift)}px 0`);
-  const minimum = 120;
+  const minimum = panel.getAttribute?.("data-keyboard-popover") === "true" ? 44 : 120;
   if (rect.bottom > bounds.bottom - margin) {
     panel.style.setProperty("max-height", `${Math.round(Math.max(minimum, bounds.bottom - margin - rect.top))}px`);
   } else if (rect.top < bounds.top + margin) {
@@ -591,6 +609,11 @@ export class SelectionToolbar {
     root.hidden = true;
     this.element = root;
     this.refs = this.build(root);
+    this.listen(root, "pointerdown", (event) => {
+      this.actions.onTextSelectionWanted?.();
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.("button") != null) event.preventDefault();
+    });
   }
 
   /** The place in the toolbar reserved for the native Canvas menu. */

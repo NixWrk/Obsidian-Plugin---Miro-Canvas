@@ -273,6 +273,7 @@ export interface QuickToolsActions {
   readonly onArm: (tool: QuickTool) => void;
   /** A click on one of native Canvas's own card, note, media, slide or group buttons: arms it, so the next press on the board places its item. */
   readonly onNativeArm?: (button: HTMLElement) => void;
+  readonly onAddFile?: (button: HTMLElement, fromVault: () => void) => void;
   readonly onShape: (shape: string) => void;
   readonly onPen: (settings: { readonly color?: string; readonly width?: number; readonly eraserSize?: number }) => void;
   /** A tool dragged off the bar and dropped at a screen point: the host creates it there, or does nothing if the drop missed the board. */
@@ -376,6 +377,7 @@ export class QuickTools {
   public readonly element: HTMLElement;
   /** The bar's own row of items, up to the "+" popover - what the arrange mode drags to reorder, remove or add. */
   public itemsRow!: HTMLElement;
+  private readonly fileButtonLabels = new Map<HTMLElement, {label: string | null; title: string | null}>();
   private readonly document: Document;
   /** Where the session puts native Canvas's own card, note and media buttons, by which one it is. */
   private readonly nativeSlots = new Map<NativeToolbarItem, HTMLElement>();
@@ -701,6 +703,13 @@ export class QuickTools {
   }
 
   public dispose(): void {
+    for (const [button, original] of this.fileButtonLabels) {
+      for (const [attribute, value] of [["aria-label", original.label], ["title", original.title]] as const) {
+        if (value === null) button.removeAttribute(attribute);
+        else button.setAttribute(attribute, value);
+      }
+    }
+    this.fileButtonLabels.clear();
     for (const remove of this.listeners.splice(0)) remove();
     for (const button of this.markedNative) {
       button.removeAttribute("aria-pressed");
@@ -750,7 +759,9 @@ export class QuickTools {
     this.nativePress = undefined;
     this.closePanels();
     if (!this.editable || dragged) return;
-    this.actions.onNativeArm?.(button);
+    if (this.actions.onAddFile !== undefined && this.nativeSlots.get("media")?.contains(button) === true) {
+      this.actions.onAddFile(button, () => this.actions.onNativeArm?.(button));
+    } else this.actions.onNativeArm?.(button);
   }
 
   /** Marks which of native Canvas's own buttons is armed, and that none is available in review mode. */
@@ -777,6 +788,11 @@ export class QuickTools {
   /** Moves one of native Canvas's own buttons - the element itself, never a copy - into its configured place. */
   public placeNativeButton(item: NativeToolbarItem, button: HTMLElement): void {
     this.nativeSlots.get(item)?.prepend(button);
+    if (item === "media") {
+      if (!this.fileButtonLabels.has(button)) this.fileButtonLabels.set(button, { label: button.getAttribute("aria-label"), title: button.getAttribute("title") });
+      button.setAttribute("aria-label", toolbarItemLabel(item));
+      button.setAttribute("title", toolbarItemLabel(item));
+    }
   }
 
   /** One item of the bar or More: a native slot the session fills, or one of the plugin's own tools. */

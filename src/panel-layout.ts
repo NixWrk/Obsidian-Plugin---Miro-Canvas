@@ -41,6 +41,11 @@ export interface PanelPosition {
   readonly dx: number;
   readonly dy: number;
   readonly orientation?: PanelOrientation;
+  readonly collapsed?: boolean;
+  readonly buttonRight?: boolean;
+  readonly buttonBottom?: boolean;
+  readonly width?: number;
+  readonly height?: number;
 }
 
 export interface ViewSize {
@@ -152,7 +157,7 @@ export function positionFromPoint(
 /** Accepts any stored value and returns a usable position, or nothing for one too broken to trust. */
 export function normalizePanelPosition(value: unknown): PanelPosition | undefined {
   if (typeof value !== "object" || value === null) return undefined;
-  const { anchor, dx, dy, orientation } = value as { anchor?: unknown; dx?: unknown; dy?: unknown; orientation?: unknown };
+  const { anchor, dx, dy, orientation, collapsed, buttonRight, buttonBottom, width, height } = value as Partial<PanelPosition>;
   if (!(PANEL_ANCHORS as readonly string[]).includes(anchor as string)) return undefined;
   if (typeof dx !== "number" || !Number.isFinite(dx)) return undefined;
   if (typeof dy !== "number" || !Number.isFinite(dy)) return undefined;
@@ -165,6 +170,11 @@ export function normalizePanelPosition(value: unknown): PanelPosition | undefine
   return Object.freeze({
     anchor: anchor as PanelAnchor, dx: bound(dx), dy: bound(dy),
     ...(validOrientation === undefined ? {} : { orientation: validOrientation }),
+    ...(collapsed === true ? { collapsed: true } : {}),
+    ...(typeof buttonRight === "boolean" ? { buttonRight } : {}),
+    ...(typeof buttonBottom === "boolean" ? { buttonBottom } : {}),
+    ...(typeof width === "number" && Number.isFinite(width) ? { width: Math.max(100, Math.min(800, width)) } : {}),
+    ...(typeof height === "number" && Number.isFinite(height) ? { height: Math.max(80, Math.min(600, height)) } : {}),
   });
 }
 
@@ -316,6 +326,11 @@ export interface StyledElement {
  */
 export function applyPanelPosition(element: StyledElement, position: PanelPosition | undefined, view: ViewSize, panel: ViewSize): void {
   const style = element.style;
+  if (position?.width !== undefined) style.setProperty("--miro-canvas-minimap-width", `${Math.min(position.width, Math.max(80, view.width - 18))}px`);
+  else style.removeProperty("--miro-canvas-minimap-width");
+  if (position?.height !== undefined) style.setProperty("--miro-canvas-minimap-height", `${Math.min(position.height, Math.max(60, view.height - 18))}px`);
+  else style.removeProperty("--miro-canvas-minimap-height");
+  element.setAttribute("data-miro-canvas-panel-collapsed", position?.collapsed === true ? "true" : "false");
   if (position === undefined) {
     for (const property of ["left", "top", "right", "bottom", "transform"]) style.removeProperty(property);
     element.setAttribute("data-miro-canvas-panel-orientation", "horizontal");

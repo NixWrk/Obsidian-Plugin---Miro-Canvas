@@ -25,6 +25,7 @@ describe("list_boards", () => {
 			["boards/future-fields-board.canvas", false, "valid"],
 			["boards/native-board.canvas", false, "absent"],
 			["boards/plugin-authored-board.canvas", true, "valid"],
+			["boards/pressure-stroke.canvas", false, "valid"],
 		]);
 		expect(result.nextCursor).toBeUndefined();
 	});
@@ -34,7 +35,7 @@ describe("list_boards", () => {
 		const first = call(root, "list_boards", { limit: 3 });
 		expect(first.boards).toHaveLength(3);
 		const second = call(root, "list_boards", { limit: 3, cursor: first.nextCursor });
-		expect(second.boards.map((board: any) => board.path)).toEqual(["boards/plugin-authored-board.canvas"]);
+		expect(second.boards.map((board: any) => board.path)).toEqual(["boards/plugin-authored-board.canvas", "boards/pressure-stroke.canvas"]);
 		expect(second.nextCursor).toBeUndefined();
 	});
 

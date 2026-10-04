@@ -1,6 +1,62 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 - 2026-10-04
+
+- Double-tapping empty board with a pen puts the tool away without leaving
+  dots or adding undo steps. Individual taps still leave dots.
+- Pen pressure has its own Drawing setting. Width changes along the stroke
+  while drawing and remains variable after saving, reloading and partial
+  erasing. Highlighter strokes keep a constant width.
+- Drawing with a finger is an optional setting. Two fingers still pan and
+  zoom, and touches near the pen remain protected from accidental drawing.
+- Arrange panels now resizes the minimap from its corner. Each device profile
+  remembers its size; mobile layouts respect the chosen dimensions.
+- Plus and fold controls sit together, with one separator before the tools.
+  A long vertical menu keeps its fold button in place when reopening.
+  The spare-tools tray no longer covers an open Plus menu.
+- Updated the bilingual welcome board and added English/Russian recordings
+  of drawing settings, live pressure, finger drawing, double tap and minimap
+  resizing. Pen pressure in recordings is supplied through CDP; physical
+  pressure sensors and palms are not verified by these recordings.
+
+- Fold controls use a panel icon and a separator, with a hint for holding
+  and dragging. Their icons stay centered in open and folded menus. Touch
+  input no longer leaves a hover background behind. Panel placement accounts
+  for the control's size before checking clearance above mobile navigation.
+- On a narrow screen, a new welcome board starts at the first steps with a
+  larger zoom. Reopening an existing board keeps its viewport.
+- On mobile devices with the keyboard open, formatting menus open above the
+  selection toolbar, clear of Android's native text-selection menu. Font lists
+  fit the remaining space and scroll without covering the board header.
+- Checked the current build on Galaxy A33: panel folding and dragging, adding
+  tools from Plus, hiding fold buttons, selected-word formatting and importing
+  an image and PDF from the device. Checked that selected-word formatting
+  survives saving. Refreshed Russian and English phone layout, card movement
+  and navigation GIFs.
+
+- Fold buttons now sit inside each menu and use its square button shape.
+  Each can be hidden in settings, separately for each device kind; arrangement
+  mode keeps them accessible. Folded panels are square and remain movable by holding.
+- In arrangement mode, tools can be dragged directly from Plus onto the main
+  row, with an insertion marker. Touch scrolling no longer cancels these drags.
+
+- Add file now offers a vault file or an image/document from the device's
+  system picker. Device files become vault attachments with unique names.
+- Font, size, bold, italic, underline and strike can be applied to selected
+  words in a card without changing the rest of its text. Toolbar presses
+  preserve the editor's text selection.
+- Folding controls reserve space in the main tool row, clear of tool buttons.
+  On desktop, an expanded panel shows its control only while arranging panels.
+
+- Tools and navigation can fold into separate movable buttons. Tap to fold or open; hold then drag to move either an open or folded panel. Each device profile remembers its folded states.
+- The bilingual welcome board now has square sticky notes, distinct introductory cards, a full-width introduction and examples of Obsidian notes and files earlier in the reading order.
+
+
+- In panel arrangement, spare tools follow the toolbar instead of staying
+  at the bottom of the board. The tray fits beside a column or above/below
+  a row and stays within the available screen. Drag and turn controls now
+  have separate 44px touch targets with a 12px gap. Reordering shows an
+  insertion line before release and clears it when the drag ends or cancels.
 
 - On narrow screens, the panel-arrangement instructions wrap above the
   buttons so the Russian Done button stays reachable.

@@ -28,7 +28,7 @@ export async function board(s, name, { arrange = false } = {}) {
       toolbar: {anchor:'left-middle',dx:16,dy:0,orientation:'vertical'},
       dockBar: {anchor:'bottom-right',dx:16,dy:20,orientation:'horizontal'},
     };
-    await plugin.saveCanvasSettings({panelLayout,toolbarItems,importQuestionAnswered:true,minimapVisible:false});
+    await plugin.saveCanvasSettings({panelLayout,toolbarItems,hiddenPanelButtons:[],importQuestionAnswered:true,minimapVisible:false});
     document.querySelector('.modal-close-button')?.click();
     const name = ${JSON.stringify(name)};
     const data = ${JSON.stringify(JSON.stringify(data))};

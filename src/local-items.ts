@@ -26,6 +26,8 @@ export interface LocalStroke {
   readonly points: readonly number[];
   /** Where a new piece of the same stroke starts, in points, after an erase. */
   readonly breaks?: readonly number[];
+  /** Width at every point, when drawn with pressure; width remains the maximum. */
+  readonly widths?: readonly number[];
 }
 
 /**
@@ -101,6 +103,9 @@ export function readLocalStroke(value: unknown): LocalStroke | undefined {
   if (!Array.isArray(points) || points.length < 4 || points.length > MAX_STROKE_POINTS * 2 || points.length % 2 !== 0) return undefined;
   if (points.some((point) => typeof point !== "number" || !Number.isFinite(point) || Math.abs(point) > MAX_STROKE_SIZE)) return undefined;
   const breaks = own(value, "breaks");
+  const widths = own(value, "widths");
+  if (widths !== undefined && (!Array.isArray(widths) || widths.length !== points.length / 2
+    || widths.some(entry => typeof entry !== "number" || !Number.isFinite(entry) || entry <= 0 || entry > width))) return undefined;
   if (breaks !== undefined && (!Array.isArray(breaks) || breaks.length > MAX_STROKE_POINTS
     || breaks.some((at) => typeof at !== "number" || !Number.isInteger(at) || at <= 0 || at >= points.length / 2))) return undefined;
   return Object.freeze({
@@ -110,6 +115,7 @@ export function readLocalStroke(value: unknown): LocalStroke | undefined {
     box: Object.freeze({ width: boxWidth, height: boxHeight }),
     points: Object.freeze([...points as readonly number[]]),
     ...(breaks === undefined ? {} : { breaks: Object.freeze([...breaks as readonly number[]]) }),
+    ...(widths === undefined ? {} : { widths: Object.freeze([...widths as readonly number[]]) }),
   });
 }
 

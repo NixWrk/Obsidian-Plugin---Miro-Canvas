@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/NixWrk/Miro_2_Obsidian/main/miro2obsidian/schemas/v1/miro-canvas.schema.json",
   "title": "miroCanvas v1",
-  "description": "The plugin's own versioned metadata, kept under the root Canvas document's `miroCanvas` key. Mirrors plugins/miro-canvas/src/metadata.ts's validateMiroCanvasMetadata: unknown fields at every level are forward-compatible and never make an otherwise well-formed document invalid, so every object below keeps additionalProperties true unless the validator itself rejects the extra shape.",
+  "description": "The plugin's own versioned metadata, kept under the root Canvas document's `miroCanvas` key. Mirrors the miro-canvas plugin's validateMiroCanvasMetadata (src/metadata.ts in NixWrk/Obsidian-Plugin---Miro-Canvas): unknown fields at every level are forward-compatible and never make an otherwise well-formed document invalid, so every object below keeps additionalProperties true unless the validator itself rejects the extra shape.",
   "type": "object",
   "required": ["schemaVersion"],
   "properties": {
@@ -258,6 +258,13 @@
           "minItems": 4,
           "maxItems": 8192,
           "items": { "type": "number" }
+        },
+        "widths": {
+          "description": "Optional width at each point, in board units. Its length equals points.length / 2; width remains the maximum for old readers and bounds.",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4096,
+          "items": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 }
         },
         "breaks": {
           "type": "array",

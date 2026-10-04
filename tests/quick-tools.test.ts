@@ -887,6 +887,22 @@ describe("native Canvas's own buttons on the bar", () => {
 
   const pressOn = (root: FakeElement, target: FakeElement, x = 400, y = 700) => root.dispatch("pointerdown", { target, clientX: x, clientY: y, stopPropagation: () => {} });
 
+  it("opens the source chooser for a file and keeps native vault placement available", () => {
+    const document = new FakeDocument();
+    const armed = vi.fn();
+    const chooser = vi.fn();
+    const tools = new QuickTools({onArm: () => {}, onShape: () => {}, onPen: () => {}, onNativeArm: armed, onAddFile: chooser}, {document: document as unknown as Document, toolbarItems: ["media"]});
+    const button = new FakeElement("div");
+    button.className = "canvas-card-menu-button mod-draggable";
+    tools.placeNativeButton("media", button as unknown as HTMLElement);
+    click(tools.element as unknown as FakeElement, button);
+    expect(chooser).toHaveBeenCalledTimes(1);
+    expect(armed).not.toHaveBeenCalled();
+    chooser.mock.calls[0]![1]();
+    expect(armed).toHaveBeenCalledWith(button);
+    tools.dispose();
+  });
+
   it("arms on a click, as any tool does, and stops native Canvas's own click, which would place the item mid-view", () => {
     const { root, button, armed } = nativeBar();
     const stopped = click(root, button);

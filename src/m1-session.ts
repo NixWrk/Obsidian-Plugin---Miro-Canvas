@@ -117,7 +117,8 @@ import { CommentMarkers } from "./comment-markers";
 import { matchesPointer } from "./pointer-bindings";
 import { PalmRewind, pressedPressure, strokeWidthScale, StylusWatch } from "./stylus";
 import { PickedCardMarks, type BoardWatcher, type CardChange } from "./picked-cards";
-import { DoubleTapWatch, RecentPresses } from "./double-tap";
+import { DoubleTapWatch, RecentPresses, DOUBLE_TAP_MS, TAP_MAX_MS, TAP_SLOP } from "./double-tap";
+import { pressureStrokePath, remapStrokeWidths } from "./pressure-stroke";
 import { controlToLetGo } from "./board-focus";
 import { edgeLanding } from "./edge-landing";
 import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
@@ -129,6 +130,7 @@ import {
 } from "./quick-tools";
 import { replayNativeDrag } from "./native-drag";
 import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
+import { PanelVisibility } from "./panel-visibility";
 import { applyPanelPositionSettled, defaultPanelsFit, hostFootInset, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
 import {
@@ -153,6 +155,7 @@ import { normalizeAnchor, resolveAnchor, type AnchorGeometry, type CanvasAnchor 
 import { shapeOutline } from "./shape-geometry";
 import { frameColors, miroStickyColors, readableInk } from "./miro-palette";
 import { highlightText, isHtmlText, markSelection, unhighlightText } from "./text-highlight";
+import { formatTextSelection } from "./text-format";
 import { cardLinkUrl, linkSelection, linkText, unlinkText } from "./text-link";
 import { toggleBulletList } from "./text-list";
 import {
@@ -180,6 +183,7 @@ export interface M1SessionOptions {
 	readonly setIcon?: (element: HTMLElement, icon: string) => void;
 	/** Opens this plugin's page in Obsidian's settings, from the board menu. */
 	readonly onOpenSettings?: () => void;
+	readonly onAddFile?: (button: HTMLElement, fromVault: () => void) => void;
 	readonly onOpenCommentThread?: (threadId: string, origin: CommentOrigin) => void;
 	/**
 	 * Shows a menu for the board's own connectors, which native Canvas has no
@@ -956,6 +960,7 @@ export class M1CanvasSession {
 
 	/** Put every tool, gesture and selection away, as Escape does. */
 	public resetTools(): void {
+		this.cancelPendingPenDot();
 		this.rectangleSelectionEnd?.();
 		this.selectedRouteEnds.clear();
 		this.selectionMoveEnd?.();
@@ -1501,6 +1506,7 @@ export class M1CanvasSession {
 	private currentRawDocument: unknown;
 	private commentMovePreview: Record<string, unknown> | undefined;
 	private appearance: AppearanceState = normalizeAppearanceState(undefined);
+	private textFragment: { id: string; editor: object; from: unknown; to: unknown; text: string; html: boolean } | undefined;
 	private policy: InteractionPolicy = createInteractionPolicy(undefined);
 	/** What the appearance, the policy and the parsed metadata were last worked out from. */
 	private appearanceSource: unknown;
@@ -1605,6 +1611,7 @@ export class M1CanvasSession {
 	private searchOpenedThread: { readonly id: string; readonly origin: CommentOrigin } | undefined;
 	private readonly quickTools: QuickTools | undefined;
 	private readonly arrangeMode: PanelArrangeMode | undefined;
+	private readonly panelVisibility: PanelVisibility | undefined;
 	private armedTool: ArmedTool = "select";
 	/** The native Canvas button armed while the armed tool is "native": the next press on the board places its item. */
 	private armedNative: HTMLElement | undefined;
@@ -1646,6 +1653,11 @@ export class M1CanvasSession {
 	/** The board points a pen gesture has passed through, and what it erases. */
 	private penPoints: StrokePoint[] = [];
 	private penPressures: number[] = [];
+	private penPointerType = "mouse";
+	private penStartedAt = 0;
+	private penTap = false;
+	private pendingPenDot: { timer: ReturnType<typeof setTimeout>; commit: () => void } | undefined;
+	private skipPenDotUntil = 0;
 	private erasing = new Set<string>();
 	/** When a stylus was last near this board, and whether this device has one at all. */
 	private readonly stylus = new StylusWatch();
@@ -1654,6 +1666,7 @@ export class M1CanvasSession {
 	/** A tool being used on the board: where the press began and what it draws meanwhile. */
 	private toolGesture: {
 		readonly tool: ArmedTool;
+		readonly press?: PointerEvent;
 		readonly start: { readonly x: number; readonly y: number };
 		readonly from?: { readonly nodeId: string; readonly anchor: CanvasAnchor; readonly board: { readonly x: number; readonly y: number } };
 		/** What the gesture draws on the board meanwhile, if anything. */
@@ -1753,6 +1766,7 @@ export class M1CanvasSession {
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
 		});
 		this.toolbar = new SelectionToolbar({
+			onTextSelectionWanted: () => this.captureTextFragment(),
 			onAppearance: (action) => this.applyAppearance(action),
 			onStyle: (patch) => this.applyElementStyle(patch),
 			onEditConnectorLabel: () => {this.editSelectedConnectorLabel();},
@@ -1792,6 +1806,12 @@ export class M1CanvasSession {
 		this.quickTools = controlDocument === undefined ? undefined : new QuickTools({
 			onArm: (tool) => this.armTool(tool),
 			onNativeArm: (button) => this.armNative(button),
+			onAddFile: this.options.onAddFile === undefined ? undefined : (button) => {
+				this.options.onAddFile?.(button, () => {
+					const rect = this.root?.getBoundingClientRect();
+					if (rect !== undefined) this.placeNativeItem(button, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+				});
+			},
 			onShape: (shape) => {
 				const wasBlock = lineKind(this.toolShape)?.block === true;
 				const isBlock = lineKind(shape)?.block === true;
@@ -1828,12 +1848,23 @@ export class M1CanvasSession {
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
 			panels: () => this.arrangePanels(),
 			toolbarBar: () => this.quickTools?.itemsRow,
+			closeToolChoices: () => this.quickTools?.closePanels(),
 			toolbarItems: () => this.settings.toolbarItems,
 			panelPosition: (id) => this.settings.panelLayout[id],
 			savePanelPosition: (id, position) => this.commitPanelPosition(id, position),
 			saveToolbarItems: (items) => this.options.onToolbarItemsChanged?.(items),
 			resetLayout: () => this.options.onResetPanels?.(),
 			onExit: () => undefined,
+			refreshPanelButtons: () => this.panelVisibility?.refresh(),
+		});
+		this.panelVisibility = controlDocument === undefined || this.root === undefined ? undefined : new PanelVisibility({
+			document: controlDocument,
+			boardRoot: this.root,
+			panels: () => this.arrangePanels(),
+			position: (id) => this.settings.panelLayout[id],
+			buttonHidden: (id) => this.settings.hiddenPanelButtons?.includes(id) === true,
+			savePosition: (id, position) => this.commitPanelPosition(id, position),
+			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
 		});
 	}
 
@@ -1889,6 +1920,15 @@ export class M1CanvasSession {
 			if (this.panelSizeObserver !== undefined && !this.watchedPanels.has(element)) {
 				this.watchedPanels.add(element);
 				this.panelSizeObserver.observe(element);
+			}
+		}
+		this.arrangeMode?.refresh();
+		this.panelVisibility?.refresh();
+		// Showing the fold control changes the bar's size, for example on mobile.
+		for (const id of ["toolbar", "dockBar"] as const) {
+			const element = panels[id];
+			if (element !== undefined && typeof element.style?.setProperty === "function") {
+				applyPanelPositionSettled(element, this.settings.panelLayout[id], uncovered);
 			}
 		}
 		// The pen's row and the lines' row beside a vertical bar go with it.
@@ -3409,6 +3449,7 @@ export class M1CanvasSession {
 		}
 		this.adoptNativeMenu();
 		this.attachQuickTools();
+		this.panelVisibility?.mount();
 		this.attachClipboard();
 		this.attachGuards();
 		this.attachMinimapHandlers();
@@ -3423,6 +3464,9 @@ export class M1CanvasSession {
 		this.attachDoubleTap();
 		this.attachBoardFocus();
 		this.listen(this.root, "pointerdown", (event) => this.pressBoard(event as PointerEvent), true);
+		this.listen(this.root, "pointerdown", (event) => {
+			if (!this.closestTarget(event, ".miro-canvas-toolbar:not(.miro-canvas-tools)")) this.textFragment = undefined;
+		}, true);
 		this.listen(this.root, "pointerdown", (event) => this.noteEndPickup(event), true);
 		// A press on the plugin's own bars and cards is theirs alone and ends at
 		// the board: another Canvas plugin (Canvas Minimap) reads every click
@@ -4118,6 +4162,8 @@ export class M1CanvasSession {
 			const lift = event as PointerEvent;
 			if (lift.pointerType === "mouse" || this.ownPointerEvents.has(lift)) return;
 			if (!taps.release(lift.pointerId, { x: lift.clientX, y: lift.clientY }, Date.now())) return;
+			this.cancelPendingPenDot();
+			this.skipPenDotUntil = Date.now() + 30;
 			view.setTimeout(() => {
 				if (!this.disposed) this.escapeOnDoublePress("taps");
 			}, 0);
@@ -4839,6 +4885,24 @@ export class M1CanvasSession {
 
 	/** A press on the board with a tool armed: drag out the item, or click to drop it. */
 	private startToolGesture(event: PointerEvent): void {
+		if (this.ownPointerEvents.has(event)) return;
+		// A second finger gives both pointers back to Canvas for its own pan and pinch.
+		const first = this.toolGesture?.press;
+		if (event.pointerType === "touch" && first?.pointerType === "touch" && first.pointerId !== event.pointerId) {
+			this.toolGesture?.end();
+			this.penPoints = [];
+			this.penPressures = [];
+			this.clearErasing();
+			const Pointer = this.root?.ownerDocument.defaultView?.PointerEvent;
+			if (Pointer !== undefined && first.target instanceof EventTarget) {
+				const resumed = new Pointer("pointerdown", { bubbles: true, cancelable: true, pointerId: first.pointerId,
+					pointerType: "touch", isPrimary: true, button: 0, buttons: 1, clientX: first.clientX, clientY: first.clientY,
+					pressure: first.pressure, width: first.width, height: first.height });
+				this.ownPointerEvents.add(resumed);
+				first.target.dispatchEvent(resumed);
+			}
+			return;
+		}
 		if (this.armedTool === "connector" && this.closestTarget(event, ".miro-canvas-comment-marker") && event.button === 0) {
 			this.startLine(lineKind(this.toolShape) ?? lineKind("arrow")!, event);
 			return;
@@ -4908,7 +4972,7 @@ export class M1CanvasSession {
 		// A stylus rules the board it draws on: while one is near a touch is a
 		// palm or a hand resting, and with a drawing tool armed a finger pans
 		// instead of drawing, as Miro's tablets behave.
-		if (pointer === "touch" && this.stylus.touchIsHand(Date.now(), drawingTool)) return;
+		if (pointer === "touch" && (this.stylus.near(Date.now()) || (drawingTool && !this.settings.fingerDrawing))) return;
 		const target = event.target as Element | null;
 		if (target?.closest?.(PANEL_SELECTOR) != null) return;
 		const start = { x: event.clientX, y: event.clientY };
@@ -4916,6 +4980,9 @@ export class M1CanvasSession {
 		if (drawingTool) {
 			this.penPoints = [];
 			this.penPressures = [];
+			this.penPointerType = pointer;
+			this.penStartedAt = Date.now();
+			this.penTap = false;
 			this.erasing.clear();
 		}
 		let from: { readonly nodeId: string; readonly anchor: CanvasAnchor; readonly board: { readonly x: number; readonly y: number } } | undefined;
@@ -4942,7 +5009,9 @@ export class M1CanvasSession {
 		ghost.setAttribute("class", `miro-canvas-tool-ghost miro-canvas-tool-ghost--${tool}`);
 		// A lasso shows the ring it closes; an eraser the trail it wipes; a pen
 		// the line it will leave.
-		const line = svg ? document.createElementNS("http://www.w3.org/2000/svg", tool === "lasso" ? "polygon" : "polyline") : undefined;
+		const pressurePen = tool === "pen" && pointer === "pen" && this.settings.penPressure;
+		let pressureScale = pressurePen ? strokeWidthScale([pressedPressure(event) ?? 0.5]) : 1;
+		const line = svg ? document.createElementNS("http://www.w3.org/2000/svg", pressurePen ? "path" : tool === "lasso" ? "polygon" : "polyline") : undefined;
 		const zoom = finite(readRuntime(this.viewport.getViewport(), "zoom")) ?? 1;
 		if (line !== undefined) {
 			line.setAttribute("class", "miro-canvas-tool-ghost__line");
@@ -4963,6 +5032,14 @@ export class M1CanvasSession {
 		const origin = from === undefined ? start : this.viewportPoint(from.board) ?? start;
 		// The preview grows by the points added, not redrawn from the start.
 		const shown: string[] = [];
+		const updateStrokePreview = (): void => {
+			if (pressurePen) {
+				const points = shown.flatMap(pair => pair.split(",").map(Number));
+				line?.setAttribute("fill", this.penInk());
+				line?.setAttribute("stroke", "none");
+				line?.setAttribute("d", pressureStrokePath(points, this.penPressures.map(scale => this.penWidth * scale * zoom)));
+			} else line?.setAttribute("points", shown.join(" "));
+		};
 		// With Shift held a pen draws straight: from the point the line had
 		// reached when Shift went down to the pointer.  Letting go carries on
 		// freehand from the end of the straight part.  A pen held still at the
@@ -4977,10 +5054,12 @@ export class M1CanvasSession {
 					const board = this.boardPoint(end);
 					if (board === undefined) return;
 					this.penPoints.length = straightFrom + 1;
+					this.penPressures.length = straightFrom + 1;
 					shown.length = straightFrom + 1;
 					this.penPoints.push(board);
+					this.penPressures.push(pressureScale);
 					shown.push(`${end.x - rootRect.left},${end.y - rootRect.top}`);
-					line?.setAttribute("points", shown.join(" "));
+					updateStrokePreview();
 					return;
 				}
 				straightFrom = undefined;
@@ -4989,8 +5068,9 @@ export class M1CanvasSession {
 				const previous = this.penPoints[this.penPoints.length - 1];
 				if (previous !== undefined && Math.hypot(board.x - previous.x, board.y - previous.y) < 1) return;
 				this.penPoints.push(board);
+				this.penPressures.push(pressureScale);
 				shown.push(`${point.x - rootRect.left},${point.y - rootRect.top}`);
-				line?.setAttribute("points", shown.join(" "));
+				updateStrokePreview();
 				if (erasing) {
 					for (const id of this.drawingsUnder(board, previous)) {
 						if (this.erasing.has(id)) continue;
@@ -5049,8 +5129,7 @@ export class M1CanvasSession {
 			if (!own(moved)) return;
 			const point = moved as PointerEvent;
 			// A stylus reports how hard it is pressed; see `strokeWidthScale`.
-			const pressure = pressedPressure(point);
-			if (drawing && pressure !== undefined) this.penPressures.push(pressure);
+			pressureScale = pressurePen ? strokeWidthScale([pressedPressure(point) ?? 0.5]) : 1;
 			const at = { x: point.clientX, y: point.clientY };
 			draw(at, point.shiftKey === true || held);
 			watchHold(at);
@@ -5059,6 +5138,12 @@ export class M1CanvasSession {
 			if (!own(released)) return;
 			const pointer = released as PointerEvent;
 			const gesture = this.toolGesture;
+			this.penTap = drawing && Date.now() - this.penStartedAt <= TAP_MAX_MS
+				&& Math.hypot(pointer.clientX - start.x, pointer.clientY - start.y) <= TAP_SLOP
+				&& shown.every(pair => {
+					const [x, y] = pair.split(",").map(Number);
+					return Math.hypot(x! + rootRect.left - start.x, y! + rootRect.top - start.y) <= TAP_SLOP;
+				});
 			end();
 			if (gesture !== undefined) this.finishToolGesture(tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from, event.shiftKey === true);
 		};
@@ -5081,7 +5166,7 @@ export class M1CanvasSession {
 		view?.addEventListener("pointermove", move, true);
 		view?.addEventListener("pointerup", up, true);
 		view?.addEventListener("pointercancel", cancel, true);
-		this.toolGesture = { tool, start, ...(from === undefined ? {} : { from }), ghost, end };
+		this.toolGesture = { tool, press: event, start, ...(from === undefined ? {} : { from }), ghost, end };
 	}
 
 	private finishToolGesture(
@@ -5424,6 +5509,9 @@ export class M1CanvasSession {
 
 	/** Keeps the stroke a pen gesture drew, as one item of its own. */
 	private drawStroke(tool: "pen" | "highlighter"): void {
+		const usePressure = tool === "pen" && this.penPointerType === "pen" && this.settings.penPressure;
+		const original = this.penPoints;
+		const scales = this.penPressures;
 		const zoom = finite(readRuntime(this.viewport.getViewport(), "zoom")) ?? 1;
 		// The line is kept to the shape a person drew, not to every point the
 		// pointer reported: within half a pixel on screen.  A stroke that still
@@ -5435,14 +5523,20 @@ export class M1CanvasSession {
 			tolerance *= 2;
 			points = simplifyPoints(this.penPoints, tolerance);
 		}
+		if (usePressure) {
+			points = original.filter((_point, index) => index === original.length - 1 || index % Math.max(1, Math.ceil(original.length / (MAX_STROKE_POINTS - 1))) === 0);
+		}
 		this.penPoints = [];
 		if (points.length === 0) return;
-		const width = Math.round(this.penWidth * (tool === "highlighter" ? HIGHLIGHTER_SCALE : 1) * strokeWidthScale(this.penPressures) * 100) / 100;
+		const scaleByPoint = new Map(original.map((point, index) => [point, scales[index] ?? 1]));
+		const widths = usePressure ? points.map(point => Math.round(this.penWidth * scaleByPoint.get(point)! * 100) / 100) : undefined;
+		const width = widths === undefined ? this.penWidth * (tool === "highlighter" ? HIGHLIGHTER_SCALE : 1) : Math.max(...widths);
 		this.penPressures = [];
 		const rect = strokeBounds(points.length === 1 ? [points[0]!, points[0]!] : points, width);
 		const stroke = {
 			color: this.penInk(),
 			width,
+			...(widths === undefined ? {} : { widths }),
 			...(tool === "highlighter" ? { opacity: HIGHLIGHTER_OPACITY } : {}),
 			box: { width: Math.round(rect.width * 100) / 100, height: Math.round(rect.height * 100) / 100 },
 			points: points.flatMap((point) => [
@@ -5452,14 +5546,36 @@ export class M1CanvasSession {
 		};
 		// A single tap leaves a dot: two points at the same place.
 		if (stroke.points.length === 2) stroke.points.push(stroke.points[0]!, stroke.points[1]!);
-		this.readInteractionState();
-		this.authoring ??= createCanvasAuthoring(this.view);
-		const created = this.authoring.createItem({
-			item: { type: "drawing", stroke },
-			x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-		});
-		if (!created.ok) this.addDiagnostic(firstProblem(created.diagnostics) ?? "Canvas rejected the drawing.");
-		this.refresh();
+		if (widths?.length === 1) widths.push(widths[0]!);
+		const commit = (): void => {
+			if (this.disposed) return;
+			this.readInteractionState();
+			this.authoring ??= createCanvasAuthoring(this.view);
+			const created = this.authoring.createItem({ item: { type: "drawing", stroke }, x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+			if (!created.ok) this.addDiagnostic(firstProblem(created.diagnostics) ?? "Canvas rejected the drawing.");
+			this.refresh();
+		};
+		const dot = this.penTap && this.penPointerType !== "mouse";
+		if (dot && Date.now() <= this.skipPenDotUntil) return;
+		if (dot) {
+			const pending = this.pendingPenDot;
+			this.cancelPendingPenDot();
+			pending?.commit();
+			this.pendingPenDot = { commit, timer: setTimeout(() => {
+				this.pendingPenDot = undefined;
+				commit();
+			}, DOUBLE_TAP_MS + TAP_MAX_MS + 30) };
+		} else {
+			const pending = this.pendingPenDot;
+			this.cancelPendingPenDot();
+			pending?.commit();
+			commit();
+		}
+	}
+
+	private cancelPendingPenDot(): void {
+		if (this.pendingPenDot !== undefined) clearTimeout(this.pendingPenDot.timer);
+		this.pendingPenDot = undefined;
 	}
 
 	/**
@@ -5557,7 +5673,9 @@ export class M1CanvasSession {
 				continue;
 			}
 			if (!left.changed) continue;
-			changes.push({ id, item: { type: "drawing", stroke: { ...stroke, points: left.points, ...(left.breaks.length === 0 ? {} : { breaks: left.breaks }) } } });
+			changes.push({ id, item: { type: "drawing", stroke: { ...stroke, points: left.points,
+				...(stroke.widths === undefined ? {} : { widths: remapStrokeWidths(stroke.points, stroke.widths, left.points, stroke.breaks) }),
+				...(left.breaks.length === 0 ? {} : { breaks: left.breaks }) } } });
 		}
 		// A locked drawing is left alone rather than refusing the whole sweep,
 		// and what is trimmed and what is removed go in one step, undone as one.
@@ -5913,8 +6031,9 @@ export class M1CanvasSession {
 	 * beside the node reads as rotating about a different point entirely.
 	 */
 	private overlayOrigin(): { readonly left: number; readonly top: number } | undefined {
-		return boundingRect(isElement(this.handles.element) ? this.handles.element : this.root)
-			?? boundingRect(this.root);
+		// Hidden handles have a zero rectangle. Their containing board keeps its
+		// real origin when the selection appears or changes to another card.
+		return boundingRect(this.root);
 	}
 
 	private handleRect(id: string): HandleRect | undefined {
@@ -5931,9 +6050,9 @@ export class M1CanvasSession {
 		const node = Array.isArray(nodes)
 			? (nodes as readonly unknown[]).find((item) => readRuntime(item, "id") === id)
 			: undefined;
-		const zoom = finite(readRuntime(this.viewport.getViewport(), "zoom")) ?? 1;
-		const width = (finite(readRuntime(node, "width")) ?? (rect.right - rect.left) / zoom) * zoom;
-		const height = (finite(readRuntime(node, "height")) ?? (rect.bottom - rect.top) / zoom) * zoom;
+		const zoom = this.displayViewport()?.zoom ?? finite(readRuntime(this.viewport.getViewport(), "zoom")) ?? 1;
+		const width = (finite(readRuntime(element, "width")) ?? finite(readRuntime(node, "width")) ?? (rect.right - rect.left) / zoom) * zoom;
+		const height = (finite(readRuntime(element, "height")) ?? finite(readRuntime(node, "height")) ?? (rect.bottom - rect.top) / zoom) * zoom;
 		if (!(width > 0) || !(height > 0)) {
 			return undefined;
 		}
@@ -6603,6 +6722,7 @@ export class M1CanvasSession {
 			}
 		}
 		const slot = readRuntime(action, "slot");
+		if (!isGlobal && this.applyTextFragment(action)) return;
 		this.writeMetadata(type, (draft) => {
 			const previous = normalizeAppearanceState(draft);
 			let next = previous;
@@ -6637,6 +6757,47 @@ export class M1CanvasSession {
 		if (type === APPEARANCE_ACTIONS.setColor && slot === "highlight") {
 			this.markSelectedText(readRuntime(action, "color") !== null);
 		}
+	}
+
+	private captureTextFragment(): void {
+		for (const node of this.adapter.getNodes() ?? []) {
+			const id = readCanvasElementId(node);
+			if (id === undefined || !this.selectedIds.includes(id) || readRuntime(node, "isEditing") !== true) continue;
+			const child = readRuntime(node, "child");
+			const editor = readRuntime(child, "editor") ?? readRuntime(readRuntime(child, "editMode"), "editor");
+			if (!isObject(editor)) continue;
+			const text = callRuntime(editor, "getSelection");
+			if (typeof text !== "string" || text === "") continue;
+			this.textFragment = {
+				id, editor, text, from: callRuntime(editor, "getCursor", "from"),
+				to: callRuntime(editor, "getCursor", "to"), html: isHtmlText(String(readRuntime(node, "text") ?? "")),
+			};
+			return;
+		}
+	}
+
+	private applyTextFragment(action: AppearanceAction): boolean {
+		this.captureTextFragment();
+		const fragment = this.textFragment;
+		if (fragment === undefined || this.selectedIds.length !== 1 || this.selectedIds[0] !== fragment.id) {
+			this.textFragment = undefined;
+			return false;
+		}
+		const next = formatTextSelection(fragment.text, action, fragment.html);
+		if (next === undefined) return false;
+		if (callRuntime(fragment.editor, "getRange", fragment.from, fragment.to) !== fragment.text) {
+			this.textFragment = undefined;
+			return true;
+		}
+		if (typeof readRuntime(fragment.editor, "replaceRange") !== "function") return true;
+		callRuntime(fragment.editor, "replaceRange", next, fragment.from, fragment.to);
+		const from = fragment.from as { line: number; ch: number };
+		const lines = next.split("\n");
+		const to = { line: from.line + lines.length - 1, ch: lines.length === 1 ? from.ch + next.length : lines[lines.length - 1]!.length };
+		callRuntime(fragment.editor, "setSelection", fragment.from, to);
+		this.textFragment = { ...fragment, text: next, to };
+		this.refresh();
+		return true;
 	}
 
 	/**
@@ -7633,6 +7794,19 @@ export class M1CanvasSession {
 			for (const end of ["from", "to"] as const) if (anchors[end]) anchors[end] = detach(anchors[end], id, end);
 			draft.localOverrides[id] = {...o, connectorAnchors: anchors};
 		}
+	}
+
+	/** Add the selected local files through native Canvas, preserving its history. */
+	public addFiles(files: readonly unknown[]): boolean {
+		this.readInteractionState();
+		if (this.readNativeReadonly() === true || !this.editAllowed("create", [])) return false;
+		const point = this.pastePoint();
+		if (point === undefined || files.length === 0) return false;
+		const created = callRuntime(this.nativeCanvas(), "createFileNodes", files, point);
+		if (!Array.isArray(created)) return false;
+		this.adapter.requestSave();
+		this.refresh();
+		return true;
 	}
 
 	/** Paste files the clipboard names as nodes pointing at them; false when it names none this vault has. */
@@ -9253,10 +9427,12 @@ export class M1CanvasSession {
 			return;
 		}
 		this.disposed = true;
+		this.cancelPendingPenDot();
 		this.selectionMoveEnd?.();
 		this.slideShow?.stop();
 		this.closeExport();
 		this.arrangeMode?.dispose();
+		this.panelVisibility?.dispose();
 		this.controls.dispose();
 		this.connectorLayer?.dispose();
 		this.connectorLabels?.dispose();

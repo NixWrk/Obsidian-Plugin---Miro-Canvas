@@ -149,6 +149,13 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName(labels.drawingHeading).setHeading();
 
+    new Setting(containerEl).setName(labels.penPressureName).setDesc(labels.penPressureDesc)
+      .addToggle(toggle => toggle.setValue(this.host.settings.penPressure)
+        .onChange(value => void this.host.saveSettings({ penPressure: value })));
+    new Setting(containerEl).setName(labels.fingerDrawingName).setDesc(labels.fingerDrawingDesc)
+      .addToggle(toggle => toggle.setValue(this.host.settings.fingerDrawing)
+        .onChange(value => void this.host.saveSettings({ fingerDrawing: value })));
+
     new Setting(containerEl)
       .setName(labels.holdStraightName)
       .setDesc(labels.holdStraightDesc)
@@ -356,6 +363,17 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
       .addButton((button) => button
         .setButtonText(labels.toolBarReset)
         .onClick(() => void this.host.saveSettings({ toolbarItems: DEFAULT_TOOLBAR_ITEMS }).then(() => this.redisplayInPlace())));
+    for (const id of ["toolbar", "dockBar"] as const) {
+      new Setting(containerEl)
+        .setName(id === "toolbar" ? labels.collapseToolsButton : labels.collapseNavigationButton)
+        .setDesc(labels.collapseButtonDesc)
+        .addToggle((toggle) => toggle
+          .setValue(!this.host.settings.hiddenPanelButtons?.includes(id))
+          .onChange((shown) => {
+            const hidden = this.host.settings.hiddenPanelButtons ?? [];
+            void this.host.saveSettings({ hiddenPanelButtons: shown ? hidden.filter((entry) => entry !== id) : [...hidden, id] });
+          }));
+    }
     const current = this.host.settings.toolbarItems;
     const onBar = new Set(current);
     const listed: readonly ToolbarItem[] = [...current, ...ALL_TOOLBAR_ITEMS.filter((item) => !onBar.has(item))];

@@ -845,6 +845,42 @@ describe("keepPanelInView", () => {
     expect(panelAt(100, 200, 200, 100).size).toBe(0);
   });
 
+  it("keeps formatting above every toolbar row while the mobile keyboard is open", () => {
+    const style = new Map<string, string>();
+    const attributes = new Map<string, string>();
+    let keyboard = true;
+    let panelTop = 112;
+    let panelBottom = 172;
+    const board = {
+      getAttribute: () => keyboard ? "open" : null,
+      getBoundingClientRect: () => ({ left: 0, top: 80.4, right: 384, bottom: 475 }),
+    };
+    const toolbar = { getAttribute: () => "true", getBoundingClientRect: () => ({ top: 182 }) };
+    const panel = {
+      style: { setProperty: (name: string, value: string) => style.set(name, value), removeProperty: (name: string) => style.delete(name) },
+      getAttribute: (name: string) => attributes.get(name) ?? null,
+      setAttribute: (name: string, value: string) => attributes.set(name, value),
+      removeAttribute: (name: string) => attributes.delete(name),
+      parentElement: { getBoundingClientRect: () => ({ bottom: 264 }) },
+      closest: (selector: string) => selector === ".miro-canvas-root" ? board : toolbar,
+      getBoundingClientRect: () => ({ left: 100, top: panelTop, right: 300, bottom: panelBottom }),
+    };
+    keepPanelInView(panel as unknown as HTMLElement);
+    expect(style.get("top")).toBe("auto");
+    expect(style.get("bottom")).toBe("92px");
+    expect(style.get("max-height")).toBe("84px");
+    // Fractional screen coordinates must not expand a short font list back to 120px.
+    panelTop = 87.8;
+    panelBottom = 168.8;
+    keepPanelInView(panel as unknown as HTMLElement);
+    expect(style.get("max-height")).toBe("80px");
+    keyboard = false;
+    keepPanelInView(panel as unknown as HTMLElement);
+    expect(style.has("top")).toBe(false);
+    expect(style.has("bottom")).toBe(false);
+    expect(attributes.has("data-keyboard-popover")).toBe(false);
+  });
+
   it("cuts a panel longer than the strip the keyboard leaves, so it scrolls", () => {
     expect(panelAt(100, 342, 200, 170).get("max-height")).toBe("125px");
   });

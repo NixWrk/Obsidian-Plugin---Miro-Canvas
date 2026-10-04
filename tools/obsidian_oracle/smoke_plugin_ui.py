@@ -50,6 +50,18 @@ def main() -> int:
             page.add_script_tag(path=str(bundle))
             assert page.evaluate("miroBrowser.mounted"), "M1 controls did not mount on real DOM"
             if args.controls:
+                page.evaluate("document.querySelector('.miro-canvas-dock__map').hidden = false")
+                page.locator('.miro-canvas-dock button[aria-label="Board settings"]').click()
+                page.evaluate("""() => {
+                  const menu = document.querySelector('.miro-canvas-dock__menu--board');
+                  for (const item of menu.querySelectorAll('[role=menuitem]')) {
+                    const box = item.getBoundingClientRect();
+                    if (!box.width) continue;
+                    const hit = document.elementFromPoint(box.left+box.width/2, box.top+box.height/2);
+                    if (!menu.contains(hit)) throw Error('Minimap covers board menu: '+item.textContent);
+                  }
+                }""")
+                page.locator('.miro-canvas-dock button[aria-label="Board settings"]').click()
                 # Russian arrangement instructions must leave Done reachable on a phone.
                 board_width = page.evaluate("miroBrowser.root.style.width")
                 page.set_viewport_size({"width": 384, "height": 853})
@@ -62,6 +74,14 @@ def main() -> int:
                   buttons[0].textContent = 'Вернуть как было';
                   buttons[1].textContent = 'Готово';
                 }""")
+                page.evaluate("""() => {
+                  for(const control of document.querySelectorAll('.miro-canvas-arrange-grip,.miro-canvas-arrange-flip')) {
+                    const rect=control.getBoundingClientRect();
+                    if(rect.width===0 || rect.height===0) continue;
+                    const hit=document.elementFromPoint(rect.left+rect.width/2, rect.top+rect.height/2);
+                    if(!hit || !control.contains(hit)) throw Error('Another panel covers an arrange control: '+control.className);
+                  }
+                }""")
                 done = page.locator('.miro-canvas-arrange-banner__button--done')
                 bounds = done.bounding_box()
                 assert bounds and bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 384, bounds
@@ -69,6 +89,134 @@ def main() -> int:
                 assert page.locator('.miro-canvas-arrange-banner').count() == 0
                 page.evaluate("(width) => miroBrowser.root.style.width = width", board_width)
                 page.set_viewport_size({"width": 1600, "height": 900})
+                page.evaluate("miroBrowser.session.toggleArrangeMode()")
+                for anchor in ("left-middle", "right-middle", "top-center", "bottom-center"):
+                    vertical = anchor.endswith("middle")
+                    page.evaluate("""({anchor, vertical}) => {
+                      miroBrowser.session.commitPanelPosition('toolbar', {
+                        anchor, dx: 16, dy: 16, orientation: vertical ? 'vertical' : 'horizontal'
+                      });
+                    }""", {"anchor": anchor, "vertical": vertical})
+                    page.wait_for_timeout(100)
+                    page.evaluate("""(vertical) => {
+                      const root = miroBrowser.root.getBoundingClientRect();
+                      const tools = document.querySelector('.miro-canvas-tools').getBoundingClientRect();
+                      const tray = document.querySelector('.miro-canvas-arrange-tray').getBoundingClientRect();
+                      if(tray.left < root.left || tray.right > root.right || tray.top < root.top || tray.bottom > root.bottom)
+                        throw Error('Spare tools leave the board');
+                      const distance = vertical ? Math.max(tray.left-tools.right, tools.left-tray.right) : Math.max(tray.top-tools.bottom, tools.top-tray.bottom);
+                      if(distance < 8 || distance > 65) throw Error('Spare tools are not next to the toolbar: '+distance);
+                      const grip = document.querySelector('.miro-canvas-tools .miro-canvas-arrange-grip').getBoundingClientRect();
+                      const flip = document.querySelector('.miro-canvas-tools .miro-canvas-arrange-flip').getBoundingClientRect();
+                      if(grip.width < 44 || grip.height < 44 || flip.width < 44 || flip.height < 44 || flip.left-grip.right < 11)
+                        throw Error('Drag and turn targets are too close or too small');
+                      if(grip.left < root.left || flip.right > root.right) throw Error('Arrange controls leave the board');
+                    }""", vertical)
+                page.evaluate("miroBrowser.session.options.onToolbarItemsChanged = items => window.__arrangedItems = items")
+                for orientation in ("horizontal", "vertical"):
+                    page.evaluate("""(orientation) => {
+                      miroBrowser.session.commitPanelPosition('toolbar', {
+                        anchor: orientation === 'vertical' ? 'left-middle' : 'bottom-center',
+                        dx:16, dy:16, orientation
+                      });
+                    }""", orientation)
+                    page.wait_for_timeout(100)
+                    source = page.locator('.miro-canvas-tools [data-tool="text"]').first.bounding_box()
+                    target = page.locator('.miro-canvas-tools [data-tool="shape"]').first.bounding_box()
+                    assert source and target
+                    page.mouse.move(source['x'] + source['width']/2, source['y'] + source['height']/2)
+                    page.mouse.down()
+                    page.mouse.move(target['x'] + target['width']/2, target['y'] + target['height']/2, steps=8)
+                    marker = page.locator('.miro-canvas-arrange-insertion')
+                    assert marker.count() == 1 and marker.is_visible()
+                    expected_index = int(marker.get_attribute('data-insert-index'))
+                    line = marker.bounding_box()
+                    assert line and (line['height'] == 3 if orientation == 'vertical' else line['width'] == 3), line
+                    page.mouse.up()
+                    assert page.locator('.miro-canvas-arrange-insertion').count() == 0
+                    order = page.evaluate("window.__arrangedItems")
+                    assert order.index('text') == expected_index, (order, expected_index)
+                    grip = page.locator('.miro-canvas-tools .miro-canvas-arrange-grip').bounding_box()
+                    assert grip
+                    page.mouse.move(grip['x'] + grip['width']/2, grip['y'] + grip['height']/2)
+                    page.mouse.down()
+                    page.mouse.move(grip['x'] + grip['width']/2 + 50, grip['y'] + grip['height']/2 - 40, steps=8)
+                    page.evaluate("""(vertical) => {
+                      const tools = document.querySelector('.miro-canvas-tools').getBoundingClientRect();
+                      const tray = document.querySelector('.miro-canvas-arrange-tray').getBoundingClientRect();
+                      const distance = vertical ? Math.max(tray.left-tools.right, tools.left-tray.right) : Math.max(tray.top-tools.bottom, tools.top-tray.bottom);
+                      if(distance < 8 || distance > 65) throw Error('Spare tools do not follow the drag preview: '+distance);
+                    }""", orientation == 'vertical')
+                    page.mouse.up()
+                page.evaluate("""() => {
+                  delete miroBrowser.session.options.onToolbarItemsChanged;
+                  miroBrowser.session.toggleArrangeMode();
+                  miroBrowser.session.commitPanelPosition('toolbar', {anchor:'bottom-center',dx:0,dy:12,orientation:'horizontal'});
+                }""")
+                page.evaluate("miroBrowser.session.toggleArrangeMode()")
+                # Real browser touch input: dragging from a scrolling Plus menu must not be cancelled.
+                page.evaluate("miroBrowser.session.options.onToolbarItemsChanged = items => window.__arrangedItems = items")
+                page.evaluate("miroBrowser.session.commitPanelPosition('toolbar', {anchor:'left-middle',dx:16,dy:0,orientation:'vertical'})")
+                page.locator('.miro-canvas-tools__more > button').click()
+                spare = page.locator('.miro-canvas-tools__more [data-tool="code"]').bounding_box()
+                destination = page.locator('.miro-canvas-tools > .miro-canvas-toolbar__bar > [data-tool="sticky"]').bounding_box()
+                assert spare and destination
+                sx, sy = spare['x']+spare['width']/2, spare['y']+spare['height']/2
+                tx, ty = destination['x']+destination['width']/2, destination['y']+destination['height']/2
+                touch = page.context.new_cdp_session(page)
+                touch.send('Input.dispatchTouchEvent', {'type':'touchStart','touchPoints':[{'x':sx,'y':sy,'id':41}]})
+                for step in range(1, 21):
+                    touch.send('Input.dispatchTouchEvent', {'type':'touchMove','touchPoints':[{'x':sx+(tx-sx)*step/20,'y':sy+(ty-sy)*step/20,'id':41}]})
+                    page.wait_for_timeout(20)
+                assert page.locator('.miro-canvas-arrange-insertion').is_visible()
+                touch.send('Input.dispatchTouchEvent', {'type':'touchEnd','touchPoints':[]})
+                page.wait_for_timeout(100)
+                assert page.evaluate("window.__arrangedItems.includes('code')")
+                assert page.locator('.miro-canvas-arrange-insertion').count() == 0
+                touch.detach()
+                page.evaluate("delete miroBrowser.session.options.onToolbarItemsChanged")
+                # The button is the same pivot before and after folding, even at the board edges.
+                for panel_id, selector in (("toolbar", ".miro-canvas-tools"), ("dockBar", ".miro-canvas-dock")):
+                    for anchor in ("top-left", "top-right", "bottom-left", "bottom-right", "left-middle", "right-middle", "bottom-center"):
+                        # Keep the other panel clear: overlapping bars cannot both receive the same tap.
+                        if panel_id == "dockBar":
+                            page.evaluate("miroBrowser.session.commitPanelPosition('toolbar', {anchor:'top-center',dx:0,dy:200,collapsed:true})")
+                        page.evaluate("""({panel_id, anchor}) => miroBrowser.session.commitPanelPosition(panel_id, {
+                          anchor, dx:24, dy:80, orientation: anchor.endsWith('middle') ? 'vertical' : 'horizontal'
+                        })""", {"panel_id": panel_id, "anchor": anchor})
+                        page.wait_for_timeout(50)
+                        page.evaluate("""(selector) => {
+                          const panel = document.querySelector(selector);
+                          const pivot = panel.querySelector('.miro-canvas-panel-toggle').getBoundingClientRect();
+                          const controls = panel.querySelectorAll('[data-tool], .canvas-card-menu-button, .miro-canvas-tools__more > button, .miro-canvas-dock__bar button');
+                          for (const control of controls) {
+                            if (control.classList.contains('miro-canvas-panel-toggle')) continue;
+                            const box = control.getBoundingClientRect();
+                            if (box.width && box.height && box.left < pivot.right && box.right > pivot.left && box.top < pivot.bottom && box.bottom > pivot.top) {
+                              throw Error('Panel pivot overlaps a tool: '+control.getAttribute('aria-label'));
+                            }
+                          }
+                        }""", selector)
+                        button = page.locator(selector + ' .miro-canvas-panel-toggle')
+                        for _ in range(2):
+                            before = button.bounding_box()
+                            assert before
+                            button.click()
+                            after = button.bounding_box()
+                            assert after and abs(after['x']-before['x']) < 2 and abs(after['y']-before['y']) < 2, (anchor, before, after, page.evaluate("({layout:miroBrowser.session.settings.panelLayout,box:document.querySelector('.miro-canvas-tools').getBoundingClientRect().toJSON(),style:document.querySelector('.miro-canvas-tools').getAttribute('style')})"))
+                        before = button.bounding_box()
+                        assert before
+                        page.mouse.move(before['x']+22, before['y']+22)
+                        page.mouse.down()
+                        page.wait_for_timeout(500)
+                        page.mouse.move(before['x']+62, before['y']+52, steps=8)
+                        page.mouse.up()
+                        assert button.get_attribute('aria-expanded') == 'true'
+                page.evaluate("""() => {
+                  miroBrowser.session.toggleArrangeMode();
+                  miroBrowser.session.commitPanelPosition('toolbar', {anchor:'bottom-center',dx:0,dy:12,orientation:'horizontal'});
+                  miroBrowser.session.commitPanelPosition('dockBar', {anchor:'bottom-right',dx:12,dy:12,orientation:'horizontal'});
+                }""")
                 page.evaluate("""() => {
                   const b=miroBrowser;
                   const map=b.root.querySelector('.miro-canvas-dock__map');
@@ -374,6 +522,10 @@ def main() -> int:
                   if(getComputedStyle(text).touchAction==='none')throw Error('A computer with a mouse carries the touch rule');
                   card.className='canvas-node';
                   await settled();
+                }""")
+                page.evaluate("""() => {
+                  window.__plusTouch=[];
+                  for(const type of ['pointerdown','pointerup','pointercancel']) document.addEventListener(type,e=>window.__plusTouch.push({type,x:e.clientX,y:e.clientY,item:e.target.closest?.('[data-tool]')?.getAttribute('data-tool'),tag:e.target.className}),true);
                 }""")
                 touch = page.context.new_cdp_session(page)
                 touch.send("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5})
@@ -757,6 +909,7 @@ def main() -> int:
                     return found
 
                 page.evaluate("document.body.classList.add('is-mobile')")
+                page.wait_for_timeout(100)
                 labelled = [
                     ('the tool bar', '.miro-canvas-tools__more > button'),
                     ('the pen settings', '.miro-canvas-tools__drawing [data-tool="highlighter"]'),

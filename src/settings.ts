@@ -42,6 +42,7 @@ export interface DeviceLayout {
    * an empty layout is exactly today's places.
    */
   readonly panelLayout: PanelLayout;
+  readonly hiddenPanelButtons?: readonly ("toolbar" | "dockBar")[];
 }
 
 /** A font file added by hand, kept under the plugin's own `fonts/custom` folder. */
@@ -93,6 +94,8 @@ export interface MiroCanvasSettings {
    * into a straight line from where it began.
    */
   readonly holdStraightLine: boolean;
+  readonly penPressure: boolean;
+  readonly fingerDrawing: boolean;
   readonly lassoBinding: PointerBinding;
   readonly panBinding: PointerBinding;
   readonly lineBinding: PointerBinding;
@@ -107,6 +110,7 @@ export interface MiroCanvasSettings {
   readonly toolbarItems: readonly ToolbarItem[];
   /** The panels' places on this kind of device: `layouts[layoutKind].panelLayout`. */
   readonly panelLayout: PanelLayout;
+  readonly hiddenPanelButtons?: readonly ("toolbar" | "dockBar")[];
   /**
    * The warning badge listing what the plugin could not do as asked.  It is
    * for whoever develops or debugs the plugin, so it starts hidden; it is
@@ -189,6 +193,8 @@ export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   selectionToolbarEnabled: true,
   boardFindKey: true,
   holdStraightLine: true,
+  penPressure: true,
+  fingerDrawing: false,
   lassoBinding: "alt+left",
   panBinding: "none",
   lineBinding: "right",
@@ -300,10 +306,15 @@ function readToolbarItems(value: unknown, legacyShowLasso: unknown, legacyShowCo
  * kind's, so nothing moves for anyone until they rearrange on one kind of
  * device.  A kind whose entry is missing or broken takes the same fallback.
  */
+function readHiddenPanelButtons(value: unknown): readonly ("toolbar" | "dockBar")[] {
+  return Object.freeze(Array.isArray(value) ? [...new Set(value.filter((id): id is "toolbar" | "dockBar" => id === "toolbar" || id === "dockBar"))] : []);
+}
+
 function readLayouts(source: Record<string, unknown>): Readonly<Record<LayoutKind, DeviceLayout>> {
   const shared: DeviceLayout = Object.freeze({
     toolbarItems: readToolbarItems(source.toolbarItems, source.showLassoTool, source.showConnectorTool),
     panelLayout: normalizePanelLayout(source.panelLayout),
+    hiddenPanelButtons: readHiddenPanelButtons(source.hiddenPanelButtons),
   });
   const stored = isRecord(source.layouts) ? source.layouts : {};
   const layouts = {} as Record<LayoutKind, DeviceLayout>;
@@ -316,6 +327,7 @@ function readLayouts(source: Record<string, unknown>): Readonly<Record<LayoutKin
     layouts[kind] = Object.freeze({
       toolbarItems: Array.isArray(entry.toolbarItems) ? readToolbarItems(entry.toolbarItems, undefined, undefined) : shared.toolbarItems,
       panelLayout: isRecord(entry.panelLayout) ? normalizePanelLayout(entry.panelLayout) : shared.panelLayout,
+      hiddenPanelButtons: readHiddenPanelButtons(entry.hiddenPanelButtons ?? shared.hiddenPanelButtons),
     });
   }
   return Object.freeze(layouts);
@@ -451,6 +463,8 @@ export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvas
     selectionToolbarEnabled: readBoolean(value, "selectionToolbarEnabled", DEFAULT_SETTINGS.selectionToolbarEnabled),
     boardFindKey: readBoolean(value, "boardFindKey", DEFAULT_SETTINGS.boardFindKey),
     holdStraightLine: readBoolean(value, "holdStraightLine", DEFAULT_SETTINGS.holdStraightLine),
+    penPressure: readBoolean(value, "penPressure", DEFAULT_SETTINGS.penPressure),
+    fingerDrawing: readBoolean(value, "fingerDrawing", DEFAULT_SETTINGS.fingerDrawing),
     lassoBinding: POINTER_BINDINGS.includes(value.lassoBinding as PointerBinding) ? value.lassoBinding as PointerBinding : DEFAULT_SETTINGS.lassoBinding,
     panBinding: POINTER_BINDINGS.includes(value.panBinding as PointerBinding) ? value.panBinding as PointerBinding : DEFAULT_SETTINGS.panBinding,
     lineBinding: POINTER_BINDINGS.includes(value.lineBinding as PointerBinding) ? value.lineBinding as PointerBinding : DEFAULT_SETTINGS.lineBinding,
@@ -458,6 +472,7 @@ export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvas
     layoutKind: wanted,
     toolbarItems: layouts[wanted].toolbarItems,
     panelLayout: layouts[wanted].panelLayout,
+    hiddenPanelButtons: layouts[wanted].hiddenPanelButtons ?? [],
     developerDiagnostics: readBoolean(value, "developerDiagnostics", DEFAULT_SETTINGS.developerDiagnostics),
     commentAuthor: typeof value.commentAuthor === "string" ? value.commentAuthor.trim().slice(0, MAX_AUTHOR_NAME) : DEFAULT_SETTINGS.commentAuthor,
     commentAuthorColors: readAuthorColors(value.commentAuthorColors),
@@ -482,12 +497,12 @@ export function useLayoutKind(settings: MiroCanvasSettings, kind: LayoutKind): M
  * kind of device's layout only; every other setting is shared by all.
  */
 export function mergeSettings(current: MiroCanvasSettings, patch: Partial<MiroCanvasSettings>): MiroCanvasSettings {
-  const { toolbarItems, panelLayout, ...shared } = patch;
+  const { toolbarItems, panelLayout, hiddenPanelButtons, ...shared } = patch;
   const kind = current.layoutKind;
   const own = current.layouts[kind];
   const layouts = {
     ...current.layouts,
-    [kind]: { toolbarItems: toolbarItems ?? own.toolbarItems, panelLayout: panelLayout ?? own.panelLayout },
+    [kind]: { ...own, toolbarItems: toolbarItems ?? own.toolbarItems, panelLayout: panelLayout ?? own.panelLayout, hiddenPanelButtons: hiddenPanelButtons ?? own.hiddenPanelButtons ?? [] },
   };
   return normalizeSettings({ ...current, layouts, ...shared }, kind);
 }
@@ -548,6 +563,7 @@ export function settingsForStorage(settings: MiroCanvasSettings): Record<string,
     ...stored,
     toolbarItems: settings.layouts.desktop.toolbarItems,
     panelLayout: settings.layouts.desktop.panelLayout,
+    hiddenPanelButtons: settings.layouts.desktop.hiddenPanelButtons ?? [],
   };
 }
 

@@ -365,7 +365,7 @@ describe("a panel layout for each kind of device", () => {
     const onTablet = normalizeSettings(oldFile, "tablet");
     const rearranged = mergeSettings(onTablet, { toolbarItems: ["card"], panelLayout: {} });
     expect(rearranged.toolbarItems).toEqual(["card"]);
-    expect(rearranged.layouts.tablet).toEqual({ toolbarItems: ["card"], panelLayout: {} });
+    expect(rearranged.layouts.tablet).toEqual({ toolbarItems: ["card"], panelLayout: {}, hiddenPanelButtons: [] });
     // Seen from the same device after a round trip through the file.
     const reread = normalizeSettings(JSON.parse(JSON.stringify(settingsForStorage(rearranged))), "tablet");
     expect(reread.toolbarItems).toEqual(["card"]);
@@ -399,7 +399,7 @@ describe("a panel layout for each kind of device", () => {
     const base = normalizeSettings(oldFile, "tablet");
     const phoneDone = mergeSettings(useLayoutKind(base, "phone"), { toolbarItems: ["card"] });
     const tabletReset = mergeSettings(useLayoutKind(phoneDone, "tablet"), { toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {} });
-    expect(tabletReset.layouts.tablet).toEqual({ toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {} });
+    expect(tabletReset.layouts.tablet).toEqual({ toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {}, hiddenPanelButtons: [] });
     expect(tabletReset.layouts.phone.toolbarItems).toEqual(["card"]);
     expect(tabletReset.layouts.desktop.toolbarItems).toEqual(["select", "frame"]);
     expect(tabletReset.layouts.desktop.panelLayout).toEqual(upright);
@@ -444,7 +444,7 @@ describe("a panel layout for each kind of device", () => {
       const onDesktop = normalizeSettings(oldFile, "desktop");
       const arranged = mergeSettings(onDesktop, { toolbarItems: ["card"] });
       const saved = withOtherKindsFromDisk(arranged, diskWithTablet());
-      expect(saved.layouts.tablet).toEqual({ toolbarItems: ["text"], panelLayout: tabletBar });
+      expect(saved.layouts.tablet).toEqual({ toolbarItems: ["text"], panelLayout: tabletBar, hiddenPanelButtons: [] });
       expect(saved.layouts.desktop.toolbarItems).toEqual(["card"]);
       expect(saved.toolbarItems).toEqual(["card"]);
       expect(saved.layoutKind).toBe("desktop");
@@ -496,5 +496,22 @@ describe("a panel layout for each kind of device", () => {
     const arranged = mergeSettings(useLayoutKind(normalizeSettings(oldFile), "phone"), { toolbarItems: ["card"], panelLayout: {} });
     const reread = normalizeSettings(JSON.parse(JSON.stringify(settingsForStorage(arranged))), "phone");
     expect(reread).toEqual(arranged);
+  });
+});
+
+
+describe("panel fold button visibility", () => {
+  it("keeps hidden buttons only in this device's layout", () => {
+    const tablet = useLayoutKind(DEFAULT_SETTINGS, "tablet");
+    const changed = mergeSettings(tablet, { hiddenPanelButtons: ["toolbar"] });
+    expect(changed.hiddenPanelButtons).toEqual(["toolbar"]);
+    expect(useLayoutKind(changed, "desktop").hiddenPanelButtons).toEqual([]);
+    expect(useLayoutKind(changed, "phone").hiddenPanelButtons).toEqual([]);
+    expect(normalizeSettings(settingsForStorage(changed), "tablet").hiddenPanelButtons).toEqual(["toolbar"]);
+  });
+
+  it("ignores unknown button identifiers and duplicates", () => {
+    const settings = normalizeSettings({ layouts: { tablet: { hiddenPanelButtons: ["toolbar", "toolbar", "foreign", null, "dockBar"] } } }, "tablet");
+    expect(settings.hiddenPanelButtons).toEqual(["toolbar", "dockBar"]);
   });
 });

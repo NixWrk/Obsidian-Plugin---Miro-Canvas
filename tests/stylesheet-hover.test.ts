@@ -39,7 +39,7 @@ function styleRules(stylesheet: string): StyleRule[] {
 }
 
 const stylesheet = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
-const BARS = [".miro-canvas-toolbar", ".miro-canvas-dock", ".miro-canvas-search"];
+const BARS = [".miro-canvas-toolbar", ".miro-canvas-dock", ".miro-canvas-search", ".miro-canvas-panel-toggle"];
 
 describe("hover styles of the bars", () => {
   it("reads the rules of the stylesheet with their at-rules", () => {

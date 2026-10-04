@@ -1995,3 +1995,55 @@ The first production release is ready when:
    and connector anchors are keyboard-accessible and covered by tests;
 7. opening a board never changes it silently;
 8. source-limited data is identified honestly rather than fabricated.
+
+
+Panel arrangement (2026-10-03): spare tools now follow the toolbar, beside a
+column or above/below a row, avoiding the other panels and their controls.
+The drag grip and turn button use separate 44px targets with a 12px gap.
+Reordering shows the actual insertion slot before release; cancellation clears
+the ghost and insertion line. Placement updates during panel drag/turn and
+on board or panel resize, with no per-card work.
+
+Tools and navigation each have a fold button inside their menu. A folded panel becomes a small square button. Tap to fold or open a panel. Hold the button, then drag to move it; this works with an open panel too. Positions and folded states are remembered separately for computers, tablets and phones. In plugin settings, you can hide each panel’s fold button; it remains available while arranging panels. In that mode, open “+” and drag a spare tool onto the main row: the insertion line shows where it will land.
+
+The pivot reserves space in the main bar, excluding drawing/connector submenus.
+Desktop expanded pivots are visible only in arrangement mode. File sources use
+Obsidian's native vault picker or a local system file input. Device files use
+FileManager.getAvailablePathForAttachment and Vault.createBinary, then native
+Canvas.createFileNodes with one board history request. A remounted session on
+the same view can complete the import; changing views never inserts into a
+different board.
+
+Selected text formatting uses the native editor's range and replaceRange,
+with a captured range checked against current text before a write. No card
+appearance override is written for a fragment. Markdown carries bold, italic
+and strike; native-rendered inline HTML carries underline and fragment fonts.
+The same lock/review policy applies. This explicitly requested rich-text
+feature uses inline tags only; newly created cards remain Markdown/plain text.
+
+
+With the mobile keyboard open, selection-toolbar popovers open above the whole toolbar, including when it wraps into two rows. Their height follows the space between the toolbar and the top of the board; the ordinary 120px minimum does not apply there. This keeps Android’s native text-selection menu from intercepting font and style choices. Galaxy A33 checks used real touch selection and formatting, plus image and PDF imports through Android’s picker.
+
+A newly created welcome board fits the first-steps frame when the Canvas view
+is narrower than 500px. Wider views fit the introduction and first row of
+examples. Existing boards retain their viewport.
+
+Fold controls align in the main bar's own coordinates, with a separator and
+an orientation-specific panel icon. A collapsed bar has one background and
+border; its 44px button and 20px icon share its center. Touch media suppresses
+Obsidian's retained hover background, while keyboard focus remains visible.
+Placement measures the bars again after refreshing fold controls because
+showing or hiding one can change wrapping and height.
+
+
+Release 0.2.1: pressure and finger drawing are independent Drawing settings.
+The pen uses one width per sampled point, with the same outline renderer for
+preview and saved data; the pinned upstream schema supports `stroke.widths`.
+Partial erasing interpolates widths at new endpoints. Highlighter is constant.
+Touch/pen dots wait through the double-tap interval; a completed double tap
+cancels them before either enters native history. Two fingers abandon an
+unfinished finger stroke and return navigation to Canvas.
+Minimap dimensions live in the device panel layout, not in board metadata.
+Responsive CSS uses the stored dimensions before its device defaults.
+Plus and fold controls share one separator. The welcome board explains the
+switches and minimap resizing and includes a sample variable-width stroke.
