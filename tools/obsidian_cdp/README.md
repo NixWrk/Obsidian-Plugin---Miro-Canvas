@@ -464,3 +464,19 @@ With an isolated Canvas open on CDP_PORT (default 9336), run
 `node tools/obsidian_cdp/check_export_page_gestures.mjs`. It refuses non-isolated
 vaults, drives real mouse input on page labels and corners, checks previews
 and committed geometry, unchanged native content, A4 proportions and reopening.
+
+### Export page touch regression
+
+Open a disposable Canvas in MiroCanvasTest on a connected Android device,
+forward its WebView with android.mjs, deploy the build, then run:
+
+```sh
+node tools/obsidian_cdp/check_export_page_touch.mjs --serial <adb-serial> --port 9340 --out tools/obsidian_cdp/.out/touch-report.json
+```
+
+The runner refuses other vaults. It changes export-page metadata on the active
+board, so use a disposable test board. Swipes go through real Android input;
+CDP checks the preview while each swipe is held. It verifies moving, free
+resizing, A4 proportions, unchanged camera and native content, and reopening
+saved page geometry. The portrait fixture keeps controls away from the open
+export panel and toolbar; obscured controls fail explicitly.

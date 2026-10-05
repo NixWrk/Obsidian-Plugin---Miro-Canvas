@@ -499,6 +499,7 @@ It is not yet available in the in-app catalog. Until it is accepted, use BRAT
 or the manual installation below. Requires Obsidian **1.13.7 or newer**; this
 is the oldest version verified in the current real-app test suite. Desktop
 editing and PDF/PPTX export on Windows and Android tablets are tested;
+export-page touch gestures are also checked on a physical Android phone.
 iOS, macOS and Linux remain unverified.
 
 **With BRAT.** This plugin installs GitHub releases and can update them.

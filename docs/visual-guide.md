@@ -271,3 +271,14 @@ resize corners being intercepted by rectangle selection. Paired
 `export-page-layout` recordings now demonstrate moving and resizing a page.
 The regression runner checks preview without persistence, unchanged native
 content, non-default zoom, free sizing, A4 ratio and reopening saved geometry.
+
+0.2.5 Android verification (2026-10-05): physical Samsung SM-X736B tablet
+(753 × 1204 CSS pixels, Obsidian 1.13.8) and SM-A336E phone
+(384 × 853, Obsidian 1.12.7), both in MiroCanvasTest. The phone checks only
+these gestures; the manifest’s supported minimum remains 1.13.7.
+Real ADB swipes moved page labels and resized corners. The touch regression
+runner checked uncommitted previews, unchanged camera/nodes/edges, free sizing,
+A4 proportions and reopening. Both passed. Page controls can be obscured by
+an overlapping toolbar; the test refuses such a target and stages its page in
+a clear area. These checks cover page gestures in portrait, not iOS or every
+mobile orientation.
