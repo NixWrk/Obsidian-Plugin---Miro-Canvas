@@ -28,14 +28,14 @@ class ElementStub {
   }
 }
 
-function setup(collapsed: boolean, hidden = false, inBar = false) {
+function setup(collapsed: boolean, hidden = false, inBar = false, orientation: "horizontal" | "vertical" = "vertical") {
   const document = new ElementStub();
   document.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 });
   const panel = new ElementStub();
   const bar = new ElementStub();
   if (inBar) panel.querySelector = () => bar as never;
   (document as any).body = { classList: { contains: () => true } };
-  let position: PanelPosition = { anchor: "top-left", dx: 20, dy: 100, orientation: "vertical", collapsed };
+  let position: PanelPosition = { anchor: "top-left", dx: 20, dy: 100, orientation, collapsed };
   const save = vi.fn((_id, next: PanelPosition) => { position = next; });
   const visibility = new PanelVisibility({
     document: document as unknown as Document,
@@ -138,6 +138,35 @@ describe("panel buttons", () => {
     rig.button.fire("click");
     expect(rig.save).not.toHaveBeenCalled();
     expect(rig.panel.style.setProperty).toHaveBeenCalledWith("left", "20px");
+    rig.visibility.dispose();
+  });
+
+  it("clears expanded inline spacing while folded and restores it on reopening", () => {
+    const rig = setup(false, false, true);
+    rig.panel.setAttribute("data-miro-canvas-panel-orientation", "vertical");
+    rig.visibility.refresh();
+    expect(rig.bar.getAttribute("data-miro-panel-toggle-host")).toBe("true");
+    for (let cycle = 0; cycle < 3; cycle++) {
+      rig.button.fire("click");
+      for (const property of ["min-height", "min-width", "padding-top", "padding-bottom", "padding-left", "padding-right"]) {
+        expect(rig.bar.style.setProperty.mock.calls.filter(([key]) => key === property).at(-1)).toEqual([property, "0px"]);
+      }
+      rig.button.fire("click");
+      expect(rig.bar.style.setProperty.mock.calls.filter(([key]) => key === "padding-top").at(-1)).toEqual(["padding-top", "100px"]);
+    }
+    rig.visibility.dispose();
+    expect(rig.bar.getAttribute("data-miro-panel-toggle-host")).toBeNull();
+  });
+
+  it("wraps a wide phone bar towards the roomier side instead of flipping its button", () => {
+    const rig = setup(true, false, true, "horizontal");
+    rig.document.getBoundingClientRect = () => ({ left: 0, top: 0, right: 384, bottom: 800, width: 384, height: 800 });
+    rig.button.getBoundingClientRect = () => ({ left: 20, top: 100, right: 64, bottom: 144, width: 44, height: 44 });
+    rig.panel.getBoundingClientRect = () => ({ left: 20, top: 100, right: 390, bottom: 160, width: 370, height: 60 });
+    rig.panel.setAttribute("data-miro-canvas-panel-orientation", "horizontal");
+    rig.button.fire("click");
+    expect(rig.save).toHaveBeenCalledWith("toolbar", expect.objectContaining({ buttonRight: false, collapsed: false }));
+    expect(rig.bar.style.setProperty).toHaveBeenCalledWith("max-width", "362px");
     rig.visibility.dispose();
   });
 

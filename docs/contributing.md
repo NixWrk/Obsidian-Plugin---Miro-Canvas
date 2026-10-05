@@ -23,6 +23,7 @@ This section is written so that a task can be handed to an AI coding agent
   interface speaks, not word for word, with the interface's own terms: фрейм
   (frame), рамка (border), маркер (highlight), порядок (layer order).
 - **Gates** before every commit: `npm run check`, `npm test`,
+  `npm run lint`, `npm run lint:css`,
   `npm run build`, `git diff --check`, and the three smoke suites
   (`python -m tools.obsidian_oracle.smoke_plugin_ui`, with `--interactions`
   and with `--controls`). A change under `mcp/` also runs `npm run mcp:build`.

@@ -279,6 +279,7 @@ groups its fold button and “+” together, with one separator before the tools
 Tap to fold or open a panel. Hold until the button gains an outline, then
 drag to move it; this works with an open panel too. Positions and folded
 states are remembered separately for computers, tablets and phones.
+On narrow screens, an open bar wraps towards the available space while its fold button stays in place.
 
 In plugin settings, you can hide each panel’s fold button; it remains
 available while arranging panels. In that mode, open “+” and drag a spare

@@ -1,5 +1,5 @@
 import * as obsidian from "obsidian";
-import { Component, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { Component, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, getLanguage, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
 import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily } from "./appearance";
 import {
@@ -79,24 +79,9 @@ function uniqueFontFileName(name: string, taken: ReadonlySet<string>): string {
   }
 }
 
-/**
- * The language Obsidian shows itself in.  `getLanguage` arrived in Obsidian
- * 1.8; before it, Obsidian kept its choice in local storage.
- */
-function obsidianLanguage(): string | null {
-  const getLanguage = (obsidian as { getLanguage?: () => string }).getLanguage;
-  if (typeof getLanguage === "function") {
-    try {
-      return getLanguage();
-    } catch {
-      // Fall back to where older Obsidian kept its choice.
-    }
-  }
-  try {
-    return window.localStorage.getItem("language");
-  } catch {
-    return null;
-  }
+/** The minimum supported Obsidian exposes its language through the public API. */
+function obsidianLanguage(): string {
+  return getLanguage();
 }
 const LAYER_MENU_SECTION = "miro-canvas-layer";
 

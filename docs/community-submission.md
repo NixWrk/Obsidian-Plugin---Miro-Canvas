@@ -1,6 +1,6 @@
 # Community directory submission package
 
-Updated on 2026-10-05 for Miro Canvas 0.2.5. The owner has created a directory
+Updated on 2026-10-05 for Miro Canvas 0.2.6. The owner has created a directory
 draft; review of 0.2.3 reported blocking errors addressed by this release.
 Acceptance and publication of the directory listing remain pending.
 
@@ -23,7 +23,7 @@ were checked on 2026-10-04, before preparation continued after midnight.
 | Name | Miro Canvas |
 | Plugin ID | `miro-canvas` |
 | Author | NixWrk |
-| Version | 0.2.5 |
+| Version | 0.2.6 |
 | Minimum app version | 1.13.7 |
 | Platforms | Desktop and mobile editing and export |
 | License | MIT; third-party notices in repository |
@@ -88,13 +88,32 @@ The official eslint-plugin-obsidianmd recommended configuration runs in CI and
 release jobs. Obsidian blocking errors fail these jobs. Existing TypeScript
 migration diagnostics remain warnings, as in the directory report.
 
+Version 0.2.6 removes the search announcement's `clip-path`, seven `:has()`
+selectors in plugin-owned controls, and four `!important` declarations used
+to undo expanded panel spacing. The CSS regression check reports the remaining
+90 `!important` declarations and 10 `:has()` selectors and rejects increases.
+This is a regression budget, not the directory's CSS linter or a warning-free
+certification. Remaining selectors bridge native Canvas/Markdown markup;
+further cascade cleanup requires visual and interaction checks. The full
+repository scan also reports Node imports in `mcp/`, the optional standalone
+Node server. The submission packaging check rejects those imports in `main.js`.
+
 ## Reproducible verification
+
+The 0.2.6 panel changes pass 28 repeated folds and held drags at each corner
+in both orientations, using real mouse input in isolated Windows Obsidian.
+Real ADB touches verify repeated folding, zero folded spacing and menu stacking
+on Samsung SM-X736B (Obsidian 1.13.8) and SM-A336E (1.12.7), in portrait.
+The phone check covers these controls only; the manifest minimum stays 1.13.7.
+The search announcement remains exposed as an `aria-live="polite"` region in
+the real desktop accessibility tree after its `clip-path` is removed.
 
 Run from the repository root:
 
 ```sh
 npm run check
 npm run lint
+npm run lint:css
 npm test
 npm run build
 npm run mcp:build
@@ -126,7 +145,7 @@ validation; absence from the legacy catalog alone is not proof.
 
 ## Owner's final steps
 
-1. Refresh the existing draft’s automated review for version 0.2.5.
+1. Refresh the existing draft’s automated review for version 0.2.6.
 2. Sign in to Community Directory with your Obsidian account.
 3. Connect GitHub `NixWrk` so the directory can verify repository ownership.
 4. Open **Plugins → New plugin** and paste the repository URL above.

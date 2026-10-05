@@ -634,6 +634,7 @@ export class QuickTools {
     this.connectorBar.hidden = !linesShown;
     this.penButton?.setAttribute("aria-expanded", drawingShown ? "true" : "false");
     this.buttons.get("connector")?.setAttribute("aria-expanded", linesShown ? "true" : "false");
+    this.refreshPanelState();
     // An eraser has a size but no colour; a line has both.
     const erasing = isEraser(this.armed);
     if (this.colorRow !== undefined) this.colorRow.hidden = erasing;
@@ -665,6 +666,21 @@ export class QuickTools {
       if (keepOpen !== undefined && panel.contains(keepOpen)) continue;
       panel.hidden = true;
       button.setAttribute("aria-expanded", "false");
+    }
+    this.refreshPanelState();
+  }
+
+  /** Menu stacking follows the tools' own state, without searching the board. */
+  private refreshPanelState(): void {
+    const open = this.panels.some(({ panel }) => !panel.hidden);
+    const more = this.panels.some(({ panel }) => panel.classList.contains("miro-canvas-tools__menu") && !panel.hidden);
+    const states = {
+      "data-miro-tools-popover-open": open,
+      "data-miro-tools-settings-open": !this.connectorBar.hidden || this.drawingBar?.hidden === false,
+      "data-miro-tools-more-open": more,
+    };
+    for (const [attribute, value] of Object.entries(states)) {
+      if (this.element.getAttribute(attribute) !== String(value)) this.element.setAttribute(attribute, String(value));
     }
   }
 
@@ -935,6 +951,7 @@ export class QuickTools {
       panel.hidden = false;
       keepPanelInView(panel);
       button.setAttribute("aria-expanded", "true");
+      this.refreshPanelState();
     });
     this.panels.push({ button, panel });
     return panel;

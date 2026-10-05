@@ -31,7 +31,9 @@ export class PanelVisibility {
       const button = this.host.document.createElement("button");
       button.type = "button";
       button.className = "miro-canvas-panel-toggle clickable-icon";
-      (this.bar(id, panel) ?? panel).appendChild(button);
+      const buttonHost = this.bar(id, panel) ?? panel;
+      if (buttonHost !== panel) buttonHost.setAttribute("data-miro-panel-toggle-host", "true");
+      buttonHost.appendChild(button);
       this.buttons.set(id, button);
       let suppressClick = false;
       const click = (event: Event): void => {
@@ -52,11 +54,14 @@ export class PanelVisibility {
         const bottom = panel.getAttribute("data-panel-button-bottom") === "true";
         const bar = this.bar(id, panel);
         bar?.style.removeProperty("max-height");
+        bar?.style.removeProperty("max-width");
         bar?.style.removeProperty("overflow-y");
         applyPanelPositionSettled(panel, { ...current, collapsed }, view);
         this.placeButton(id, button, collapsed, { ...current, buttonRight: right, buttonBottom: bottom });
         const size = panel.getBoundingClientRect();
-        const buttonRight = collapsed ? right : pivot.left - board.left + size.width > view.width;
+        const before = pivot.right - board.left;
+        const after = view.width - (pivot.left - board.left);
+        const buttonRight = collapsed ? right : size.width > after && before > after;
         const above = pivot.bottom - board.top;
         const below = view.height - (pivot.top - board.top);
         const buttonBottom = collapsed ? bottom : size.height > below && above > below;
@@ -64,6 +69,9 @@ export class PanelVisibility {
           // A long column scrolls away from its pivot instead of moving the button.
           bar.style.setProperty("max-height", `${Math.max(44, (buttonBottom ? above : below) - 2)}px`);
           setElementStyles(bar, { "overflow-y": "auto" });
+        } else if (!collapsed && bar !== null) {
+          // Wrap towards the roomier side instead of moving the button on a phone.
+          bar.style.setProperty("max-width", `${Math.max(44, (buttonRight ? before : after) - 2)}px`);
         }
         this.placeButton(id, button, collapsed, { ...current, buttonRight, buttonBottom });
         const panelBox = panel.getBoundingClientRect();
@@ -88,6 +96,7 @@ export class PanelVisibility {
         const pivot = button.getBoundingClientRect();
         const bar = this.bar(id, panel);
         const previousHeight = bar?.style.getPropertyValue?.("max-height") ?? "";
+        const previousWidth = bar?.style.getPropertyValue?.("max-width") ?? "";
         const previousOverflow = bar?.style.getPropertyValue?.("overflow-y") ?? "";
         const board = this.host.boardRoot.getBoundingClientRect();
         const startX = event.clientX;
@@ -122,6 +131,9 @@ export class PanelVisibility {
             const room = buttonBottom ? target.top + pivot.height : view.height - target.top;
             bar.style.setProperty("max-height", `${Math.max(44, room - 2)}px`);
             setElementStyles(bar, { "overflow-y": "auto" });
+          } else if (initial?.collapsed !== true && bar !== null) {
+            const room = buttonRight ? target.left + pivot.width : view.width - target.left;
+            bar.style.setProperty("max-width", `${Math.max(44, room - 2)}px`);
           }
           const box = panel.getBoundingClientRect();
           const placed = button.getBoundingClientRect();
@@ -149,6 +161,8 @@ export class PanelVisibility {
           if (bar !== null) {
             if (previousHeight) bar.style.setProperty("max-height", previousHeight);
             else bar.style.removeProperty("max-height");
+            if (previousWidth) bar.style.setProperty("max-width", previousWidth);
+            else bar.style.removeProperty("max-width");
             if (previousOverflow) bar.style.setProperty("overflow-y", previousOverflow);
             else bar.style.removeProperty("overflow-y");
           }
@@ -172,6 +186,7 @@ export class PanelVisibility {
       this.listeners.push(() => {
         button.removeEventListener("click", click);
         button.removeEventListener("pointerdown", down);
+        if (buttonHost !== panel) buttonHost.removeAttribute("data-miro-panel-toggle-host");
       });
     }
     this.refresh();
@@ -238,16 +253,17 @@ export class PanelVisibility {
       }
     }
     if (bar !== null) {
-      if (!vertical) {
+      if (collapsed || vertical) bar.style.removeProperty("max-width");
+      if (collapsed || !vertical) {
         bar.style.removeProperty("max-height");
         bar.style.removeProperty("overflow-y");
       }
-      bar.style.setProperty("min-height", button.hidden ? "0px" : vertical ? "44px" : "52px");
-      bar.style.setProperty("min-width", button.hidden || !vertical ? "0px" : "44px");
-      bar.style.setProperty("padding-left", !vertical && !right ? reserve : "0px");
-      bar.style.setProperty("padding-right", !vertical && right ? reserve : "0px");
-      bar.style.setProperty("padding-top", vertical && !bottom ? reserve : !vertical && !button.hidden ? "4px" : "0px");
-      bar.style.setProperty("padding-bottom", vertical && bottom ? reserve : !vertical && !button.hidden ? "4px" : "0px");
+      bar.style.setProperty("min-height", collapsed || button.hidden ? "0px" : vertical ? "44px" : "52px");
+      bar.style.setProperty("min-width", collapsed || button.hidden || !vertical ? "0px" : "44px");
+      bar.style.setProperty("padding-left", !collapsed && !vertical && !right ? reserve : "0px");
+      bar.style.setProperty("padding-right", !collapsed && !vertical && right ? reserve : "0px");
+      bar.style.setProperty("padding-top", collapsed ? "0px" : vertical && !bottom ? reserve : !vertical && !button.hidden ? "4px" : "0px");
+      bar.style.setProperty("padding-bottom", collapsed ? "0px" : vertical && bottom ? reserve : !vertical && !button.hidden ? "4px" : "0px");
     }
     // Local alignment stays centered when wrapping or positioning changes the bar.
     button.style.setProperty("left", collapsed || vertical ? "calc(50% - 22px)" : right ? "auto" : "4px");

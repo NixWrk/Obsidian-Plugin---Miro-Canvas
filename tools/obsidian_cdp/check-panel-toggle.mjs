@@ -30,6 +30,7 @@ try {
   await checked("document.body.classList.add('is-mobile','is-tablet');return true;");
   for (const orientation of ['horizontal','vertical']) {
     for (const anchor of ['top-left','top-right','bottom-left','bottom-right']) {
+      if (process.env.PANEL_CASE && process.env.PANEL_CASE !== `${orientation} ${anchor}`) continue;
       await checked(`await app.plugins.plugins['miro-canvas'].saveCanvasSettings({panelLayout:{toolbar:{anchor:${JSON.stringify(anchor)},dx:80,dy:80,orientation:${JSON.stringify(orientation)}}}});return true;`);
       await wait(600);
       let pivot = await measure();
@@ -50,7 +51,7 @@ try {
       await press(moved,'mouseReleased',0);
       await wait(150);
       const dropped = await measure();
-      assert.ok(Math.hypot(dropped.x-moved.x,dropped.y-moved.y)<=1,'held drag drift');
+      assert.ok(Math.hypot(dropped.x-moved.x,dropped.y-moved.y)<=1,`held drag drift: ${JSON.stringify({pivot,moved,dropped})}`);
       for(let cycle=0;cycle<8;cycle++) {
         await click();
         const next=await measure();

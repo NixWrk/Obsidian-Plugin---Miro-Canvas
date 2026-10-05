@@ -115,6 +115,10 @@ intend to keep**, so the state is exactly what `launch.py` itself produces.
 at all four corners in both orientations, followed by a held drag and more
 folds. It uses real input in the isolated desktop window and restores its
 settings. `scenarios/panel-folding.mjs` records touch input on Android.
+`node tools/obsidian_cdp/check-panel-css.mjs --serial <device> --port 9340`
+checks folded spacing and More-menu stacking using real Android taps in
+`MiroCanvasTest`, in both panel orientations, and restores panel preferences.
+It also checks that reopening a wide phone bar does not move its fold button.
 `scenarios/welcome-board.mjs` refuses an older guide missing section 12 or
 the resolved comment. Use a fresh vault for the current template.
 

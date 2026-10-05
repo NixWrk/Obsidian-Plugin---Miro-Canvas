@@ -2066,3 +2066,7 @@ PDF/PPTX use bundled html2canvas-pro on Windows and Android. Pages are tiled at 
 ## Export page gestures (0.2.5)
 
 Export-page tabs and resize corners belong to PANEL_SELECTOR so rectangle selection, drawing and tool drops cannot claim their pointer gestures. The interior is deliberately excluded and remains native board content. Regression checks cover event ownership and real mouse input at non-default zoom, preview without persistence, unchanged native nodes/edges, free resizing, fixed paper ratio and reopening page metadata.
+
+## Panel CSS states (0.2.6)
+
+PanelVisibility marks the main row with data-miro-panel-toggle-host and clears expanded spacing while folded. QuickTools mirrors its menu and settings state in attributes only when values change; stacking and the spare-tools tray use these states instead of :has. Horizontal panels choose the roomier side and wrap to the space between the button and board edge, matching the vertical panel height limit. Cancelled drags restore the previous width. The search live region uses opacity: 0 and remains in the accessibility tree without clip-path. CI reports advisory budgets of 90 !important declarations and 10 native-markup :has selectors; it does not certify them as required or eliminate the remaining directory warnings.

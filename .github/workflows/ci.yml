@@ -23,6 +23,8 @@ jobs:
       - run: npm run check
       - name: Official Obsidian lint rules
         run: npm run lint
+      - name: CSS advisory regression check
+        run: npm run lint:css
       - run: npm test
       - run: npm run build
       - name: Community submission packaging

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.6 - 2026-10-05
+
+- Folded panels now clear their expanded inline spacing instead of overriding it with CSS `!important`. Explicit toggle-host and menu states replace seven `:has()` selectors and four `!important` declarations.
+- Keep the fold button in place when a wide toolbar opens on a narrow phone: choose the roomier side and wrap within the available width. Preserve and restore this width when dragging or cancelling a drag.
+- Keep search announcements visually hidden without `clip-path`, while retaining them for assistive technology.
+- Read the interface language through Obsidian's public API; remove the obsolete local storage fallback.
+- Check CSS advisory regression budgets in CI and release builds. Remaining advisories are still reported; this release does not claim a warning-free community review.
+
 ## 0.2.5 - 2026-10-05
 
 - Fix export pages that could not be moved or resized with a mouse: the board’s selection tool intercepted their controls. Page labels and resize corners now handle their own gestures while the page interior stays available for board editing.

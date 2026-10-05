@@ -4469,17 +4469,17 @@
   box-shadow: var(--shadow-s, 0 4px 18px rgb(0 0 0 / 18%));
 }
 
-[data-miro-canvas-panel-collapsed="true"] > :not(:has(> .miro-canvas-panel-toggle)):not(.miro-canvas-panel-toggle),
-[data-miro-canvas-panel-collapsed="true"] > :has(> .miro-canvas-panel-toggle) > :not(.miro-canvas-panel-toggle) {
-  display: none !important;
+.miro-canvas-root [data-miro-canvas-panel-collapsed="true"] > :not([data-miro-panel-toggle-host]):not(.miro-canvas-panel-toggle),
+.miro-canvas-root [data-miro-canvas-panel-collapsed="true"] > [data-miro-panel-toggle-host] > :not(.miro-canvas-panel-toggle) {
+  display: none;
 }
 
-[data-miro-canvas-panel-collapsed="true"] > :has(> .miro-canvas-panel-toggle) {
+.miro-canvas-root [data-miro-canvas-panel-collapsed="true"] > [data-miro-panel-toggle-host] {
   width: 100%;
   height: 100%;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  padding: 0 !important;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -4780,7 +4780,8 @@
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
   white-space: nowrap;
 }
 
@@ -4841,9 +4842,8 @@
 .miro-canvas-dock .miro-canvas-panel-toggle {
   z-index: 120;
 }
-.miro-canvas-tools .miro-canvas-toolbar__bar:has(.miro-canvas-toolbar__panel:not([hidden])),
-.miro-canvas-tools .miro-canvas-toolbar__bar:has(.miro-canvas-tools__drawing:not([hidden])),
-.miro-canvas-tools .miro-canvas-toolbar__bar:has(.miro-canvas-tools__connectors:not([hidden])) {
+.miro-canvas-tools[data-miro-tools-popover-open="true"] > .miro-canvas-toolbar__bar,
+.miro-canvas-tools[data-miro-tools-settings-open="true"] > .miro-canvas-toolbar__bar {
   z-index: 130;
 }
 
@@ -4876,7 +4876,7 @@
 }
 
 /* Plus and the spare-tools tray offer the same tools; keep the open menu clear. */
-.miro-canvas-root:has(.miro-canvas-tools__more > button[aria-expanded="true"]) > .miro-canvas-arrange-tray {
+.miro-canvas-root > .miro-canvas-tools[data-miro-tools-more-open="true"] ~ .miro-canvas-arrange-tray {
   visibility: hidden;
   pointer-events: none;
 }

@@ -236,6 +236,24 @@ function moreOrder(root: FakeElement): ToolbarItem[] {
 }
 
 describe("quick tools", () => {
+  it("keeps menu and settings stacking states correct through reopening and Escape", () => {
+    const { root, tools } = build();
+    const more = byLabel(root, "More tools");
+    more.dispatch("click");
+    expect(root.getAttribute("data-miro-tools-more-open")).toBe("true");
+    expect(root.getAttribute("data-miro-tools-popover-open")).toBe("true");
+    root.dispatch("keydown", { key: "Escape" });
+    expect(root.getAttribute("data-miro-tools-more-open")).toBe("false");
+    expect(root.getAttribute("data-miro-tools-popover-open")).toBe("false");
+    more.dispatch("click");
+    expect(root.getAttribute("data-miro-tools-more-open")).toBe("true");
+    more.dispatch("click");
+    expect(root.getAttribute("data-miro-tools-more-open")).toBe("false");
+    tools.update({ ...STATE, armed: "pen" });
+    expect(root.getAttribute("data-miro-tools-settings-open")).toBe("true");
+    tools.update({ ...STATE, armed: "select" });
+    expect(root.getAttribute("data-miro-tools-settings-open")).toBe("false");
+  });
   it("reports valid head sizes separately from width and supports optional hosts", () => {
     const patches: unknown[] = [];
     const tools = new QuickTools({onArm:()=>{}, onShape:()=>{}, onPen:()=>{}, onConnector:p=>patches.push(p)}, {document:new FakeDocument() as unknown as Document});
