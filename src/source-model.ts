@@ -167,6 +167,14 @@ export interface SourceScene {
   readonly diagnostics: readonly string[];
 }
 
+/** Restyling a native card keeps its own rounded face. Miro items draw theirs. */
+export function usesNativeCardSurface(descriptor: SourceItemDescriptor | undefined): boolean {
+  return descriptor === undefined || (
+    descriptor.kind === "text" && descriptor.sourceId === undefined &&
+    descriptor.localItem === undefined && descriptor.structured === undefined
+  );
+}
+
 export interface Point {
   readonly x: number;
   readonly y: number;

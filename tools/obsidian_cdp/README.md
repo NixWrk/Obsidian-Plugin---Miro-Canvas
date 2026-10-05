@@ -122,6 +122,12 @@ It also checks that reopening a wide phone bar does not move its fold button.
 `scenarios/welcome-board.mjs` refuses an older guide missing section 12 or
 the resolved comment. Use a fresh vault for the current template.
 
+`node tools/obsidian_cdp/check-card-fill.mjs --port 9336` checks native card
+fills in both themes, selection, editing, shape undo and plugin unload/reload.
+For Android, pass `--port 9340 --serial <device>` after forwarding and deploying;
+the script only writes a new regression board in `MiroCanvasTest`, then restores
+the previously open board and theme. Mobile checks use real ADB taps.
+
 Stop the instance when done:
 
 ```

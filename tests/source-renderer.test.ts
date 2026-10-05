@@ -1409,7 +1409,7 @@ describe("a card's border", () => {
         { id: "dashed", type: "text", x: 0, y: 0, width: 145, height: 70, text: "Dashed" },
       ],
       edges: [],
-      miroCanvas: { schemaVersion: 1, localOverrides: { dashed: { borderStyle: "dashed", borderWidth: 4, colors: { border: "#f24726" } } } },
+      miroCanvas: { schemaVersion: 1, localOverrides: { dashed: { borderStyle: "dashed", borderWidth: 4, colors: { border: "#f24726", fill: "#edeaf580" } } } },
     };
     const renderer = new SourceRenderer({
       getDocument: () => data,
@@ -1419,8 +1419,15 @@ describe("a card's border", () => {
     renderer.refresh();
     expect(container.style.getPropertyValue("border-style")).toBe("dashed");
     expect(container.style.getPropertyValue("border-width")).toBe("4px");
+    expect(container.style.getPropertyValue("border-color")).toBe("#f24726");
+    expect(container.style.getPropertyValue("background-color")).toBe("#edeaf580");
+    expect(shell.style.getPropertyValue("background-color")).toBe("transparent");
     expect(shell.style.getPropertyValue("border-style")).toBe("");
     expect(shell.style.getPropertyValue("border-width")).toBe("");
+    renderer.dispose();
+    expect(container.style.getPropertyValue("background-color")).toBe("");
+    expect(container.style.getPropertyValue("border-color")).toBe("");
+    expect(shell.style.getPropertyValue("background-color")).toBe("");
   });
 });
 

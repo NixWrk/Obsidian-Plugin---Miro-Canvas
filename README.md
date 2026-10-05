@@ -166,6 +166,9 @@ You can also add titled code blocks, Markdown tables and website links.
 
 ## Formatting
 
+Native cards keep one rounded border. Their fill is painted once, including
+translucent colours, and survives editing and undoing a shape change.
+
 Select a card to open its toolbar. Change the shape, font, text size,
 formatting, alignment, line spacing, fill and border. Highlight words,
 add a list or turn text into a link.

@@ -12,7 +12,7 @@ import { planRoute, routePath, type RouteEnd as PlannedEnd, type RouteSegment } 
 import { normalizeAnchor, resolveAnchor, type AnchorEdgeGeometry, type AnchorGeometry, type AnchorPoint, type AnchorRect } from "./anchors";
 import { readCanvasElementId } from "./canvas-elements";
 import { blockArrowOutline, linePoints, planLine } from "./free-line";
-import { buildSourceScene, type SourceItemDescriptor, type SourceScene } from "./source-model";
+import { buildSourceScene, usesNativeCardSurface, type SourceItemDescriptor, type SourceScene } from "./source-model";
 import { TOOLTIP_DELAY } from "./tooltips";
 import { words } from "./i18n";
 import { pressureStrokePath } from "./pressure-stroke";
@@ -755,10 +755,8 @@ function applyNodeCss(
   patches: RestorePatch[],
   onFontUsed?: (family: string) => void,
 ): void {
-  // Native Canvas draws a card's border on its container, inside the shell.
-  // The border's style and width go there too: on the shell they drew a
-  // second border around the native one, and a card set to no border kept
-  // the native one.
+  // Native cards paint their rounded face and border on the inner container.
+  // Painting the shell too leaves square corners around that face.
   const container = layer === undefined ? safeCall(shell, "querySelector", [":scope > .canvas-node-container"]) : undefined;
   for (const [property, value] of Object.entries(descriptor.css)) {
     if (TYPOGRAPHY_CSS.has(property)) {
@@ -772,7 +770,11 @@ function applyNodeCss(
         const seeThrough = property === "background-color" && /^#[0-9a-f]{6}(?!ff)[0-9a-f]{2}$/iu.test(value);
         if ((descriptor.kind !== "shape" || property === "opacity") && !seeThrough) setOwnedElementStyle(layer, property, value);
       }
-      else if (isElement(container) && (property === "border-style" || property === "border-width")) patchStyle(container, property, value, patches);
+      else if (isElement(container) && property === "background-color" && usesNativeCardSurface(descriptor)) {
+        patchStyle(shell, property, "transparent", patches);
+        patchStyle(container, property, value, patches);
+      }
+      else if (isElement(container) && (property === "border-style" || property === "border-width" || property === "border-color")) patchStyle(container, property, value, patches);
       else patchStyle(shell, property, value, patches);
     }
   }
@@ -2226,6 +2228,11 @@ export class SourceRenderer {
   public dispose(): void {
     this.resetRenderedState();
     this.diagnosticList = Object.freeze([]);
+  }
+
+  /** Unwind source paint before the host changes the appearance it was drawn over. */
+  public restoreBeforeAppearanceChange(): void {
+    this.resetRenderedState();
   }
 
   /**

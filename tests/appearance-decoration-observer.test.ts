@@ -82,6 +82,11 @@ const HTMLElementStub = (globalThis as unknown as { HTMLElement: typeof EventTar
 class HostElement extends HTMLElementStub {
 	nodeType = 1;
 	parentElement?: HostElement;
+	get parentNode(): HostElement | undefined { return this.parentElement; }
+	get nextElementSibling(): HostElement | null {
+		const siblings = this.parentElement?.children ?? [];
+		return siblings[siblings.indexOf(this) + 1] ?? null;
+	}
 	ownerDocument?: unknown;
 	children: HostElement[] = [];
 	attributes = new Map<string, string>();
@@ -104,8 +109,23 @@ class HostElement extends HTMLElementStub {
 		super();
 		for (const name of className.split(" ").filter(Boolean)) this.classes.add(name);
 	}
-	appendChild(child: HostElement) { child.parentElement = this; this.children.push(child); return child; }
-	removeChild(child: HostElement) { this.children = this.children.filter((item) => item !== child); }
+	appendChild(child: HostElement) {
+		child.parentElement?.removeChild(child);
+		child.parentElement = this;
+		this.children.push(child);
+		return child;
+	}
+	insertBefore(child: HostElement, before: HostElement | null) {
+		child.parentElement?.removeChild(child);
+		child.parentElement = this;
+		const index = before === null ? -1 : this.children.indexOf(before);
+		this.children.splice(index < 0 ? this.children.length : index, 0, child);
+		return child;
+	}
+	removeChild(child: HostElement) {
+		this.children = this.children.filter((item) => item !== child);
+		child.parentElement = undefined;
+	}
 	remove() { this.parentElement?.removeChild(this); }
 	setAttribute(key: string, value: string) { this.attributes.set(key, value); }
 	getAttribute(key: string) { return this.attributes.get(key) ?? null; }
@@ -119,7 +139,27 @@ class HostElement extends HTMLElementStub {
 		}
 		return this.parentElement?.closest(selector) ?? null;
 	}
-	querySelectorAll(): HostElement[] { return []; }
+	querySelectorAll(selector: string): HostElement[] {
+		const names = selector.split(",").map((part) => part.trim().slice(1));
+		return this.children.flatMap((child) => [
+			...(names.some((name) => child.classes.has(name)) ? [child] : []),
+			...child.querySelectorAll(selector),
+		]);
+	}
+	querySelector(selector: string): HostElement | null {
+		if (selector === ":scope > .canvas-node-container") {
+			return this.children.find((child) => child.classes.has("canvas-node-container")) ?? null;
+		}
+		return this.querySelectorAll(selector)[0] ?? null;
+	}
+}
+
+function nativeCardDom(): HostElement {
+	const shell = new HostElement("canvas-node");
+	const container = shell.appendChild(new HostElement("canvas-node-container"));
+	const content = container.appendChild(new HostElement("canvas-node-content"));
+	content.appendChild(new HostElement("markdown-preview-view"));
+	return shell;
 }
 
 // The board's node layer, watched by the plugin's own MutationObserver; kept
@@ -162,6 +202,7 @@ class FakeWindow extends EventTarget {
 class FakeDocument extends EventTarget {
 	defaultView = new FakeWindow();
 	createElement(): HostElement { return new HostElement(); }
+	createElementNS(_namespace: string, tag: string): HostElement { return new HostElement("", tag.toUpperCase()); }
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -174,7 +215,7 @@ afterEach(() => {
 });
 
 /** A board with one styled card and one plain card, wired the way real Canvas exposes canvasEl and a MutationObserver-capable document. */
-function fixture() {
+function fixture(override: Record<string, unknown> = {}) {
 	const root = new HostElement("canvas-wrapper");
 	const nodeLayer = new HostElement("canvas-node-layer");
 	root.appendChild(nodeLayer);
@@ -188,11 +229,11 @@ function fixture() {
 		miroCanvas: {
 			schemaVersion: 1,
 			settings: {},
-			localOverrides: { styled: { typography: { fontSize: 40, alignment: "center", verticalAlign: "center" } } },
+			localOverrides: { styled: { typography: { fontSize: 40, alignment: "center", verticalAlign: "center" }, ...override } },
 		},
 	};
 	class NativeNode {
-		nodeEl = nodeLayer.appendChild(new HostElement("canvas-node"));
+		nodeEl = nodeLayer.appendChild(nativeCardDom());
 		constructor(public data: Data) {}
 		get id() { return this.data.id; }
 		getData() { return clone(this.data); }
@@ -219,7 +260,7 @@ function fixture() {
 
 /** Swap a node's DOM the way Obsidian does when it re-creates a card without touching the board: same runtime node, a fresh element. */
 function replaceNodeDom(nodeLayer: HostElement, node: { nodeEl: HostElement }): HostElement {
-	const next = nodeLayer.appendChild(new HostElement("canvas-node"));
+	const next = nodeLayer.appendChild(nativeCardDom());
 	node.nodeEl.remove();
 	node.nodeEl = next;
 	return next;
@@ -234,6 +275,55 @@ async function flushMutationPass(): Promise<void> {
 }
 
 describe("appearance decoration follows Obsidian's own DOM replacement", () => {
+	it("restores one card face after a shape change and undo, and native styles on unload", () => {
+		const { session, nodes, canvas } = fixture({ colors: { fill: "#edeaf5" } });
+		const shell = nodes.get("styled")!.nodeEl;
+		const surfaces = [shell, ...shell.querySelectorAll(".canvas-node-container, .canvas-node-content, .markdown-preview-view")];
+		for (let cycle = 0; cycle < 3; cycle += 1) {
+			canvas.data.miroCanvas.localOverrides.styled.shape = { kind: "rhombus", fallback: "text" };
+			session.refresh();
+			expect(shell.style.getPropertyValue("background-color")).toBe("transparent");
+			delete canvas.data.miroCanvas.localOverrides.styled.shape;
+			session.refresh();
+			expect(surfaces[1].style.getPropertyValue("background-color")).toBe("#edeaf5");
+			for (const surface of [surfaces[0], ...surfaces.slice(2)]) {
+				expect(surface.style.getPropertyValue("background-color")).toBe("transparent");
+			}
+		}
+		session.dispose();
+		for (const surface of surfaces) expect(surface.style.getPropertyValue("background-color")).toBe("");
+	});
+
+	it.each(["#edeaf5", "#edeaf580", null])("paints a native card's %s fill once on its rounded face", (fill) => {
+		const { session, nodes, canvas } = fixture({ colors: { fill, border: "#123456" } });
+		const shell = nodes.get("styled")!.nodeEl;
+		const [container, content, preview] = shell.querySelectorAll(".canvas-node-container, .canvas-node-content, .markdown-preview-view");
+		const before = JSON.stringify(canvas.getData());
+		for (let pass = 0; pass < 3; pass += 1) {
+			session.refresh();
+			expect(shell.style.getPropertyValue("background-color")).toBe("transparent");
+			expect(container.style.getPropertyValue("background-color")).toBe(fill ?? "transparent");
+			expect(content.style.getPropertyValue("background-color")).toBe("transparent");
+			expect(preview.style.getPropertyValue("background-color")).toBe("transparent");
+			expect(container.style.getPropertyValue("border-color")).toBe("#123456");
+		}
+		expect(JSON.stringify(canvas.getData())).toBe(before);
+		session.dispose();
+		for (const surface of [shell, container, content, preview]) {
+			expect(surface.style.getPropertyValue("background-color")).toBe("");
+		}
+	});
+
+	it("keeps the fill on the rounded face after native DOM replacement", async () => {
+		const { nodeLayer, nodes } = fixture({ colors: { fill: "#edeaf580" } });
+		const fresh = replaceNodeDom(nodeLayer, nodes.get("styled")!);
+		appearanceObserverInstance().callback([{ addedNodes: [fresh] }]);
+		await flushMutationPass();
+		expect(fresh.style.getPropertyValue("background-color")).toBe("transparent");
+		expect(fresh.children[0].style.getPropertyValue("background-color")).toBe("#edeaf580");
+		expect(fresh.children[0].children[0].style.getPropertyValue("background-color")).toBe("transparent");
+	});
+
 	it("decorates a styled card's new DOM once the observer fires and the frame runs, without a full refresh", async () => {
 		const { nodeLayer, session, nodes } = fixture();
 		const observer = appearanceObserverInstance();

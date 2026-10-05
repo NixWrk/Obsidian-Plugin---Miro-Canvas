@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.7 - 2026-10-05
+
+- Fix the square outline around rounded native cards: paint their fill on the native face and leave the shell and inner Markdown surfaces transparent. Translucent fills are painted once.
+- Restore source decorations before changing persisted appearance, preventing stale fills after undoing a shape change. Keep native styles intact when the plugin unloads.
+- Verify light/dark themes, selection and plugin reload on desktop, Android tablet and phone, plus editing and shape undo in real desktop Obsidian.
+
 ## 0.2.6 - 2026-10-05
 
 - Folded panels now clear their expanded inline spacing instead of overriding it with CSS `!important`. Explicit toggle-host and menu states replace seven `:has()` selectors and four `!important` declarations.

@@ -15,6 +15,16 @@ from the plugin.
 
 ## Current implementation status
 
+Native card fills belong to `.canvas-node-container`, the same rounded face
+that draws the border. The shell and inner Markdown surfaces remain transparent;
+Miro text, shapes, sticky notes and frames retain their own painting rules.
+Before persisted appearance changes, source decorations are restored first,
+then the older appearance is unwound and the new one applied. This reverse
+order prevents shape undo from restoring stale fills over the new card face.
+`check-card-fill.mjs` verifies both themes, real selection and desktop editing,
+shape undo, plugin unload/reload and unchanged saved colour overrides in isolated
+Obsidian or the Android `MiroCanvasTest` vault.
+
 The M0 foundation is implemented at the root of this repository (until
 2026-09-24 the plugin lived under `plugins/miro-canvas/` in miro2obsidian;
 `FUT-002` moved it here). It includes the plugin shell, versioned `miroCanvas`

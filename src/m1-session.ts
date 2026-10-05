@@ -111,6 +111,7 @@ import {
 	CONNECTOR_ROUTES,
 	CONNECTOR_STROKES,
 	takesShape,
+	usesNativeCardSurface,
 	type SourceScene,
 } from "./source-model";
 import { CommentMarkers } from "./comment-markers";
@@ -3567,12 +3568,13 @@ export class M1CanvasSession {
 			: this.sceneSignature(this.scene);
 		this.sceneSignedFor = signedFor;
 		const appearanceSignature = this.appearanceSignature();
+		const appearanceChanged = appearanceSignature !== this.lastAppearanceSignature;
 		const policySignature = safeSignature({
 			reviewMode: this.policy.reviewMode,
 			lockedElementIds: this.policy.lockedElementIds,
 		});
 		const decorationsChanged = sceneSignature !== this.lastSceneSignature
-			|| appearanceSignature !== this.lastAppearanceSignature
+			|| appearanceChanged
 			|| policySignature !== this.lastPolicySignature;
 		this.lastSceneSignature = sceneSignature;
 		this.lastAppearanceSignature = appearanceSignature;
@@ -3614,6 +3616,11 @@ export class M1CanvasSession {
 		}
 		this.syncNativeReadonly(this.appearance.settings.reviewMode === true, diagnostics);
 		this.applyTheme(this.appearance.settings.displayTheme);
+		if (appearanceChanged) {
+			// Source paint was applied last; remove it before restoring our
+			// older appearance, or shape undo brings back stale card fills.
+			this.sourceRenderer?.restoreBeforeAppearanceChange();
+		}
 		if (decorationsChanged) {
 			this.refreshDecorations();
 		}
@@ -7888,6 +7895,7 @@ export class M1CanvasSession {
 		colors: ColorSettings | undefined,
 		isEdge: boolean,
 		inner = false,
+		fillSurface?: HTMLElement,
 	): void {
 		if (typography === undefined && colors === undefined) {
 			return;
@@ -7919,11 +7927,13 @@ export class M1CanvasSession {
 				}
 			} else {
 				if (colors.text !== undefined) this.setAppearanceStyle(element, "color", colorToCss(colors.text));
-				// A fill that lets the board show through is painted once, on
-				// the node itself; painted on every surface it would thicken with
-				// each layer, as a frame's quiet fills did.
+				// A native card's fill belongs to its rounded face. Other items
+				// keep their shell fill; translucent fills are never stacked.
 				if (colors.fill !== undefined) {
-					this.setAppearanceStyle(element, "background-color", inner && seeThrough(colors.fill) ? "transparent" : colorToCss(colors.fill));
+					const transparent = fillSurface === undefined
+						? inner && seeThrough(colors.fill)
+						: element !== fillSurface;
+					this.setAppearanceStyle(element, "background-color", transparent ? "transparent" : colorToCss(colors.fill));
 				}
 				if (colors.border !== undefined) this.setAppearanceStyle(element, "border-color", colorToCss(colors.border));
 				// The card's marks take its highlight colour.  Text keeps the colour
@@ -7982,25 +7992,26 @@ export class M1CanvasSession {
 
 	/**
 	 * Paint one node's persisted typography and colors onto its current DOM:
-	 * the shell, every inner surface Canvas paints its own fill and font on,
+	 * its rounded face, inner text surfaces and shell,
 	 * and its editor frame when one applies.  Shared by the full restore-then-
 	 * apply-all pass and by the mutation-observer pass below, which calls it
 	 * only for the shells a mutation just added.
 	 */
-	private decorateNodeAppearance(node: unknown): void {
+	private decorateNodeAppearance(node: unknown, sourceScene: SourceScene): void {
 		const id = readCanvasElementId(node);
 		const dom = readCanvasElementDom(node);
 		if (id === undefined || dom === undefined) {
 			return;
 		}
 		const override = this.appearance.localOverrides[id];
-		this.applyElementAppearance(dom, override?.typography, override?.colors, false);
-		for (const content of this.appearanceContentTargets(dom).slice(1)) {
-			// Native Canvas paints its own fill and border on an inner
-			// container that covers the outer node, and it carries explicit
-			// font rules there too.  Decorating only the shell is therefore
-			// invisible; every painted surface gets the same values.
-			this.applyElementAppearance(content, override?.typography, override?.colors, false, true);
+		const targets = this.appearanceContentTargets(dom);
+		const fillSurface = usesNativeCardSurface(sourceScene.items.get(id))
+			? targets.find((target) => target !== dom && target.parentElement === dom && target.classList.contains("canvas-node-container"))
+			: undefined;
+		this.applyElementAppearance(dom, override?.typography, override?.colors, false, false, fillSurface);
+		for (const content of targets.slice(1)) {
+			// Keep fonts on native surfaces and paint the card's fill once.
+			this.applyElementAppearance(content, override?.typography, override?.colors, false, true, fillSurface);
 		}
 		this.refreshEditorAppearance(node, dom, override?.typography, override?.colors);
 	}
@@ -8008,8 +8019,9 @@ export class M1CanvasSession {
 	/** Apply persisted M1 appearance to native node/edge DOM and restore it on teardown. */
 	private refreshAppearanceDecorations(): void {
 		this.restoreAppearanceDom();
+		const sourceScene = this.landingGeometry().scene;
 		for (const node of this.scene.nodes) {
-			this.decorateNodeAppearance(node);
+			this.decorateNodeAppearance(node, sourceScene);
 		}
 		for (const edge of this.scene.edges) {
 			const id = readCanvasElementId(edge);
@@ -8223,6 +8235,7 @@ export class M1CanvasSession {
 			return;
 		}
 		const nodeByDom = new Map<HTMLElement, unknown>();
+		const sourceScene = this.landingGeometry().scene;
 		for (const node of this.scene.nodes) {
 			const dom = readCanvasElementDom(node);
 			if (dom !== undefined) {
@@ -8237,7 +8250,7 @@ export class M1CanvasSession {
 			const id = readCanvasElementId(node);
 			const hasOverride = id !== undefined && this.appearance.localOverrides[id] !== undefined;
 			if (hasOverride || this.editorAppearanceDom.has(shell)) {
-				this.decorateNodeAppearance(node);
+				this.decorateNodeAppearance(node, sourceScene);
 			}
 		}
 	}
