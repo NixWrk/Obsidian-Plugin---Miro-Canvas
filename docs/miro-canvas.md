@@ -15,6 +15,14 @@ from the plugin.
 
 ## Current implementation status
 
+Native connector paint preserves the theme's `--canvas-color`: older mobile
+Canvas exposes comma-separated RGB channels, whereas newer Canvas exposes a
+complete CSS colour. Wrap only the channels in `rgb()`, including arrowhead
+fills and block arrows. Detached off-screen edges use the body's theme format
+until Canvas attaches them again. Explicit connector colours bypass this lookup;
+rendering never writes a default colour into the board. `check-arrow-color.mjs`
+checks both themes, real selection, all routes, arrowheads and plugin reload.
+
 Native card fills belong to `.canvas-node-container`, the same rounded face
 that draws the border. The shell and inner Markdown surfaces remain transparent;
 Miro text, shapes, sticky notes and frames retain their own painting rules.

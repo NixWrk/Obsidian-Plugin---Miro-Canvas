@@ -198,6 +198,8 @@ an item keeps its layer order.
 Choose **L** and draw between two cards. The line follows them as they move.
 Change its colour, width, ends, label and route: straight, elbowed or curved.
 Drag the middle to adjust a curve. A free end can stay on empty board.
+Without a chosen colour, the line and arrowhead use Obsidian's theme colour
+on computers, tablets and phones, including after reopening the board.
 
 <details>
 <summary>Move a connected card and undo</summary>

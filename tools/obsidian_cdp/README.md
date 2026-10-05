@@ -122,6 +122,12 @@ It also checks that reopening a wide phone bar does not move its fold button.
 `scenarios/welcome-board.mjs` refuses an older guide missing section 12 or
 the resolved comment. Use a fresh vault for the current template.
 
+`node tools/obsidian_cdp/check-arrow-color.mjs --port 9336` checks default,
+preset and explicit arrow colours in both themes, all routes, filled/open/block
+arrowheads, real selection and plugin reload without persisting default colours.
+For Android, use `--port 9340 --serial <device>` in `MiroCanvasTest` only.
+The script stages a new test board and restores the previous board and theme.
+
 `node tools/obsidian_cdp/check-card-fill.mjs --port 9336` checks native card
 fills in both themes, selection, editing, shape undo and plugin unload/reload.
 For Android, pass `--port 9340 --serial <device>` after forwarding and deploying;

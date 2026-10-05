@@ -1187,6 +1187,19 @@ function localRoute(path: DomElementLike, geometry: AnchorEdgeGeometry): string 
   return `M ${p(start)}` + (geometry.points ?? [start, end]).slice(1).map(point => ` L ${p(point)}`).join("");
 }
 
+function nativeConnectorColor(document: Document | undefined, group: DomElementLike): string {
+  const style = safeCall(document?.defaultView, "getComputedStyle", [group]);
+  let value = safeCall(style, "getPropertyValue", ["--canvas-color"]);
+  // Canvas detaches off-screen edges; read the theme's format before they return.
+  if ((typeof value !== "string" || value.trim() === "") && document?.body !== undefined) {
+    const theme = safeCall(document.defaultView, "getComputedStyle", [document.body]);
+    value = safeCall(theme, "getPropertyValue", ["--canvas-color"]);
+  }
+  // Older mobile Canvas themes store RGB channels; newer themes store a full color.
+  const channels = typeof value === "string" && /^\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*$/.test(value);
+  return channels ? "rgb(var(--canvas-color))" : "var(--canvas-color, currentColor)";
+}
+
 /** Draws the connector's route and returns each path with the route it now carries. */
 function renderConnectorGeometry(document: Document | undefined, runtime: unknown, descriptor: SourceItemDescriptor,
   geometry: AnchorEdgeGeometry | undefined, native: unknown, patches: RestorePatch[], diagnostics: string[], id: string,
@@ -1209,7 +1222,7 @@ function renderConnectorGeometry(document: Document | undefined, runtime: unknow
     diagnostics.push(`connector-endcap-fallback: ${id}.`);
     return undefined;
   }
-  const color = descriptor.css.stroke ?? "var(--canvas-color, currentColor)";
+  const color = descriptor.css.stroke ?? nativeConnectorColor(document, group);
   const scale = local ? LOCAL_CAP_SCALE : 1;
   const startMarker = marker(document, caps[0]!, color, patches, group, scale, descriptor.connector?.headSize);
   const endMarker = marker(document, caps[1]!, color, patches, group, scale, descriptor.connector?.headSize);

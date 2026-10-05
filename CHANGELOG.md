@@ -2,6 +2,7 @@
 
 ## 0.2.7 - 2026-10-05
 
+- Fix arrows disappearing on phones when no colour was assigned: support both native RGB-channel and complete CSS-colour theme variables for lines, arrowheads and block arrows, including off-screen edges after plugin reload.
 - Fix the square outline around rounded native cards: paint their fill on the native face and leave the shell and inner Markdown surfaces transparent. Translucent fills are painted once.
 - Restore source decorations before changing persisted appearance, preventing stale fills after undoing a shape change. Keep native styles intact when the plugin unloads.
 - Verify light/dark themes, selection and plugin reload on desktop, Android tablet and phone, plus editing and shape undo in real desktop Obsidian.

@@ -66,6 +66,60 @@ function fixture(shape = "triangle", routing = "straight", document: Document = 
 }
 
 describe("reversible source geometry DOM", () => {
+  it.each([
+    ["126, 126, 126", "rgb(var(--canvas-color))"],
+    [" 12.5, 84, 240 ", "rgb(var(--canvas-color))"],
+    ["#7e7e7e", "var(--canvas-color, currentColor)"],
+    ["rgb(126, 126, 126)", "var(--canvas-color, currentColor)"],
+    ["oklch(60% 0.1 120)", "var(--canvas-color, currentColor)"],
+    ["", "var(--canvas-color, currentColor)"],
+  ])("keeps an uncolored local arrow visible with native color %s", (nativeColor, paint) => {
+    const document = { ...dom, defaultView: {
+      getComputedStyle: () => ({ getPropertyValue: () => nativeColor }),
+    } } as unknown as Document;
+    const f = fixture("triangle", "straight", document);
+    delete f.data.miroSource;
+    f.data.miroCanvas.localOverrides.e.connector = { route: "straight" };
+    const before = JSON.stringify(f.data);
+    f.renderer.refresh();
+    expect(f.path.style.getPropertyValue("stroke")).toBe(paint);
+    const cap = f.lineGroupEl.querySelectorAll("marker")[0].querySelectorAll("path")[0];
+    expect(cap.getAttribute("stroke")).toBe(paint);
+    expect(cap.getAttribute("fill")).toBe(paint);
+    expect(f.hit.style.getPropertyValue("stroke-width")).toBe("24");
+    expect(JSON.stringify(f.data)).toBe(before);
+    f.renderer.dispose();
+    expect(f.path.style.getPropertyValue("stroke")).toBe("native-stroke");
+    expect(f.lineGroupEl.querySelectorAll("marker")).toHaveLength(0);
+  });
+
+  it("uses the theme color format for a detached edge before Canvas shows it again", () => {
+    const body = new Element("body");
+    const document = { ...dom, body, defaultView: {
+      getComputedStyle: (element: Element) => ({ getPropertyValue: () => element === body ? "126, 126, 126" : "" }),
+    } } as unknown as Document;
+    const f = fixture("triangle", "straight", document);
+    delete f.data.miroSource;
+    f.data.miroCanvas.localOverrides.e.connector = { route: "straight", block: true, width: 12 };
+    f.renderer.refresh();
+    expect(f.path.style.getPropertyValue("stroke")).toBe("rgb(var(--canvas-color))");
+    expect(f.path.style.getPropertyValue("fill")).toBe("rgb(var(--canvas-color))");
+    f.renderer.dispose();
+    expect(f.path.style.getPropertyValue("stroke")).toBe("native-stroke");
+  });
+
+  it("does not read native color when a local arrow has its own color", () => {
+    const getComputedStyle = vi.fn(() => { throw new Error("native style unavailable"); });
+    const document = { ...dom, defaultView: { getComputedStyle } } as unknown as Document;
+    const f = fixture("triangle", "straight", document);
+    delete f.data.miroSource;
+    f.data.miroCanvas.localOverrides.e.connector = { route: "straight", color: "#2385d7" };
+    f.renderer.refresh();
+    expect(f.path.style.getPropertyValue("stroke")).toBe("#2385d7");
+    expect(getComputedStyle).not.toHaveBeenCalled();
+    f.renderer.dispose();
+  });
+
   it("renders exact U/V endpoints, stroke and real cap geometry; hit path follows without losing hit width", () => {
     const f = fixture(); const before = JSON.stringify(f.data);
     f.renderer.refresh();
