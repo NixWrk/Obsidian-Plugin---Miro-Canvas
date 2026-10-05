@@ -457,3 +457,10 @@ about half an hour.
   on stderr past 4 MiB but always writes the file.
 - **Rate limits** - not applicable; everything here runs on your own
   machine against your own local Obsidian process.
+
+### Export page mouse regression
+
+With an isolated Canvas open on CDP_PORT (default 9336), run
+`node tools/obsidian_cdp/check_export_page_gestures.mjs`. It refuses non-isolated
+vaults, drives real mouse input on page labels and corners, checks previews
+and committed geometry, unchanged native content, A4 proportions and reopening.

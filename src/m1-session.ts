@@ -328,7 +328,8 @@ const SELECTION_FRAME_SELECTOR = ".miro-canvas-mixed-selection-frame, .canvas-se
 /** A card, a native line or one of the board's own, which is selected when it carries one of the two classes below. */
 const SELECTABLE_SELECTOR = ".canvas-node, .canvas-edge, .miro-board-connector";
 const PANEL_SELECTOR = ".miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
-	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray";
+	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray,"
+	+ " .miro-canvas-export, .miro-canvas-export-page__tab, .miro-canvas-export-page__corner";
 
 /**
  * Whether a screen point lands on the board itself, so a tool dragged off

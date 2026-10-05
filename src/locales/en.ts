@@ -27,6 +27,8 @@ export const EN = {
 		slidesLabel: "Slides",
 		noPages: "No pages yet: add one, or one for each frame.",
 		showPage: "Show on the board",
+		movePageHint: "Drag this label to move the export page",
+		resizePageHint: "Drag this corner to resize the export page",
 		earlier: "Earlier",
 		later: "Later",
 		removePage: "Remove page",

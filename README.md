@@ -415,6 +415,18 @@ the board, move them or resize them. **A page for each frame** adds pages
 automatically. Formats include A4, A3, Letter, 16:9, 4:3 and a custom size,
 with portrait or landscape orientation. Page layout is saved with the board.
 
+Drag a page’s label above its top-left corner to move it. Drag the dot at its
+bottom-right corner to resize it. Fixed paper formats keep their proportions;
+choose **Free size** for independent width and height. Click a page name in
+the export panel to bring its frame into view.
+
+<details>
+<summary>Move and resize export pages</summary>
+
+![Move and resize export pages](docs/media/en/export-page-layout.gif)
+
+</details>
+
 <details>
 <summary>Arrange pages and save PDF and PowerPoint</summary>
 

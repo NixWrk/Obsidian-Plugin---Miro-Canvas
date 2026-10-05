@@ -2062,3 +2062,7 @@ cross-platform browser export and official lint checks.
 ## Browser export (0.2.4)
 
 PDF/PPTX use bundled html2canvas-pro on Windows and Android. Pages are tiled at a fixed output scale, independent of device pixel ratio, up to 3000 pixels on the long side. SVG styles and viewports preserve native edges and plugin connectors. Camera and progress UI are restored on success, cancellation or failure. Attachments are written using Obsidian’s file manager and Vault.createBinary with unique names. Live web embeds and video are omitted. Official Obsidian lint rules run in CI and release jobs.
+
+## Export page gestures (0.2.5)
+
+Export-page tabs and resize corners belong to PANEL_SELECTOR so rectangle selection, drawing and tool drops cannot claim their pointer gestures. The interior is deliberately excluded and remains native board content. Regression checks cover event ownership and real mouse input at non-default zoom, preview without persistence, unchanged native nodes/edges, free resizing, fixed paper ratio and reopening page metadata.

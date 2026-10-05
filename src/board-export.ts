@@ -249,10 +249,12 @@ export class ExportOverlay {
     const tab = frame.appendChild(this.document.createElement("div"));
     tab.className = "miro-canvas-export-page__tab";
     tab.textContent = page.label;
+    tab.title = words().export.movePageHint;
     const entry: OverlayEntry = { id: page.id, frame, tab, page };
     if (editable) {
       const corner = frame.appendChild(this.document.createElement("div"));
       corner.className = "miro-canvas-export-page__corner";
+      corner.title = words().export.resizePageHint;
       // Read the page fresh from `entry`: it is kept up to date between drags.
       tab.addEventListener("pointerdown", (event) => this.begin(event, entry.page, "move", frame));
       corner.addEventListener("pointerdown", (event) => this.begin(event, entry.page, "resize", frame));

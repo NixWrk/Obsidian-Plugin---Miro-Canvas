@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5 - 2026-10-05
+
+- Fix export pages that could not be moved or resized with a mouse: the board’s selection tool intercepted their controls. Page labels and resize corners now handle their own gestures while the page interior stays available for board editing.
+- Add English and Russian hover hints for moving and resizing export pages.
+- Verify mouse dragging, live preview without premature saves, free resizing, A4 proportions and reopening saved page geometry in real desktop Obsidian.
+
 ## 0.2.4 - 2026-10-05
 
 - PDF and PowerPoint export now work on desktop and Android through one browser backend. Files are saved as new vault attachments using Obsidian’s configured attachment location.

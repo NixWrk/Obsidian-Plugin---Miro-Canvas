@@ -265,3 +265,9 @@ plugin/MCP builds, pinned schema, all three synthetic smoke modes, 63 Python
 tests and two recording-helper tests passed. All 56 GIFs are below 4 MiB
 and 35 seconds. Native Obsidian renders the completed pin and both real export
 examples; pypdf confirms two pages in each language's exported PDF.
+
+0.2.5 correction (2026-10-05): real mouse input reproduced export tabs and
+resize corners being intercepted by rectangle selection. Paired
+`export-page-layout` recordings now demonstrate moving and resizing a page.
+The regression runner checks preview without persistence, unchanged native
+content, non-default zoom, free sizing, A4 ratio and reopening saved geometry.
