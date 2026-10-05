@@ -1,3 +1,4 @@
+import { setElementStyles } from "./dom-styles";
 import { words } from "./i18n";
 import { applyPanelPositionSettled, effectivePanelOrientation, positionFromPoint, type PanelId, type PanelPosition } from "./panel-layout";
 
@@ -62,7 +63,7 @@ export class PanelVisibility {
         if (!collapsed && effectivePanelOrientation(current) === "vertical" && bar !== null) {
           // A long column scrolls away from its pivot instead of moving the button.
           bar.style.setProperty("max-height", `${Math.max(44, (buttonBottom ? above : below) - 2)}px`);
-          bar.style.setProperty("overflow-y", "auto");
+          setElementStyles(bar, { "overflow-y": "auto" });
         }
         this.placeButton(id, button, collapsed, { ...current, buttonRight, buttonBottom });
         const panelBox = panel.getBoundingClientRect();
@@ -120,7 +121,7 @@ export class PanelVisibility {
           if (initial?.collapsed !== true && orientation === "vertical" && bar !== null) {
             const room = buttonBottom ? target.top + pivot.height : view.height - target.top;
             bar.style.setProperty("max-height", `${Math.max(44, room - 2)}px`);
-            bar.style.setProperty("overflow-y", "auto");
+            setElementStyles(bar, { "overflow-y": "auto" });
           }
           const box = panel.getBoundingClientRect();
           const placed = button.getBoundingClientRect();
@@ -226,10 +227,10 @@ export class PanelVisibility {
     if (more != null) {
       for (const key of ["position", "left", "right", "top", "bottom", "margin", "padding", "border"]) more.style.removeProperty(key);
       if (grouped && !collapsed) {
-        more.style.setProperty("position", "absolute");
-        more.style.setProperty("margin", "0");
-        more.style.setProperty("padding", "0");
-        more.style.setProperty("border", "0");
+        setElementStyles(more, { "position": "absolute" });
+        setElementStyles(more, { "margin": "0" });
+        setElementStyles(more, { "padding": "0" });
+        setElementStyles(more, { "border": "0" });
         more.style.setProperty("left", vertical ? "calc(50% - 20px)" : right ? "auto" : "52px");
         more.style.setProperty("right", !vertical && right ? "52px" : "auto");
         more.style.setProperty("top", bottom ? "auto" : vertical ? "52px" : "6px");

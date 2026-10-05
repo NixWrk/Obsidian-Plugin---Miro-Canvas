@@ -4880,3 +4880,24 @@
   visibility: hidden;
   pointer-events: none;
 }
+
+.miro-canvas-export-progress {
+  position: fixed;
+  z-index: 10000;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-s);
+}
+.miro-canvas-export-progress button {
+  --miro-canvas-button-padding: 4px 12px;
+  padding: var(--miro-canvas-button-padding);
+}

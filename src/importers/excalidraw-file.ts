@@ -110,7 +110,7 @@ const PLUGIN_RELEASE = /obsidian-excalidraw-plugin\/releases\/tag\/([^/?#\s]+)/;
  * plain scene; anything else for the plugin's Markdown note.
  */
 export function readExcalidrawFile(text: string): ExcalidrawReadResult {
-  const normalized = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const normalized = text.replace(/^\ufeff/, "").replace(/\r\n?/g, "\n");
   if (normalized.trimStart().startsWith("{")) {
     return readPlainScene(normalized);
   }

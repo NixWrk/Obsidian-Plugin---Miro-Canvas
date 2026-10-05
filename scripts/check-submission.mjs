@@ -55,6 +55,7 @@ async function check() {
   assert.ok(changelog.includes(`## ${manifest.version} - `), "Missing release notes");
   const bundle = await readFile(new URL("main.js", root), "utf8");
   assert.ok(!bundle.includes("miro-canvas-mcp.mjs"), "Optional MCP server must not be bundled");
+  assert.ok(!/@electron\/remote|original-fs|node:fs|node:path|node:crypto/.test(bundle), "Plugin bundle must not load desktop runtime APIs");
   if (process.argv.includes("--remote")) {
     const release = await remoteJson(`https://api.github.com/repos/${repository}/releases/tags/${manifest.version}`);
     inspectRelease(manifest, release);
@@ -71,7 +72,7 @@ async function check() {
     console.log(`Published release ${manifest.version}: tag, default-branch manifest and all three asset contents verified.`);
   }
   console.log(`Submission files verified for ${manifest.name} ${manifest.version}.`);
-  console.log("Manual review required: desktop export uses Electron/Node APIs while isDesktopOnly is false. See docs/community-submission.md.");
+
   console.log("This check verifies packaging; it does not certify policy compliance or directory acceptance.");
 }
 

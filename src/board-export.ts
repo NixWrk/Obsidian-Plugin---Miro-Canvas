@@ -8,10 +8,8 @@
  * copying or resizing a single item.  A presentation's slides are pages
  * already.
  *
- * The capture works as Obsidian's own "Export as image" does: the board is
- * laid over the whole window, every item is kept drawn, and the view steps
- * across each page a window at a time while Electron photographs it.  It
- * needs Obsidian on a computer; a phone or a tablet has no such camera.
+ * The browser renders each visible tile into a picture on desktop and mobile.
+ * The camera is restored after success, failure or cancellation.
  */
 
 import {
@@ -19,6 +17,7 @@ import {
   type ExportState, type PaperFormat, type PaperOrientation,
 } from "./export-pages";
 import { words } from "./i18n";
+import html2canvas from "html2canvas-pro";
 
 export type ExportKind = "pdf" | "pptx";
 
@@ -371,79 +370,7 @@ interface CaptureCanvas {
   setViewport?(x: number, y: number, zoom: number): void;
 }
 
-interface Remote {
-  getCurrentWebContents(): {
-    getZoomLevel(): number;
-    capturePage(rect: { x: number; y: number; width: number; height: number }): Promise<{ toPNG(): Uint8Array }>;
-  };
-}
-
-/** Electron's remote module, where Obsidian runs on a computer. */
-export function electronRemote(view: Window | null | undefined): Remote | undefined {
-  const host = view as (Window & { electron?: { remote?: Remote }; require?: (name: string) => unknown }) | null | undefined;
-  if (host?.electron?.remote !== undefined) return host.electron.remote;
-  try {
-    return host?.require?.("@electron/remote") as Remote | undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** A small window that stays on top of Obsidian while the main one is a camera and cannot show its own status. */
-interface ProgressWindow {
-  setStatus(text: string): void;
-  stopped(): boolean;
-  close(): void;
-}
-
-/**
- * As native Canvas does for its own image export: a separate top-level
- * window laid over Obsidian's, so it is on screen for the person but never
- * in the picture, since `capturePage` only photographs the window it is
- * asked for.  `undefined` when the host refuses a popup; the export then
- * runs without one.
- */
-function openProgressWindow(view: Window): ProgressWindow | undefined {
-  const x = (view.screenX ?? 0) + 5, y = (view.screenY ?? 0) + 5;
-  const width = Math.max(1, (view.outerWidth ?? 0) - 10), height = Math.max(1, (view.outerHeight ?? 0) - 10);
-  const popup = view.open("about:blank", "_blank", `popup,x=${x},y=${y},width=${width},height=${height}`);
-  if (popup === null) return undefined;
-  const doc = popup.document;
-  doc.title = words().export.progressTitle;
-  Object.assign(doc.documentElement.style, { colorScheme: "light dark" });
-  Object.assign(doc.body.style, {
-    margin: "0", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", font: "13px sans-serif",
-  });
-  const status = doc.body.appendChild(doc.createElement("div"));
-  status.textContent = words().export.capturing;
-  const stop = doc.body.appendChild(doc.createElement("button"));
-  stop.type = "button";
-  stop.textContent = words().export.stop;
-  Object.assign(stop.style, { padding: "4px 14px" });
-  let halted = false;
-  stop.addEventListener("click", () => { halted = true; });
-  popup.addEventListener("beforeunload", () => { halted = true; });
-  return {
-    setStatus: (text) => { status.textContent = text; },
-    stopped: () => halted,
-    close: () => {
-      try {
-        popup.close();
-      } catch {
-        // Already closed, by the person or by Obsidian shutting down.
-      }
-    },
-  };
-}
-
-/**
- * Photograph each page of the board, a window at a time, and return one
- * JPEG per page.  The board is put back exactly as it was, whatever
- * happens; `progress` is told what is going on and may stop the run by
- * returning false, and so may the progress window's own Stop button.
- */
+/** Render pages in the browser; no desktop capture or filesystem is needed. */
 export async function capturePages(
   canvas: CaptureCanvas,
   pages: readonly ExportRect[],
@@ -451,84 +378,135 @@ export async function capturePages(
   progress: (done: number, total: number) => boolean,
 ): Promise<CapturedPage[]> {
   const wrapper = canvas.wrapperEl;
-  const view = wrapper.ownerDocument.defaultView;
-  const remote = electronRemote(view);
-  if (view === null || remote === undefined) throw new Error(words().export.unavailable);
-  const contents = remote.getCurrentWebContents();
-  const zoomFactor = 1.2 ** contents.getZoomLevel();
-  const saved = { x: canvas.x, y: canvas.y, zoom: canvas.zoom, parent: wrapper.parentElement, next: wrapper.nextSibling };
   const document = wrapper.ownerDocument;
-  const popup = openProgressWindow(view);
-  canvas.deselectAll();
-  wrapper.classList.add("is-screenshotting", "miro-canvas-exporting");
-  canvas.screenshotting = true;
-  document.body.appendChild(wrapper);
-  const inset = `${5 / zoomFactor}px`;
-  Object.assign(wrapper.style, { top: inset, left: inset, bottom: inset, right: inset, width: "auto", height: "auto" });
-  canvas.onResize?.();
+  const view = document.defaultView;
+  if (view === null) throw new Error(words().export.unavailable);
+  const saved = { x: canvas.x, y: canvas.y, zoom: canvas.zoom, screenshotting: canvas.screenshotting };
+  const status = document.createElement("div");
+  status.className = "miro-canvas-export-progress";
+  status.setAttribute("role", "status");
+  const label = document.createElement("span");
+  const stop = document.createElement("button");
+  stop.type = "button";
+  stop.textContent = words().export.stop;
+  status.append(label, stop);
+  document.body.appendChild(status);
+  let stopped = false;
+  const controller = new AbortController();
+  stop.addEventListener("click", () => {
+    stopped = true;
+    controller.abort();
+  });
+  const pause = (ms: number): Promise<void> => new Promise(resolve => view.setTimeout(resolve, ms));
   const results: CapturedPage[] = [];
+  let activeSheet: HTMLCanvasElement | undefined;
+  let activePicture: HTMLCanvasElement | undefined;
   try {
-    await sleep(300);
+    canvas.deselectAll();
+    wrapper.classList.add("is-screenshotting", "miro-canvas-exporting");
+    canvas.screenshotting = true;
+    await document.fonts.ready;
     const bounds = wrapper.getBoundingClientRect();
-    // The rectangle captured, in the window's own pixels; a pixel is left
-    // off each side so no edge of the board's frame gets in.
-    const capture = {
-      x: Math.ceil(bounds.x * zoomFactor + 1), y: Math.ceil(bounds.y * zoomFactor + 1),
-      width: Math.floor(bounds.width * zoomFactor) - 2, height: Math.floor(bounds.height * zoomFactor) - 2,
-    };
-    const plans = planCapture(pages, quality, capture, view.devicePixelRatio, zoomFactor);
+    const capture = { width: Math.floor(bounds.width), height: Math.floor(bounds.height) };
+    if (capture.width < 1 || capture.height < 1) throw new Error(words().export.pageNotDrawn);
+    const plans = planCapture(pages, quality, capture, 1, 1);
     const total = plans.reduce((sum, plan) => sum + plan.tiles.length, 0);
     let done = 0;
     for (const { pixels, tiles } of plans) {
       const sheet = document.createElement("canvas");
+      activeSheet = sheet;
       sheet.width = pixels.width;
       sheet.height = pixels.height;
       const context = sheet.getContext("2d");
       if (context === null) throw new Error(words().export.pageNotDrawn);
       for (const { center, zoom, draw } of tiles) {
-        popup?.setStatus(words().export.capturingProgress(done, total));
-        if (popup?.stopped() === true || !progress(done, total)) throw new Error(words().export.exportStopped);
+        label.textContent = words().export.capturingProgress(done, total);
+        if (stopped || !progress(done, total)) throw new Error(words().export.exportStopped);
         canvas.x = canvas.tx = center.x;
         canvas.y = canvas.ty = center.y;
         canvas.zoom = canvas.tZoom = zoom;
         canvas.viewportChanged = true;
         canvas.requestFrame();
-        await sleep(120);
-        await new Promise<void>((resolve) => view.requestAnimationFrame(() => resolve()));
-        await new Promise<void>((resolve) => (view.requestIdleCallback === undefined ? resolve() : view.requestIdleCallback(() => resolve(), { timeout: 500 })));
-        const image = await contents.capturePage(capture);
-        const picture = await pictureOf(document, image.toPNG());
-        const width = Math.min(picture.width, draw.width);
-        const height = Math.min(picture.height, draw.height);
-        context.drawImage(picture, 0, 0, width, height, draw.x, draw.y, width, height);
+        await pause(120);
+        await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()));
+        const picture = await html2canvas(wrapper, {
+          signal: controller.signal,
+          scale: 1, logging: false, backgroundColor: view.getComputedStyle(wrapper).backgroundColor,
+          width: capture.width, height: capture.height,
+          allowTaint: false, useCORS: false, imageTimeout: 10000,
+          ignoreElements: element => element.matches("iframe, video, .miro-canvas-export-progress"),
+          onclone: (_document, cloned) => prepareExportSvgs(wrapper, cloned),
+        });
+        activePicture = picture;
+        if (stopped || !progress(done, total)) throw new Error(words().export.exportStopped);
+        context.drawImage(picture, 0, 0, Math.min(picture.width, draw.width), Math.min(picture.height, draw.height),
+          draw.x, draw.y, Math.min(picture.width, draw.width), Math.min(picture.height, draw.height));
+        picture.width = picture.height = 0;
+        activePicture = undefined;
         done += 1;
       }
       results.push({ jpeg: await jpegOf(sheet), width: pixels.width, height: pixels.height });
+      sheet.width = sheet.height = 0;
+      activeSheet = undefined;
     }
-    popup?.setStatus(words().export.capturingProgress(total, total));
     progress(total, total);
+  } catch (error) {
+    if (stopped) throw new Error(words().export.exportStopped);
+    throw error;
   } finally {
-    popup?.close();
-    if (saved.parent !== null) saved.parent.insertBefore(wrapper, saved.next);
+    if (activePicture !== undefined) activePicture.width = activePicture.height = 0;
+    if (activeSheet !== undefined) activeSheet.width = activeSheet.height = 0;
+    status.remove();
     wrapper.classList.remove("is-screenshotting", "miro-canvas-exporting");
-    Object.assign(wrapper.style, { top: "", left: "", bottom: "", right: "", width: "", height: "" });
-    canvas.screenshotting = false;
-    if (typeof canvas.setViewport === "function") canvas.setViewport(saved.x, saved.y, saved.zoom);
-    canvas.onResize?.();
+    canvas.screenshotting = saved.screenshotting;
+    canvas.x = canvas.tx = saved.x;
+    canvas.y = canvas.ty = saved.y;
+    canvas.zoom = canvas.tZoom = saved.zoom;
+    canvas.setViewport?.(saved.x, saved.y, saved.zoom);
     canvas.requestFrame();
   }
   return results;
 }
 
-async function pictureOf(document: Document, png: Uint8Array): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(new Blob([png as BlobPart], { type: "image/png" }));
-  try {
-    const picture = document.createElement("img");
-    picture.src = url;
-    await picture.decode();
-    return picture;
-  } finally {
-    URL.revokeObjectURL(url);
+/** SVG image serialization loses inherited CSS and clips overflowing edges. */
+function prepareExportSvgs(source: HTMLElement, cloned: HTMLElement): void {
+  const view = source.ownerDocument.defaultView;
+  if (view === null) return;
+  const originals = Array.from(source.querySelectorAll("svg"));
+  const copies = Array.from(cloned.querySelectorAll("svg"));
+  const viewport = source.getBoundingClientRect();
+  for (let index = 0; index < originals.length; index += 1) {
+    const original = originals[index]!;
+    const copy = copies[index];
+    if (copy === undefined || original.getBoundingClientRect().width === 0) continue;
+    const elements = [original, ...Array.from(original.querySelectorAll("*"))];
+    const targets = [copy, ...Array.from(copy.querySelectorAll("*"))];
+    elements.forEach((element, at) => {
+      const target = targets[at] as SVGElement | undefined;
+      if (target === undefined) return;
+      const computed = view.getComputedStyle(element);
+      for (const property of ["color", "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity", "font-family", "font-size"]) {
+        target.style.setProperty(property, computed.getPropertyValue(property));
+      }
+    });
+    if (!original.classList.contains("canvas-edges")) continue;
+    const matrix = original.getScreenCTM();
+    if (matrix === null) continue;
+    const inverse = matrix.inverse();
+    const first = original.createSVGPoint();
+    first.x = viewport.left;
+    first.y = viewport.top;
+    const last = original.createSVGPoint();
+    last.x = viewport.right;
+    last.y = viewport.bottom;
+    const a = first.matrixTransform(inverse);
+    const b = last.matrixTransform(inverse);
+    const width = b.x - a.x;
+    const height = b.y - a.y;
+    copy.setAttribute("viewBox", `${a.x} ${a.y} ${width} ${height}`);
+    copy.setAttribute("width", String(width));
+    copy.setAttribute("height", String(height));
+    for (const [property, value] of Object.entries({ left: `${a.x}px`, top: `${a.y}px`, width: `${width}px`, height: `${height}px` })) copy.style.setProperty(property, value);
   }
 }
 

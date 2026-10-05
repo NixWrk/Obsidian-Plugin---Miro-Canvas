@@ -250,9 +250,10 @@ The published series and its remaining coverage are listed in
 [the guide review](../../docs/visual-guide.md). `_guide.mjs` prepares native
 demo boards and resets panel placement between scenarios. It moves the cursor
 away from the minimap when a result is held, to avoid a hover hint.
-`export-pages.mjs` exercises the actual PDF/PPTX exporters; only the operating
-system's save location is predetermined inside the isolated vault. Cleanup
-restores the save-dialog function. The recording overlay hides while the
+`export-pages.mjs` exercises the actual cross-platform PDF/PPTX exporters
+and verifies attachments saved through Obsidian’s vault API, then opens the
+finished PDF in the real viewer. Its GIF shortens capture pauses with
+`maxHoldMs = 450`; no export or input is simulated. The recording overlay hides while the
 plugin captures a page, so captions and the cursor never enter exported files.
 
 After recording both languages, run `python tools/obsidian_cdp/audit_guide.py`

@@ -906,7 +906,7 @@ function hasDataUrl(files: unknown, fileId: string): boolean {
 
 /** Whether a note's frontmatter, read from its first lines, has `key`. */
 function textFrontmatterHas(text: string, key: string): boolean {
-	const normalized = text.replace(/^﻿/u, "").replace(/\r\n?/gu, "\n");
+	const normalized = text.replace(/^\ufeff/u, "").replace(/\r\n?/gu, "\n");
 	if (!normalized.startsWith("---\n")) return false;
 	const end = normalized.indexOf("\n---", 3);
 	if (end < 0) return false;

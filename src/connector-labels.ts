@@ -1,3 +1,4 @@
+import { setElementStyles } from "./dom-styles";
 /**
  * Labels on connectors - native edges and the board's own alike - placed at
  * a share of the route's length, dragged along it and edited in place.
@@ -219,7 +220,7 @@ export class ConnectorLabels {
       wrapper, label, item,
       ...(item.native === undefined ? {} : { native: item.native, nativeVisibility: item.native.style.visibility }),
     };
-    if (item.native !== undefined) item.native.style.visibility = "hidden";
+    if (item.native !== undefined) setElementStyles(item.native, { "visibility": "hidden" });
     this.entries.set(item.id, entry);
     return entry;
   }

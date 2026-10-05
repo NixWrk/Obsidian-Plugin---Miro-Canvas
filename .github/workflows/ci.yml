@@ -21,6 +21,8 @@ jobs:
       - run: npm ci
       # Types, tests and the build: the same as before every commit by hand.
       - run: npm run check
+      - name: Official Obsidian lint rules
+        run: npm run lint
       - run: npm test
       - run: npm run build
       - name: Community submission packaging

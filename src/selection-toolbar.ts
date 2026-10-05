@@ -1,3 +1,4 @@
+import { setElementStyles } from "./dom-styles";
 /**
  * Floating, selection-scoped formatting toolbar.
  *
@@ -300,7 +301,7 @@ export function keepPanelInView(panel: HTMLElement): void {
     const bar = toolbar.getBoundingClientRect();
     const host = panel.parentElement.getBoundingClientRect();
     // Android's text-selection menu sits below the bar. Keep formatting above it.
-    panel.style.setProperty("top", "auto");
+    setElementStyles(panel, { "top": "auto" });
     panel.style.setProperty("bottom", `${Math.round(host.bottom - bar.top + 10)}px`);
     panel.style.setProperty("max-height", `${Math.round(Math.max(44, bar.top - bounds.top - 18))}px`);
     panel.setAttribute("data-keyboard-popover", "true");

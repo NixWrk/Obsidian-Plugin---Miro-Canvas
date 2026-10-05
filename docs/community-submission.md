@@ -1,9 +1,8 @@
 # Community directory submission package
 
-Prepared on 2026-10-05 for Miro Canvas 0.2.3. **Not submitted or approved.**
-Packaging readiness and policy approval are separate; see the open review
-question below before submitting. This document must not be used as a claim
-that Obsidian has accepted the plugin.
+Updated on 2026-10-05 for Miro Canvas 0.2.4. The owner has created a directory
+draft; review of 0.2.3 reported blocking errors addressed by this release.
+Acceptance and publication of the directory listing remain pending.
 
 ## Current submission process
 
@@ -24,9 +23,9 @@ were checked on 2026-10-04, before preparation continued after midnight.
 | Name | Miro Canvas |
 | Plugin ID | `miro-canvas` |
 | Author | NixWrk |
-| Version | 0.2.3 |
+| Version | 0.2.4 |
 | Minimum app version | 1.13.7 |
-| Platforms | Desktop and mobile editing; desktop export only |
+| Platforms | Desktop and mobile editing and export |
 | License | MIT; third-party notices in repository |
 | Suggested categories, if offered | Visualization, Editing |
 
@@ -42,7 +41,7 @@ Long description, if a description field is offered:
 > minimap. Draw with a stylus or enable finger drawing on a tablet.
 > Explore the editable welcome board with practical examples, resolved
 > comments and sample exported documents. Export boards or presentations
-> to PDF and PowerPoint on desktop. English and Russian interfaces are included.
+> to PDF and PowerPoint on desktop and mobile. English and Russian interfaces are included.
 >
 > Board editing works offline. Optional GitHub update checks announce
 > releases without installing them; font packs download only when requested.
@@ -73,45 +72,21 @@ Examples for the listing or a reviewer:
   website links/embeds and selected-file access are disclosed in both READMEs.
 - No payment, account, telemetry, advertising, self-installation or plugin
   self-update. The optional stdio MCP server is built and started separately.
-- Selected external files are copied into the vault; desktop export can write
-  outside it after the save/overwrite dialog. No external-folder scanning.
+- Selected external files are copied into the vault; exports create new vault
+  attachments. No external-folder scanning.
 - MIT license and adapted LZ-string notice are linked. Font-pack licenses are
   distributed with the packs. The README states independent project ownership.
-- Current limitations, desktop export, unverified iOS/macOS/Linux platforms and
+- Current export limitations, unverified iOS/macOS/Linux platforms and
   experimental connector chains are disclosed, rather than marked as tested.
 
-## Open review question: desktop export in a mobile plugin
+## Cross-platform export and lint checks
 
-The current submission requirements say that a plugin using Node.js or
-Electron APIs must set `isDesktopOnly: true`. Miro Canvas has
-`isDesktopOnly: false` because its editor supports Android tablets.
-The export backend uses `@electron/remote` to capture rendered board pages
-and `original-fs` to save the chosen PDF/PPTX path:
-
-- `src/board-export.ts`: `electronRemote`, `capturePages`.
-- `src/m1-session.ts`: `saveExportFile`, export availability and actions.
-
-These modules are accessed lazily through desktop host capabilities; mobile
-has no capture backend and export is unavailable. There are no top-level
-Node/Electron imports in the plugin source, and real Android editing has been
-tested. Nevertheless, conditional execution alone does **not** establish
-compliance with the wording of the published requirement.
-
-Do not tick a blanket policy-compliance declaration until one of these is
-resolved: Obsidian confirms the isolated desktop backend is acceptable;
-the backend is replaced/removed for the mobile-capable release; or the
-manifest is deliberately changed to desktop-only. The last option prevents
-normal installation on tablets and phones.
-
-Prepared clarification text (not sent):
-
-> Miro Canvas edits native Canvas boards on desktop and Android, with
-> isDesktopOnly set to false. Its optional PDF/PPTX export accesses Electron
-> capture and a system save dialog only through available desktop host
-> capabilities; mobile export is unavailable. There are no top-level
-> Node/Electron imports. Does the current directory allow this isolated
-> desktop-only feature in a mobile-capable plugin, or must we replace/remove
-> that backend before submitting?
+Version 0.2.4 replaces Electron capture and filesystem writes with bundled
+html2canvas-pro and Obsidian Vault.createBinary. The plugin has no Node/Electron
+runtime loaders. The optional Node MCP server is separate from main.js.
+The official eslint-plugin-obsidianmd recommended configuration runs in CI and
+release jobs. Obsidian blocking errors fail these jobs. Existing TypeScript
+migration diagnostics remain warnings, as in the directory report.
 
 ## Reproducible verification
 
@@ -119,6 +94,7 @@ Run from the repository root:
 
 ```sh
 npm run check
+npm run lint
 npm test
 npm run build
 npm run mcp:build
@@ -135,17 +111,13 @@ git diff --check
 After release publication, run `npm run submission:check -- --remote`.
 It verifies the public release tag, default-branch manifest, attached files and
 their contents against the local build (normalizing Windows line endings).
-The checker explicitly reports the export policy question; a successful exit
-verifies packaging, not acceptance or full policy compliance.
+The checker verifies packaging and rejects desktop runtime loaders.
+Success does not certify directory acceptance.
 
-Preparation checks on 2026-10-05: types, production build, MCP build and pinned
-schema passed; 109 Vitest files passed (1689 tests, one skipped); three submission
-checker tests passed; all three browser smoke modes and 25 Python tests passed.
-An isolated Windows Obsidian 1.13.7 loaded the 0.2.3 manifest and current welcome
-board (79 nodes, real PDF/PPTX examples, one plugin root); an actual Escape key
-press and screenshot confirmed the visible board. No runtime feature code was
-changed for this preparation release. These checks do not cover iOS or certify
-the unresolved export policy requirement.
+Version 0.2.4 is checked in isolated Windows Obsidian 1.13.7 and real Android
+Obsidian 1.13.8 in MiroCanvasTest: multi-page PDF/PPTX, native and independent
+connectors, pressure strokes, text and formulas. iOS, macOS and Linux are
+unverified. The directory must scan the new release before acceptance.
 
 The legacy catalog contained no matching ID or repository on this check.
 The new directory page could not be checked from the command-line client
@@ -154,7 +126,7 @@ validation; absence from the legacy catalog alone is not proof.
 
 ## Owner's final steps
 
-1. Resolve the export policy question above before asserting compliance.
+1. Refresh the existing draft’s automated review for version 0.2.4.
 2. Sign in to Community Directory with your Obsidian account.
 3. Connect GitHub `NixWrk` so the directory can verify repository ownership.
 4. Open **Plugins → New plugin** and paste the repository URL above.

@@ -1,3 +1,4 @@
+import { setElementStyles } from "./dom-styles";
 /**
  * Namespaced, framework-free controls for the M1 Canvas session.
  *
@@ -360,8 +361,8 @@ export class M1Controls {
 		const origin = dock.getBoundingClientRect();
 		panel.style.setProperty("left", `${place.left - origin.left}px`);
 		panel.style.setProperty("top", `${place.top - origin.top}px`);
-		panel.style.setProperty("right", "auto");
-		panel.style.setProperty("bottom", "auto");
+		setElementStyles(panel, { "right": "auto" });
+		setElementStyles(panel, { "bottom": "auto" });
 		if (place.maxHeight !== undefined) panel.style.setProperty("max-height", `${place.maxHeight}px`);
 	}
 

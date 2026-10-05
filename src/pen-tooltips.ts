@@ -1,3 +1,4 @@
+import { setElementStyles } from "./dom-styles";
 /**
  * Hover text for a stylus, on a phone or a tablet.
  *
@@ -193,9 +194,9 @@ export class PenTooltips {
     const tooltip = state.document.createElement("div");
     tooltip.className = "tooltip miro-canvas-pen-tooltip";
     tooltip.setAttribute("role", "tooltip");
-    tooltip.style.position = "fixed";
-    tooltip.style.pointerEvents = "none";
-    tooltip.style.visibility = "hidden";
+    setElementStyles(tooltip, { "position": "fixed" });
+    setElementStyles(tooltip, { "pointer-events": "none" });
+    setElementStyles(tooltip, { "visibility": "hidden" });
     tooltip.appendChild(state.document.createTextNode(label));
     const arrow = state.document.createElement("div");
     arrow.className = "tooltip-arrow";
@@ -203,7 +204,7 @@ export class PenTooltips {
     body.appendChild(tooltip);
     state.tooltip = tooltip;
     this.place(state, control, tooltip);
-    tooltip.style.visibility = "";
+    setElementStyles(tooltip, { "visibility": "" });
   }
 
   /**
@@ -247,7 +248,7 @@ export class PenTooltips {
     tooltip.setAttribute("data-tooltip-placement", placement);
     // Its size as measured, as Obsidian's own tooltip fixes it: left alone it would shrink to the room
     // that is left between where it is put and the edge of the window.
-    tooltip.style.boxSizing = "border-box";
+    setElementStyles(tooltip, { "box-sizing": "border-box" });
     tooltip.style.width = `${width}px`;
     tooltip.style.height = `${height}px`;
     tooltip.style.left = `${Math.round(left * 100) / 100}px`;

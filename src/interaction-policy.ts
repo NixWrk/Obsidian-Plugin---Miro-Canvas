@@ -343,11 +343,7 @@ function cloneJson(value: unknown, seen = new Set<object>()): unknown {
 			if (!present) {
 				throw new Error("sparse-array");
 			}
-			try {
-				result.push(cloneJson(value[index], seen));
-			} catch (error) {
-				throw error;
-			}
+			result.push(cloneJson(value[index], seen));
 		}
 		const keys = ownKeys(value as unknown as UnknownRecord);
 		if (keys === undefined) {

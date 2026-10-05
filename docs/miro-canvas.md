@@ -896,7 +896,7 @@ link and formula (`FUT-017`), other systems, phones and tablets (`FUT-010`).
   bundled English/Russian board now has an introduction, eight practical
   sections in two columns and a sandbox. It joins Miro tools with real
   Obsidian notes, wiki links and another Canvas, explains device layouts,
-  customization and desktop export, and opens new boards at the introduction.
+  customization and cross-platform export, and opens new boards at the introduction.
   New board and sample-folder names preserve older boards and examples;
   reopening an existing board preserves its contents and viewport.
   Revised 2026-10-04 for 0.2.2: twelve practical sections, a resolved comment
@@ -2057,4 +2057,8 @@ switches and minimap resizing and includes a sample variable-width stroke.
 The minimum supported Obsidian version is 1.13.7, matching the oldest current
 real-app check. See [the submission package](community-submission.md) for
 the current directory process, disclosures, verification command and the
-unresolved policy question about desktop export APIs in a mobile plugin.
+cross-platform browser export and official lint checks.
+
+## Browser export (0.2.4)
+
+PDF/PPTX use bundled html2canvas-pro on Windows and Android. Pages are tiled at a fixed output scale, independent of device pixel ratio, up to 3000 pixels on the long side. SVG styles and viewports preserve native edges and plugin connectors. Camera and progress UI are restored on success, cancellation or failure. Attachments are written using Obsidian’s file manager and Vault.createBinary with unique names. Live web embeds and video are omitted. Official Obsidian lint rules run in CI and release jobs.

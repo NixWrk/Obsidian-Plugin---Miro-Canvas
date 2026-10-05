@@ -410,7 +410,7 @@ iPhone, iPad, macOS and Linux were not checked in this recording series.
 
 ## Export
 
-On a computer, choose gear → **Export to PDF or PowerPoint**. Mark pages on
+On your computer, tablet or phone, choose gear → **Export to PDF or PowerPoint**. Mark pages on
 the board, move them or resize them. **A page for each frame** adds pages
 automatically. Formats include A4, A3, Letter, 16:9, 4:3 and a custom size,
 with portrait or landscape orientation. Page layout is saved with the board.
@@ -425,8 +425,10 @@ with portrait or landscape orientation. Page layout is saved with the board.
 </details>
 
 Each PDF page and PowerPoint slide contains an **image of the board**.
-Card text and shapes are not separate editable slide objects. PDF/PPTX
-export requires Obsidian on a computer.
+Card text and shapes are not separate editable slide objects. Files are saved
+in the vault using Obsidian’s attachment location with unique filenames.
+Live web embeds and video are omitted. Standard quality uses 2000 pixels on
+the long side, high quality 3000. Stop cancels export and restores the view.
 
 ## Bring boards from Miro and other plugins
 
@@ -465,15 +467,13 @@ or advertising and never installs or updates itself.
 
 **Files outside the vault.** Adding device files, custom fonts or a local import
 reads only the files you select in a system picker and copies the chosen data
-into the vault. On desktop, PDF/PowerPoint export writes to the location you
-choose in the save dialog, which can be outside the vault. It can replace an
-existing file after the system overwrite confirmation. The plugin does not
-scan folders outside the vault.
+into the vault. Export creates a new attachment and preserves existing files.
+The plugin does not scan folders outside the vault.
 
 Website links and embeds can contact their sites through Obsidian.
 BRAT, Obsidian Sync and other plugins have their own network behaviour.
 
-Besides desktop-only export, these limitations remain:
+These limitations remain:
 
 - Imported Miro tables have no cell text because the export does not supply it.
 - Line-to-line connections are experimental and disabled by default.
@@ -486,8 +486,8 @@ Miro Canvas is preparing for submission to the [Obsidian Community directory](ht
 It is not yet available in the in-app catalog. Until it is accepted, use BRAT
 or the manual installation below. Requires Obsidian **1.13.7 or newer**; this
 is the oldest version verified in the current real-app test suite. Desktop
-editing and Android tablet input are tested; iOS, macOS and Linux remain
-unverified. PDF/PowerPoint export currently requires desktop Obsidian.
+editing and PDF/PPTX export on Windows and Android tablets are tested;
+iOS, macOS and Linux remain unverified.
 
 **With BRAT.** This plugin installs GitHub releases and can update them.
 

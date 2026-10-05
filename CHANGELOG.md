@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4 - 2026-10-05
+
+- PDF and PowerPoint export now work on desktop and Android through one browser backend. Files are saved as new vault attachments using Obsidian’s configured attachment location.
+- Preserve native arrows, independent connectors and pressure strokes, including inherited SVG styles and modern theme colors.
+- Restore the board view after export, cancellation or capture errors; bound page resolution independently of device pixel ratio.
+- Fix community review’s blocking style assignment and Markdown component lifecycle errors. Run the official Obsidian linter in CI and release builds; existing advisory warnings remain visible.
+- Update English and Russian welcome instructions and export examples. Live web embeds and video are excluded; iOS remains unverified.
+
 ## 0.2.3 - 2026-10-05
 
 - Set the minimum Obsidian version to 1.13.7, the oldest version verified

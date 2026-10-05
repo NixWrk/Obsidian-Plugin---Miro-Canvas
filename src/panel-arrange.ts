@@ -1,3 +1,4 @@
+import { setElementStyles } from "./dom-styles";
 /**
  * "Arrange panels": a mode, entered from the dock's board menu or its
  * command, in which the bottom tool bar, the dock's icon row and the
@@ -369,8 +370,8 @@ export class PanelArrangeMode {
       }
       handle.style.setProperty("left", `${left - bar.left}px`);
       handle.style.setProperty("top", `${top - bar.top}px`);
-      handle.style.setProperty("right", "auto");
-      handle.style.setProperty("bottom", "auto");
+      setElementStyles(handle, { "right": "auto" });
+      setElementStyles(handle, { "bottom": "auto" });
     }
   }
 

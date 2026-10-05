@@ -465,10 +465,10 @@ async function runScenario(scenarioPath, port, outPath, fps, width, androidSeria
   for (const connection of recorder.connections.values()) {
     if (connection.captureError) throw connection.captureError;
   }
-  writeGif(frames, outPath, fps, width);
+  writeGif(frames, outPath, fps, width, scenarioModule.maxHoldMs ?? 10000);
 }
 
-function writeGif(frames, outPath, fps, width) {
+function writeGif(frames, outPath, fps, width, maxHoldMs) {
   const workDir = mkdtempSync(path.join(tmpdir(), "obsidian-cdp-frames-"));
   try {
     const manifestFrames = frames.map((frame, index) => {
@@ -487,6 +487,7 @@ function writeGif(frames, outPath, fps, width) {
       "--out", path.resolve(outPath),
       "--width", String(width),
       "--fps", String(fps),
+      "--max-hold-ms", String(maxHoldMs),
     ], { stdio: "inherit" });
     if (result.status !== 0) throw new Error(`frames_to_gif.py failed with exit code ${result.status}`);
   } finally {

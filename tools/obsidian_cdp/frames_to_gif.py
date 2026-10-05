@@ -109,6 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--width", type=int, default=960)
     parser.add_argument("--fps", type=float, default=10)
+    parser.add_argument("--max-hold-ms", type=int, default=MAX_FRAME_MS)
     return parser
 
 
@@ -139,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
     timestamps = [float(frame["t"]) for frame in frames]
 
     kept_indices = thin_by_fps(timestamps, args.fps)
-    durations = frame_durations(timestamps, kept_indices)
+    durations = frame_durations(timestamps, kept_indices, max_ms=max(MIN_FRAME_MS, args.max_hold_ms))
     composed = compose_frames(args.manifest.parent, frames, kept_indices, args.width)
     composed = shared_palette(composed)
 

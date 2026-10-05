@@ -1,6 +1,6 @@
 {
   "name": "miro-canvas",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "description": "Miro's look and Miro's tools on Obsidian's own Canvas.",
   "main": "main.js",
@@ -13,14 +13,22 @@
     "typecheck": "tsc --noEmit",
     "schema:check": "node scripts/sync-schema.mjs --check",
     "schema:sync": "node scripts/sync-schema.mjs",
-    "submission:check": "node scripts/check-submission.mjs"
+    "submission:check": "node scripts/check-submission.mjs",
+    "lint": "eslint src --cache",
+    "lint:report": "eslint src --format json --output-file tools/obsidian_cdp/.out/lint-report.json"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "ajv": "^8.20.0",
     "esbuild": "^0.25.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.4.2",
     "obsidian": "^1.8.7",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^3.0.8"
+  },
+  "dependencies": {
+    "html2canvas-pro": "^2.5.0"
   }
 }

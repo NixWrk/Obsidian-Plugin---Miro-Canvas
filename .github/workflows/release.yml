@@ -25,6 +25,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run lint
       - run: npm test
       - run: npm run build
       # Obsidian looks for the manifest's version and downloads the files of

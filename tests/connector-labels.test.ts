@@ -8,6 +8,8 @@ class FakeStyle {
   private readonly props = new Map<string, string>();
   public setProperty(name: string, value: string): void {
     this.props.set(name, value);
+    // CSSStyleDeclaration exposes the same value through named properties.
+    if (name === "visibility" || name === "transform") Reflect.set(this, name, value);
   }
   public removeProperty(name: string): void {
     this.props.delete(name);

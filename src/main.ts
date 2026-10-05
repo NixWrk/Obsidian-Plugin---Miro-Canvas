@@ -1,5 +1,5 @@
 import * as obsidian from "obsidian";
-import { MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { Component, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
 import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily } from "./appearance";
 import {
@@ -363,7 +363,6 @@ export default class MiroCanvasPlugin extends Plugin {
         const description = session.describeSelection();
         // A notice can be copied out of, which a panel line cannot.
         new Notice(description, 20000);
-        console.info(`[miro-canvas] ${description}`);
       }),
     });
     this.addCommand({
@@ -528,6 +527,12 @@ export default class MiroCanvasPlugin extends Plugin {
       onStateChange: () => this.updateStatus(true),
       setIcon: (element, icon) => setIcon(element, icon),
       onOpenSettings: () => this.openOwnSettings(),
+      onSaveExport: async (name, bytes) => {
+        const sourcePath = view instanceof obsidian.FileView ? view.file?.path : undefined;
+        const path = await this.app.fileManager.getAvailablePathForAttachment(name, sourcePath);
+        await this.app.vault.createBinary(path, bytes.slice().buffer as ArrayBuffer);
+        return path;
+      },
       onAddFile: (button, fromVault) => this.openFileSourceMenu(button, fromVault),
       onConnectorMenu: (event, run) => {
         // The clipboard and danger sections of native Canvas's selection menu.
@@ -702,11 +707,15 @@ export default class MiroCanvasPlugin extends Plugin {
     const update = this.canvasSettings.availableUpdate;
     if (update === undefined) return;
     const labels = words().updates;
-    const modal = new Modal(this.app);
+    const renderComponent = new Component();
+    renderComponent.load();
+    const modal = new class extends Modal {
+      override onClose(): void { renderComponent.unload(); }
+    }(this.app);
     modal.setTitle(labels.modalTitle(update.version));
     const notes = modal.contentEl.createDiv({ cls: "miro-canvas-update-notes" });
     if (update.notes === "") notes.createEl("p", { text: labels.noNotes });
-    else void MarkdownRenderer.render(this.app, update.notes, notes, "", this);
+    else void MarkdownRenderer.render(this.app, update.notes, notes, "", renderComponent);
     modal.contentEl.createEl("p", { text: labels.howToUpdate });
     const buttons = modal.contentEl.createDiv({ cls: "modal-button-container" });
     buttons.createEl("button", { text: labels.openRelease, cls: "mod-cta" }).addEventListener("click", () => {
@@ -1140,7 +1149,7 @@ export default class MiroCanvasPlugin extends Plugin {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = ".ttf,.otf,.woff,.woff2";
-      input.style.display = "none";
+      input.hidden = true;
       input.addEventListener("change", () => {
         resolve(input.files?.[0] ?? undefined);
         input.remove();

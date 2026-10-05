@@ -2,7 +2,7 @@
 
 Source files live in tools/welcome-export-samples/{en,ru}. To refresh them,
 record tools/obsidian_cdp/scenarios/export-pages.mjs in each language and copy
-guide-export.pdf/pptx from that isolated vault. No export runs in the plugin
+the PDF/PPTX named after the scenario board from that isolated vault. No export runs in the plugin
 when a welcome board is created; these offline examples are copied on request.
 """
 import base64

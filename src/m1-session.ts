@@ -166,7 +166,7 @@ import {
 	DEFAULT_EXPORT_STATE, MAX_EXPORT_PAGES, exportRecord, pageAround, paperRatio, paperSize, readExportState, reshapePage,
 	type ExportPageRecord, type ExportRect, type ExportState,
 } from "./export-pages";
-import { ExportOverlay, ExportPanel, capturePages, electronRemote, type ExportKind } from "./board-export";
+import { ExportOverlay, ExportPanel, capturePages, type ExportKind } from "./board-export";
 import { makePdf, makePptx } from "./export-files";
 import { words } from "./i18n";
 
@@ -183,6 +183,7 @@ export interface M1SessionOptions {
 	readonly setIcon?: (element: HTMLElement, icon: string) => void;
 	/** Opens this plugin's page in Obsidian's settings, from the board menu. */
 	readonly onOpenSettings?: () => void;
+	readonly onSaveExport?: (name: string, bytes: Uint8Array) => Promise<string>;
 	readonly onAddFile?: (button: HTMLElement, fromVault: () => void) => void;
 	readonly onOpenCommentThread?: (threadId: string, origin: CommentOrigin) => void;
 	/**
@@ -401,27 +402,6 @@ function readRuntime(value: unknown, key: PropertyKey): unknown {
 /** The key a moved comment's place is kept under: its origin and id, which alone may repeat. */
 function commentPlaceKey(origin: CommentOrigin, id: string): string {
 	return `${origin}:${id}`;
-}
-
-/**
- * Offer to save an exported file where the person chooses, as Obsidian's own
- * image export does; the path it went to, or undefined when they declined.
- */
-async function saveExportFile(view: Window | null | undefined, name: string, kind: ExportKind, bytes: Uint8Array): Promise<string | undefined> {
-	const remote = electronRemote(view) as unknown as {
-		dialog?: { showSaveDialog(options: unknown): Promise<{ canceled: boolean; filePath?: string }> };
-	} | undefined;
-	const host = view as (Window & { require?: (name: string) => unknown }) | null | undefined;
-	const fs = host?.require?.("original-fs") as { promises?: { writeFile(path: string, data: Uint8Array): Promise<void> } } | undefined;
-	if (remote?.dialog === undefined || fs?.promises === undefined) throw new Error(words().export.unavailable);
-	const choice = await remote.dialog.showSaveDialog({
-		defaultPath: name,
-		filters: [kind === "pdf" ? { name: "PDF", extensions: ["pdf"] } : { name: "PowerPoint", extensions: ["pptx"] }],
-		properties: ["showOverwriteConfirmation"],
-	});
-	if (choice.canceled || choice.filePath === undefined || choice.filePath === "") return undefined;
-	await fs.promises.writeFile(choice.filePath, bytes);
-	return choice.filePath;
 }
 
 /** Call a method a host object may or may not have; what it throws is swallowed. */
@@ -6331,7 +6311,7 @@ export class M1CanvasSession {
 			title: exporting.title,
 			state: exporting.state,
 			...(exporting.busy === undefined ? {} : { busy: exporting.busy }),
-			...(electronRemote(view) === undefined ? { unavailable: words().export.unavailable } : {}),
+			...(this.options.onSaveExport === undefined ? { unavailable: words().export.unavailable } : {}),
 		});
 		this.updateExportOverlay();
 	}
@@ -6367,7 +6347,6 @@ export class M1CanvasSession {
 	private async runExport(kind: ExportKind): Promise<void> {
 		const exporting = this.exporting;
 		const canvas = this.nativeCanvas();
-		const view = ownerDocument(this.root)?.defaultView;
 		if (exporting === undefined || canvas === undefined || exporting.busy !== undefined) return;
 		const pages = exporting.state.pages;
 		if (pages.length === 0) return;
@@ -6401,7 +6380,8 @@ export class M1CanvasSession {
 				};
 			});
 			const bytes = kind === "pdf" ? makePdf(sheets, { title: base }) : makePptx(sheets, { title: base });
-			const saved = await saveExportFile(view, `${base}.${kind}`, kind, bytes);
+			if (this.options.onSaveExport === undefined) throw new Error(words().export.unavailable);
+			const saved = await this.options.onSaveExport(`${base}.${kind}`, bytes);
 			if (saved !== undefined) this.options.onNotice?.(words().export.exportedTo(saved));
 		} catch (error) {
 			this.options.onNotice?.(error instanceof Error ? error.message : words().export.exportFailed);
