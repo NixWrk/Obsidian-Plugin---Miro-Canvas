@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add a keyboard-accessible section selector to settings and move welcome/import actions to the top. Keep all parameters visible and separate developer diagnostics.
+- Document the existing Obsidian design foundation in DESIGN.md. Give README and the welcome introduction a short numbered route while preserving all twelve tutorial sections and real examples.
+- Explain moving and resizing export pages directly in the export panel, including on touch devices.
+
 ## 0.2.7 - 2026-10-05
 
 - Fix arrows disappearing on phones when no colour was assigned: support both native RGB-channel and complete CSS-colour theme variables for lines, arrowheads and block arrows, including off-screen edges after plugin reload.

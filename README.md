@@ -39,6 +39,18 @@ size if its smaller controls are difficult to see.
 4. Write a quick thought. Add a note from your vault and connect them with an arrow.
 5. Select an item to change its colour, font or shape.
 
+Continue with a small plan:
+
+| Try | What you get |
+| --- | --- |
+| [Connect two sticky notes](#arrows-and-drawing) | A plan whose arrows follow the cards |
+| [Add a note or file](#obsidian-notes-and-links) | Your Obsidian material beside the plan |
+| [Reply and resolve a comment](#comments-and-locking) | An open discussion and a completed thread |
+| [Export the plan](#export) | A PDF or PowerPoint saved in your vault |
+
+The welcome board has the same route through sections **1 → 2 → 6 → 8**.
+Its other sections remain available whenever you need them.
+
 Use these tool shortcuts while you are not editing text:
 
 | Key | Tool |
@@ -271,6 +283,10 @@ While editing text, Ctrl + F searches inside the card as usual in Obsidian.
 Board search does not change content and works in review mode.
 
 ## Make it yours
+
+In **Settings → Miro Canvas**, use **Go to section** to reach drawing,
+tools, fonts or another group without searching the whole page. Getting started
+is at the top; all parameters remain visible below the selector.
 
 The gear opens the board menu. **Arrange panels** lets you move the toolbar,
 navigation buttons and minimap, switch between rows and columns, reorder tools
@@ -548,6 +564,7 @@ listing text, release checks, policy disclosures and remaining review question.
 
 Read [AGENTS.md](AGENTS.md) and the [workflow, release and GIF recording
 instructions](docs/contributing.md) before changing the repository.
+For interface work, follow the existing host-based [design rules](DESIGN.md).
 Board reading and editing use the optional [MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
 The server is started separately by its owner's configuration; the plugin

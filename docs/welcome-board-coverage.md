@@ -1,7 +1,7 @@
 # Welcome board coverage
 
 Reviewed against README.md, `src/settings.ts`, `src/quick-tools.ts`, the
-selection toolbar, board controls and import/export modules on 2026-10-04.
+selection toolbar, board controls and import/export modules on 2026-10-05.
 This distinguishes an editable example from an instruction: words about a
 feature do not count as a demonstration of its result.
 
@@ -9,6 +9,11 @@ The original 0.2.1 Russian GIF used an older vault board. Its section numbers
 and narrow introduction differed from the bundled final template. The guide
 scenario now checks the template before recording and uses the correct
 drawing/settings sections. Record in a fresh isolated vault.
+
+The introduction now offers a short route through sections 1, 2, 6 and 8:
+start, sticky notes, comments and export. All twelve numbered sections and
+their examples remain available. The route is a reading aid, not a set of
+clickable links or a demonstration of those features by itself.
 
 | Capability | Earlier bundled guide | Current guide and how to try it |
 | --- | --- | --- |

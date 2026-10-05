@@ -58,6 +58,7 @@ export interface SettingsTabHost {
 
 export class MiroCanvasSettingTab extends PluginSettingTab {
   private readonly host: SettingsTabHost;
+  private readonly sectionTargets = new Map<string, HTMLElement>();
 
   public constructor(app: App, plugin: Plugin, host: SettingsTabHost) {
     super(app, plugin);
@@ -67,9 +68,26 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
   public override display(): void {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.addClass("miro-canvas-settings");
+    this.sectionTargets.clear();
     const labels = words().settings;
 
-    new Setting(containerEl).setName(labels.navigationHeading).setHeading();
+    const importLabels = words().importGuide;
+    this.sectionHeading(containerEl, "getting-started", importLabels.settingsHeading);
+    new Setting(containerEl)
+      .setClass("miro-canvas-settings-action")
+      .setName(labels.welcomeBoardName)
+      .setDesc(labels.welcomeBoardDesc)
+      .addButton(button => button.setButtonText(importLabels.createWelcomeBoardButton)
+        .setCta().onClick(() => this.host.createWelcomeBoard()));
+    new Setting(containerEl)
+      .setClass("miro-canvas-settings-action")
+      .setName(labels.importGuideName)
+      .setDesc(labels.importGuideDesc)
+      .addButton(button => button.setButtonText(importLabels.openGuideButton)
+        .onClick(() => this.host.openImportGuide()));
+
+    this.sectionHeading(containerEl, "navigation", labels.navigationHeading);
 
     this.slider(containerEl, labels.zoomStepName, labels.zoomStepDesc,
       "zoomStep", (value) => `${Math.round((value - 1) * 100)}%`);
@@ -104,14 +122,14 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     this.slider(containerEl, labels.maxZoomName, labels.maxZoomDesc,
       "maxZoom", (value) => `${Math.round(value * 100)}%`);
 
-    new Setting(containerEl).setName(labels.panningHeading).setHeading();
+    this.sectionHeading(containerEl, "panning", labels.panningHeading);
 
     this.slider(containerEl, labels.panStepName, labels.panStepDesc,
       "panStep", (value) => `${value} px`);
     this.slider(containerEl, labels.fastPanName, labels.fastPanDesc,
       "fastPanMultiplier", (value) => `${value}×`);
 
-    new Setting(containerEl).setName(labels.connectorsHeading).setHeading();
+    this.sectionHeading(containerEl, "connectors", labels.connectorsHeading);
     // Where an end of a line or an arrow may be put down.  Existing
     // connections keep their ends whatever is chosen here.
     for (const [key, title, description] of [
@@ -147,7 +165,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     this.slider(containerEl, labels.labelPositionName, labels.labelPositionDesc,
       "connectorLabelPosition", (value) => `${Math.round(value * 100)}%`);
 
-    new Setting(containerEl).setName(labels.drawingHeading).setHeading();
+    this.sectionHeading(containerEl, "drawing", labels.drawingHeading);
 
     new Setting(containerEl).setName(labels.penPressureName).setDesc(labels.penPressureDesc)
       .addToggle(toggle => toggle.setValue(this.host.settings.penPressure)
@@ -163,7 +181,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         .setValue(this.host.settings.holdStraightLine)
         .onChange((value) => void this.host.saveSettings({ holdStraightLine: value })));
 
-    new Setting(containerEl).setName(labels.keyboardHeading).setHeading();
+    this.sectionHeading(containerEl, "keyboard", labels.keyboardHeading);
 
     new Setting(containerEl)
       .setName(labels.shortcutsName)
@@ -185,10 +203,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
         .setValue(this.host.settings.boardFindKey)
         .onChange((value) => void this.host.saveSettings({ boardFindKey: value })));
 
-    new Setting(containerEl)
-      .setName(labels.interfaceName)
-      .setDesc(labels.interfaceDesc)
-      .setHeading();
+    this.sectionHeading(containerEl, "interface", labels.interfaceName, labels.interfaceDesc);
 
     new Setting(containerEl)
       .setName(labels.minimapDefaultName)
@@ -206,27 +221,49 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     this.toolBar(containerEl);
     this.comments(containerEl);
 
-    const importLabels = words().importGuide;
-    new Setting(containerEl).setName(importLabels.settingsHeading).setHeading();
-    new Setting(containerEl)
-      .addButton((button) => button
-        .setButtonText(importLabels.createWelcomeBoardButton)
-        .setCta()
-        .onClick(() => this.host.createWelcomeBoard()));
-    new Setting(containerEl)
-      .addButton((button) => button
-        .setButtonText(importLabels.openGuideButton)
-        .onClick(() => this.host.openImportGuide()));
-
     this.fonts(containerEl);
     this.updates(containerEl);
 
+    this.sectionHeading(containerEl, "advanced", labels.advancedHeading);
     new Setting(containerEl)
       .setName(labels.developerDiagnosticsName)
       .setDesc(labels.developerDiagnosticsDesc)
       .addToggle((toggle) => toggle
         .setValue(this.host.settings.developerDiagnostics)
         .onChange((value) => void this.host.saveSettings({ developerDiagnostics: value })));
+    this.sectionNavigation(containerEl);
+  }
+
+  private sectionHeading(container: HTMLElement, id: string, name: string, description?: string): void {
+    const heading = new Setting(container).setName(name).setHeading();
+    if (description !== undefined) heading.setDesc(description);
+    heading.nameEl.tabIndex = -1;
+    heading.nameEl.setAttribute("role", "heading");
+    heading.nameEl.setAttribute("aria-level", "2");
+    heading.settingEl.setAttribute("data-miro-settings-section", id);
+    this.sectionTargets.set(id, heading.nameEl);
+  }
+
+  private sectionNavigation(container: HTMLElement): void {
+    const labels = words().settings;
+    const setting = new Setting(container).setName(labels.sectionJumpName).setDesc(labels.sectionJumpDesc);
+    setting.settingEl.addClass("miro-canvas-settings-jump");
+    setting.addDropdown(dropdown => {
+      dropdown.selectEl.setAttribute("aria-label", labels.sectionJumpName);
+      dropdown.addOption("", labels.sectionJumpPlaceholder);
+      for (const [id, heading] of this.sectionTargets) dropdown.addOption(id, heading.textContent ?? "");
+      dropdown.onChange(id => {
+        const heading = this.sectionTargets.get(id);
+        if (heading === undefined) return;
+        const view = container.ownerDocument.defaultView;
+        const inset = Number.parseFloat(view?.getComputedStyle(container).paddingTop ?? "0") || 0;
+        const top = container.scrollTop + heading.getBoundingClientRect().top - container.getBoundingClientRect().top - inset;
+        container.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+        heading.focus({ preventScroll: true });
+        dropdown.setValue("");
+      });
+    });
+    container.prepend(setting.settingEl);
   }
 
   /**
@@ -237,7 +274,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
    */
   private fonts(containerEl: HTMLElement): void {
     const labels = words().fonts;
-    new Setting(containerEl).setName(labels.heading).setDesc(labels.networkLine).setHeading();
+    this.sectionHeading(containerEl, "fonts", labels.heading, labels.networkLine);
 
     const locale = currentLocale();
     for (const pack of this.host.fontPackCatalogue) {
@@ -319,7 +356,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
   /** "Check for updates": the installed version, and on a press what GitHub has. */
   private updates(containerEl: HTMLElement): void {
     const labels = words().updates;
-    new Setting(containerEl).setName(labels.heading).setHeading();
+    this.sectionHeading(containerEl, "updates", labels.heading);
     new Setting(containerEl)
       .setName(labels.autoName)
       .setDesc(labels.autoDesc)
@@ -356,7 +393,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
    */
   private toolBar(containerEl: HTMLElement): void {
     const labels = words().settings;
-    new Setting(containerEl).setName(labels.toolBarHeading).setDesc(labels.toolBarDesc).setHeading();
+    this.sectionHeading(containerEl, "tools", labels.toolBarHeading, labels.toolBarDesc);
     new Setting(containerEl).setDesc(labels.toolBarArrangeHint);
     new Setting(containerEl).setDesc(labels.toolBarLayoutKept(labels.layoutKinds[this.host.settings.layoutKind]));
     new Setting(containerEl)
@@ -426,7 +463,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
   /** Who signs the comments written here, and the colour each author's pins wear. */
   private comments(containerEl: HTMLElement): void {
     const labels = words().settings;
-    new Setting(containerEl).setName(labels.commentsHeading).setHeading();
+    this.sectionHeading(containerEl, "comments", labels.commentsHeading);
     const account = this.host.accountName?.();
     new Setting(containerEl)
       .setName(labels.yourNameName)

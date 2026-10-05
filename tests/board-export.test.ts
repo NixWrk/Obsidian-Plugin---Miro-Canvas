@@ -174,6 +174,15 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
 }
 
 describe("ExportPanel", () => {
+  it("explains page placement only when the page bounds can be edited", () => {
+    const { root, render } = buildPanel();
+    expect(texts(root, "miro-canvas-export__layout-hint")).toHaveLength(1);
+    render({ mode: "slides" });
+    expect(texts(root, "miro-canvas-export__layout-hint")).toHaveLength(0);
+    render({ mode: "board" });
+    expect(texts(root, "miro-canvas-export__layout-hint")).toHaveLength(1);
+  });
+
   it("lists the board's pages with their number and name", () => {
     const { root } = buildPanel();
     expect(texts(root, "miro-canvas-export__page-name")).toEqual(["1. Intro", "2. Page 2"]);

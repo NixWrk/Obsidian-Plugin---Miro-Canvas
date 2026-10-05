@@ -88,6 +88,7 @@ export class ExportPanel {
       }
     }
 
+    if (view.mode === "board") this.add(root, "p", "miro-canvas-export__layout-hint", words().export.layoutHint);
     const pages = this.add(root, "div", "miro-canvas-export__pages");
     this.add(pages, "div", "miro-canvas-export__label", view.mode === "slides" ? words().export.slidesLabel : words().export.pagesLabel);
     if (view.state.pages.length === 0) {

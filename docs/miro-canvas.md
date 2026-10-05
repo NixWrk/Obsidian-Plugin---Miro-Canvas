@@ -15,6 +15,13 @@ from the plugin.
 
 ## Current implementation status
 
+`DESIGN.md` records the native Obsidian visual foundation. Settings start with
+a keyboard-accessible section selector and the welcome/import actions. Selecting
+a section scrolls to and focuses its native heading without hiding parameters.
+The welcome introduction and README offer the numbered 1 → 2 → 6 → 8 route;
+all twelve tutorial sections, editable samples and exported files remain.
+The export panel explains page positioning and sizing beside the page list.
+
 Native connector paint preserves the theme's `--canvas-color`: older mobile
 Canvas exposes comma-separated RGB channels, whereas newer Canvas exposes a
 complete CSS colour. Wrap only the channels in `rgb()`, including arrowhead

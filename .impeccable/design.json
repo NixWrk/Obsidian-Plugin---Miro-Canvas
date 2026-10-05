@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T18:40:44Z",
+  "title": "Design System: Miro Canvas",
+  "extensions": {
+    "shadows": [
+      { "name": "floating-panel", "value": "var(--shadow-s, 0 4px 18px rgb(0 0 0 / 18%))", "purpose": "Existing floating navigation panel." }
+    ],
+    "motion": [
+      { "name": "state-change", "value": "120ms ease", "purpose": "Existing short colour and transform transitions; never board geometry." }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "900px" },
+      { "name": "phone", "value": "480px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Floating panel",
+      "kind": "nav",
+      "refersTo": "floating-panel",
+      "description": "Uses the host theme. Preview it inside Obsidian to resolve the host variables.",
+      "html": "<nav class=\"ds-panel\" aria-label=\"Navigation\">Navigation</nav>",
+      "css": ".ds-panel{background:var(--background-primary);color:var(--text-normal);border:1px solid var(--background-modifier-border);border-radius:var(--radius-m,8px);box-shadow:var(--shadow-s,0 4px 18px rgb(0 0 0 / 18%));padding:4px}"
+    },
+    {
+      "name": "Panel toggle",
+      "kind": "button",
+      "refersTo": "panel-toggle",
+      "description": "Separate 44px target; host icons are injected by Obsidian.",
+      "html": "<button class=\"ds-toggle\" aria-label=\"Fold panel\">Fold</button>",
+      "css": ".ds-toggle{width:44px;height:44px;color:var(--text-normal);background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:var(--radius-s,4px)}.ds-toggle:hover{background:var(--background-modifier-hover)}.ds-toggle:focus-visible{outline:2px solid var(--interactive-accent)}"
+    },
+    {
+      "name": "Section selector",
+      "kind": "input",
+      "description": "Native select navigates the complete settings page.",
+      "html": "<label class=\"ds-select-label\">Go to section <select class=\"ds-select\"><option>Choose a section…</option><option>Drawing</option><option>Fonts</option></select></label>",
+      "css": ".ds-select-label{color:var(--text-normal)}.ds-select{max-width:100%;color:var(--text-normal);background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:var(--radius-s,4px)}.ds-select:focus-visible{outline:2px solid var(--interactive-accent)}"
+    },
+    {
+      "name": "Native card face",
+      "kind": "card",
+      "description": "One rounded face paints the fill and border.",
+      "html": "<article class=\"ds-card\">A note on the board</article>",
+      "css": ".ds-card{color:var(--text-normal);background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:8px;padding:12px}"
+    },
+    {
+      "name": "Export help",
+      "kind": "custom",
+      "description": "Visible instructions without a hover requirement.",
+      "html": "<p class=\"ds-export-help\">Choose a page. Drag its label to move it, or its corner to resize it.</p>",
+      "css": ".ds-export-help{margin:0 0 12px;font-size:var(--font-ui-small);line-height:1.5;color:var(--text-normal)}"
+    }
+  ]
+}

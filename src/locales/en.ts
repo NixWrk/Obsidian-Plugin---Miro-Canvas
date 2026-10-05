@@ -27,6 +27,7 @@ export const EN = {
 		slidesLabel: "Slides",
 		noPages: "No pages yet: add one, or one for each frame.",
 		showPage: "Show on the board",
+		layoutHint: "Choose a page below to show it on the board. Drag its label to move it, or its corner to resize it. The paper format keeps its proportions.",
 		movePageHint: "Drag this label to move the export page",
 		resizePageHint: "Drag this corner to resize the export page",
 		earlier: "Earlier",
@@ -244,6 +245,14 @@ export const EN = {
 	},
 	/** The Obsidian settings tab, and the pointer-binding labels `settings.ts` itself owns. */
 	settings: {
+		sectionJumpName: "Go to section",
+		sectionJumpDesc: "Choose what you want to adjust. All settings remain below.",
+		sectionJumpPlaceholder: "Choose a section…",
+		welcomeBoardName: "Learn on a real board",
+		welcomeBoardDesc: "Try sticky notes, arrows, comments and export. Creates a fresh copy and keeps your existing boards.",
+		importGuideName: "Bring an existing board",
+		importGuideDesc: "See how to import boards from Miro and other plugins.",
+		advancedHeading: "For developers",
 		pointerBindings: {
 			none: "None",
 			right: "Right button",
@@ -937,7 +946,7 @@ export const EN = {
 		miroIntro: "Sticky notes and shapes, drawing, comments and handy toolbars.",
 		obsidianIntro: "Notes from your vault, Markdown, links and native Canvas. Your files stay with you and work offline.",
 		deviceIntro: "Mouse, touch or pen. Computer, tablet or phone. Choose your tools, fonts and panel layout.",
-		route: "Start here → Try the examples → Make your own board",
+		route: "Your first plan: 1. Start here → 2. Sticky notes → 6. Comments → 8. Export. Use the minimap to reach these sections.",
 		startTitle: "Start here",
 		startIntro: "Try it right here.",
 		startSticky: "**Write something on a sticky note.**\nChoose the sticky note tool or press N, then tap an empty part of the board.",

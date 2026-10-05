@@ -474,6 +474,20 @@ about half an hour.
 - **Rate limits** - not applicable; everything here runs on your own
   machine against your own local Obsidian process.
 
+### Settings navigation and onboarding regression
+
+Run `node tools/obsidian_cdp/check-settings-navigation.mjs --port 9336` in an
+isolated test vault. For Android, add `--serial <adb-serial>` and use its
+forwarded port with MiroCanvasTest open. Set `ADB` if the executable is outside
+the known VirtualTablet installation. Add `--theme moonstone` to check light
+mode; the runner restores the prior theme and active file afterward.
+
+The check chooses Drawing with real mouse/touch and native picker keys,
+checks that the heading clears Obsidian's header, continues with Tab, creates
+a fresh welcome copy, verifies twelve numbered tutorial sections and the
+unchanged prior board, and opens the export help. Screenshots go to `.out`.
+It supports both inline settings and the desktop's separate settings window.
+
 ### Export page mouse regression
 
 With an isolated Canvas open on CDP_PORT (default 9336), run

@@ -288,7 +288,8 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 		const id = caption(within("welcome", 40 + index * 610, 250, 580, 220), `**${title}**\n\n${body}`);
 		overrides[id] = { ...overrides[id], typography: { fontSize: 24 } };
 	});
-	caption(within("welcome", 40, 510, 1800, 60), strings.route);
+	const route = caption(within("welcome", 40, 510, 1800, 60), strings.route);
+	overrides[route] = { ...overrides[route], typography: { fontSize: 22, verticalAlign: "center" } };
 	for (const y of [230, 490]) connect({ from: pointIn("welcome", 40, y), to: pointIn("welcome", 1840, y), color: "#747474", width: 1, endCap: "none" });
 	const startTitle = caption(within("start", 40, 40, 820, 80), strings.startIntro);
 	overrides[startTitle] = { ...overrides[startTitle], typography: { fontSize: 32 } };
