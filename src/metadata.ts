@@ -178,7 +178,7 @@ export interface MiroCanvasLocalCommentReply {
 
 export interface MiroCanvasFreeAnchor {
   readonly id?: string;
-  readonly type?: "free" | "node" | "image" | "edge" | string;
+  readonly type?: string;
   readonly nodeId?: string;
   readonly edgeId?: string;
   readonly x?: number;

@@ -252,7 +252,7 @@ function isRecord(value: unknown): value is UnknownRecord {
   }
 }
 
-function readOwn(record: UnknownRecord, key: string): unknown | typeof ABSENT {
+function readOwn(record: UnknownRecord, key: string): unknown {
   try {
     if (!Object.prototype.hasOwnProperty.call(record, key)) {
       return ABSENT;
@@ -343,7 +343,7 @@ function defineOwn<T extends object>(record: T, key: string, value: unknown): vo
  * erased by an M1 edit.  Unsupported values fail closed and are omitted by
  * `copyUnknownProperties`.
  */
-function cloneUnknown(value: unknown, visiting = new Set<object>()): unknown | typeof INVALID {
+function cloneUnknown(value: unknown, visiting = new Set<object>()): unknown {
   if (value === null || typeof value === "string" || typeof value === "boolean") {
     return value;
   }
@@ -1282,7 +1282,7 @@ export function validateAppearanceState(value: unknown): AppearanceValidationRes
 export const validateAppearance = validateAppearanceState;
 
 /** Return an owned, JSON-safe appearance subset suitable for metadata merge. */
-export function toAppearanceMetadata(state: AppearanceState | unknown): AppearanceMetadataPayload {
+export function toAppearanceMetadata(state: unknown): AppearanceMetadataPayload {
   const normalized = normalizeAppearanceState(state);
   const localOverrides: Record<string, AppearanceLocalOverride> = {};
   for (const key of ownKeys(normalized.localOverrides)) {
@@ -1466,8 +1466,8 @@ function mergeColorsMetadata(currentInput: unknown, nextInput: unknown): Unknown
  */
 export function mergeAppearanceMetadata(
   metadataInput: unknown,
-  stateInput: AppearanceState | unknown,
-  _previousStateInput?: AppearanceState | unknown,
+  stateInput: unknown,
+  _previousStateInput?: unknown,
 ): Record<string, unknown> {
   const root = cloneMergeRecord(metadataInput);
   const hasSchema = hasOwnKey(root, "schemaVersion");
@@ -1713,7 +1713,7 @@ function buildState(settings: AppearanceSettings, overrides: Readonly<Record<str
   return freeze({ settings: ownedSettings, localOverrides: freeze(ownedOverrides) });
 }
 
-function actionValue(action: UnknownRecord, ...keys: readonly string[]): unknown | typeof ABSENT {
+function actionValue(action: UnknownRecord, ...keys: readonly string[]): unknown {
   for (const key of keys) {
     const value = readOwn(action, key);
     if (value !== ABSENT) {
@@ -1780,7 +1780,7 @@ function withPaletteEntry(state: AppearanceState, action: UnknownRecord): Appear
  * Pure immutable reducer.  Invalid commands are ignored and hostile payloads
  * fail closed.  The input state and action are never mutated or retained.
  */
-export function appearanceReducer(state: AppearanceState | unknown, action: AppearanceAction | unknown): AppearanceState {
+export function appearanceReducer(state: unknown, action: unknown): AppearanceState {
   const current = normalizeAppearanceState(state);
   if (!isRecord(action)) {
     return current;

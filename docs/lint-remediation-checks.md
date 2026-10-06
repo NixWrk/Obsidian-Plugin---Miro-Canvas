@@ -654,3 +654,82 @@ Types, 113 unit files (1,757 passed / one existing skip), ESLint 0 errors /
 381 existing warnings, CSS budget, three synthetic smoke modes, plugin/MCP
 builds, schema, 25 oracle tests and diff check pass. The main.js bundle is
 unchanged (SHA-256 3a0fce60d0428c9433e1a7d6f9a98201ed08eb3ec388e0060cf2a4b0edd7a8a4).
+
+## L14: redundant type-union members (traced before implementation)
+
+Baseline e5908b8: 30 no-redundant-type-constituents diagnostics in eight
+modules, at 27 distinct union annotations. lint-redundant-type-sites.json
+records original line/column, owning function/interface, entire union and
+local source/test/MCP importers before the edits. unknown already accepts
+undefined/sentinels/domain types; string already accepts capability enums
+and anchor literals. Simplify only the annotations to that existing broad
+type; preserve all runtime guards, supported capability sets and metadata
+validation, including unknown/future fields.
+
+| Participation | Mandatory checks |
+| --- | --- |
+| Native/Advanced Canvas adapter supports/hasCapability, readMetadata/getMetadata, root/document reads and setViewport | Adapter/compatibility tests: unknown capability refused, unavailable/private API reads fail closed, native selection/history/camera methods unchanged. |
+| anchors readOwn/mapValue/resolveAnchor/resolveAnchors and connector-endpoints readOwn/connectorAnchor | Anchor/endpoint/geometry tests: missing/inaccessible keys and symbols, malformed geometry, free/node/edge anchors, rotation and connector-chain preview. |
+| appearance readOwn/cloneUnknown/toAppearanceMetadata/mergeAppearanceMetadata/reducer helpers | Appearance/store/authoring tests: invalid payloads rejected, source and unknown fields preserved, font/color/text alignment and native history unchanged. |
+| local-comments readOwn and metadata MiroCanvasFreeAnchor.type | Comments/schema/MCP edit tests: origin and immutable evidence, extra fields and unknown anchor types remain supported/rejected by the same runtime rules. |
+| source-renderer SourceRendererHost.getDocument | Source renderer tests: absent document, edge/rotation/markup observations, preview and cleanup. |
+
+These annotations are erased. Require byte-identical plugin and MCP builds
+against the pre-edit checkpoints, full types/unit/lint and three browser
+modes, pinned schema, CSS budget and diff check; no disabled lint rules.
+main.js SHA-256: 3a0fce60d0428c9433e1a7d6f9a98201ed08eb3ec388e0060cf2a4b0edd7a8a4.
+MCP SHA-256: ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
+If a bundle differs, inspect it and leave the affected real-app checks pending.
+For identical executables, retain L12/L13 real-app evidence on Windows and
+both Androids and verify installed Android bundles still match this build.
+This is build verification, not a fresh ADB/hardware-input claim; no new
+Android runtime behavior is introduced. Windows work stays in the background.
+
+L14 build checkpoint: all eight changed modules produce identical unminified
+JavaScript after TypeScript erasure; the complete unminified plugin bundle
+also matches (SHA-256 5cbf997a4258f144e80c3bff5e57afdc6183978f31472aa0be674da3ced35fd6).
+The production minifier swaps two groups of short internal identifier names:
+394,902 AST nodes retain their kinds/literals/structure, and only 216 identifier
+occurrences change consistently. No runtime guards/statements/literal values
+change. MCP production bytes remain identical. The plugin's minified bytes
+therefore do not meet the original byte-identity gate, so rerun installed-app
+selection/resize/edge/history/cancel and search/export checks with the new
+production build rather than claiming the previous installed build matches.
+New main.js SHA-256: 3155e5bc4ae84ab1ac6f0d4903416c1abc2f11caadb003c1ca83ad2039fca043.
+
+### L14 results (2026-10-06)
+
+All 30 redundant-union diagnostics removed in 27 annotations; ESLint now
+0 errors / 351 warnings (381 before), with no rule suppression/new advisory.
+No executable statements or validation rules were edited. Unminified module
+and whole-bundle byte identity plus the consistent global identifier-renaming
+check confirm the production difference is minifier naming only. MCP remains
+byte-identical. The new production plugin SHA is recorded above.
+
+Types, all 113 unit files (1,757 passed / one existing skip), both builds,
+ESLint, CSS budget (86 priorities / zero :has), all three synthetic browser
+modes, pinned schema, 25 oracle tests and diff check pass.
+
+New production-build real-app checks passed:
+- Windows 10.0.19045.6456 / Obsidian 1.14.4, hidden isolated port 9346:
+  check-css-state --background and check-owned-visibility. Both themes,
+  native/turned selection, attached native edge before resize release at
+  50/125 percent, one-step commit/Undo/Redo/Escape cancel, code/attachment
+  state/reload, search and actual PDF capture/restore passed. Input is CDP
+  renderer synthesis; no OS input or foreground switch during the matrix.
+- Samsung SM-X736B / R52Y808PDJB / Obsidian 1.13.8, MiroCanvasTest port 9340:
+  same matrices with actual ADB taps/resize/CANCEL. Query text, late markup
+  and screenshot-class instrumentation are CDP/DOM synthesis. The installed
+  build was updated before checks. An initially loading Canvas had no active
+  file/session immediately after enable, so the first attempt was excluded;
+  a dedicated temporary test tab opened the existing test board after mount.
+  Original data/preferences were restored and the temporary tab was closed.
+- Samsung SM-A336E phone is currently absent from ADB. Its new-build input
+  matrix and installed-hash confirmation remain pending; it is not counted
+  as passed. Reconnect was requested; no response had arrived at this checkpoint.
+  Earlier L13 phone behavior evidence refers to the preceding minified build.
+
+Result JSON: .out/css-state-desktop.json, css-state-R52Y808PDJB.json,
+visibility-Windows.json and visibility-R52Y808PDJB.json. No new iOS/hardware
+pressure claims. User-facing behavior is unchanged, so no README/release-note
+behavior amendment is needed for this annotation cleanup.

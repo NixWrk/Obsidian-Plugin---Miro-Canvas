@@ -21,7 +21,7 @@ import { pressureStrokePath } from "./pressure-stroke";
 type UnknownRecord = Record<PropertyKey, unknown>;
 
 export interface SourceRendererHost {
-  getDocument(): unknown | undefined;
+  getDocument(): unknown;
   getNodes(): readonly unknown[] | undefined;
   getEdges(): readonly unknown[] | undefined;
   getRotationPreview?(): { readonly id: string; readonly rotation: number } | undefined;

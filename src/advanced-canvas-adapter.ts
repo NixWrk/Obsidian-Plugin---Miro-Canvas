@@ -634,11 +634,11 @@ export class AdvancedCanvasAdapter {
 		return [...this.diagnosticList];
 	}
 
-	public supports(capability: AdvancedCanvasCapability | string): boolean {
+	public supports(capability: string): boolean {
 		return this.capabilitySet.has(capability as AdvancedCanvasCapability);
 	}
 
-	public hasCapability(capability: AdvancedCanvasCapability | string): boolean {
+	public hasCapability(capability: string): boolean {
 		return this.supports(capability);
 	}
 
@@ -667,7 +667,7 @@ export class AdvancedCanvasAdapter {
 		return safeCall(this.plugin, method, args, this.probeState()) as T | undefined;
 	}
 
-	public readMetadata(): unknown | undefined {
+	public readMetadata(): unknown {
 		const probe = this.probeState();
 		for (const method of METADATA_METHODS) {
 			const value = safeCall(this.plugin, method, [], probe, ADVANCED_CANVAS_CAPABILITIES.metadata);
@@ -690,7 +690,7 @@ export class AdvancedCanvasAdapter {
 		return undefined;
 	}
 
-	public getMetadata(): unknown | undefined {
+	public getMetadata(): unknown {
 		return this.readMetadata();
 	}
 

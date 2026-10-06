@@ -152,7 +152,7 @@ function hasOwn(record: UnknownRecord, key: string): boolean {
   }
 }
 
-function readOwn(record: UnknownRecord, key: string): unknown | typeof ABSENT {
+function readOwn(record: UnknownRecord, key: string): unknown {
   if (!hasOwn(record, key)) {
     return ABSENT;
   }

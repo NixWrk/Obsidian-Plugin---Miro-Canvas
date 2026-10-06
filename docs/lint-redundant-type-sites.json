@@ -1,0 +1,413 @@
+{
+  "baselineCommit": "e5908b8",
+  "rule": "@typescript-eslint/no-redundant-type-constituents",
+  "interpretation": "Type annotations only; original owners and local importers traced before editing. Mandatory gates in L14.",
+  "modules": [
+    {
+      "file": "src/advanced-canvas-adapter.ts",
+      "importers": [
+        "src/canvas-session.ts",
+        "src/compatibility.ts",
+        "tests/advanced-canvas-adapter.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 637,
+          "column": 30,
+          "owner": "supports",
+          "union": "AdvancedCanvasCapability | string",
+          "member": "AdvancedCanvasCapability",
+          "message": "\"metadata\" | \"events\" | \"controls\" is overridden by string in this union type."
+        },
+        {
+          "line": 641,
+          "column": 35,
+          "owner": "hasCapability",
+          "union": "AdvancedCanvasCapability | string",
+          "member": "AdvancedCanvasCapability",
+          "message": "\"metadata\" | \"events\" | \"controls\" is overridden by string in this union type."
+        },
+        {
+          "line": 670,
+          "column": 25,
+          "owner": "readMetadata",
+          "union": "unknown | undefined",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 693,
+          "column": 24,
+          "owner": "getMetadata",
+          "union": "unknown | undefined",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/anchors.ts",
+      "importers": [
+        "src/board-connector-writes.ts",
+        "src/board-connectors.ts",
+        "src/board-search.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/comment-markers.ts",
+        "src/comments-panel.ts",
+        "src/connector-endpoints.ts",
+        "src/connector-labels.ts",
+        "src/connector-layer.ts",
+        "src/connector-route.ts",
+        "src/edge-landing.ts",
+        "src/importers/board-builder.ts",
+        "src/importers/excalidraw.ts",
+        "src/local-comments.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/metadata.ts",
+        "src/source-renderer.ts",
+        "src/welcome-board.ts",
+        "tests/anchors.test.ts",
+        "tests/board-connectors.test.ts",
+        "tests/edge-landing.test.ts",
+        "tests/source-renderer.test.ts",
+        "mcp/src/tools-edit.ts",
+        "mcp/src/validate.ts"
+      ],
+      "sites": [
+        {
+          "line": 136,
+          "column": 55,
+          "owner": "readOwn",
+          "union": "unknown | typeof ABSENT",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 395,
+          "column": 46,
+          "owner": "mapValue",
+          "union": "unknown | typeof ABSENT",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 440,
+          "column": 80,
+          "owner": "resolveAnchor",
+          "union": "AnchorGeometry | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 504,
+          "column": 48,
+          "owner": "resolveAnchors",
+          "union": "Readonly<Record<string, unknown>> | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 505,
+          "column": 30,
+          "owner": "resolveAnchors",
+          "union": "AnchorGeometry | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/appearance.ts",
+      "importers": [
+        "src/canvas-authoring.ts",
+        "src/editor-appearance.ts",
+        "src/font-packs.ts",
+        "src/importers/excalidraw.ts",
+        "src/m1-controls.ts",
+        "src/m1-session.ts",
+        "src/main.ts",
+        "src/metadata.ts",
+        "src/quick-tools.ts",
+        "src/selection-toolbar.ts",
+        "src/settings-tab.ts",
+        "src/settings.ts",
+        "src/source-model.ts",
+        "src/source-renderer.ts",
+        "src/text-format.ts",
+        "tests/appearance.test.ts",
+        "tests/editor-appearance.test.ts",
+        "tests/m1-controls-dock.test.ts",
+        "tests/m1-session-label-font.test.ts",
+        "tests/m1-session-locking.test.ts",
+        "tests/selection-toolbar.test.ts",
+        "tests/text-format.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 255,
+          "column": 55,
+          "owner": "readOwn",
+          "union": "unknown | typeof ABSENT",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 346,
+          "column": 70,
+          "owner": "cloneUnknown",
+          "union": "unknown | typeof INVALID",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1285,
+          "column": 63,
+          "owner": "toAppearanceMetadata",
+          "union": "AppearanceState | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1469,
+          "column": 33,
+          "owner": "mergeAppearanceMetadata",
+          "union": "AppearanceState | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1470,
+          "column": 43,
+          "owner": "mergeAppearanceMetadata",
+          "union": "AppearanceState | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1716,
+          "column": 74,
+          "owner": "actionValue",
+          "union": "unknown | typeof ABSENT",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1783,
+          "column": 60,
+          "owner": "appearanceReducer",
+          "union": "AppearanceState | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1783,
+          "column": 96,
+          "owner": "appearanceReducer",
+          "union": "AppearanceAction | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/canvas-adapter.ts",
+      "importers": [
+        "src/advanced-canvas-adapter.ts",
+        "src/canvas-session.ts",
+        "src/compatibility.ts",
+        "src/m1-session.ts",
+        "src/viewport-controller.ts",
+        "tests/canvas-adapter.test.ts",
+        "tests/viewport-controller.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 1214,
+          "column": 30,
+          "owner": "supports",
+          "union": "CanvasCapability | string",
+          "member": "CanvasCapability",
+          "message": "\"events\" | \"document\" | \"rootElement\" | \"scene\" | \"viewport\" | \"nativeCamera\" | \"selection\" | \"viewportMutation\" | \"render\" | \"persistence\" is overridden by string in this union type."
+        },
+        {
+          "line": 1218,
+          "column": 35,
+          "owner": "hasCapability",
+          "union": "CanvasCapability | string",
+          "member": "CanvasCapability",
+          "message": "\"events\" | \"document\" | \"rootElement\" | \"scene\" | \"viewport\" | \"nativeCamera\" | \"selection\" | \"viewportMutation\" | \"render\" | \"persistence\" is overridden by string in this union type."
+        },
+        {
+          "line": 1266,
+          "column": 27,
+          "owner": "getRootElement",
+          "union": "unknown | undefined",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1316,
+          "column": 24,
+          "owner": "getDocument",
+          "union": "unknown | undefined",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 1391,
+          "column": 48,
+          "owner": "setViewport",
+          "union": "CanvasViewport | unknown",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/connector-endpoints.ts",
+      "importers": [
+        "src/board-connector-writes.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/source-renderer.ts",
+        "tests/board-connectors.test.ts",
+        "tests/board-search.test.ts",
+        "tests/connector-endpoints.test.ts",
+        "tests/connector-layer.test.ts",
+        "tests/source-renderer.test.ts",
+        "mcp/src/tools-edit.ts",
+        "mcp/src/validate.ts"
+      ],
+      "sites": [
+        {
+          "line": 78,
+          "column": 55,
+          "owner": "readOwn",
+          "union": "unknown | typeof ABSENT | typeof ERROR",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        },
+        {
+          "line": 319,
+          "column": 87,
+          "owner": "connectorAnchor",
+          "union": "unknown | typeof ABSENT",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/local-comments.ts",
+      "importers": [
+        "src/board-search.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/comment-markers.ts",
+        "src/comment-thread.ts",
+        "src/comments-panel.ts",
+        "src/connector-endpoints.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/source-model.ts",
+        "src/welcome-board.ts",
+        "tests/board-search.test.ts",
+        "tests/comment-markers.test.ts",
+        "tests/comment-thread.test.ts",
+        "tests/comments-panel.test.ts",
+        "tests/local-comments.test.ts",
+        "tests/welcome-board.test.ts",
+        "mcp/src/summary.ts",
+        "mcp/src/tools-edit.ts"
+      ],
+      "sites": [
+        {
+          "line": 155,
+          "column": 55,
+          "owner": "readOwn",
+          "union": "unknown | typeof ABSENT",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/metadata.ts",
+      "importers": [
+        "src/canvas-authoring.ts",
+        "src/canvas-session.ts",
+        "src/connector-endpoints.ts",
+        "src/importers/advanced-canvas.ts",
+        "src/importers/board-builder.ts",
+        "src/m1-session.ts",
+        "src/metadata-writer.ts",
+        "src/welcome-board.ts",
+        "tests/board-connectors.test.ts",
+        "tests/import-advanced-canvas.test.ts",
+        "tests/import-common.test.ts",
+        "tests/import-excalidraw.test.ts",
+        "tests/import-mindmap.test.ts",
+        "tests/metadata.test.ts",
+        "tests/schema-fixtures.test.ts",
+        "tests/welcome-board.test.ts",
+        "mcp/src/summary.ts",
+        "mcp/src/validate.ts"
+      ],
+      "sites": [
+        {
+          "line": 181,
+          "column": 19,
+          "owner": "MiroCanvasFreeAnchor",
+          "union": "\"free\" | \"node\" | \"image\" | \"edge\" | string",
+          "member": "\"free\"",
+          "message": "\"free\" is overridden by string in this union type."
+        },
+        {
+          "line": 181,
+          "column": 28,
+          "owner": "MiroCanvasFreeAnchor",
+          "union": "\"free\" | \"node\" | \"image\" | \"edge\" | string",
+          "member": "\"node\"",
+          "message": "\"node\" is overridden by string in this union type."
+        },
+        {
+          "line": 181,
+          "column": 37,
+          "owner": "MiroCanvasFreeAnchor",
+          "union": "\"free\" | \"node\" | \"image\" | \"edge\" | string",
+          "member": "\"image\"",
+          "message": "\"image\" is overridden by string in this union type."
+        },
+        {
+          "line": 181,
+          "column": 47,
+          "owner": "MiroCanvasFreeAnchor",
+          "union": "\"free\" | \"node\" | \"image\" | \"edge\" | string",
+          "member": "\"edge\"",
+          "message": "\"edge\" is overridden by string in this union type."
+        }
+      ]
+    },
+    {
+      "file": "src/source-renderer.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/source-renderer.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 24,
+          "column": 18,
+          "owner": "getDocument",
+          "union": "unknown | undefined",
+          "member": "unknown",
+          "message": "'unknown' overrides all other types in this union type."
+        }
+      ]
+    }
+  ]
+}

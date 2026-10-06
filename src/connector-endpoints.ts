@@ -75,7 +75,7 @@ function isRecord(value: unknown): value is UnknownRecord {
   return prototype === Object.prototype || prototype === null;
 }
 
-function readOwn(record: UnknownRecord, key: string): unknown | typeof ABSENT | typeof ERROR {
+function readOwn(record: UnknownRecord, key: string): unknown {
   try {
     const descriptor = Object.getOwnPropertyDescriptor(record, key);
     if (descriptor === undefined) {
@@ -316,7 +316,7 @@ function sidePoint(rect: AnchorRect, side: unknown, outline?: readonly ShapePoin
   return { x: cx + dx * Math.cos(radians) - dy * Math.sin(radians), y: cy + dx * Math.sin(radians) + dy * Math.cos(radians) };
 }
 
-function connectorAnchor(document: UnknownRecord, edgeId: string, end: ConnectorEnd): unknown | typeof ABSENT {
+function connectorAnchor(document: UnknownRecord, edgeId: string, end: ConnectorEnd): unknown {
   const override = metadataOverride(document, edgeId);
   if (override === undefined) {
     return ABSENT;

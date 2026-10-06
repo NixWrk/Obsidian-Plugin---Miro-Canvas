@@ -1211,11 +1211,11 @@ export class CanvasAdapter {
 		return this.cameraFeaturesValue;
 	}
 
-	public supports(capability: CanvasCapability | string): boolean {
+	public supports(capability: string): boolean {
 		return this.capabilitySet.has(capability as CanvasCapability);
 	}
 
-	public hasCapability(capability: CanvasCapability | string): boolean {
+	public hasCapability(capability: string): boolean {
 		return this.supports(capability);
 	}
 
@@ -1263,7 +1263,7 @@ export class CanvasAdapter {
 		return safeCall(this.runtime, method, args, probe) as T | undefined;
 	}
 
-	public getRootElement(): unknown | undefined {
+	public getRootElement(): unknown {
 		const probe = this.probeState();
 		const result = firstDefined(this.runtime, ROOT_KEYS, probe, CANVAS_CAPABILITIES.rootElement);
 		if (result === undefined) {
@@ -1313,7 +1313,7 @@ export class CanvasAdapter {
 	 * throwing getter/method fails closed instead of falling through to an
 	 * unverified object.
 	 */
-	public getDocument(): unknown | undefined {
+	public getDocument(): unknown {
 		const probe = this.probeState();
 		const beforeMethodProbe = probe.diagnostics.length;
 		const getData = safeRead(this.runtime, DOCUMENT_METHOD_KEYS[0], probe, CANVAS_CAPABILITIES.document);
@@ -1388,7 +1388,7 @@ export class CanvasAdapter {
 		return result;
 	}
 
-	public setViewport(viewport: CanvasViewport | unknown): boolean {
+	public setViewport(viewport: unknown): boolean {
 		const probe = this.probeState();
 		if (this.disposed) {
 			addDiagnostic(probe, {

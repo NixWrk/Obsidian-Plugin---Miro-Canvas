@@ -133,7 +133,7 @@ function hasOwn(record: UnknownRecord, key: string): boolean {
   }
 }
 
-function readOwn(record: UnknownRecord, key: string): unknown | typeof ABSENT {
+function readOwn(record: UnknownRecord, key: string): unknown {
   if (!hasOwn(record, key)) {
     return ABSENT;
   }
@@ -392,7 +392,7 @@ function rotateRectPoint(point: AnchorPoint, rect: AnchorRect): AnchorPoint {
   return { x: cx + dx * Math.cos(radians) - dy * Math.sin(radians), y: cy + dx * Math.sin(radians) + dy * Math.cos(radians) };
 }
 
-function mapValue(map: unknown, id: string): unknown | typeof ABSENT {
+function mapValue(map: unknown, id: string): unknown {
   if (!isRecord(map)) {
     return ABSENT;
   }
@@ -437,7 +437,7 @@ export function pointOnPolyline(points: readonly AnchorPoint[], t: number): Anch
 }
 
 /** Resolve an anchor against detached, supplied geometry only. */
-export function resolveAnchor(anchorValue: unknown, geometry: AnchorGeometry | unknown): AnchorResolutionResult {
+export function resolveAnchor(anchorValue: unknown, geometry: unknown): AnchorResolutionResult {
   const normalized = normalizeAnchor(anchorValue);
   if (!normalized.valid || normalized.anchor === undefined) {
     return { valid: false, diagnostics: normalized.diagnostics };
@@ -501,8 +501,8 @@ export function resolveAnchor(anchorValue: unknown, geometry: AnchorGeometry | u
 }
 
 export function resolveAnchors(
-  anchors: Readonly<Record<string, unknown>> | unknown,
-  geometry: AnchorGeometry | unknown,
+  anchors: unknown,
+  geometry: unknown,
 ): Readonly<Record<string, AnchorResolutionResult>> {
   const result: Record<string, AnchorResolutionResult> = {};
   if (!isRecord(anchors)) {
