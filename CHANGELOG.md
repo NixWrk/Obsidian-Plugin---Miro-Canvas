@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the search close button above folded panel controls on phones. Remove four redundant CSS priorities for hidden search/export roots and screenshot search outlines; verify search and actual PDF capture in installed Windows/Android Obsidian.
+
 - Remove the four remaining CSS `:has()` selectors. Keep one selection outline on native cards and one code title with Obsidian's wrapped Markdown preview. Track late attachment labels and code markup with reversible local state.
 - Cancel a resize without adding an empty Undo step; preserve the live attached-line preview and one history step on release.
 - Remove 367 redundant TypeScript assertions; verify byte-identical plugin and MCP builds for that cleanup.

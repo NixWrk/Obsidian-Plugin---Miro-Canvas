@@ -574,3 +574,83 @@ Android code/bundles are unchanged; no new Android behavior requires a rerun.
 Types, full 1,757-pass/one-skip unit suite, ESLint (0 errors / 381 warnings),
 CSS budget, all three synthetic browser modes, builds/schema, oracle tests
 and diff check pass for the harness update.
+
+## L13: search/export owned visibility (traced before edits)
+
+styles.css:3710,3834,4713,4814: four !important declarations for export
+panel/pages [hidden], search bar/hit [hidden], and screenshot search hit.
+BoardSearchBar.open/close toggles hidden; M1.openSearch/closeSearch and
+updateSearchHit own the result outline. ExportPanel/ExportPageOverlay roots
+are created by M1.openExport, removed by closeExport, and temporarily hidden
+by runExport during capture, then restored in finally. capturePages adds
+is-screenshotting while pictures are taken. None of these owned roots gets
+an inline display value. Their visible base rules have one class; [hidden]
+and is-screenshotting add specificity and already override those base rules.
+
+Before implementation, inspect these roots and computed display in installed
+Windows and Android Obsidian. Remove only the four redundant priorities;
+retain selectors and behavior. Mandatory checks: search open/type/next/no
+matches/close/reopen, hidden hit does not intercept input, screenshot hit
+suppression; export open/close, page/panel hidden while capturing and restored
+after capture; actual small PDF export, unknown/source fields and original
+file/preferences preserved. Record ADB taps separately from CDP text/DOM
+capture instrumentation. Windows stays hidden with CDP input; no OS input.
+Use existing search/export unit suites, full gates, and lower CSS budget only
+after the installed-app matrix passes on both connected Android models.
+
+L13 pre-edit installed inspection: Obsidian 1.14.4 Windows, 1.13.8 tablet,
+1.12.7 phone all expose search flex, export grid and pages block; all three
+roots have empty inline display and compute none with hidden. The inspection
+uses controlled visibility flags, not a physical input claim.
+
+L13 harness follow-up: the first prototype cleanup byte check masked a
+selector failure and native serialization of the freshly generated welcome
+board. Keep the primary error visible and compare the complete parsed original
+document (including all unknown/source fields), since native Canvas may
+normalize whitespace on opening. No harness write to the original is allowed.
+Search bar buttons do not carry data-icon in this runtime; target its three
+actual buttons in their observed previous/next/close order. This is test
+instrumentation only; production markup is unchanged.
+
+L13 phone finding traced before the layering fix: the folded tools toggle at
+the owner's top-right saved position is the native hit target over search's
+Close button. Search z-index=102 is below the shared saved-panel toggle=120
+and popover=130. This is an existing reproducible overlap, not a failed ADB
+injection. Set the search bar to the next shared layer (140), retaining the
+result outline's layer and export/modal layers. Mandatory checks: actual
+search Next/Close/Reopen hits with the folded tools button at that position,
+both themes, Windows and both Androids; source search/toolbar tests and gates.
+
+### L13 results (2026-10-06)
+
+Four priorities removed; CSS budget 86 !important / zero :has. Search layer
+140 fixes the actual phone overlap without altering hit-outline geometry or
+native card/connector data. Full check-owned-visibility.mjs matrix passes:
+- Windows 10.0.19045.6456, installed Obsidian 1.14.4, isolated hidden window
+  / port 9346: renderer CDP input only, no foreground/OS input.
+- Samsung SM-X736B / R52Y808PDJB, Obsidian 1.13.8, MiroCanvasTest / port 9340.
+- Samsung SM-A336E / RZCW101PJVN, Obsidian 1.12.7, MiroCanvasTest / port 9341:
+  extra legacy evidence below the unchanged supported minimum.
+
+Both Androids use actual ADB taps for open/next/close/reopen search, export
+menu/PDF/close. Query text and screenshot-class inspection are synthesized
+in the real WebView, separately from ADB evidence. Both host themes pass.
+Hidden hits have display none and pointer-events none; search stays clickable
+above the phone's folded tools toggle. Actual PDF files were saved (Windows
+37,407 bytes; tablet 37,322; phone 36,280) with a valid %PDF- header. Capture
+observer sees panel/pages display none; both restore to grid/block afterward,
+and the real close button removes both roots. Wait for camera/UI settlement
+after export before the closing tap; an immediate legacy-phone tap did not
+close the panel. No production close handler was changed for that timing.
+
+The phone initially had NotificationShade over Obsidian: the focus guard
+refused input; Back dismissed the shade before the affected checks. Failed
+obscured attempts are not success evidence. Originals are never overwritten;
+full parsed original data and all unknown/source fields compare equal after
+restoration, and theme/viewport are restored. Result JSON is under
+.out/visibility-<Windows or serial>.json. No hardware stylus/iOS claim.
+
+Types, 113 unit files (1,757 passed / one existing skip), ESLint 0 errors /
+381 existing warnings, CSS budget, three synthetic smoke modes, plugin/MCP
+builds, schema, 25 oracle tests and diff check pass. The main.js bundle is
+unchanged (SHA-256 3a0fce60d0428c9433e1a7d6f9a98201ed08eb3ec388e0060cf2a4b0edd7a8a4).

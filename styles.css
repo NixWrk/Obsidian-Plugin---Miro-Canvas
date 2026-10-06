@@ -3707,7 +3707,7 @@
 }
 
 .miro-canvas-export[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .miro-canvas-export__header {
@@ -3831,7 +3831,7 @@
 }
 
 .miro-canvas-export-pages[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .miro-canvas-export-page {
@@ -4693,7 +4693,8 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 102;
+  /* Above saved panel toggles (120) and their menus (130). */
+  z-index: 140;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -4710,7 +4711,7 @@
 
 .miro-canvas-search[hidden],
 .miro-canvas-search-hit[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .miro-canvas-search .miro-canvas-search__input {
@@ -4811,7 +4812,7 @@
 }
 
 .is-screenshotting .miro-canvas-search-hit {
-  display: none !important;
+  display: none;
 }
 
 .miro-canvas-settings .miro-canvas-settings-jump select {

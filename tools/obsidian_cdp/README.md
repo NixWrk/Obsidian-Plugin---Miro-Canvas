@@ -573,3 +573,14 @@ mode hides the isolated Obsidian window, keeps its renderer timers running,
 and skips screenshots/bringing the window to the foreground. CDP mouse/key
 input stays within that renderer and does not take the owner's OS input.
 The runner asserts the window stays hidden after checks and restoration.
+
+### Search/export visibility
+
+`node tools/obsidian_cdp/check-owned-visibility.mjs --port <port>` runs in a
+hidden isolated Windows Obsidian window; add `--serial <device>` for actual
+ADB taps in MiroCanvasTest. It checks both themes, search result/next/no-match,
+close/reopen and screenshot hit suppression, then saves a small real PDF,
+observes hidden export roots during capture, restoration and actual close.
+Query entry and screenshot-class timing are explicitly synthesized. Original
+board data, theme and viewport are restored; results go to `.out/visibility-*`.
+Native focus and DOM hit-target guards prevent tapping obscured Android UI.

@@ -279,7 +279,7 @@ Nearby buttons undo and redo actions.
 **Ctrl + F**, or **Cmd + F** on Mac, searches cards, frame and file names,
 line labels and comments. **Enter** visits the next match; **Shift + Enter**
 visits the previous one. **Escape** closes search. The magnifying-glass button
-opens it too.
+opens it too. Its controls stay above folded panel buttons, including on phones.
 
 <details>
 <summary>Find a card outside the current view</summary>

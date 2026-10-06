@@ -15,6 +15,11 @@ from the plugin.
 
 ## Current implementation status
 
+Search uses layer 140 above saved-panel toggles (120) and popovers (130),
+so its Close button stays reachable when panels share the top-right corner.
+Hidden search/export roots rely on their specific selectors without CSS
+priority overrides; capture hides both export roots until completion.
+
 Native single-card selection uses the node's is-focused/is-selected state,
 looked up by ID, to keep the plugin's handle overlay transparent when the
 native card already supplies its outline. Turned and actively resized frames
