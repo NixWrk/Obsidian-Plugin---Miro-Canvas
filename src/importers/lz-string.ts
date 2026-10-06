@@ -76,7 +76,7 @@ class BitReader {
     let power = 1;
     for (let bit = 0; bit < count; bit += 1) {
       if (this.index >= this.values.length) return undefined;
-      const value = this.values[this.index]!;
+      const value = this.values[this.index];
       if ((value & this.mask) !== 0) result += power;
       power *= 2;
       this.mask >>= 1;

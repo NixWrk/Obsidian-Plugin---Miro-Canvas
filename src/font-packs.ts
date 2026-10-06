@@ -581,7 +581,7 @@ export class FontFaceRegistry {
       }
       const rules = target.faces.map((face, index) => faceRuleText(name, face, [
         `local(${cssString(name)})`,
-        `url(${cssString(targetBlobs[index]!)}) format("woff2")`,
+        `url(${cssString(targetBlobs[index])}) format("woff2")`,
       ]));
       this.loadedOwnerPack.set(name, alias.packId);
       this.rulesByOwner.set(name, rules);
@@ -720,7 +720,7 @@ function bytesToHex(buffer: ArrayBuffer): string {
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   // `.slice()` always allocates a fresh, plain ArrayBuffer, never the shared
   // kind a wider typed-array view could in principle be backed by.
-  return bytes.slice().buffer as ArrayBuffer;
+  return bytes.slice().buffer;
 }
 
 /**

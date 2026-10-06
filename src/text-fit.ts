@@ -33,8 +33,8 @@ export function codeLineCount(markup: unknown): number {
   const pre = /<pre\b[^>]*>([\s\S]*?)<\/pre>/iu.exec(source);
   const fence = /^\s*(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\n\s*\1\s*$/mu.exec(source);
   const body = pre !== null
-    ? pre[1]!.replace(/<br\s*\/?>/giu, "\n").replace(/<[^>]*>/gu, "")
-    : fence !== null ? fence[2]! : source;
+    ? pre[1].replace(/<br\s*\/?>/giu, "\n").replace(/<[^>]*>/gu, "")
+    : fence !== null ? fence[2] : source;
   const lines = body.replace(/\r\n?/gu, "\n").replace(/^\n/u, "").replace(/\n$/u, "").split("\n").length;
   return Math.min(Math.max(lines, 1), MAX_NUMBERED_LINES);
 }

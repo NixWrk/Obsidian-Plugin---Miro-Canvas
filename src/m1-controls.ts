@@ -497,7 +497,7 @@ export class M1Controls {
 		if (owner !== undefined && owner !== null && typeof owner.addEventListener === "function") {
 			// A press anywhere else closes an open menu.
 			this.listen(owner, "pointerdown", (event) => {
-				const target = (event as Event).target as Node | null;
+				const target = (event).target as Node | null;
 				const contains = (root as { contains?: (node: Node | null) => boolean }).contains;
 				if (typeof contains === "function" && !contains.call(root, target)) this.closeMenus();
 			});

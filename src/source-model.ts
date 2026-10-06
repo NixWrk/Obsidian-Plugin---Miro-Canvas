@@ -840,7 +840,7 @@ function indexSource(document: unknown, diagnostics: string[]): IndexedSource {
     const keys = ownNames(bindings);
     const limit = Math.min(keys.length, MAX_BINDINGS);
     for (let index = 0; index < limit; index += 1) {
-      const canvasId = keys[index]!;
+      const canvasId = keys[index];
       const binding = valueOf(bindings, canvasId);
       const sourceId = valueOf(binding, "sourceId");
       if (!isRecord(binding) || typeof sourceId !== "string" || sourceId.length === 0) {

@@ -1,0 +1,3291 @@
+{
+  "baselineCommit": "6fdc053",
+  "rule": "@typescript-eslint/no-unnecessary-type-assertion",
+  "interpretation": "TypeScript-only assertions; sites refer to the baseline. Owners and importers are extracted from local source before editing; mandatory gates are L10 in lint-remediation-checks.md.",
+  "modules": [
+    {
+      "file": "src/advanced-canvas-adapter.ts",
+      "importers": [
+        "src/canvas-session.ts",
+        "src/compatibility.ts",
+        "tests/advanced-canvas-adapter.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 139,
+          "column": 11,
+          "owner": "safeRead",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 163,
+          "column": 11,
+          "owner": "safeCallResult",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 225,
+          "column": 11,
+          "owner": "safeIsArray",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 245,
+          "column": 11,
+          "owner": "safeInstanceOf",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 286,
+          "column": 12,
+          "owner": "hasCollectionMember",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 336,
+          "column": 27,
+          "owner": "containsPluginId",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 336,
+          "column": 27,
+          "owner": "containsPluginId",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 343,
+          "column": 12,
+          "owner": "containsPluginId",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 351,
+          "column": 12,
+          "owner": "containsPluginId",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 358,
+          "column": 27,
+          "owner": "containsPluginId",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 358,
+          "column": 27,
+          "owner": "containsPluginId",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 421,
+          "column": 13,
+          "owner": "locatePlugin",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 514,
+          "column": 12,
+          "owner": "createProbe",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 520,
+          "column": 12,
+          "owner": "createProbe",
+          "expression": "\"info\"",
+          "automatic": true
+        },
+        {
+          "line": 530,
+          "column": 12,
+          "owner": "createProbe",
+          "expression": "\"info\"",
+          "automatic": true
+        },
+        {
+          "line": 541,
+          "column": 13,
+          "owner": "createProbe",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 687,
+          "column": 11,
+          "owner": "AdvancedCanvasAdapter.readMetadata",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 720,
+          "column": 12,
+          "owner": "AdvancedCanvasAdapter.on",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 744,
+          "column": 14,
+          "owner": "AdvancedCanvasAdapter.on.<callback>",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 775,
+          "column": 11,
+          "owner": "AdvancedCanvasAdapter.off",
+          "expression": "\"warning\"",
+          "automatic": true
+        },
+        {
+          "line": 811,
+          "column": 70,
+          "owner": "AdvancedCanvasAdapter.hasControl",
+          "expression": "controlId",
+          "automatic": true
+        },
+        {
+          "line": 823,
+          "column": 12,
+          "owner": "AdvancedCanvasAdapter.registerControl",
+          "expression": "\"warning\"",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/anchors.ts",
+      "importers": [
+        "src/board-connector-writes.ts",
+        "src/board-connectors.ts",
+        "src/board-search.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/comment-markers.ts",
+        "src/comments-panel.ts",
+        "src/connector-endpoints.ts",
+        "src/connector-labels.ts",
+        "src/connector-layer.ts",
+        "src/connector-route.ts",
+        "src/edge-landing.ts",
+        "src/importers/board-builder.ts",
+        "src/importers/excalidraw.ts",
+        "src/local-comments.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/metadata.ts",
+        "src/source-renderer.ts",
+        "src/welcome-board.ts",
+        "tests/anchors.test.ts",
+        "tests/board-connectors.test.ts",
+        "tests/edge-landing.test.ts",
+        "tests/source-renderer.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 324,
+          "column": 15,
+          "owner": "normalizeAnchor",
+          "expression": "{ ...common, type, nodeId: id.trim(), u, v }",
+          "automatic": true
+        },
+        {
+          "line": 546,
+          "column": 28,
+          "owner": "anchorMap",
+          "expression": "value",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/appearance.ts",
+      "importers": [
+        "src/appearance-metadata.ts",
+        "src/canvas-authoring.ts",
+        "src/editor-appearance.ts",
+        "src/font-packs.ts",
+        "src/importers/excalidraw.ts",
+        "src/m1-controls.ts",
+        "src/m1-session.ts",
+        "src/main.ts",
+        "src/metadata.ts",
+        "src/quick-tools.ts",
+        "src/selection-toolbar.ts",
+        "src/settings-tab.ts",
+        "src/settings.ts",
+        "src/source-model.ts",
+        "src/source-renderer.ts",
+        "src/text-format.ts",
+        "tests/appearance.test.ts",
+        "tests/editor-appearance.test.ts",
+        "tests/m1-controls-dock.test.ts",
+        "tests/m1-session-label-font.test.ts",
+        "tests/m1-session-locking.test.ts",
+        "tests/selection-toolbar.test.ts",
+        "tests/text-format.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 287,
+          "column": 15,
+          "owner": "readArray",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 296,
+          "column": 26,
+          "owner": "readArray",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 720,
+          "column": 35,
+          "owner": "normalizeTypographyFormat",
+          "expression": "fallback",
+          "automatic": true
+        },
+        {
+          "line": 764,
+          "column": 35,
+          "owner": "normalizeTypography",
+          "expression": "fallback",
+          "automatic": true
+        },
+        {
+          "line": 783,
+          "column": 31,
+          "owner": "normalizeTypography",
+          "expression": "fallback",
+          "automatic": true
+        },
+        {
+          "line": 810,
+          "column": 52,
+          "owner": "normalizeTypography",
+          "expression": "fallback",
+          "automatic": true
+        },
+        {
+          "line": 844,
+          "column": 35,
+          "owner": "normalizeColors",
+          "expression": "fallback",
+          "automatic": true
+        },
+        {
+          "line": 1288,
+          "column": 29,
+          "owner": "toAppearanceMetadata",
+          "expression": "normalized",
+          "automatic": true
+        },
+        {
+          "line": 1289,
+          "column": 30,
+          "owner": "toAppearanceMetadata",
+          "expression": "normalized",
+          "automatic": true
+        },
+        {
+          "line": 1689,
+          "column": 29,
+          "owner": "copyOverrides",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 1693,
+          "column": 30,
+          "owner": "copyOverrides",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 1704,
+          "column": 29,
+          "owner": "buildState",
+          "expression": "overrides",
+          "automatic": true
+        },
+        {
+          "line": 1708,
+          "column": 30,
+          "owner": "buildState",
+          "expression": "overrides",
+          "automatic": true
+        },
+        {
+          "line": 1737,
+          "column": 27,
+          "owner": "updateOverride",
+          "expression": "state",
+          "automatic": true
+        },
+        {
+          "line": 1835,
+          "column": 30,
+          "owner": "appearanceReducer",
+          "expression": "current",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/board-clipboard.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/board-clipboard.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 167,
+          "column": 30,
+          "owner": "linkedFilePaths",
+          "expression": "link",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/board-connectors.ts",
+      "importers": [
+        "src/board-clipboard.ts",
+        "src/board-connector-writes.ts",
+        "src/board-search.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/connector-endpoints.ts",
+        "src/connector-labels.ts",
+        "src/connector-layer.ts",
+        "src/importers/board-builder.ts",
+        "src/m1-session.ts",
+        "src/metadata.ts",
+        "src/welcome-board.ts",
+        "tests/board-connector-writes.test.ts",
+        "tests/board-connectors.test.ts",
+        "tests/connector-layer.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 103,
+          "column": 78,
+          "owner": "nearestRouteFraction.<callback>",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 103,
+          "column": 106,
+          "owner": "nearestRouteFraction.<callback>",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 108,
+          "column": 19,
+          "owner": "nearestRouteFraction.<callback>",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 108,
+          "column": 41,
+          "owner": "nearestRouteFraction.<callback>",
+          "expression": "points",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/board-export.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/board-export.test.ts",
+        "tests/browser-export.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 224,
+          "column": 58,
+          "owner": "ExportOverlay.update.<callback>",
+          "expression": "pages",
+          "automatic": true
+        },
+        {
+          "line": 234,
+          "column": 21,
+          "owner": "ExportOverlay.update.<callback>",
+          "expression": "this",
+          "automatic": true
+        },
+        {
+          "line": 482,
+          "column": 22,
+          "owner": "prepareExportSvgs",
+          "expression": "originals",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/board-search-bar.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/board-search-bar.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 55,
+          "column": 10,
+          "owner": "BoardSearchBar",
+          "expression": "globalThis",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/board-search.ts",
+      "importers": [
+        "src/board-search-bar.ts",
+        "src/m1-session.ts",
+        "tests/board-search.test.ts",
+        "tests/m1-session-search.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 294,
+          "column": 9,
+          "owner": "findMatches",
+          "expression": "index",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/board-selection.ts",
+      "importers": [
+        "src/canvas-authoring.ts",
+        "src/m1-session.ts",
+        "tests/board-selection.test.ts",
+        "tests/canvas-authoring.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 61,
+          "column": 36,
+          "owner": "routeEndsInBox",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 61,
+          "column": 80,
+          "owner": "routeEndsInBox",
+          "expression": "points",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/canvas-adapter.ts",
+      "importers": [
+        "src/advanced-canvas-adapter.ts",
+        "src/canvas-session.ts",
+        "src/compatibility.ts",
+        "src/m1-session.ts",
+        "src/viewport-controller.ts",
+        "tests/canvas-adapter.test.ts",
+        "tests/viewport-controller.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 375,
+          "column": 19,
+          "owner": "installNativeCameraPatch",
+          "expression": "runtime",
+          "automatic": true
+        },
+        {
+          "line": 432,
+          "column": 18,
+          "owner": "installNativeCameraPatch",
+          "expression": "(() => undefined)",
+          "automatic": true
+        },
+        {
+          "line": 1001,
+          "column": 38,
+          "owner": "readArrayCollection",
+          "expression": "raw",
+          "automatic": true
+        },
+        {
+          "line": 1025,
+          "column": 38,
+          "owner": "readArrayCollection",
+          "expression": "raw",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/canvas-authoring.ts",
+      "importers": [
+        "src/importers/advanced-canvas.ts",
+        "src/importers/board-builder.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/welcome-board.ts",
+        "tests/canvas-authoring-update-nodes.test.ts",
+        "tests/canvas-authoring.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 550,
+          "column": 9,
+          "owner": "normalizeRecord",
+          "expression": "result",
+          "automatic": true
+        },
+        {
+          "line": 558,
+          "column": 9,
+          "owner": "cloneRecord",
+          "expression": "result",
+          "automatic": true
+        },
+        {
+          "line": 1042,
+          "column": 37,
+          "owner": "restoreDiscardedRootMetadata",
+          "expression": "data",
+          "automatic": true
+        },
+        {
+          "line": 1107,
+          "column": 11,
+          "owner": "readStylePatch.only",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 1160,
+          "column": 40,
+          "owner": "mergeStylePatch",
+          "expression": "(prior ?? {})",
+          "automatic": true
+        },
+        {
+          "line": 1160,
+          "column": 72,
+          "owner": "mergeStylePatch",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 1470,
+          "column": 38,
+          "owner": "readNodeUpdate",
+          "expression": "color",
+          "automatic": true
+        },
+        {
+          "line": 1617,
+          "column": 16,
+          "owner": "readLayerCards",
+          "expression": "nodesArray",
+          "automatic": true
+        },
+        {
+          "line": 1670,
+          "column": 17,
+          "owner": "buildZOrderDocument",
+          "expression": "nodesArray",
+          "automatic": true
+        },
+        {
+          "line": 1677,
+          "column": 15,
+          "owner": "buildZOrderDocument",
+          "expression": "slots",
+          "automatic": true
+        },
+        {
+          "line": 1677,
+          "column": 49,
+          "owner": "buildZOrderDocument",
+          "expression": "newCardOrder",
+          "automatic": true
+        },
+        {
+          "line": 1741,
+          "column": 20,
+          "owner": "buildZOrderDocument",
+          "expression": "newCardTokenOrder",
+          "automatic": true
+        },
+        {
+          "line": 2020,
+          "column": 26,
+          "owner": "CanvasAuthoring.previewShape",
+          "expression": "read",
+          "automatic": true
+        },
+        {
+          "line": 2024,
+          "column": 14,
+          "owner": "CanvasAuthoring.previewShape",
+          "expression": "read",
+          "automatic": true
+        },
+        {
+          "line": 2025,
+          "column": 11,
+          "owner": "CanvasAuthoring.previewShape",
+          "expression": "(read.nodes ?? [])",
+          "automatic": true
+        },
+        {
+          "line": 2026,
+          "column": 11,
+          "owner": "CanvasAuthoring.previewShape",
+          "expression": "(read.edges ?? [])",
+          "automatic": true
+        },
+        {
+          "line": 2972,
+          "column": 36,
+          "owner": "CanvasAuthoring.updateElementStyles",
+          "expression": "previous",
+          "automatic": true
+        },
+        {
+          "line": 2974,
+          "column": 13,
+          "owner": "CanvasAuthoring.updateElementStyles",
+          "expression": "overrides",
+          "automatic": true
+        },
+        {
+          "line": 3102,
+          "column": 36,
+          "owner": "CanvasAuthoring.changeZOrder",
+          "expression": "idsValue",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/comment-thread.ts",
+      "importers": [
+        "src/board-search.ts",
+        "src/comment-markers.ts",
+        "src/comments-panel.ts",
+        "src/m1-session.ts",
+        "src/main.ts",
+        "src/settings-tab.ts",
+        "src/source-model.ts",
+        "src/source-renderer.ts",
+        "tests/comment-thread.test.ts",
+        "tests/settings.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 69,
+          "column": 10,
+          "owner": "authorColor",
+          "expression": "AVATAR_COLORS",
+          "automatic": true
+        },
+        {
+          "line": 208,
+          "column": 44,
+          "owner": "CommentThreadCard",
+          "expression": "this",
+          "automatic": false
+        }
+      ]
+    },
+    {
+      "file": "src/comments-panel.ts",
+      "importers": [
+        "src/m2-tools.ts",
+        "tests/comments-panel.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 390,
+          "column": 6,
+          "owner": "CommentsPanel.focusThread",
+          "expression": "match",
+          "automatic": false
+        }
+      ]
+    },
+    {
+      "file": "src/connector-endpoints.ts",
+      "importers": [
+        "src/board-connector-writes.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/source-renderer.ts",
+        "tests/board-connectors.test.ts",
+        "tests/board-search.test.ts",
+        "tests/connector-endpoints.test.ts",
+        "tests/connector-layer.test.ts",
+        "tests/source-renderer.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 413,
+          "column": 9,
+          "owner": "buildCanvasAnchorGeometry",
+          "expression": "observed",
+          "automatic": true
+        },
+        {
+          "line": 413,
+          "column": 9,
+          "owner": "buildCanvasAnchorGeometry",
+          "expression": "observed",
+          "automatic": true
+        },
+        {
+          "line": 713,
+          "column": 18,
+          "owner": "contourNormal",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 714,
+          "column": 16,
+          "owner": "contourNormal",
+          "expression": "outline",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/connector-labels.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/connector-labels.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 177,
+          "column": 8,
+          "owner": "ConnectorLabels.edit.key",
+          "expression": "this",
+          "automatic": false
+        }
+      ]
+    },
+    {
+      "file": "src/connector-route.ts",
+      "importers": [
+        "src/board-connectors.ts",
+        "src/connector-endpoints.ts",
+        "src/connector-layer.ts",
+        "src/free-line.ts",
+        "src/importers/excalidraw.ts",
+        "src/m1-session.ts",
+        "src/source-model.ts",
+        "src/source-renderer.ts",
+        "tests/board-connectors.test.ts",
+        "tests/connector-route.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 111,
+          "column": 24,
+          "owner": "lines",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 139,
+          "column": 35,
+          "owner": "simplifyCorners",
+          "expression": "result",
+          "automatic": true
+        },
+        {
+          "line": 200,
+          "column": 21,
+          "owner": "squareBends",
+          "expression": "bends",
+          "automatic": true
+        },
+        {
+          "line": 200,
+          "column": 32,
+          "owner": "squareBends",
+          "expression": "bends",
+          "automatic": true
+        },
+        {
+          "line": 202,
+          "column": 24,
+          "owner": "squareBends",
+          "expression": "bends",
+          "automatic": true
+        },
+        {
+          "line": 202,
+          "column": 57,
+          "owner": "squareBends",
+          "expression": "bends",
+          "automatic": true
+        },
+        {
+          "line": 204,
+          "column": 16,
+          "owner": "squareBends",
+          "expression": "bends",
+          "automatic": true
+        },
+        {
+          "line": 213,
+          "column": 58,
+          "owner": "curveThrough.<callback>",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 215,
+          "column": 47,
+          "owner": "curveThrough.<callback>",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 217,
+          "column": 17,
+          "owner": "curveThrough.<callback>",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 217,
+          "column": 41,
+          "owner": "curveThrough.<callback>",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 217,
+          "column": 64,
+          "owner": "curveThrough.<callback>",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 217,
+          "column": 88,
+          "owner": "curveThrough.<callback>",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 221,
+          "column": 15,
+          "owner": "curveThrough",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 221,
+          "column": 36,
+          "owner": "curveThrough",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 223,
+          "column": 47,
+          "owner": "curveThrough",
+          "expression": "tangents",
+          "automatic": true
+        },
+        {
+          "line": 223,
+          "column": 84,
+          "owner": "curveThrough",
+          "expression": "tangents",
+          "automatic": true
+        },
+        {
+          "line": 272,
+          "column": 17,
+          "owner": "routeHandles",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 272,
+          "column": 38,
+          "owner": "routeHandles",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 284,
+          "column": 15,
+          "owner": "routeHandles",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 287,
+          "column": 21,
+          "owner": "routeHandles",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 287,
+          "column": 59,
+          "owner": "routeHandles",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 306,
+          "column": 49,
+          "owner": "gripNear.<callback>",
+          "expression": "samples",
+          "automatic": true
+        },
+        {
+          "line": 306,
+          "column": 65,
+          "owner": "gripNear.<callback>",
+          "expression": "samples",
+          "automatic": true
+        },
+        {
+          "line": 350,
+          "column": 44,
+          "owner": "placeWaypoint",
+          "expression": "result",
+          "automatic": true
+        },
+        {
+          "line": 351,
+          "column": 56,
+          "owner": "placeWaypoint",
+          "expression": "result",
+          "automatic": true
+        },
+        {
+          "line": 376,
+          "column": 35,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 376,
+          "column": 54,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 385,
+          "column": 18,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 386,
+          "column": 33,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 391,
+          "column": 27,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 391,
+          "column": 40,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 395,
+          "column": 13,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        },
+        {
+          "line": 395,
+          "column": 36,
+          "owner": "moveElbowSegment",
+          "expression": "corners",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/drawing.ts",
+      "importers": [
+        "src/importers/excalidraw.ts",
+        "src/m1-session.ts",
+        "tests/drawing.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 66,
+          "column": 38,
+          "owner": "simplifyPoints",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 66,
+          "column": 54,
+          "owner": "simplifyPoints",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 66,
+          "column": 70,
+          "owner": "simplifyPoints",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 106,
+          "column": 23,
+          "owner": "distanceToStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 106,
+          "column": 42,
+          "owner": "distanceToStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 107,
+          "column": 21,
+          "owner": "distanceToStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 107,
+          "column": 44,
+          "owner": "distanceToStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 110,
+          "column": 56,
+          "owner": "distanceToStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 110,
+          "column": 78,
+          "owner": "distanceToStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 159,
+          "column": 5,
+          "owner": "eraseFromStroke",
+          "expression": "originals",
+          "automatic": true
+        },
+        {
+          "line": 159,
+          "column": 48,
+          "owner": "eraseFromStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 159,
+          "column": 67,
+          "owner": "eraseFromStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 171,
+          "column": 34,
+          "owner": "eraseFromStroke",
+          "expression": "original",
+          "automatic": true
+        },
+        {
+          "line": 172,
+          "column": 87,
+          "owner": "eraseFromStroke",
+          "expression": "original",
+          "automatic": true
+        },
+        {
+          "line": 172,
+          "column": 109,
+          "owner": "eraseFromStroke",
+          "expression": "original",
+          "automatic": true
+        },
+        {
+          "line": 220,
+          "column": 58,
+          "owner": "strokeHitsSegment",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 220,
+          "column": 73,
+          "owner": "strokeHitsSegment",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 222,
+          "column": 20,
+          "owner": "strokeHitsSegment",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 222,
+          "column": 39,
+          "owner": "strokeHitsSegment",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 223,
+          "column": 20,
+          "owner": "strokeHitsSegment",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 223,
+          "column": 43,
+          "owner": "strokeHitsSegment",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 250,
+          "column": 15,
+          "owner": "pointInLasso",
+          "expression": "ring",
+          "automatic": true
+        },
+        {
+          "line": 250,
+          "column": 33,
+          "owner": "pointInLasso",
+          "expression": "ring",
+          "automatic": true
+        },
+        {
+          "line": 278,
+          "column": 17,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 279,
+          "column": 16,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 287,
+          "column": 26,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 287,
+          "column": 45,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 287,
+          "column": 67,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 287,
+          "column": 86,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 288,
+          "column": 45,
+          "owner": "recogniseStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 427,
+          "column": 13,
+          "owner": "shoelace",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 427,
+          "column": 35,
+          "owner": "shoelace",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 427,
+          "column": 56,
+          "owner": "shoelace",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 427,
+          "column": 78,
+          "owner": "shoelace",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 441,
+          "column": 27,
+          "owner": "eraserBox",
+          "expression": "path",
+          "automatic": true
+        },
+        {
+          "line": 442,
+          "column": 27,
+          "owner": "eraserBox",
+          "expression": "path",
+          "automatic": true
+        },
+        {
+          "line": 443,
+          "column": 27,
+          "owner": "eraserBox",
+          "expression": "path",
+          "automatic": true
+        },
+        {
+          "line": 444,
+          "column": 27,
+          "owner": "eraserBox",
+          "expression": "path",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/edge-landing.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/edge-landing.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 8,
+          "column": 66,
+          "owner": "edgeLanding.<callback>",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 8,
+          "column": 86,
+          "owner": "edgeLanding.<callback>",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 14,
+          "column": 15,
+          "owner": "edgeLanding",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 14,
+          "column": 31,
+          "owner": "edgeLanding",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 14,
+          "column": 56,
+          "owner": "edgeLanding",
+          "expression": "lengths",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/export-files.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/export-files.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 125,
+          "column": 11,
+          "owner": "crc32",
+          "expression": "CRC32_TABLE",
+          "automatic": true
+        },
+        {
+          "line": 125,
+          "column": 30,
+          "owner": "crc32",
+          "expression": "data",
+          "automatic": true
+        },
+        {
+          "line": 222,
+          "column": 20,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 227,
+          "column": 21,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 227,
+          "column": 44,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 231,
+          "column": 23,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 231,
+          "column": 56,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 232,
+          "column": 22,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 232,
+          "column": 55,
+          "owner": "jpegSize",
+          "expression": "image",
+          "automatic": true
+        },
+        {
+          "line": 335,
+          "column": 14,
+          "owner": "makePdf.<callback>",
+          "expression": "pageIds",
+          "automatic": true
+        },
+        {
+          "line": 343,
+          "column": 14,
+          "owner": "makePdf.<callback>",
+          "expression": "contentIds",
+          "automatic": true
+        },
+        {
+          "line": 347,
+          "column": 14,
+          "owner": "makePdf.<callback>",
+          "expression": "imageIds",
+          "automatic": true
+        },
+        {
+          "line": 367,
+          "column": 21,
+          "owner": "makePdf",
+          "expression": "outlineItemIds",
+          "automatic": true
+        },
+        {
+          "line": 368,
+          "column": 20,
+          "owner": "makePdf",
+          "expression": "outlineItemIds",
+          "automatic": true
+        },
+        {
+          "line": 374,
+          "column": 20,
+          "owner": "makePdf.<callback>",
+          "expression": "pages",
+          "automatic": true
+        },
+        {
+          "line": 379,
+          "column": 16,
+          "owner": "makePdf.<callback>",
+          "expression": "outlineItemIds",
+          "automatic": true
+        },
+        {
+          "line": 642,
+          "column": 24,
+          "owner": "makePptx",
+          "expression": "pages",
+          "automatic": true
+        },
+        {
+          "line": 643,
+          "column": 25,
+          "owner": "makePptx",
+          "expression": "pages",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/font-packs.ts",
+      "importers": [
+        "src/main.ts",
+        "src/settings-tab.ts",
+        "tests/font-packs.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 584,
+          "column": 26,
+          "owner": "FontFaceRegistry.loadFamily.<callback>",
+          "expression": "targetBlobs",
+          "automatic": true
+        },
+        {
+          "line": 723,
+          "column": 10,
+          "owner": "toArrayBuffer",
+          "expression": "bytes",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/free-line.ts",
+      "importers": [
+        "src/board-connectors.ts",
+        "src/connector-layer.ts",
+        "src/m1-session.ts",
+        "src/quick-tools.ts",
+        "src/source-renderer.ts",
+        "tests/free-line.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 107,
+          "column": 88,
+          "owner": "lineBends",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 107,
+          "column": 100,
+          "owner": "lineBends",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 121,
+          "column": 84,
+          "owner": "linePoints",
+          "expression": "line",
+          "automatic": true
+        },
+        {
+          "line": 121,
+          "column": 108,
+          "owner": "linePoints",
+          "expression": "line",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/import-guide.ts",
+      "importers": [
+        "src/main.ts",
+        "tests/import-guide.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 179,
+          "column": 15,
+          "owner": "buildImportGuide",
+          "expression": "append",
+          "automatic": false
+        }
+      ]
+    },
+    {
+      "file": "src/importers/advanced-canvas.ts",
+      "importers": [
+        "src/importers/registry.ts",
+        "tests/import-advanced-canvas.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 228,
+          "column": 10,
+          "owner": "setAt",
+          "expression": "path",
+          "automatic": true
+        },
+        {
+          "line": 606,
+          "column": 9,
+          "owner": "firstSlideLine",
+          "expression": "sorted",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/importers/excalidraw-file.ts",
+      "importers": [
+        "src/importers/excalidraw.ts",
+        "tests/excalidraw-file.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 269,
+          "column": 16,
+          "owner": "readTextElements",
+          "expression": "anchor",
+          "automatic": true
+        },
+        {
+          "line": 293,
+          "column": 35,
+          "owner": "readEmbeddedFiles",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 295,
+          "column": 16,
+          "owner": "readEmbeddedFiles",
+          "expression": "entry",
+          "automatic": true
+        },
+        {
+          "line": 296,
+          "column": 17,
+          "owner": "readEmbeddedFiles",
+          "expression": "entry",
+          "automatic": true
+        },
+        {
+          "line": 301,
+          "column": 25,
+          "owner": "readEmbeddedFiles",
+          "expression": "lines",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/importers/excalidraw.ts",
+      "importers": [
+        "src/importers/registry.ts",
+        "tests/import-excalidraw.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 437,
+          "column": 38,
+          "owner": "DrawingImport.placeStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 437,
+          "column": 50,
+          "owner": "DrawingImport.placeStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 479,
+          "column": 17,
+          "owner": "DrawingImport.placeLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 480,
+          "column": 16,
+          "owner": "DrawingImport.placeLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 757,
+          "column": 112,
+          "owner": "headSizeOf.<callback>",
+          "expression": "ARROWHEAD_SIZES",
+          "automatic": true
+        },
+        {
+          "line": 764,
+          "column": 67,
+          "owner": "arrowheadOf",
+          "expression": "ARROWHEADS",
+          "automatic": true
+        },
+        {
+          "line": 868,
+          "column": 16,
+          "owner": "isClosedCourse",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 869,
+          "column": 15,
+          "owner": "isClosedCourse",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 884,
+          "column": 46,
+          "owner": "linkPath",
+          "expression": "wiki",
+          "automatic": true
+        },
+        {
+          "line": 885,
+          "column": 23,
+          "owner": "linkPath",
+          "expression": "inner",
+          "automatic": true
+        },
+        {
+          "line": 886,
+          "column": 9,
+          "owner": "linkPath",
+          "expression": "withoutAlias",
+          "automatic": true
+        },
+        {
+          "line": 914,
+          "column": 30,
+          "owner": "textFrontmatterHas.<callback>",
+          "expression": "line",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/importers/lz-string.ts",
+      "importers": [
+        "src/importers/excalidraw-file.ts",
+        "tests/lz-string.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 79,
+          "column": 21,
+          "owner": "BitReader.read",
+          "expression": "this",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/importers/mindmap-outline.ts",
+      "importers": [
+        "src/importers/registry.ts",
+        "tests/import-mindmap.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 145,
+          "column": 37,
+          "owner": "unquoted",
+          "expression": "quoted",
+          "automatic": true
+        },
+        {
+          "line": 167,
+          "column": 28,
+          "owner": "readFrontmatter",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 170,
+          "column": 19,
+          "owner": "readFrontmatter",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 185,
+          "column": 16,
+          "owner": "readFrontmatter",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 190,
+          "column": 17,
+          "owner": "readFrontmatter",
+          "expression": "key",
+          "automatic": true
+        },
+        {
+          "line": 192,
+          "column": 23,
+          "owner": "readFrontmatter",
+          "expression": "key",
+          "automatic": true
+        },
+        {
+          "line": 216,
+          "column": 16,
+          "owner": "classifyLines",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 224,
+          "column": 26,
+          "owner": "classifyLines",
+          "expression": "close",
+          "automatic": true
+        },
+        {
+          "line": 224,
+          "column": 62,
+          "owner": "classifyLines",
+          "expression": "close",
+          "automatic": true
+        },
+        {
+          "line": 233,
+          "column": 25,
+          "owner": "classifyLines",
+          "expression": "open",
+          "automatic": true
+        },
+        {
+          "line": 234,
+          "column": 22,
+          "owner": "classifyLines",
+          "expression": "open",
+          "automatic": true
+        },
+        {
+          "line": 240,
+          "column": 43,
+          "owner": "classifyLines",
+          "expression": "heading",
+          "automatic": true
+        },
+        {
+          "line": 245,
+          "column": 53,
+          "owner": "classifyLines",
+          "expression": "item",
+          "automatic": true
+        },
+        {
+          "line": 261,
+          "column": 25,
+          "owner": "itemIndent",
+          "expression": "spaces",
+          "automatic": true
+        },
+        {
+          "line": 262,
+          "column": 10,
+          "owner": "itemIndent",
+          "expression": "spaces",
+          "automatic": true
+        },
+        {
+          "line": 293,
+          "column": 79,
+          "owner": "parseMindmapOutline.<callback>",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 314,
+          "column": 17,
+          "owner": "parseMindmapOutline",
+          "expression": "classes",
+          "automatic": true
+        },
+        {
+          "line": 316,
+          "column": 15,
+          "owner": "parseMindmapOutline",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 334,
+          "column": 34,
+          "owner": "parseMindmapOutline",
+          "expression": "headings",
+          "automatic": true
+        },
+        {
+          "line": 346,
+          "column": 31,
+          "owner": "parseMindmapOutline",
+          "expression": "items",
+          "automatic": true
+        },
+        {
+          "line": 464,
+          "column": 85,
+          "owner": "layoutTree",
+          "expression": "placed",
+          "automatic": true
+        },
+        {
+          "line": 468,
+          "column": 18,
+          "owner": "layoutTree",
+          "expression": "order",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/interaction-policy.ts",
+      "importers": [
+        "src/canvas-authoring.ts",
+        "src/connector-endpoints.ts",
+        "src/m1-session.ts",
+        "tests/interaction-policy.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 297,
+          "column": 33,
+          "owner": "freezeDeep",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 1091,
+          "column": 13,
+          "owner": "reduceMetadataInternal",
+          "expression": "freezeDeep",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/layer-order.ts",
+      "importers": [
+        "src/canvas-authoring.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/main.ts",
+        "src/selection-toolbar.ts",
+        "tests/layer-order.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 85,
+          "column": 25,
+          "owner": "moveTowardNearestOverlap",
+          "expression": "order",
+          "automatic": true
+        },
+        {
+          "line": 93,
+          "column": 25,
+          "owner": "moveTowardNearestOverlap",
+          "expression": "order",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/local-comments.ts",
+      "importers": [
+        "src/board-search.ts",
+        "src/board-selection.ts",
+        "src/canvas-authoring.ts",
+        "src/comment-markers.ts",
+        "src/comment-thread.ts",
+        "src/comments-panel.ts",
+        "src/connector-endpoints.ts",
+        "src/m1-session.ts",
+        "src/m2-tools.ts",
+        "src/source-model.ts",
+        "src/welcome-board.ts",
+        "tests/board-search.test.ts",
+        "tests/comment-markers.test.ts",
+        "tests/comment-thread.test.ts",
+        "tests/comments-panel.test.ts",
+        "tests/local-comments.test.ts",
+        "tests/welcome-board.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 272,
+          "column": 50,
+          "owner": "readComments",
+          "expression": "value",
+          "automatic": true
+        },
+        {
+          "line": 496,
+          "column": 27,
+          "owner": "targetIds",
+          "expression": "thread",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/local-items.ts",
+      "importers": [
+        "src/board-connectors.ts",
+        "src/canvas-authoring.ts",
+        "src/free-line.ts",
+        "src/importers/board-builder.ts",
+        "src/importers/excalidraw.ts",
+        "src/m1-session.ts",
+        "src/metadata.ts",
+        "src/quick-tools.ts",
+        "src/source-model.ts",
+        "src/welcome-board.ts",
+        "tests/free-line.test.ts",
+        "tests/local-items.test.ts",
+        "tests/pressure-stroke.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 151,
+          "column": 50,
+          "owner": "readLocalLine",
+          "expression": "headSize",
+          "automatic": true
+        },
+        {
+          "line": 152,
+          "column": 57,
+          "owner": "readLocalLine",
+          "expression": "strokeStyle",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/m1-controls.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/m1-controls-dock.test.ts",
+        "tests/m1-controls-source-inspector.test.ts",
+        "tests/m1-session-board-presses.test.ts",
+        "tests/m1-session-drag-placement.test.ts",
+        "tests/m1-session-large-board.test.ts",
+        "tests/m1-session-layers.test.ts",
+        "tests/m1-session-locking.test.ts",
+        "tests/m1-session-pen.test.ts",
+        "tests/m1-session-search.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 500,
+          "column": 21,
+          "owner": "M1Controls.build.<callback>",
+          "expression": "event",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/m1-session.ts",
+      "importers": [
+        "src/m2-tools.ts",
+        "src/main.ts",
+        "tests/appearance-decoration-observer.test.ts",
+        "tests/export-page-controls.test.ts",
+        "tests/m1-session-board-presses.test.ts",
+        "tests/m1-session-drag-placement.test.ts",
+        "tests/m1-session-label-font.test.ts",
+        "tests/m1-session-large-board.test.ts",
+        "tests/m1-session-layers.test.ts",
+        "tests/m1-session-locking.test.ts",
+        "tests/m1-session-panel-crowding.test.ts",
+        "tests/m1-session-pen.test.ts",
+        "tests/m1-session-persistence.test.ts",
+        "tests/m1-session-picked-cards.test.ts",
+        "tests/m1-session-search.test.ts",
+        "tests/m1-session-toolbar-state.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 2482,
+          "column": 20,
+          "owner": "M1CanvasSession.plannedRoute",
+          "expression": "this",
+          "automatic": true
+        },
+        {
+          "line": 2658,
+          "column": 28,
+          "owner": "M1CanvasSession.writeBends",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 2658,
+          "column": 50,
+          "owner": "M1CanvasSession.writeBends",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 2846,
+          "column": 43,
+          "owner": "M1CanvasSession.connectorLanding",
+          "expression": "geometry",
+          "automatic": true
+        },
+        {
+          "line": 2852,
+          "column": 16,
+          "owner": "M1CanvasSession.connectorLanding",
+          "expression": "geometry",
+          "automatic": true
+        },
+        {
+          "line": 2922,
+          "column": 40,
+          "owner": "M1CanvasSession.createEdge.nativeSide",
+          "expression": "fallback",
+          "automatic": true
+        },
+        {
+          "line": 3861,
+          "column": 11,
+          "owner": "M1CanvasSession.mutateComment.<callback>",
+          "expression": "mutation",
+          "automatic": true
+        },
+        {
+          "line": 5041,
+          "column": 21,
+          "owner": "M1CanvasSession.startToolGesture.draw",
+          "expression": "shown",
+          "automatic": true
+        },
+        {
+          "line": 5143,
+          "column": 24,
+          "owner": "M1CanvasSession.startToolGesture.up.<callback>",
+          "expression": "x",
+          "automatic": true
+        },
+        {
+          "line": 5143,
+          "column": 54,
+          "owner": "M1CanvasSession.startToolGesture.up.<callback>",
+          "expression": "y",
+          "automatic": true
+        },
+        {
+          "line": 5288,
+          "column": 34,
+          "owner": "M1CanvasSession.startLine.course",
+          "expression": "placed",
+          "automatic": true
+        },
+        {
+          "line": 5288,
+          "column": 55,
+          "owner": "M1CanvasSession.startLine.course",
+          "expression": "placed",
+          "automatic": true
+        },
+        {
+          "line": 5288,
+          "column": 81,
+          "owner": "M1CanvasSession.startLine.course",
+          "expression": "placed",
+          "automatic": true
+        },
+        {
+          "line": 5293,
+          "column": 58,
+          "owner": "M1CanvasSession.startLine.show",
+          "expression": "through",
+          "automatic": true
+        },
+        {
+          "line": 5333,
+          "column": 43,
+          "owner": "M1CanvasSession.startLine.move",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5368,
+          "column": 31,
+          "owner": "M1CanvasSession.startLine.place",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5370,
+          "column": 37,
+          "owner": "M1CanvasSession.startLine.place",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5401,
+          "column": 57,
+          "owner": "M1CanvasSession.createLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5401,
+          "column": 72,
+          "owner": "M1CanvasSession.createLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5402,
+          "column": 55,
+          "owner": "M1CanvasSession.createLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5402,
+          "column": 86,
+          "owner": "M1CanvasSession.createLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5534,
+          "column": 52,
+          "owner": "M1CanvasSession.drawStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5534,
+          "column": 64,
+          "owner": "M1CanvasSession.drawStroke",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 5547,
+          "column": 54,
+          "owner": "M1CanvasSession.drawStroke",
+          "expression": "stroke",
+          "automatic": true
+        },
+        {
+          "line": 5547,
+          "column": 73,
+          "owner": "M1CanvasSession.drawStroke",
+          "expression": "stroke",
+          "automatic": true
+        },
+        {
+          "line": 5548,
+          "column": 41,
+          "owner": "M1CanvasSession.drawStroke",
+          "expression": "widths",
+          "automatic": true
+        },
+        {
+          "line": 5960,
+          "column": 29,
+          "owner": "M1CanvasSession.nativeCanvas",
+          "expression": "canvas",
+          "automatic": true
+        },
+        {
+          "line": 6251,
+          "column": 38,
+          "owner": "M1CanvasSession.openExport.onMovePage.<callback>",
+          "expression": "pages",
+          "automatic": true
+        },
+        {
+          "line": 6251,
+          "column": 54,
+          "owner": "M1CanvasSession.openExport.onMovePage.<callback>",
+          "expression": "pages",
+          "automatic": true
+        },
+        {
+          "line": 6402,
+          "column": 21,
+          "owner": "M1CanvasSession.runExport.<callback>",
+          "expression": "pictures",
+          "automatic": true
+        },
+        {
+          "line": 6802,
+          "column": 101,
+          "owner": "M1CanvasSession.applyTextFragment",
+          "expression": "lines",
+          "automatic": true
+        },
+        {
+          "line": 6974,
+          "column": 11,
+          "owner": "M1CanvasSession.applyInteraction.<callback>",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 7594,
+          "column": 90,
+          "owner": "M1CanvasSession.startSelectionMove",
+          "expression": "ids",
+          "automatic": true
+        },
+        {
+          "line": 8712,
+          "column": 36,
+          "owner": "M1CanvasSession.attachResizeObserver",
+          "expression": "(() => {\r\n\t\t\t\t\tthis.refresh();\r\n\t\t\t\t\tthis.updatePanelPositions();\r\n\t\t\t\t})",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/m2-tools.ts",
+      "importers": [
+        "src/main.ts"
+      ],
+      "sites": [
+        {
+          "line": 49,
+          "column": 33,
+          "owner": "humanizeToken",
+          "expression": "spaced",
+          "automatic": true
+        },
+        {
+          "line": 424,
+          "column": 83,
+          "owner": "M2CanvasTools.focusComment",
+          "expression": "root",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/main.ts",
+      "importers": [],
+      "sites": [
+        {
+          "line": 518,
+          "column": 49,
+          "owner": "MiroCanvasPlugin.handleActiveLeafChange.onSaveExport",
+          "expression": "bytes",
+          "automatic": true
+        },
+        {
+          "line": 720,
+          "column": 10,
+          "owner": "MiroCanvasPlugin.openFileSourceMenu",
+          "expression": "this",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/metadata-writer.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "src/main.ts",
+        "src/obsidian-metadata-store.ts",
+        "tests/appearance-decoration-observer.test.ts",
+        "tests/m1-session-board-presses.test.ts",
+        "tests/m1-session-drag-placement.test.ts",
+        "tests/m1-session-large-board.test.ts",
+        "tests/m1-session-layers.test.ts",
+        "tests/m1-session-locking.test.ts",
+        "tests/m1-session-pen.test.ts",
+        "tests/m1-session-persistence.test.ts",
+        "tests/m1-session-picked-cards.test.ts",
+        "tests/m1-session-search.test.ts",
+        "tests/metadata-writer.test.ts",
+        "tests/metadata.test.ts",
+        "tests/obsidian-metadata-store.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 523,
+          "column": 19,
+          "owner": "MetadataWriter.runExplicitAction",
+          "expression": "currentMetadata",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/minimap-model.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/minimap-model.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 846,
+          "column": 9,
+          "owner": "modelOptions",
+          "expression": "result",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/miro-palette.ts",
+      "importers": [
+        "src/editor-appearance.ts",
+        "src/importers/mindmap-outline.ts",
+        "src/local-items.ts",
+        "src/m1-session.ts",
+        "src/quick-tools.ts",
+        "src/source-model.ts",
+        "src/source-renderer.ts",
+        "src/welcome-board.ts",
+        "tests/editor-appearance.test.ts",
+        "tests/import-mindmap.test.ts",
+        "tests/local-items.test.ts",
+        "tests/selection-toolbar.test.ts",
+        "tests/text-fit.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 84,
+          "column": 33,
+          "owner": "readableInk",
+          "expression": "match",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/panel-arrange.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/panel-arrange.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 53,
+          "column": 18,
+          "owner": "dropIndexFromPointer",
+          "expression": "rects",
+          "automatic": true
+        },
+        {
+          "line": 284,
+          "column": 42,
+          "owner": "PanelArrangeMode.renderTray.<callback>",
+          "expression": "event",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/pen-tooltips.ts",
+      "importers": [
+        "src/main.ts",
+        "tests/pen-tooltips.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 67,
+          "column": 20,
+          "owner": "labelledControl",
+          "expression": "element",
+          "automatic": false
+        }
+      ]
+    },
+    {
+      "file": "src/pressure-stroke.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "src/source-renderer.ts",
+        "tests/pressure-stroke.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 7,
+          "column": 15,
+          "owner": "pressureStrokePath",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 7,
+          "column": 39,
+          "owner": "pressureStrokePath",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 7,
+          "column": 72,
+          "owner": "pressureStrokePath",
+          "expression": "widths",
+          "automatic": true
+        },
+        {
+          "line": 10,
+          "column": 16,
+          "owner": "pressureStrokePath",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 10,
+          "column": 45,
+          "owner": "pressureStrokePath",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 13,
+          "column": 57,
+          "owner": "pressureStrokePath",
+          "expression": "widths",
+          "automatic": true
+        },
+        {
+          "line": 25,
+          "column": 17,
+          "owner": "remapStrokeWidths",
+          "expression": "widths",
+          "automatic": true
+        },
+        {
+          "line": 27,
+          "column": 17,
+          "owner": "remapStrokeWidths",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 27,
+          "column": 40,
+          "owner": "remapStrokeWidths",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 29,
+          "column": 18,
+          "owner": "remapStrokeWidths",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 29,
+          "column": 46,
+          "owner": "remapStrokeWidths",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 31,
+          "column": 62,
+          "owner": "remapStrokeWidths",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 31,
+          "column": 89,
+          "owner": "remapStrokeWidths",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 32,
+          "column": 35,
+          "owner": "remapStrokeWidths",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 32,
+          "column": 63,
+          "owner": "remapStrokeWidths",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 35,
+          "column": 17,
+          "owner": "remapStrokeWidths",
+          "expression": "widths",
+          "automatic": true
+        },
+        {
+          "line": 35,
+          "column": 42,
+          "owner": "remapStrokeWidths",
+          "expression": "widths",
+          "automatic": true
+        },
+        {
+          "line": 35,
+          "column": 58,
+          "owner": "remapStrokeWidths",
+          "expression": "widths",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/selection-bounds.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/selection-bounds.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 163,
+          "column": 16,
+          "owner": "pickReferences",
+          "expression": "pool",
+          "automatic": true
+        },
+        {
+          "line": 164,
+          "column": 15,
+          "owner": "pickReferences",
+          "expression": "pool",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/selection-handles.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/selection-handles.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 142,
+          "column": 10,
+          "owner": "resizeCursor",
+          "expression": "[\"ew-resize\", \"nwse-resize\", \"ns-resize\", \"nesw-resize\"]",
+          "automatic": true
+        },
+        {
+          "line": 611,
+          "column": 14,
+          "owner": "SelectionHandles.placeRouteGrips.<callback>",
+          "expression": "event",
+          "automatic": true
+        },
+        {
+          "line": 612,
+          "column": 14,
+          "owner": "SelectionHandles.placeRouteGrips.<callback>",
+          "expression": "event",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/selection-toolbar.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "src/quick-tools.ts",
+        "tests/selection-toolbar.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 254,
+          "column": 66,
+          "owner": "highlightPalette.<callback>",
+          "expression": "id",
+          "automatic": true
+        },
+        {
+          "line": 254,
+          "column": 80,
+          "owner": "highlightPalette.<callback>",
+          "expression": "label",
+          "automatic": true
+        },
+        {
+          "line": 254,
+          "column": 95,
+          "owner": "highlightPalette.<callback>",
+          "expression": "color",
+          "automatic": true
+        },
+        {
+          "line": 389,
+          "column": 48,
+          "owner": "normalizedHex",
+          "expression": "text",
+          "automatic": true
+        },
+        {
+          "line": 389,
+          "column": 59,
+          "owner": "normalizedHex",
+          "expression": "text",
+          "automatic": true
+        },
+        {
+          "line": 389,
+          "column": 70,
+          "owner": "normalizedHex",
+          "expression": "text",
+          "automatic": true
+        },
+        {
+          "line": 389,
+          "column": 81,
+          "owner": "normalizedHex",
+          "expression": "text",
+          "automatic": true
+        },
+        {
+          "line": 389,
+          "column": 92,
+          "owner": "normalizedHex",
+          "expression": "text",
+          "automatic": true
+        },
+        {
+          "line": 389,
+          "column": 103,
+          "owner": "normalizedHex",
+          "expression": "text",
+          "automatic": true
+        },
+        {
+          "line": 716,
+          "column": 31,
+          "owner": "SelectionToolbar.build",
+          "expression": "SHAPE_CATALOG",
+          "automatic": true
+        },
+        {
+          "line": 716,
+          "column": 84,
+          "owner": "SelectionToolbar.build.<callback>",
+          "expression": "SHAPE_CATALOG",
+          "automatic": true
+        },
+        {
+          "line": 767,
+          "column": 29,
+          "owner": "SelectionToolbar.build",
+          "expression": "ALIGNMENT_ICONS",
+          "automatic": true
+        },
+        {
+          "line": 864,
+          "column": 25,
+          "owner": "SelectionToolbar.build",
+          "expression": "colors",
+          "automatic": true
+        },
+        {
+          "line": 931,
+          "column": 19,
+          "owner": "SelectionToolbar.wire",
+          "expression": "refs",
+          "automatic": true
+        },
+        {
+          "line": 947,
+          "column": 19,
+          "owner": "SelectionToolbar.wire",
+          "expression": "refs",
+          "automatic": true
+        },
+        {
+          "line": 977,
+          "column": 22,
+          "owner": "SelectionToolbar.wire.<callback>",
+          "expression": "{ [key]: valueOf(option) as ConnectorCap }",
+          "automatic": true
+        },
+        {
+          "line": 1002,
+          "column": 21,
+          "owner": "SelectionToolbar.wire",
+          "expression": "refs",
+          "automatic": true
+        },
+        {
+          "line": 1114,
+          "column": 26,
+          "owner": "SelectionToolbar.update",
+          "expression": "state",
+          "automatic": true
+        },
+        {
+          "line": 1115,
+          "column": 25,
+          "owner": "SelectionToolbar.update",
+          "expression": "state",
+          "automatic": true
+        },
+        {
+          "line": 1116,
+          "column": 53,
+          "owner": "SelectionToolbar.update",
+          "expression": "state",
+          "automatic": true
+        },
+        {
+          "line": 1147,
+          "column": 7,
+          "owner": "SelectionToolbar.update",
+          "expression": "refs",
+          "automatic": true
+        },
+        {
+          "line": 1152,
+          "column": 7,
+          "owner": "SelectionToolbar.update",
+          "expression": "refs",
+          "automatic": true
+        },
+        {
+          "line": 1154,
+          "column": 28,
+          "owner": "SelectionToolbar.update",
+          "expression": "SHAPE_CATALOG",
+          "automatic": true
+        },
+        {
+          "line": 1166,
+          "column": 7,
+          "owner": "SelectionToolbar.update",
+          "expression": "refs",
+          "automatic": true
+        },
+        {
+          "line": 1171,
+          "column": 94,
+          "owner": "SelectionToolbar.update",
+          "expression": "ALIGNMENT_ICONS",
+          "automatic": true
+        },
+        {
+          "line": 1192,
+          "column": 24,
+          "owner": "SelectionToolbar.update",
+          "expression": "refs",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/settings-tab.ts",
+      "importers": [
+        "src/main.ts"
+      ],
+      "sites": [
+        {
+          "line": 437,
+          "column": 53,
+          "owner": "MiroCanvasSettingTab.toolBar.<callback>.<callback>",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 437,
+          "column": 70,
+          "owner": "MiroCanvasSettingTab.toolBar.<callback>.<callback>",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 446,
+          "column": 53,
+          "owner": "MiroCanvasSettingTab.toolBar.<callback>.<callback>",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 446,
+          "column": 74,
+          "owner": "MiroCanvasSettingTab.toolBar.<callback>.<callback>",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 519,
+          "column": 37,
+          "owner": "MiroCanvasSettingTab.slider.<callback>.<callback>",
+          "expression": "{ [key]: next }",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/settings.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "src/main.ts",
+        "src/settings-tab.ts",
+        "tests/m1-session-panel-crowding.test.ts",
+        "tests/m1-session-pen.test.ts",
+        "tests/m1-session-search.test.ts",
+        "tests/pointer-bindings.test.ts",
+        "tests/settings.test.ts",
+        "tests/update-check.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 413,
+          "column": 34,
+          "owner": "moveFontListEntry",
+          "expression": "next",
+          "automatic": true
+        },
+        {
+          "line": 413,
+          "column": 49,
+          "owner": "moveFontListEntry",
+          "expression": "next",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/shape-geometry.ts",
+      "importers": [
+        "src/connector-endpoints.ts",
+        "src/m1-session.ts",
+        "src/selection-handles.ts",
+        "src/selection-toolbar.ts",
+        "src/source-renderer.ts",
+        "tests/connector-endpoints.test.ts",
+        "tests/shape-catalog.test.ts",
+        "tests/shape-geometry.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 256,
+          "column": 28,
+          "owner": "contourPoint",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 256,
+          "column": 45,
+          "owner": "contourPoint",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 278,
+          "column": 18,
+          "owner": "closestContourPoint",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 279,
+          "column": 16,
+          "owner": "closestContourPoint",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 300,
+          "column": 18,
+          "owner": "insideSpan",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 301,
+          "column": 16,
+          "owner": "insideSpan",
+          "expression": "outline",
+          "automatic": true
+        },
+        {
+          "line": 316,
+          "column": 29,
+          "owner": "insideSpan",
+          "expression": "crossings",
+          "automatic": true
+        },
+        {
+          "line": 316,
+          "column": 55,
+          "owner": "insideSpan",
+          "expression": "crossings",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/slide-show.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/slide-show.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 73,
+          "column": 35,
+          "owner": "SlideShow.go",
+          "expression": "this",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/source-model.ts",
+      "importers": [
+        "src/board-connectors.ts",
+        "src/board-search.ts",
+        "src/canvas-authoring.ts",
+        "src/connector-endpoints.ts",
+        "src/connector-style.ts",
+        "src/m1-session.ts",
+        "src/selection-toolbar.ts",
+        "src/shape-catalog.ts",
+        "src/source-inspector.ts",
+        "src/source-renderer.ts",
+        "tests/board-search.test.ts",
+        "tests/comment-thread.test.ts",
+        "tests/import-excalidraw.test.ts",
+        "tests/selection-toolbar.test.ts",
+        "tests/shape-catalog.test.ts",
+        "tests/shape-geometry.test.ts",
+        "tests/source-model.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 843,
+          "column": 24,
+          "owner": "indexSource",
+          "expression": "keys",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/source-renderer.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/source-renderer.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 565,
+          "column": 39,
+          "owner": "decorateLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 565,
+          "column": 51,
+          "owner": "decorateLine",
+          "expression": "points",
+          "automatic": true
+        },
+        {
+          "line": 1093,
+          "column": 17,
+          "owner": "observeNodes",
+          "expression": "ratios",
+          "automatic": true
+        },
+        {
+          "line": 1165,
+          "column": 25,
+          "owner": "localMap.<callback>",
+          "expression": "a",
+          "automatic": true
+        },
+        {
+          "line": 1165,
+          "column": 40,
+          "owner": "localMap.<callback>",
+          "expression": "c",
+          "automatic": true
+        },
+        {
+          "line": 1165,
+          "column": 55,
+          "owner": "localMap.<callback>",
+          "expression": "e",
+          "automatic": true
+        },
+        {
+          "line": 1165,
+          "column": 62,
+          "owner": "localMap.<callback>",
+          "expression": "b",
+          "automatic": true
+        },
+        {
+          "line": 1165,
+          "column": 77,
+          "owner": "localMap.<callback>",
+          "expression": "d",
+          "automatic": true
+        },
+        {
+          "line": 1165,
+          "column": 92,
+          "owner": "localMap.<callback>",
+          "expression": "f",
+          "automatic": true
+        },
+        {
+          "line": 1227,
+          "column": 40,
+          "owner": "renderConnectorGeometry",
+          "expression": "caps",
+          "automatic": true
+        },
+        {
+          "line": 1228,
+          "column": 38,
+          "owner": "renderConnectorGeometry",
+          "expression": "caps",
+          "automatic": true
+        },
+        {
+          "line": 1285,
+          "column": 8,
+          "owner": "connectorFollow",
+          "expression": "routes",
+          "automatic": true
+        },
+        {
+          "line": 1551,
+          "column": 19,
+          "owner": "applyConnector",
+          "expression": "targets",
+          "automatic": true
+        },
+        {
+          "line": 2361,
+          "column": 11,
+          "owner": "rollBack",
+          "expression": "patches",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/stylus.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/m1-session-board-presses.test.ts",
+        "tests/m1-session-pen.test.ts",
+        "tests/stylus.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 119,
+          "column": 18,
+          "owner": "strokeWidthScale",
+          "expression": "sorted",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/text-fit.ts",
+      "importers": [
+        "src/source-renderer.ts",
+        "tests/text-fit.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 36,
+          "column": 7,
+          "owner": "codeLineCount",
+          "expression": "pre",
+          "automatic": true
+        },
+        {
+          "line": 37,
+          "column": 24,
+          "owner": "codeLineCount",
+          "expression": "fence",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/text-format.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/text-format.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 8,
+          "column": 41,
+          "owner": "formatTextSelection",
+          "expression": "outerSpan",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/text-list.ts",
+      "importers": [
+        "src/m1-session.ts",
+        "tests/text-list.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 57,
+          "column": 37,
+          "owner": "removeBullet",
+          "expression": "match",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/update-check.ts",
+      "importers": [
+        "src/main.ts",
+        "src/settings-tab.ts",
+        "src/settings.ts",
+        "tests/update-check.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 43,
+          "column": 38,
+          "owner": "versionNumbers",
+          "expression": "match",
+          "automatic": true
+        }
+      ]
+    },
+    {
+      "file": "src/welcome-board.ts",
+      "importers": [
+        "src/main.ts",
+        "tests/welcome-board.test.ts"
+      ],
+      "sites": [
+        {
+          "line": 297,
+          "column": 56,
+          "owner": "buildWelcomeBoard.<callback>",
+          "expression": "key",
+          "automatic": true
+        },
+        {
+          "line": 298,
+          "column": 73,
+          "owner": "buildWelcomeBoard.<callback>",
+          "expression": "text",
+          "automatic": true
+        }
+      ]
+    }
+  ]
+}

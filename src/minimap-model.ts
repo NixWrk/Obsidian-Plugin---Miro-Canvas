@@ -843,7 +843,7 @@ function modelOptions(viewportOrOptions: unknown, options: unknown): MinimapMode
 	if (viewportCandidate !== NO_VALUE && viewportCandidate !== undefined) {
 		result.viewport = viewportCandidate;
 	}
-	return result as MinimapModelOptions;
+	return result;
 }
 
 function validCanvasSize(options: unknown): { readonly width: number; readonly height: number } {

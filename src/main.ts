@@ -515,7 +515,7 @@ export default class MiroCanvasPlugin extends Plugin {
       onSaveExport: async (name, bytes) => {
         const sourcePath = view instanceof obsidian.FileView ? view.file?.path : undefined;
         const path = await this.app.fileManager.getAvailablePathForAttachment(name, sourcePath);
-        await this.app.vault.createBinary(path, bytes.slice().buffer as ArrayBuffer);
+        await this.app.vault.createBinary(path, bytes.slice().buffer);
         return path;
       },
       onAddFile: (button, fromVault) => this.openFileSourceMenu(button, fromVault),
@@ -717,7 +717,7 @@ export default class MiroCanvasPlugin extends Plugin {
     if (session === null) return;
     const sourceView = this.currentCanvasView;
     const sourcePath = this.app.workspace.activeLeaf?.view instanceof obsidian.FileView
-      ? (this.app.workspace.activeLeaf.view as obsidian.FileView).file?.path
+      ? (this.app.workspace.activeLeaf.view).file?.path
       : undefined;
     const menu = new Menu();
     menu.addItem(item => item.setTitle(labels.fromVault).setIcon("vault").onClick(fromVault));

@@ -410,7 +410,7 @@ export function moveFontListEntry(fontList: readonly FontListEntry[], family: st
     return fontList;
   }
   const next = [...fontList];
-  [next[index], next[target]] = [next[target]!, next[index]!];
+  [next[index], next[target]] = [next[target], next[index]];
   return Object.freeze(next);
 }
 

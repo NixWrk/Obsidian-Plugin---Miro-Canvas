@@ -63,7 +63,7 @@ export function simplifyPoints(points: readonly StrokePoint[], tolerance: number
     let farthest = -1;
     let distance = tolerance;
     for (let index = first + 1; index < last; index += 1) {
-      const away = distanceToSegment(points[index]!, points[first]!, points[last]!);
+      const away = distanceToSegment(points[index], points[first], points[last]);
       if (away > distance) {
         distance = away;
         farthest = index;
@@ -103,11 +103,11 @@ export function strokeBounds(points: readonly StrokePoint[], width = 0): StrokeB
 export function distanceToStroke(points: readonly number[], point: StrokePoint): number {
   let best = Number.POSITIVE_INFINITY;
   for (let index = 0; index + 3 < points.length; index += 2) {
-    const from = { x: points[index]!, y: points[index + 1]! };
-    const to = { x: points[index + 2]!, y: points[index + 3]! };
+    const from = { x: points[index], y: points[index + 1] };
+    const to = { x: points[index + 2], y: points[index + 3] };
     best = Math.min(best, distanceToSegment(point, from, to));
   }
-  if (points.length === 2) best = Math.hypot(point.x - points[0]!, point.y - points[1]!);
+  if (points.length === 2) best = Math.hypot(point.x - points[0], point.y - points[1]);
   return best;
 }
 
@@ -156,7 +156,7 @@ export function eraseFromStroke(
   const starts = new Set(breaks);
   for (let index = 0; index + 1 < points.length; index += 2) {
     if (originals.length === 0 || starts.has(index / 2)) originals.push([]);
-    originals[originals.length - 1]!.push({ x: points[index]!, y: points[index + 1]! });
+    originals[originals.length - 1].push({ x: points[index], y: points[index + 1] });
   }
   // Only the part of the line inside the box the eraser's path covers is
   // stepped along; the rest keeps its ends.  Stepping a long line end to end
@@ -168,8 +168,8 @@ export function eraseFromStroke(
   const pieces: number[][] = [];
   let changed = false;
   for (const original of originals) {
-    const walk: StrokePoint[] = [original[0]!];
-    for (let index = 1; index < original.length; index += 1) walk.push(...stepsWithin(original[index - 1]!, original[index]!, area, step));
+    const walk: StrokePoint[] = [original[0]];
+    for (let index = 1; index < original.length; index += 1) walk.push(...stepsWithin(original[index - 1], original[index], area, step));
     const erased = walk.map((stop) => distanceToStroke(eraser, stop) <= reach);
     if (!erased.includes(true)) {
       if (original.length >= 2) pieces.push(original.flatMap((point) => [point.x, point.y]));
@@ -217,10 +217,10 @@ export function strokeHitsSegment(
   const a = local(from), b = local(to);
   const reach = stroke.width / 2 + tolerance * Math.min(scaleX, scaleY);
   const points = stroke.points;
-  if (points.length === 2) return distanceToSegment({ x: points[0]!, y: points[1]! }, a, b) <= reach;
+  if (points.length === 2) return distanceToSegment({ x: points[0], y: points[1] }, a, b) <= reach;
   for (let index = 0; index + 3 < points.length; index += 2) {
-    const p = { x: points[index]!, y: points[index + 1]! };
-    const q = { x: points[index + 2]!, y: points[index + 3]! };
+    const p = { x: points[index], y: points[index + 1] };
+    const q = { x: points[index + 2], y: points[index + 3] };
     if (segmentDistance(a, b, p, q) <= reach) return true;
   }
   return false;
@@ -247,7 +247,7 @@ function segmentDistance(a: StrokePoint, b: StrokePoint, p: StrokePoint, q: Stro
 export function pointInLasso(ring: readonly StrokePoint[], point: StrokePoint): boolean {
   let inside = false;
   for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index, index += 1) {
-    const a = ring[index]!, b = ring[previous]!;
+    const a = ring[index], b = ring[previous];
     const straddles = (a.y > point.y) !== (b.y > point.y);
     if (!straddles) continue;
     const crossing = a.x + ((point.y - a.y) / (b.y - a.y)) * (b.x - a.x);
@@ -275,8 +275,8 @@ export interface StrokeShape {
  */
 export function recogniseStroke(points: readonly StrokePoint[]): StrokeShape | undefined {
   if (points.length < 2) return undefined;
-  const first = points[0]!;
-  const last = points[points.length - 1]!;
+  const first = points[0];
+  const last = points[points.length - 1];
   const box = strokeBounds(points);
   const diagonal = Math.hypot(box.width, box.height);
   if (diagonal < MIN_SHAPE_SIZE) return undefined;
@@ -284,8 +284,8 @@ export function recogniseStroke(points: readonly StrokePoint[]): StrokeShape | u
   let length = 0;
   let bend = 0;
   for (let index = 1; index < points.length; index += 1) {
-    length += Math.hypot(points[index]!.x - points[index - 1]!.x, points[index]!.y - points[index - 1]!.y);
-    bend = Math.max(bend, distanceToSegment(points[index]!, first, last));
+    length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+    bend = Math.max(bend, distanceToSegment(points[index], first, last));
   }
   if (length === 0) return undefined;
   if (bend <= Math.max(diagonal * 0.08, 2)) {
@@ -424,7 +424,7 @@ function fitShapeBox(points: readonly StrokePoint[], degrees: number): { box: St
 function shoelace(points: readonly StrokePoint[]): number {
   let sum = 0;
   for (let index = 0, previous = points.length - 1; index < points.length; previous = index, index += 1) {
-    sum += (points[previous]!.x + points[index]!.x) * (points[previous]!.y - points[index]!.y);
+    sum += (points[previous].x + points[index].x) * (points[previous].y - points[index].y);
   }
   return sum;
 }
@@ -438,10 +438,10 @@ function eraserBox(path: readonly number[], reach: number): StrokeBox | undefine
   let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
   for (let index = 0; index + 1 < path.length; index += 2) {
-    minX = Math.min(minX, path[index]!);
-    maxX = Math.max(maxX, path[index]!);
-    minY = Math.min(minY, path[index + 1]!);
-    maxY = Math.max(maxY, path[index + 1]!);
+    minX = Math.min(minX, path[index]);
+    maxX = Math.max(maxX, path[index]);
+    minY = Math.min(minY, path[index + 1]);
+    maxY = Math.max(maxY, path[index + 1]);
   }
   return { x: minX - reach, y: minY - reach, width: maxX - minX + reach * 2, height: maxY - minY + reach * 2 };
 }

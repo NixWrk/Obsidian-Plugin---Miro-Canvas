@@ -294,8 +294,8 @@ export function buildWelcomeBoard(options: WelcomeBoardOptions = {}): Record<str
 	const startTitle = caption(within("start", 40, 40, 820, 80), strings.startIntro);
 	overrides[startTitle] = { ...overrides[startTitle], typography: { fontSize: 32 } };
 	[["N", strings.startSticky], ["L", strings.startConnect], ["↶", strings.startUndo]].forEach(([key, text], index) => {
-		card(within("start", 40, 150 + index * 130, 64, 64), key!, { shape: { kind: "round_rectangle", fallback: "text" }, typography: centred(26) });
-		const id = caption(within("start", 130, 140 + index * 130, 720, 110), text!);
+		card(within("start", 40, 150 + index * 130, 64, 64), key, { shape: { kind: "round_rectangle", fallback: "text" }, typography: centred(26) });
+		const id = caption(within("start", 130, 140 + index * 130, 720, 110), text);
 		overrides[id] = { ...overrides[id], typography: { fontSize: 21 } };
 	});
 	caption(within("start", 40, 565, 820, 100), strings.startEscape);

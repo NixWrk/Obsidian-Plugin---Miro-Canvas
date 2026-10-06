@@ -160,8 +160,8 @@ function pickReferences(rects: readonly { readonly element: SelectedElement; rea
 	const cards = rects.filter((item) => item.element.card);
 	const pool = cards.length >= 2 ? cards : rects;
 	if (pool.length < 2) return undefined;
-	const first = pool[0]!;
-	const last = pool[pool.length - 1]!;
+	const first = pool[0];
+	const last = pool[pool.length - 1];
 	return [
 		{ element: first.element.element, rect: first.rect },
 		{ element: last.element.element, rect: last.rect },

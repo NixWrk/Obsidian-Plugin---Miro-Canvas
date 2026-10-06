@@ -547,7 +547,7 @@ function normalizeRecord(value: unknown): UnknownRecord {
 	if (result === OMIT || !isPlainObject(result)) {
 		throw new SnapshotError("Canvas document root must be an object");
 	}
-	return result as UnknownRecord;
+	return result;
 }
 
 function cloneRecord(value: unknown): UnknownRecord {
@@ -555,7 +555,7 @@ function cloneRecord(value: unknown): UnknownRecord {
 	if (!isPlainObject(result)) {
 		throw new SnapshotError("Canvas document root must be an object");
 	}
-	return result as UnknownRecord;
+	return result;
 }
 
 function structurallyEqual(left: unknown, right: unknown): boolean {
@@ -1039,7 +1039,7 @@ function restoreDiscardedRootMetadata(
 		// written in place, the metadata would also rewrite the step before
 		// this one, and Undo would bring back the new metadata with the old
 		// graph.  The document is replaced by a copy instead.
-		const next: UnknownRecord = { ...(data.value as UnknownRecord) };
+		const next: UnknownRecord = { ...(data.value) };
 		for (const [key, value] of repairs) setOwn(next, key, cloneJson(value));
 		if (!Reflect.set(host.runtime as object, "data", next)) return imported;
 	} catch {
@@ -1104,7 +1104,7 @@ function readStylePatch(action: unknown, diagnostics: CanvasAuthoringDiagnostic[
 		}
 		const only = (value: unknown, keys: readonly string[]): UnknownRecord => {
 			if (!isPlainObject(value) || Object.keys(value).some((key) => !keys.includes(key))) throw new SnapshotError("unsupported style field");
-			return value as UnknownRecord;
+			return value;
 		};
 		if (patch.colors !== undefined) {
 			const colors = only(patch.colors, ["text", "fill", "border", "edge"]);
@@ -1157,7 +1157,7 @@ function mergeStylePatch(existing: UnknownRecord, patch: UnknownRecord): Unknown
 		if (isPlainObject(value)) {
 			const prior = merged[key];
 			if (prior !== undefined && !isPlainObject(prior)) throw new SnapshotError("existing style object is malformed");
-			setOwn(merged, key, mergeStylePatch((prior ?? {}) as UnknownRecord, value as UnknownRecord));
+			setOwn(merged, key, mergeStylePatch((prior ?? {}), value));
 		} else setOwn(merged, key, value);
 	}
 	return merged;
@@ -1467,7 +1467,7 @@ function readNodeUpdate(
 			addDiagnostic(diagnostics, "update-node-color-invalid", "error", "A card's color must be a Canvas preset 1-6 or #rrggbb.");
 			return undefined;
 		}
-		fields.push({ key: "color", value: color.value as string | null, operation: "restyle" });
+		fields.push({ key: "color", value: color.value, operation: "restyle" });
 	}
 	return fields;
 }
@@ -1614,7 +1614,7 @@ function readLayerCards(nodesArray: readonly UnknownRecord[]): {
 	const cards: LayerCard[] = [];
 	const slots: number[] = [];
 	for (let index = 0; index < nodesArray.length; index += 1) {
-		const node = nodesArray[index]!;
+		const node = nodesArray[index];
 		const type = safeRead(node, "type");
 		if (!type.ok || typeof type.value !== "string" || !CARD_NODE_TYPES.has(type.value)) {
 			continue;
@@ -1667,14 +1667,14 @@ function buildZOrderDocument(
 		// whichever slot native Canvas already gave it.
 		const cardNodeById = new Map<string, UnknownRecord>();
 		for (const slot of slots) {
-			const node = nodesArray[slot]!;
+			const node = nodesArray[slot];
 			const id = readRequiredString(node, "id");
 			if (id !== undefined) {
 				cardNodeById.set(id, node);
 			}
 		}
 		for (let index = 0; index < slots.length; index += 1) {
-			nodesArray[slots[index]!] = cardNodeById.get(newCardOrder[index]!)!;
+			nodesArray[slots[index]] = cardNodeById.get(newCardOrder[index])!;
 		}
 	}
 
@@ -1738,7 +1738,7 @@ function buildZOrderDocument(
 		let tokenIndex = 0;
 		for (let slot = 0; slot < canonicalBySlot.length; slot += 1) {
 			if (canonicalBySlot[slot] !== undefined) {
-				const cardId = newCardTokenOrder[tokenIndex]!;
+				const cardId = newCardTokenOrder[tokenIndex];
 				tokenIndex += 1;
 				nextOrder[slot] = preferredTokens.get(cardId) ?? cardId;
 			}
@@ -2017,13 +2017,13 @@ export class CanvasAuthoring {
 			return { ok: false, status: "rejected", diagnostics: read.diagnostics };
 		}
 		const diagnostics: CanvasAuthoringDiagnostic[] = [];
-		if (policyAllowsCreate(read.document as UnknownRecord, diagnostics) === undefined) {
+		if (policyAllowsCreate(read.document, diagnostics) === undefined) {
 			return { ok: false, status: "rejected", diagnostics: [...read.diagnostics, ...diagnostics] };
 		}
 		const snapshot: InternalSnapshot = {
-			document: read.document as UnknownRecord,
-			nodes: (read.nodes ?? []) as readonly UnknownRecord[],
-			edges: (read.edges ?? []) as readonly UnknownRecord[],
+			document: read.document,
+			nodes: (read.nodes ?? []),
+			edges: (read.edges ?? []),
 		};
 		const shape = buildShape(snapshot, action, this.idPrefix, this.idCounter, diagnostics);
 		if (shape === undefined) {
@@ -2969,9 +2969,9 @@ export class CanvasAuthoring {
 				}
 				const previous = hasOwn(overrides, id) ? overrides[id] : {};
 				if (!isPlainObject(previous)) throw new SnapshotError("invalid target override");
-				const merged = mergeStylePatch(previous as UnknownRecord, patch);
+				const merged = mergeStylePatch(previous, patch);
 				if (!structurallyEqual(previous, merged)) {
-					setOwn(overrides as UnknownRecord, id, merged);
+					setOwn(overrides, id, merged);
 					changed = true;
 				}
 			}
@@ -3099,7 +3099,7 @@ export class CanvasAuthoring {
 		// Mixed selections are normal: a line, a frame, a comment pin, or an
 		// unknown ID among the requested IDs is simply ignored.  Only cards
 		// carry a layer.
-		const requestedIds = [...new Set(idsValue.value as string[])];
+		const requestedIds = [...new Set(idsValue.value)];
 		const cardIds = new Set(readLayerCards(before.nodes as UnknownRecord[]).cards.map((card) => card.id));
 		const selectedCardIds = requestedIds.filter((requestedId) => cardIds.has(requestedId));
 		if (selectedCardIds.length === 0) {

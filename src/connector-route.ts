@@ -108,7 +108,7 @@ function finish(route: ConnectorRoute, start: AnchorPoint, segments: readonly Ro
 }
 
 function lines(route: ConnectorRoute, corners: readonly AnchorPoint[]): PlannedRoute {
-  return finish(route, corners[0]!, corners.slice(1).map((to) => ({ kind: "line", to })), corners);
+  return finish(route, corners[0], corners.slice(1).map((to) => ({ kind: "line", to })), corners);
 }
 
 /**
@@ -136,7 +136,7 @@ function exitOf(end: RouteEnd, other: AnchorPoint): { readonly horizontal: boole
 export function simplifyCorners(corners: readonly AnchorPoint[]): AnchorPoint[] {
   const result: AnchorPoint[] = [];
   for (const point of corners) {
-    if (result.length > 0 && same(result[result.length - 1]!, point)) continue;
+    if (result.length > 0 && same(result[result.length - 1], point)) continue;
     result.push(point);
     while (result.length >= 3) {
       const [a, b, c] = result.slice(-3) as [AnchorPoint, AnchorPoint, AnchorPoint];
@@ -197,11 +197,11 @@ export function squareBends(from: RouteEnd, to: RouteEnd, stored: readonly Ancho
   const bends = stored.map((point) => ({ x: point.x, y: point.y }));
   if (bends.length === 0) return bends;
   const firstHorizontal = bends.length >= 2
-    ? !isHorizontal(bends[0]!, bends[1]!, !exitOf(from, to.point).horizontal)
+    ? !isHorizontal(bends[0], bends[1], !exitOf(from, to.point).horizontal)
     : exitOf(from, to.point).horizontal;
-  if (firstHorizontal) bends[0]!.y = from.point.y; else bends[0]!.x = from.point.x;
+  if (firstHorizontal) bends[0].y = from.point.y; else bends[0].x = from.point.x;
   const lastHorizontal = bends.length % 2 === 0 ? firstHorizontal : !firstHorizontal;
-  const last = bends[bends.length - 1]!;
+  const last = bends[bends.length - 1];
   if (lastHorizontal) last.y = to.point.y; else last.x = to.point.x;
   return bends;
 }
@@ -210,17 +210,17 @@ function curveThrough(from: RouteEnd, to: RouteEnd, waypoints: readonly AnchorPo
   const corners = [from.point, ...waypoints, to.point];
   const last = corners.length - 1;
   const tangents = corners.map((point, index) => {
-    if (index === 0) return from.normal ?? toward(point, corners[1]!);
+    if (index === 0) return from.normal ?? toward(point, corners[1]);
     if (index === last) {
-      return to.normal === undefined ? toward(corners[last - 1]!, point) : { x: -to.normal.x, y: -to.normal.y };
+      return to.normal === undefined ? toward(corners[last - 1], point) : { x: -to.normal.x, y: -to.normal.y };
     }
-    return unit(corners[index + 1]!.x - corners[index - 1]!.x, corners[index + 1]!.y - corners[index - 1]!.y);
+    return unit(corners[index + 1].x - corners[index - 1].x, corners[index + 1].y - corners[index - 1].y);
   });
   const segments: RouteSegment[] = [];
   for (let index = 0; index < last; index += 1) {
-    const a = corners[index]!, b = corners[index + 1]!;
+    const a = corners[index], b = corners[index + 1];
     const reach = Math.hypot(b.x - a.x, b.y - a.y) / 3;
-    segments.push({ kind: "curve", c1: add(a, tangents[index]!, reach), c2: add(b, tangents[index + 1]!, -reach), to: b });
+    segments.push({ kind: "curve", c1: add(a, tangents[index], reach), c2: add(b, tangents[index + 1], -reach), to: b });
   }
   return finish("curved", from.point, segments, corners);
 }
@@ -269,7 +269,7 @@ export function routeHandles(route: PlannedRoute): RouteHandle[] {
   const corners = route.corners;
   if (route.route === "elbowed") {
     for (let index = 0; index + 1 < corners.length; index += 1) {
-      const a = corners[index]!, b = corners[index + 1]!;
+      const a = corners[index], b = corners[index + 1];
       if (same(a, b)) continue;
       const horizontal = isHorizontal(a, b, true);
       handles.push({
@@ -281,10 +281,10 @@ export function routeHandles(route: PlannedRoute): RouteHandle[] {
   }
   for (let index = 0; index + 1 < corners.length; index += 1) {
     const segment = route.segments[index];
-    const a = corners[index]!;
+    const a = corners[index];
     const middle = segment?.kind === "curve"
       ? cubicAt(a, segment.c1, segment.c2, segment.to, 0.5)
-      : { x: (a.x + corners[index + 1]!.x) / 2, y: (a.y + corners[index + 1]!.y) / 2 };
+      : { x: (a.x + corners[index + 1].x) / 2, y: (a.y + corners[index + 1].y) / 2 };
     handles.push({ kind: "insert", index, point: middle });
     if (index > 0) handles.push({ kind: "waypoint", index: index - 1, point: a });
   }
@@ -303,7 +303,7 @@ export function gripNear(route: PlannedRoute, point: AnchorPoint): RouteHandle |
       ? [from, segment.to]
       : Array.from({ length: CURVE_STEPS + 1 }, (_, step) => cubicAt(from, segment.c1, segment.c2, segment.to, step / CURVE_STEPS));
     for (let step = 0; step + 1 < samples.length; step += 1) {
-      const distance = distanceToSegment(point, samples[step]!, samples[step + 1]!);
+      const distance = distanceToSegment(point, samples[step], samples[step + 1]);
       if (best === undefined || distance < best.distance) best = { index, distance };
     }
     from = segment.to;
@@ -347,8 +347,8 @@ export function placeWaypoint(
   }
   const tolerance = options.straighten ?? 0;
   if (tolerance > 0) {
-    const before = position === 0 ? from : result[position - 1]!;
-    const after = position + 1 >= result.length ? to : result[position + 1]!;
+    const before = position === 0 ? from : result[position - 1];
+    const after = position + 1 >= result.length ? to : result[position + 1];
     if (distanceToSegment(point, before, after) <= tolerance) result.splice(position, 1);
   }
   return result;
@@ -373,7 +373,7 @@ export function moveElbowSegment(
 ): AnchorPoint[] {
   const corners = [from.point, ...bends, to.point].map((point) => ({ x: point.x, y: point.y }));
   let segment = Math.max(0, Math.min(corners.length - 2, index));
-  const horizontal = isHorizontal(corners[segment]!, corners[segment + 1]!, exitOf(from, to.point).horizontal);
+  const horizontal = isHorizontal(corners[segment], corners[segment + 1], exitOf(from, to.point).horizontal);
   const stubFrom = (base: AnchorPoint, next: AnchorPoint, end: RouteEnd): AnchorPoint => {
     // Along the segment's own axis, the way the segment already runs.
     const run = horizontal ? next.x - base.x : next.y - base.y;
@@ -382,17 +382,17 @@ export function moveElbowSegment(
     return horizontal ? { x: base.x + sign * reach, y: base.y } : { x: base.x, y: base.y + sign * reach };
   };
   if (segment === corners.length - 2) {
-    const last = corners[corners.length - 1]!;
-    const stub = stubFrom(last, corners[corners.length - 2]!, to);
+    const last = corners[corners.length - 1];
+    const stub = stubFrom(last, corners[corners.length - 2], to);
     corners.splice(corners.length - 1, 0, { ...stub }, { ...stub });
     segment = corners.length - 4;
   }
   if (segment === 0) {
-    const stub = stubFrom(corners[0]!, corners[1]!, from);
+    const stub = stubFrom(corners[0], corners[1], from);
     corners.splice(1, 0, { ...stub }, { ...stub });
     segment = 2;
   }
-  const a = corners[segment]!, b = corners[segment + 1]!;
+  const a = corners[segment], b = corners[segment + 1];
   if (horizontal) {
     a.y = value;
     b.y = value;

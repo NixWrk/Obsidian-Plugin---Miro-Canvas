@@ -100,12 +100,12 @@ export function boardConnectors(document: unknown): BoardConnector[] {
 
 /** How far along a route - as a share of its length - the point nearest `at` lies. */
 export function nearestRouteFraction(points: readonly AnchorPoint[], at: AnchorPoint): number {
-  const lengths = points.slice(1).map((point, index) => Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y));
+  const lengths = points.slice(1).map((point, index) => Math.hypot(point.x - points[index].x, point.y - points[index].y));
   const total = lengths.reduce((sum, length) => sum + length, 0);
   if (total <= 0) return 0.5;
   let before = 0, best = Number.POSITIVE_INFINITY, fraction = 0.5;
   lengths.forEach((length, index) => {
-    const start = points[index]!, end = points[index + 1]!;
+    const start = points[index], end = points[index + 1];
     if (length > 0) {
       const along = Math.max(0, Math.min(1, ((at.x - start.x) * (end.x - start.x) + (at.y - start.y) * (end.y - start.y)) / (length * length)));
       const distance = Math.hypot(at.x - (start.x + (end.x - start.x) * along), at.y - (start.y + (end.y - start.y) * along));

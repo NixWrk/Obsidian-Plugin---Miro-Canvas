@@ -116,7 +116,7 @@ export function strokeWidthScale(pressures: readonly number[]): number {
   if (samples.length === 0) return 1;
   if (samples.every((pressure) => pressure === NO_SENSOR_PRESSURE)) return 1;
   const sorted = [...samples].sort((left, right) => left - right);
-  const median = sorted[Math.floor(sorted.length / 2)]!;
+  const median = sorted[Math.floor(sorted.length / 2)];
   const scale = 1 + (median - EVERYDAY_PRESSURE) * PRESSURE_GAIN;
   return Math.min(Math.max(scale, MIN_PRESSURE_SCALE), MAX_PRESSURE_SCALE);
 }

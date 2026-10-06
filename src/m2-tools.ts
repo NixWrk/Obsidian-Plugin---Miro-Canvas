@@ -46,7 +46,7 @@ function basename(path: string): string {
 
 function humanizeToken(value: string): string {
   const spaced = value.replace(/[_-]+/gu, " ").trim();
-  return spaced.length > 0 ? `${spaced[0]!.toUpperCase()}${spaced.slice(1)}` : words().localTools.nodeFallback;
+  return spaced.length > 0 ? `${spaced[0].toUpperCase()}${spaced.slice(1)}` : words().localTools.nodeFallback;
 }
 
 function elementLabel(element: unknown, edge: boolean): string | undefined {
@@ -421,7 +421,7 @@ export class M2CanvasTools {
   private focusComment(thread: CommentThread): void {
     if (!thread.anchor) return;
     const root = this.session.adapter.getDocument();
-    const geometry = buildCanvasAnchorGeometry(root && typeof root === "object" ? root as Record<string, unknown> : {});
+    const geometry = buildCanvasAnchorGeometry(root && typeof root === "object" ? root : {});
     const resolved = resolveAnchor(thread.anchor, geometry);
     const viewport = this.session.viewport.getViewport();
     if (!resolved.point || !viewport) {

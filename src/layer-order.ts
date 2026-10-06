@@ -82,7 +82,7 @@ function moveTowardNearestOverlap(
 		let targetId: string | undefined;
 		if (towardFront) {
 			for (let index = pos + 1; index < boundary; index += 1) {
-				const candidateId = order[index]!;
+				const candidateId = order[index];
 				if (!selected.has(candidateId) && cardsOverlap(card, byId.get(candidateId)!)) {
 					targetId = candidateId;
 					break;
@@ -90,7 +90,7 @@ function moveTowardNearestOverlap(
 			}
 		} else {
 			for (let index = pos - 1; index > boundary; index -= 1) {
-				const candidateId = order[index]!;
+				const candidateId = order[index];
 				if (!selected.has(candidateId) && cardsOverlap(card, byId.get(candidateId)!)) {
 					targetId = candidateId;
 					break;

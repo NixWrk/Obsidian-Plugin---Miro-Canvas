@@ -520,7 +520,7 @@ export class MetadataWriter {
 			}
 
 			const baseMetadata = currentMetadata.status === "valid" && currentMetadata.metadata !== undefined
-				? cloneRecord(currentMetadata.metadata as Record<string, unknown>)
+				? cloneRecord(currentMetadata.metadata)
 				: createDefaultMiroCanvasMetadata() as Record<string, unknown>;
 			let candidate: unknown;
 			try {

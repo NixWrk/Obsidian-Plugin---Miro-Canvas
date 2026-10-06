@@ -5,7 +5,7 @@ export function formatTextSelection(text: string, action: AppearanceAction, html
   if (action.type === APPEARANCE_ACTIONS.setFormat) {
     const outerSpan = /^(<span\s+style="[^"]*">)([\s\S]*)(<\/span>)$/u.exec(text);
     if (outerSpan !== null) {
-      const inner = formatTextSelection(outerSpan[2]!, action, html);
+      const inner = formatTextSelection(outerSpan[2], action, html);
       return inner === undefined ? undefined : `${outerSpan[1]}${inner}${outerSpan[3]}`;
     }
     const format = action.format;

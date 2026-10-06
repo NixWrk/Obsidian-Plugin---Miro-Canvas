@@ -54,5 +54,5 @@ function addBullet(line: string): string {
 
 function removeBullet(line: string): string {
   const match = BULLET.exec(line);
-  return match === null ? line : `${match[1]!}${line.slice(match[0].length)}`;
+  return match === null ? line : `${match[1]}${line.slice(match[0].length)}`;
 }

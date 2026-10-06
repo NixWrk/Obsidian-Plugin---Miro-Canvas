@@ -70,7 +70,7 @@ export class SlideShow {
   public go(index: number): void {
     if (!this.active) return;
     this.index = Math.min(Math.max(index, 0), this.slides.length - 1);
-    const rect = this.host.rectOf(this.slides[this.index]!);
+    const rect = this.host.rectOf(this.slides[this.index]);
     if (rect !== undefined) this.host.show(rect);
     if (this.counter !== undefined) this.counter.textContent = `${this.index + 1} / ${this.slides.length}`;
     this.bar?.setAttribute("data-first", String(this.index === 0));

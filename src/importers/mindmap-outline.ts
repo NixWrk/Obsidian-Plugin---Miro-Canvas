@@ -142,7 +142,7 @@ function indentWidth(whitespace: string): number {
 function unquoted(value: string): string {
 	const trimmed = value.trim();
 	const quoted = /^(["'])(.*)\1$/u.exec(trimmed);
-	return quoted === null ? trimmed : quoted[2]!;
+	return quoted === null ? trimmed : quoted[2];
 }
 
 /** The mark some editors put at a file's very start. */
@@ -164,10 +164,10 @@ interface Frontmatter {
 
 /** The note's properties block, read far enough to name its keys. */
 function readFrontmatter(lines: readonly string[]): Frontmatter {
-	if (lines.length === 0 || lines[0]!.trimEnd() !== "---") return { bodyStart: 0, ownLines: [], properties: [] };
+	if (lines.length === 0 || lines[0].trimEnd() !== "---") return { bodyStart: 0, ownLines: [], properties: [] };
 	let closing = -1;
 	for (let index = 1; index < lines.length; index += 1) {
-		const trimmed = lines[index]!.trimEnd();
+		const trimmed = lines[index].trimEnd();
 		if (trimmed === "---" || trimmed === "...") {
 			closing = index;
 			break;
@@ -182,14 +182,14 @@ function readFrontmatter(lines: readonly string[]): Frontmatter {
 	// The property a line of a value spread over several lines belongs to.
 	let open: OutlineProperty | undefined;
 	for (let index = 1; index < closing; index += 1) {
-		const line = lines[index]!;
+		const line = lines[index];
 		const lineNumber = index + 1;
 		if (line.trim() === "") continue;
 		const key = PROPERTY_KEY.exec(line);
 		if (key !== null) {
-			const name = key[1]!.trim();
+			const name = key[1].trim();
 			if (name === FORMAT_PROPERTY) {
-				format = unquoted(key[2]!);
+				format = unquoted(key[2]);
 				ownLines.push(lineNumber);
 				open = undefined;
 			} else {
@@ -213,7 +213,7 @@ function classifyLines(lines: readonly string[], start: number): LineClass[] {
 	const classes: LineClass[] = [];
 	let fence: { readonly marker: string } | undefined;
 	for (let index = 0; index < lines.length; index += 1) {
-		const line = lines[index]!;
+		const line = lines[index];
 		if (index < start) {
 			classes.push({ kind: "blank" });
 			continue;
@@ -221,7 +221,7 @@ function classifyLines(lines: readonly string[], start: number): LineClass[] {
 		if (fence !== undefined) {
 			classes.push({ kind: "fence", opens: false });
 			const close = FENCE_CLOSE.exec(line);
-			if (close !== null && close[1]![0] === fence.marker[0] && close[1]!.length >= fence.marker.length) fence = undefined;
+			if (close !== null && close[1][0] === fence.marker[0] && close[1].length >= fence.marker.length) fence = undefined;
 			continue;
 		}
 		if (line.trim() === "") {
@@ -230,19 +230,19 @@ function classifyLines(lines: readonly string[], start: number): LineClass[] {
 		}
 		const open = FENCE_OPEN.exec(line);
 		// A backtick fence's info string may not hold a backtick.
-		if (open !== null && (open[2]![0] !== "`" || !line.slice(open[0].length).includes("`"))) {
-			fence = { marker: open[2]! };
+		if (open !== null && (open[2][0] !== "`" || !line.slice(open[0].length).includes("`"))) {
+			fence = { marker: open[2] };
 			classes.push({ kind: "fence", opens: true });
 			continue;
 		}
 		const heading = HEADING.exec(line);
 		if (heading !== null) {
-			classes.push({ kind: "heading", level: heading[1]!.length, text: headingText(heading[2]) });
+			classes.push({ kind: "heading", level: heading[1].length, text: headingText(heading[2]) });
 			continue;
 		}
 		const item = LIST_ITEM.exec(line);
 		if (item !== null) {
-			classes.push({ kind: "item", indent: indentWidth(item[1]!), text: (item[2] ?? "").trim() });
+			classes.push({ kind: "item", indent: indentWidth(item[1]), text: (item[2] ?? "").trim() });
 			continue;
 		}
 		classes.push({ kind: "text" });
@@ -258,8 +258,8 @@ function classifyLines(lines: readonly string[], start: number): LineClass[] {
 function itemIndent(line: string, indent: number, empty: boolean, listsUseTabs: boolean): number {
 	if (!empty || !listsUseTabs) return indent;
 	const spaces = /^( +)[-*+]/u.exec(line);
-	if (spaces === null || spaces[1]!.length % EMPTY_NODE_INDENT !== 0) return indent;
-	return (spaces[1]!.length / EMPTY_NODE_INDENT) * TAB_WIDTH;
+	if (spaces === null || spaces[1].length % EMPTY_NODE_INDENT !== 0) return indent;
+	return (spaces[1].length / EMPTY_NODE_INDENT) * TAB_WIDTH;
 }
 
 function newNode(kind: OutlineNodeKind, line: number, text: string): OutlineNode {
@@ -290,7 +290,7 @@ export function parseMindmapOutline(text: string): ParsedOutline {
 	const frontmatter = readFrontmatter(lines);
 	const classes = classifyLines(lines, frontmatter.bodyStart);
 	const hasHeadings = classes.some((entry) => entry.kind === "heading");
-	const listsUseTabs = classes.some((entry, index) => entry.kind === "item" && lines[index]!.startsWith("\t"));
+	const listsUseTabs = classes.some((entry, index) => entry.kind === "item" && lines[index].startsWith("\t"));
 
 	const roots: OutlineNode[] = [];
 	let preamble: OutlineNode | undefined;
@@ -311,9 +311,9 @@ export function parseMindmapOutline(text: string): ParsedOutline {
 	};
 
 	for (let index = frontmatter.bodyStart; index < lines.length; index += 1) {
-		const entry = classes[index]!;
+		const entry = classes[index];
 		const lineNumber = index + 1;
-		const raw = lines[index]!;
+		const raw = lines[index];
 		if (entry.kind === "blank") {
 			afterBlank = true;
 			continue;
@@ -331,7 +331,7 @@ export function parseMindmapOutline(text: string): ParsedOutline {
 		}
 		if (entry.kind === "heading") {
 			started = true;
-			while (headings.length > 0 && headings[headings.length - 1]!.level >= entry.level) headings.pop();
+			while (headings.length > 0 && headings[headings.length - 1].level >= entry.level) headings.pop();
 			const node = newNode("heading", lineNumber, entry.text);
 			attach(node, headings[headings.length - 1]?.node);
 			headings.push({ level: entry.level, node });
@@ -343,7 +343,7 @@ export function parseMindmapOutline(text: string): ParsedOutline {
 		if (entry.kind === "item") {
 			started = true;
 			const indent = itemIndent(raw, entry.indent, entry.text === "", listsUseTabs);
-			while (items.length > 0 && items[items.length - 1]!.indent >= indent) items.pop();
+			while (items.length > 0 && items[items.length - 1].indent >= indent) items.pop();
 			const parent = items[items.length - 1]?.node ?? headings[headings.length - 1]?.node;
 			const node = newNode("list item", lineNumber, entry.text);
 			attach(node, parent);
@@ -461,11 +461,11 @@ function layoutTree(root: OutlineNode, left: number, top: number): Placed[] {
 		const placed = pending.pop()!;
 		order.push(placed);
 		for (const child of placed.node.children) placed.children.push(measure(child));
-		for (let index = placed.children.length - 1; index >= 0; index -= 1) pending.push(placed.children[index]!);
+		for (let index = placed.children.length - 1; index >= 0; index -= 1) pending.push(placed.children[index]);
 	}
 	// Bands, children before their parents.
 	for (let index = order.length - 1; index >= 0; index -= 1) {
-		const placed = order[index]!;
+		const placed = order[index];
 		let block = 0;
 		placed.children.forEach((child, childIndex) => {
 			block += child.band + (childIndex > 0 ? SIBLING_GAP : 0);

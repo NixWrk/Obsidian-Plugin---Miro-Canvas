@@ -269,7 +269,7 @@ function readComments(metadata: UnknownRecord): UnknownRecord[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
-  return value.every((item) => isRecord(item)) ? value as UnknownRecord[] : undefined;
+  return value.every((item) => isRecord(item)) ? value : undefined;
 }
 
 function setComments(metadata: UnknownRecord, comments: readonly UnknownRecord[]): void {
@@ -493,7 +493,7 @@ function targetIds(thread: CommentThread): ReadonlySet<string> {
     ids.add(anchor.edgeId);
   }
   for (const key of ["targetId", "elementId", "nodeId", "edgeId", "itemId"]) {
-    const value = readOwn(thread as unknown as UnknownRecord, key);
+    const value = readOwn(thread, key);
     if (safeKey(value)) {
       ids.add(value.trim());
     }

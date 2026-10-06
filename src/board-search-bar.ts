@@ -52,7 +52,7 @@ export class BoardSearchBar {
     const view = document.defaultView as unknown as TimerHost | null;
     this.timers = view !== null && typeof view?.setTimeout === "function"
       ? view
-      : (globalThis as unknown as TimerHost);
+      : (globalThis);
 
     const bar = this.make("div", "miro-canvas-panel miro-canvas-search");
     bar.setAttribute("role", "search");

@@ -50,7 +50,7 @@ export function dropIndexFromPointer(
 ): number {
   const coord = vertical ? pointer.y : pointer.x;
   for (let index = 0; index < rects.length; index += 1) {
-    const rect = rects[index]!;
+    const rect = rects[index];
     const mid = vertical ? rect.top + rect.height / 2 : rect.left + rect.width / 2;
     if (coord < mid) return index;
   }
@@ -281,7 +281,7 @@ export class PanelArrangeMode {
       row.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        this.startItemDrag(item, "tray", event as PointerEvent);
+        this.startItemDrag(item, "tray", event);
       });
     }
     this.placeTray();

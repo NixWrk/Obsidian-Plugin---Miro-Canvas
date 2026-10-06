@@ -81,7 +81,7 @@ export function stickyFill(token: string): string | undefined {
 export function readableInk(fill: string): string {
   const match = /^#([0-9a-f]{6})$/iu.exec(fill.trim());
   if (match === null) return "#1a1a1a";
-  const value = Number.parseInt(match[1]!, 16);
+  const value = Number.parseInt(match[1], 16);
   const channel = (shift: number): number => {
     const c = ((value >> shift) & 0xff) / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;

@@ -58,7 +58,7 @@ export interface SelectedRouteEnds {
 /** A marquee selects endpoint handles, not the unlimited span of a crossing line. */
 export function routeEndsInBox(points: readonly AnchorPoint[], a: AnchorPoint, b: AnchorPoint): SelectedRouteEnds | undefined {
   if (points.length < 2) return undefined;
-  const from = pointInSelectionBox(points[0]!, a, b), to = pointInSelectionBox(points[points.length - 1]!, a, b);
+  const from = pointInSelectionBox(points[0], a, b), to = pointInSelectionBox(points[points.length - 1], a, b);
   return from || to ? { from, to, wholeRoute: routeContainedInBox(points, a, b) } : undefined;
 }
 

@@ -104,7 +104,7 @@ export function bowPoint(from: LinePoint, to: LinePoint): LinePoint {
 export function lineBends(route: LineRoute, points: readonly LinePoint[]): LinePoint[] {
   const bends = points.slice(1, -1).map((point) => ({ x: point.x, y: point.y }));
   // A curve through nothing but its ends would be straight.
-  if (route === "curved" && bends.length === 0 && points.length >= 2) return [bowPoint(points[0]!, points[points.length - 1]!)];
+  if (route === "curved" && bends.length === 0 && points.length >= 2) return [bowPoint(points[0], points[points.length - 1])];
   return bends;
 }
 
@@ -118,7 +118,7 @@ export function planLine(route: LineRoute, points: readonly LinePoint[]): Planne
 /** A stored line's points in pairs, in the box it was drawn in. */
 export function linePoints(line: LocalLine): LinePoint[] {
   const points: LinePoint[] = [];
-  for (let index = 0; index + 1 < line.points.length; index += 2) points.push({ x: line.points[index]!, y: line.points[index + 1]! });
+  for (let index = 0; index + 1 < line.points.length; index += 2) points.push({ x: line.points[index], y: line.points[index + 1] });
   return points;
 }
 

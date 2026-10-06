@@ -40,7 +40,7 @@ export type ReleaseRequest = (url: string) => Promise<{ readonly status: number;
 /** A version's numbers - "v1.2.10" is [1, 2, 10] - or undefined when it is not one. */
 export function versionNumbers(version: string): readonly number[] | undefined {
 	const match = /^v?(\d+(?:\.\d+)*)$/u.exec(version.trim());
-	return match === null ? undefined : match[1]!.split(".").map(Number);
+	return match === null ? undefined : match[1].split(".").map(Number);
 }
 
 /** Whether `candidate` is a later version than `installed`; 1.10 is later than 1.9. */

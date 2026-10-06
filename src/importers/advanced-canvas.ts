@@ -225,7 +225,7 @@ function setAt(record: UnknownRecord, path: readonly string[], value: unknown): 
 			current = made;
 		}
 	}
-	current[path[path.length - 1]!] = value;
+	current[path[path.length - 1]] = value;
 }
 
 /** One board being copied: the copy, the plugin's data on it, and the report. */
@@ -603,7 +603,7 @@ function firstSlideLine(outgoing: readonly UnknownRecord[]): UnknownRecord {
 		if (label(b) === "") return -1;
 		return label(a).localeCompare(label(b), "en");
 	});
-	return sorted[0]!;
+	return sorted[0];
 }
 
 function convertAdvancedCanvas(source: ImportSource, context: ImportContext): ImportResult {

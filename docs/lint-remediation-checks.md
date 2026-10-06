@@ -301,3 +301,62 @@ budgets, all three synthetic browser modes and 25 oracle tests passed.
 The corrected build remains installed in both MiroCanvasTest vaults. Both
 reopened Export touch test.canvas; current original text, viewport and all
 preferences were verified preserved, with holding still enabled.
+
+## L10: redundant TypeScript assertions (traced before edits)
+
+Baseline commit: 6fdc053. The local ESLint report lists 367 redundant
+assertions in 56 source modules; 362 have suggested automatic fixes.
+`lint-type-assertion-sites.json` records every original line/column, its
+owning function/method and the local source/test importers before editing.
+Five DOM query/append assertions additionally require explicit generic arguments
+to retain their contextual type (comment thread, comments panel, connector
+label editor, import guide and pen tooltips). Inspect those expressions
+and move the existing type into the DOM query/append generic parameter.
+
+| Participation | Mandatory checks |
+| --- | --- |
+| Native/Advanced Canvas adapters, authoring and metadata writers | Full adapter/authoring/schema tests: CAS, unknown/source fields, native history and rejection paths. |
+| Anchors, connector routes/endpoints, selection bounds, geometry, layers and clipboard | Full geometry/selection/clipboard tests: preview, captured ends, groups, zoom, native history. |
+| Drawing, pressure outline and stylus helpers | All pen/stylus/pressure tests, including L07-L09 before release, steady widths, cancellation and Undo/Redo. |
+| Source/appearance/text/font rendering, typography and toolbars | Source/appearance/font/typography/toolbar tests, three browser modes; preserve local font failure isolation and settings locales. |
+| Search, comments, document/help/import UI, settings and main session lifecycle | All related UI/lifetime tests; DOM query generics must retain nullable HTMLElement types, cleanup and owning-window paths. |
+| Offline importers, palette/local items/comments, welcome board and policy | Full importer/local-data/locale/interaction-policy tests, source preservation and guarded writes. |
+| Export files/boards and shared pure MCP inputs | Full export and MCP suites, pinned schema and both builds. |
+
+These assertions/generic arguments are erased by TypeScript. Before edits,
+save SHA-256 of production main.js and mcp/dist/miro-canvas-mcp.mjs.
+After edits, require byte-identical builds, type check, full unit suite,
+ESLint with no new diagnostics, all three synthetic smoke modes and
+git diff --check. If either build differs, inspect the emitted difference
+and treat its affected runtime checks as pending until verified.
+A byte-identical Android bundle introduces no runtime change: retain L09
+physical-device evidence, and verify the installed files in both
+MiroCanvasTest vaults still match that exact bundle. No warning suppression
+or relaxed lint configuration is permitted. CSS cleanup is a separate batch.
+
+L10 follow-up traced before the final import edit: removing redundant casts
+leaves the type-only `DiagnosticLevel` import in advanced-canvas-adapter.ts
+unused. It had no use outside those casts. Remove that import member, then
+repeat types/lint and byte-identity checks; this removes the new unused-type
+advisory without changing generated JavaScript.
+
+### L10 results (2026-10-06)
+
+All 367 redundant assertions removed, including five contextual DOM query/
+append cases with explicit generic parameters; the now-unused type-only
+DiagnosticLevel import was removed. ESLint is 0 errors / 381 warnings
+(previously 748), with no remaining no-unnecessary-type-assertion diagnostic.
+No lint rule/configuration was disabled. Type check, all 112 unit files
+(1,750 passed, one existing skip), both builds, pinned schema, CSS budget,
+three synthetic browser modes and git diff --check pass.
+
+Both output bundles are byte-identical to the pre-edit checkpoint:
+- main.js SHA-256: b80d220455c49eb5dfde8281e63580c215e6adc657ee1bc6f87962ed32518558
+- MCP bundle SHA-256: ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150
+
+The installed main.js in both connected MiroCanvasTest vaults was read
+through Obsidian and matched this exact production bundle; both plugins
+remain enabled. The tablet was temporarily unplugged, then reconnected
+before this confirmation. This is installed-build verification, not a new
+physical input claim; earlier L09 real-app/input evidence applies to the
+identical executable. No new Android behavior was introduced by this batch.

@@ -294,7 +294,7 @@ function freezeDeep<T>(value: T, seen = new Set<object>()): T {
 			freezeDeep(item, seen);
 		}
 	} else {
-		for (const key of Object.keys(value as UnknownRecord)) {
+		for (const key of Object.keys(value)) {
 			freezeDeep((value as UnknownRecord)[key], seen);
 		}
 	}
@@ -1088,7 +1088,7 @@ function reduceMetadataInternal(metadataInput: unknown, actionInput: unknown): I
 	return {
 		ok: true,
 		changed,
-		metadata: freezeDeep(metadata) as InteractionMetadata,
+		metadata: freezeDeep(metadata),
 		diagnostics: Object.freeze([]),
 	};
 }

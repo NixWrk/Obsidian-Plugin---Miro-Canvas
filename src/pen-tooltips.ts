@@ -64,7 +64,7 @@ interface WindowState {
 function labelledControl(target: unknown): HTMLElement | undefined {
   const element = elementOf(target);
   if (element === undefined) return undefined;
-  const labelled = element.closest("[aria-label]") as HTMLElement | null;
+  const labelled = element.closest<HTMLElement>("[aria-label]");
   if (labelled === null) return undefined;
   const label = labelled.getAttribute("aria-label");
   if (label === null || label.trim() === "") return undefined;

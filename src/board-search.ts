@@ -291,7 +291,7 @@ export function findMatches(index: readonly SearchEntry[], query: string): numbe
   if (needle === "") return [];
   const matches: number[] = [];
   for (let position = 0; position < index.length; position += 1) {
-    if (index[position]!.haystack.includes(needle)) matches.push(position);
+    if (index[position].haystack.includes(needle)) matches.push(position);
   }
   return matches;
 }

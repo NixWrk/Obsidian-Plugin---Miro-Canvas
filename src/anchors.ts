@@ -321,7 +321,7 @@ export function normalizeAnchor(value: unknown): AnchorNormalizationResult {
     }
     return {
       valid: true,
-      anchor: { ...common, type, nodeId: id.trim(), u, v } as NodeAnchor | ImageAnchor,
+      anchor: { ...common, type, nodeId: id.trim(), u, v },
       diagnostics,
     };
   }
@@ -543,7 +543,7 @@ function anchorMap(metadata: UnknownRecord): UnknownRecord | undefined {
   if (value === ABSENT) {
     return {};
   }
-  return isRecord(value) ? value as UnknownRecord : undefined;
+  return isRecord(value) ? value : undefined;
 }
 
 function mutationFailure(metadataInput: unknown, item: AnchorDiagnostic): AnchorMutationResult {

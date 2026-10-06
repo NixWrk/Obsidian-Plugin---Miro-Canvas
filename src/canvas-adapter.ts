@@ -372,7 +372,7 @@ function installNativeCameraPatch(
 	if (!isObject(runtime) || nativeCameraShape(runtime, probe) === undefined) {
 		return undefined;
 	}
-	const instance = runtime as UnknownRecord;
+	const instance = runtime;
 	const existing = nativeCameraPatches.get(instance);
 	if (existing !== undefined) {
 		existing.refCount += 1;
@@ -429,7 +429,7 @@ function installNativeCameraPatch(
 		hadOwnMethod: current !== undefined,
 		...(current === undefined ? {} : { originalDescriptor: current }),
 		originalMethod: original,
-		patchedMethod: (() => undefined) as (...args: unknown[]) => unknown,
+		patchedMethod: (() => undefined),
 		refCount: 1,
 	};
 	const patchedMethod = function(this: unknown, ...args: unknown[]): unknown {
@@ -998,7 +998,7 @@ function readArrayCollection(
 	probe: MutableProbe,
 	capability: string,
 ): readonly unknown[] | undefined {
-	const lengthResult = safeReadResult(raw as unknown as UnknownRecord, "length", probe, capability);
+	const lengthResult = safeReadResult(raw, "length", probe, capability);
 	if (!lengthResult.ok) {
 		return undefined;
 	}
@@ -1022,7 +1022,7 @@ function readArrayCollection(
 
 	const result: unknown[] = [];
 	for (let index = 0; index < length; index += 1) {
-		const valueResult = safeReadResult(raw as unknown as UnknownRecord, String(index), probe, capability);
+		const valueResult = safeReadResult(raw, String(index), probe, capability);
 		if (!valueResult.ok) {
 			return undefined;
 		}

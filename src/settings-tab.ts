@@ -434,7 +434,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .setDisabled(position <= 0)
           .onClick(() => {
             const next = [...current];
-            [next[position - 1], next[position]] = [next[position]!, next[position - 1]!];
+            [next[position - 1], next[position]] = [next[position], next[position - 1]];
             void this.host.saveSettings({ toolbarItems: next }).then(() => this.redisplayInPlace());
           }))
         .addExtraButton((extra) => extra
@@ -443,7 +443,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .setDisabled(position === -1 || position === current.length - 1)
           .onClick(() => {
             const next = [...current];
-            [next[position], next[position + 1]] = [next[position + 1]!, next[position]!];
+            [next[position], next[position + 1]] = [next[position + 1], next[position]];
             void this.host.saveSettings({ toolbarItems: next }).then(() => this.redisplayInPlace());
           }));
     }
@@ -516,7 +516,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
       .setDynamicTooltip()
       .onChange((next) => {
         setting.setDesc(`${description} ${currently(format(next))}`);
-        void this.host.saveSettings({ [key]: next } as Partial<MiroCanvasSettings>);
+        void this.host.saveSettings({ [key]: next });
       }));
     setting.setDesc(`${description} ${currently(format(value))}`);
   }

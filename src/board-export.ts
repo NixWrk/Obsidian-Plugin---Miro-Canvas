@@ -221,7 +221,7 @@ export class ExportOverlay {
   public update(pages: readonly OverlayPage[], editable: boolean): void {
     if (this.drag !== undefined) return;
     const unchanged = editable === this.editable && this.known.length === pages.length
-      && this.known.every((entry, index) => entry.id === pages[index]!.id);
+      && this.known.every((entry, index) => entry.id === pages[index].id);
     if (!unchanged) {
       const root = this.element;
       while (root.firstChild !== null) root.removeChild(root.firstChild);
@@ -231,7 +231,7 @@ export class ExportOverlay {
     }
     // Same pages, same order: move and relabel what is already drawn.
     pages.forEach((page, index) => {
-      const entry = this.known[index]!;
+      const entry = this.known[index];
       entry.page = page;
       Object.assign(entry.frame.style, { left: `${page.left}px`, top: `${page.top}px`, width: `${page.width}px`, height: `${page.height}px` });
       entry.tab.textContent = page.label;
@@ -479,7 +479,7 @@ function prepareExportSvgs(source: HTMLElement, cloned: HTMLElement): void {
   const copies = Array.from(cloned.querySelectorAll("svg"));
   const viewport = source.getBoundingClientRect();
   for (let index = 0; index < originals.length; index += 1) {
-    const original = originals[index]!;
+    const original = originals[index];
     const copy = copies[index];
     if (copy === undefined || original.getBoundingClientRect().width === 0) continue;
     const elements = [original, ...Array.from(original.querySelectorAll("*"))];

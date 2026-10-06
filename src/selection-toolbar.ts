@@ -251,7 +251,7 @@ function highlightPalette(): readonly PaletteColor[] {
     ["yellow", names.yellow, "#fff59d"], ["orange", names.orange, "#ffd59a"], ["red", names.red, "#ffb4a2"],
     ["pink", names.pink, "#f8c4dc"], ["violet", names.violet, "#d9ccf0"], ["blue", names.blue, "#bfe3fb"],
     ["cyan", names.cyan, "#b8ecf0"], ["green", names.green, "#cde8b0"], ["lime", names.lime, "#e8f0a4"], ["gray", names.gray, "#e3e3e3"],
-  ].map(([id, label, color]) => Object.freeze({ id: `highlight-${id!}`, label: label!, color: color!, source: "miro" as const }));
+  ].map(([id, label, color]) => Object.freeze({ id: `highlight-${id}`, label: label, color: color, source: "miro" as const }));
 }
 
 /**
@@ -386,7 +386,7 @@ function normalizedHex(value: unknown): string | undefined {
   const text = value.trim().toLowerCase();
   // A frame's fills see through: their last two digits are how much.
   if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/u.test(text)) return text;
-  if (/^#[0-9a-f]{3}$/u.test(text)) return `#${text[1]!}${text[1]!}${text[2]!}${text[2]!}${text[3]!}${text[3]!}`;
+  if (/^#[0-9a-f]{3}$/u.test(text)) return `#${text[1]}${text[1]}${text[2]}${text[2]}${text[3]}${text[3]}`;
   return undefined;
 }
 
@@ -713,7 +713,7 @@ export class SelectionToolbar {
     // A node's shape: pictures only, every picture once.
     const shape = this.makePopover(bar, words().toolbar.shape, "miro-canvas-toolbar__button--shape");
     shape.panel.className = `${shape.panel.className} miro-canvas-toolbar__panel--shapes`;
-    showPicture(shape.button, SHAPE_CATALOG[0]!.kind, () => shapePicture(document, SHAPE_CATALOG[0]!), "▭");
+    showPicture(shape.button, SHAPE_CATALOG[0].kind, () => shapePicture(document, SHAPE_CATALOG[0]), "▭");
     const shapeOptions: Record<string, HTMLButtonElement> = {};
     for (const { section, title } of shapeSections()) {
       const grid = this.block(shape.panel, title, "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--shapes");
@@ -764,7 +764,7 @@ export class SelectionToolbar {
     }
 
     const align = this.makePopover(styleGroup, words().toolbar.alignment);
-    this.icon(align.button, ALIGNMENT_ICONS[0]!.icon, "≡");
+    this.icon(align.button, ALIGNMENT_ICONS[0].icon, "≡");
     const alignRow = this.block(align.panel, undefined);
     const alignments = alignmentChoices().map(({ value, icon, label }) => {
       const toggle = append(alignRow, makeChoice(document, label, value));
@@ -861,7 +861,7 @@ export class SelectionToolbar {
       clear.hidden = !TRANSPARENT_SLOTS.has(slot);
       colors[slot] = { popover, input, reset, clear, swatches, recent };
     }
-    const borderPanel = colors.border!.popover.panel;
+    const borderPanel = colors.border.popover.panel;
     const borderStyles = this.choices(
       this.block(borderPanel, words().toolbar.borderStyleHeading), BORDER_STYLE_VALUES,
       (value) => borderStyleChoices().find((item) => item.value === value)!.label,
@@ -928,7 +928,7 @@ export class SelectionToolbar {
     this.listen(refs.editConnectorLabel, "click", () => this.actions.onEditConnectorLabel?.());
     const valueOf = (option: HTMLElement): string => option.getAttribute("data-value") ?? "";
     for (const item of SHAPE_CATALOG) {
-      this.listen(refs.shapeOptions[item.kind]!, "click", () => {
+      this.listen(refs.shapeOptions[item.kind], "click", () => {
         // The node already shows this picture, maybe under a flowchart name.
         if (shapeCatalogEntry(this.state?.shape) === item) return;
         this.style({ shape: item.kind });
@@ -944,7 +944,7 @@ export class SelectionToolbar {
     this.listen(refs.fontSizeDown, "click", () => this.stepFontSize(-1));
     this.listen(refs.fontSizeUp, "click", () => this.stepFontSize(1));
     for (const { format } of FORMAT_ICONS) {
-      this.listen(refs.formats[format]!, "click", () => this.appearance({
+      this.listen(refs.formats[format], "click", () => this.appearance({
         type: APPEARANCE_ACTIONS.setFormat,
         format: { [format]: this.state?.typography.format[format] !== true },
       }));
@@ -974,7 +974,7 @@ export class SelectionToolbar {
     for (const [key, options] of [["startCap", refs.startCaps], ["endCap", refs.endCaps]] as const) {
       for (const option of options) {
         this.listen(option, "click", () => this.style({
-          connector: { [key]: valueOf(option) as ConnectorCap } as LocalConnectorSettings,
+          connector: { [key]: valueOf(option) as ConnectorCap },
         }));
       }
     }
@@ -999,7 +999,7 @@ export class SelectionToolbar {
       if (validHeadSize(headSize)) this.style({ connector: { headSize } });
     });
     for (const slot of COLOR_SLOT_KEYS) {
-      const color = refs.colors[slot]!;
+      const color = refs.colors[slot];
       this.listen(color.input, "change", () => {
         const value = normalizedHex(color.input.value);
         if (value !== undefined) this.appearance({ type: APPEARANCE_ACTIONS.setColor, slot, color: value });
@@ -1111,9 +1111,9 @@ export class SelectionToolbar {
     }
     if (!visible) return;
 
-    root.style.left = `${state.placement!.x}px`;
-    root.style.top = `${state.placement!.y}px`;
-    root.setAttribute("data-miro-canvas-placement", state.placement!.below === true ? "below" : "above");
+    root.style.left = `${state.placement.x}px`;
+    root.style.top = `${state.placement.y}px`;
+    root.setAttribute("data-miro-canvas-placement", state.placement.below === true ? "below" : "above");
     root.setAttribute("data-miro-canvas-editable", state.editable ? "true" : "false");
     root.setAttribute("data-miro-independent-only",state.independentOnly?"true":"false");
 
@@ -1144,14 +1144,14 @@ export class SelectionToolbar {
     refs.edgeGroup.hidden = !hasEdge;
     refs.editConnectorLabel.hidden = state.canEditConnectorLabel !== true;
     for (const slot of COLOR_SLOT_KEYS) {
-      refs.colors[slot]!.popover.host.hidden = EDGE_COLOR_SLOTS.has(slot) ? !hasEdge : !hasNode;
+      refs.colors[slot].popover.host.hidden = EDGE_COLOR_SLOTS.has(slot) ? !hasEdge : !hasNode;
     }
 
     const shape = shapeCatalogEntry(state.shape);
     for (const item of SHAPE_CATALOG) {
-      refs.shapeOptions[item.kind]!.setAttribute("aria-pressed", item === shape ? "true" : "false");
+      refs.shapeOptions[item.kind].setAttribute("aria-pressed", item === shape ? "true" : "false");
     }
-    const shown = shape ?? SHAPE_CATALOG[0]!;
+    const shown = shape ?? SHAPE_CATALOG[0];
     showPicture(refs.shape.button, shown.kind, () => shapePicture(document, shown), "▭");
 
     const typography = state.typography;
@@ -1163,12 +1163,12 @@ export class SelectionToolbar {
     for (const { format } of FORMAT_ICONS) {
       const on = typography.format[format] === true;
       styled ||= on;
-      refs.formats[format]!.setAttribute("aria-pressed", on ? "true" : "false");
+      refs.formats[format].setAttribute("aria-pressed", on ? "true" : "false");
     }
     refs.format.button.setAttribute("data-active", styled ? "true" : "false");
     pressWhere(refs.alignments, typography.alignment);
     pressWhere(refs.verticalAlignments, typography.verticalAlign ?? "top");
-    const alignment = ALIGNMENT_ICONS.find((item) => item.value === typography.alignment) ?? ALIGNMENT_ICONS[0]!;
+    const alignment = ALIGNMENT_ICONS.find((item) => item.value === typography.alignment) ?? ALIGNMENT_ICONS[0];
     this.icon(refs.align.button, alignment.icon, "≡");
     refs.lineHeight.value = typography.lineHeight === undefined ? "" : String(typography.lineHeight);
     if (this.document?.activeElement !== refs.link.input) refs.link.input.value = state.textLink ?? "";
@@ -1189,7 +1189,7 @@ export class SelectionToolbar {
 
     for (const slot of COLOR_SLOT_KEYS) {
       const color = normalizedHex(state.colors[slot]);
-      const slotRefs = refs.colors[slot]!;
+      const slotRefs = refs.colors[slot];
       // Absent is Obsidian's own colour; null is a transparent choice.
       slotRefs.reset.setAttribute("aria-pressed", state.colors[slot] === undefined ? "true" : "false");
       slotRefs.clear.setAttribute("aria-pressed", state.colors[slot] === null ? "true" : "false");

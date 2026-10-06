@@ -176,7 +176,7 @@ export function buildImportGuide(actions: ImportGuideActions, options: ImportGui
 		const { step, body } = makeStep(document, options.setIcon, 2, "bot", strings.step2Title);
 		paragraph(document, body, strings.step2Body);
 		const prompt = importPrompt(options.vaultPath);
-		const box = append(body, make(document, "textarea", "miro-canvas-import-guide__prompt")) as HTMLTextAreaElement;
+		const box = append<HTMLTextAreaElement>(body, make(document, "textarea", "miro-canvas-import-guide__prompt"));
 		box.readOnly = true;
 		box.value = prompt;
 		box.setAttribute("aria-label", strings.promptLabel);

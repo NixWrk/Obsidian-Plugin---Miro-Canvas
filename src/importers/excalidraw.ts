@@ -434,7 +434,7 @@ class DrawingImport {
 		const data = element.data;
 		let points = boardPoints(data);
 		// A single touch of the pen is a dot: a stroke from the point to itself.
-		if (points.length === 1) points = [points[0]!, points[0]!];
+		if (points.length === 1) points = [points[0], points[0]];
 		points = fewerPoints(points, MAX_STROKE_POINTS);
 		const strokeWidth = positiveNumber(data.strokeWidth) ?? 1;
 		const width = Math.min(1_000, roundTo(strokeWidth * FREEDRAW_SIZE_PER_WIDTH, 2));
@@ -476,8 +476,8 @@ class DrawingImport {
 	private placeLine(element: DrawingElement): void {
 		const data = element.data;
 		const points = boardPoints(data);
-		const first = points[0]!;
-		const last = points[points.length - 1]!;
+		const first = points[0];
+		const last = points[points.length - 1];
 		const bends = fewerPoints(points, MAX_WAYPOINTS + 2).slice(1, -1);
 		const startHead = arrowheadOf(data.startArrowhead);
 		const endHead = arrowheadOf(data.endArrowhead);
@@ -754,14 +754,14 @@ function routeOf(data: ElementRecord, pointCount: number): "straight" | "elbowed
 function headSizeOf(start: unknown, end: unknown): number | undefined {
 	const sizes = [start, end]
 		.filter((value) => value !== null && value !== undefined)
-		.map((value) => (typeof value === "string" && Object.prototype.hasOwnProperty.call(ARROWHEAD_SIZES, value) ? ARROWHEAD_SIZES[value]! : DEFAULT_ARROWHEAD_SIZE));
+		.map((value) => (typeof value === "string" && Object.prototype.hasOwnProperty.call(ARROWHEAD_SIZES, value) ? ARROWHEAD_SIZES[value] : DEFAULT_ARROWHEAD_SIZE));
 	return sizes.length === 0 ? undefined : Math.max(...sizes);
 }
 
 function arrowheadOf(value: unknown): { readonly cap: string; readonly exact: boolean } {
 	if (value === null || value === undefined) return { cap: "none", exact: true };
 	if (typeof value !== "string") return UNKNOWN_ARROWHEAD;
-	return Object.prototype.hasOwnProperty.call(ARROWHEADS, value) ? ARROWHEADS[value]! : UNKNOWN_ARROWHEAD;
+	return Object.prototype.hasOwnProperty.call(ARROWHEADS, value) ? ARROWHEADS[value] : UNKNOWN_ARROWHEAD;
 }
 
 /** The points of a line or a stroke as `[x, y]` pairs, relative to its x and y; nothing when one is unreadable. */
@@ -865,8 +865,8 @@ function isClosedCourse(data: ElementRecord): boolean {
 	if (data.polygon === true) return true;
 	const points = readPoints(data.points);
 	if (points.length < 3) return false;
-	const first = points[0]!;
-	const last = points[points.length - 1]!;
+	const first = points[0];
+	const last = points[points.length - 1];
 	return Math.hypot(last.x - first.x, last.y - first.y) <= LOOP_CLOSE_DISTANCE;
 }
 
@@ -881,9 +881,9 @@ function isNoteLink(path: string): boolean {
 /** The file a link names: `[[target#heading|alias]]` or a bare path, without the heading and the alias. */
 function linkPath(link: string): string {
 	const wiki = /^!?\[\[([^\]]*)\]\]/u.exec(link.trim());
-	const inner = wiki === null ? link.trim() : wiki[1]!;
-	const withoutAlias = inner.split("|")[0]!;
-	return withoutAlias.split("#")[0]!.trim();
+	const inner = wiki === null ? link.trim() : wiki[1];
+	const withoutAlias = inner.split("|")[0];
+	return withoutAlias.split("#")[0].trim();
 }
 
 /** A Markdown link to a web address, showing the address. */
@@ -911,7 +911,7 @@ function textFrontmatterHas(text: string, key: string): boolean {
 	const end = normalized.indexOf("\n---", 3);
 	if (end < 0) return false;
 	const lines = normalized.slice(4, end).split("\n");
-	return lines.some((line) => line.split(":")[0]!.trim() === key && line.includes(":"));
+	return lines.some((line) => line.split(":")[0].trim() === key && line.includes(":"));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

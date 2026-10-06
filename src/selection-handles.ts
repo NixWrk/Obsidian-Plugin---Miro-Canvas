@@ -139,7 +139,7 @@ export function resizeCursor(handle: ResizeHandle, rotation: number): string {
   const [sx, sy] = RESIZE_SIGNS[handle];
   const angle = ((Math.atan2(sy, sx) * 180 / Math.PI + rotation) % 180 + 180) % 180;
   const step = Math.round(angle / 45) % 4;
-  return ["ew-resize", "nwse-resize", "ns-resize", "nesw-resize"][step]!;
+  return ["ew-resize", "nwse-resize", "ns-resize", "nesw-resize"][step];
 }
 
 export type ConnectorEnd = "from" | "to";
@@ -608,8 +608,8 @@ export class SelectionHandles {
           this.listenRoute(element, "dblclick", (event) => {
             const edgeId = this.state.selectedIds[0];
             if (!this.state.editable || edgeId === undefined) return;
-            (event as Event).preventDefault?.();
-            (event as Event).stopPropagation?.();
+            (event).preventDefault?.();
+            (event).stopPropagation?.();
             this.actions.onStraighten?.(edgeId, grip);
           });
         }

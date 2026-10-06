@@ -66,7 +66,7 @@ export function authorColor(name: string): string {
   if (chosen !== undefined) return chosen;
   let hash = 0;
   for (const char of name) hash = (hash * 31 + char.codePointAt(0)!) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length]!;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
 /** Miro's short stamp, such as "11 Jun, 14:25"; nothing for an unreadable time. */
@@ -205,7 +205,7 @@ export class CommentThreadCard {
     this.authorInput.type = "text";
     this.authorInput.placeholder = words().comments.thread.authorName;
     this.authorInput.setAttribute("aria-label", words().comments.thread.authorName);
-    this.input = this.composer.appendChild(this.make("input", "miro-canvas-thread__input") as HTMLInputElement);
+    this.input = this.composer.appendChild<HTMLInputElement>(this.make("input", "miro-canvas-thread__input"));
     this.input.type = "text";
     this.input.placeholder = words().comments.thread.replyPlaceholder;
     this.input.setAttribute("aria-label", words().comments.thread.replyAriaLabel);

@@ -164,7 +164,7 @@ export function linkedFilePaths(data: { readonly files?: string; readonly text?:
   const text = (data.text ?? "").trim();
   if (text === "" || text.includes("\n")) return [];
   const link = /^!?\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]*)?\]\]$/u.exec(text);
-  if (link !== null) return [link[1]!.trim()];
+  if (link !== null) return [link[1].trim()];
   if (text.startsWith("obsidian://")) {
     try {
       const file = new URL(text).searchParams.get("file");

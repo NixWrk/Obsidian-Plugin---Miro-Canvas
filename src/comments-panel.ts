@@ -387,7 +387,7 @@ export class CommentsPanel {
     }
     match.setAttribute("data-comment-active", "true");
     match.scrollIntoView?.({ block: "nearest" });
-    (match.querySelector?.("button") as HTMLButtonElement | null)?.focus?.();
+    match.querySelector?.<HTMLButtonElement>("button")?.focus?.();
     return true;
   }
 

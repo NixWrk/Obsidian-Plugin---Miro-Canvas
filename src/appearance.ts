@@ -284,7 +284,7 @@ function readArray(value: unknown): readonly unknown[] | null {
   }
   let length: unknown;
   try {
-    length = (value as unknown as { readonly length: unknown }).length;
+    length = (value as { readonly length: unknown }).length;
   } catch {
     return null;
   }
@@ -293,7 +293,7 @@ function readArray(value: unknown): readonly unknown[] | null {
   }
   const result: unknown[] = [];
   for (let index = 0; index < length; index += 1) {
-    const item = readOwn(value as unknown as UnknownRecord, String(index));
+    const item = readOwn(value as UnknownRecord, String(index));
     if (item !== ABSENT) {
       result.push(item);
     }
@@ -717,7 +717,7 @@ export function normalizeTypographyFormat(
   value: unknown,
   fallback: TypographyFormat = DEFAULT_TYPOGRAPHY.format,
 ): TypographyFormat {
-  const fallbackRecord = isRecord(fallback as unknown)
+  const fallbackRecord = isRecord(fallback)
     ? fallback as unknown as UnknownRecord
     : DEFAULT_TYPOGRAPHY.format as unknown as UnknownRecord;
   const fallbackBold = readOwn(fallbackRecord, "bold");
@@ -761,7 +761,7 @@ export function normalizeTypography(
   value: unknown,
   fallback: TypographySettings = DEFAULT_TYPOGRAPHY,
 ): TypographySettings {
-  const fallbackRecord = isRecord(fallback as unknown)
+  const fallbackRecord = isRecord(fallback)
     ? fallback as unknown as UnknownRecord
     : DEFAULT_TYPOGRAPHY as unknown as UnknownRecord;
   const fallbackFontFamily = readOwn(fallbackRecord, "fontFamily");
@@ -780,7 +780,7 @@ export function normalizeTypography(
   };
   if (!isRecord(value)) {
     const fallbackUnknown = isRecord(fallback)
-      ? copyUnknownProperties(fallback as unknown as UnknownRecord, TYPOGRAPHY_FIELDS)
+      ? copyUnknownProperties(fallback, TYPOGRAPHY_FIELDS)
       : {};
     return freeze({ ...fallbackUnknown, ...base });
   }
@@ -807,7 +807,7 @@ export function normalizeTypography(
       : base.format;
   }
   const unknown = {
-    ...(isRecord(fallback) ? copyUnknownProperties(fallback as unknown as UnknownRecord, TYPOGRAPHY_FIELDS) : {}),
+    ...(isRecord(fallback) ? copyUnknownProperties(fallback, TYPOGRAPHY_FIELDS) : {}),
     ...copyUnknownProperties(value, TYPOGRAPHY_FIELDS),
   };
   const normalized: TypographySettings = {
@@ -841,7 +841,7 @@ export function normalizeColors(
   value: unknown,
   fallback: ColorSettings = DEFAULT_COLORS,
 ): ColorSettings {
-  const fallbackRecord = isRecord(fallback as unknown) ? fallback as unknown as UnknownRecord : {};
+  const fallbackRecord = isRecord(fallback) ? fallback as unknown as UnknownRecord : {};
   const source = isRecord(value) ? value : {};
   const result: Record<string, unknown> = {
     ...copyUnknownProperties(fallbackRecord, COLOR_FIELDS),
@@ -1285,8 +1285,8 @@ export const validateAppearance = validateAppearanceState;
 export function toAppearanceMetadata(state: AppearanceState | unknown): AppearanceMetadataPayload {
   const normalized = normalizeAppearanceState(state);
   const localOverrides: Record<string, AppearanceLocalOverride> = {};
-  for (const key of ownKeys(normalized.localOverrides as UnknownRecord)) {
-    const override = readOwn(normalized.localOverrides as UnknownRecord, key);
+  for (const key of ownKeys(normalized.localOverrides)) {
+    const override = readOwn(normalized.localOverrides, key);
     if (override !== ABSENT) {
       defineOwn(localOverrides, key, override);
     }
@@ -1686,11 +1686,11 @@ export function getAppearanceCommandLabel(command: unknown): string {
 
 function copyOverrides(value: Readonly<Record<string, AppearanceLocalOverride>>): Record<string, AppearanceLocalOverride> {
   const result: Record<string, AppearanceLocalOverride> = {};
-  for (const key of ownKeys(value as UnknownRecord)) {
+  for (const key of ownKeys(value)) {
     if (!isSafeObjectKey(key)) {
       continue;
     }
-    const override = readOwn(value as UnknownRecord, key);
+    const override = readOwn(value, key);
     if (override !== ABSENT) {
       defineOwn(result, key, override);
     }
@@ -1701,11 +1701,11 @@ function copyOverrides(value: Readonly<Record<string, AppearanceLocalOverride>>)
 function buildState(settings: AppearanceSettings, overrides: Readonly<Record<string, AppearanceLocalOverride>>): AppearanceState {
   const ownedSettings = normalizeSettings(settings);
   const ownedOverrides: Record<string, AppearanceLocalOverride> = {};
-  for (const key of ownKeys(overrides as UnknownRecord)) {
+  for (const key of ownKeys(overrides)) {
     if (!isSafeObjectKey(key)) {
       continue;
     }
-    const override = readOwn(overrides as UnknownRecord, key);
+    const override = readOwn(overrides, key);
     if (override !== ABSENT) {
       defineOwn(ownedOverrides, key, override);
     }
@@ -1734,7 +1734,7 @@ function updateOverride(
   update: (current: AppearanceLocalOverride | undefined) => AppearanceLocalOverride | undefined,
 ): AppearanceState {
   const nextOverrides = copyOverrides(state.localOverrides);
-  const current = readOwn(state.localOverrides as UnknownRecord, nodeId);
+  const current = readOwn(state.localOverrides, nodeId);
   const next = update(current === ABSENT ? undefined : current as AppearanceLocalOverride);
   if (next === undefined) {
     delete nextOverrides[nodeId];
@@ -1832,7 +1832,7 @@ export function appearanceReducer(state: AppearanceState | unknown, action: Appe
     if (nodeId === undefined) {
       return current;
     }
-    const existing = readOwn(current.localOverrides as UnknownRecord, nodeId);
+    const existing = readOwn(current.localOverrides, nodeId);
     const currentOverride = existing === ABSENT ? undefined : existing as AppearanceLocalOverride;
 
     if (type === APPEARANCE_ACTIONS.setTypography || type === "set-node-typography") {

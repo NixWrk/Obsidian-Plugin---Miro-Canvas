@@ -9,7 +9,6 @@
 
 import type {
 	AdapterDiagnostic,
-	DiagnosticLevel,
 } from "./canvas-adapter";
 
 export const ADVANCED_CANVAS_PLUGIN_ID = "advanced-canvas";
@@ -136,7 +135,7 @@ function safeRead(
 	} catch (error) {
 		addDiagnostic(probe, {
 			code: "advanced-probe-failed",
-			level: "warning" as DiagnosticLevel,
+			level: "warning",
 			message: `Reading Advanced Canvas property "${describePropertyKey(key)}" failed: ${describeError(error)}.`,
 			capability,
 		});
@@ -160,7 +159,7 @@ function safeCallResult(
 	} catch (error) {
 		addDiagnostic(probe, {
 			code: "advanced-operation-failed",
-			level: "warning" as DiagnosticLevel,
+			level: "warning",
 			message: `Calling Advanced Canvas method "${describePropertyKey(method)}" failed: ${describeError(error)}.`,
 			capability,
 		});
@@ -222,7 +221,7 @@ function safeIsArray(
 	} catch (error) {
 		addDiagnostic(probe, {
 			code: "advanced-probe-failed",
-			level: "warning" as DiagnosticLevel,
+			level: "warning",
 			message: `Checking whether an Advanced Canvas value is an array failed: ${describeError(error)}.`,
 			capability,
 		});
@@ -242,7 +241,7 @@ function safeInstanceOf(
 	} catch (error) {
 		addDiagnostic(probe, {
 			code: "advanced-probe-failed",
-			level: "warning" as DiagnosticLevel,
+			level: "warning",
 			message: `Checking whether an Advanced Canvas value is a ${constructorName} failed: ${describeError(error)}.`,
 			capability,
 		});
@@ -283,7 +282,7 @@ function hasCollectionMember(
 		} catch (error) {
 			addDiagnostic(probe, {
 				code: "advanced-probe-failed",
-				level: "warning" as DiagnosticLevel,
+				level: "warning",
 				message: `Inspecting Advanced Canvas collection "${String(key)}" failed: ${describeError(error)}.`,
 			});
 		}
@@ -333,14 +332,14 @@ function containsPluginId(value: unknown, pluginId: string, probe: MutableProbe)
 	}
 	if (arrayResult.value) {
 		const beforeLengthRead = probe.diagnostics.length;
-		const length = safeRead(value as unknown as UnknownRecord, "length", probe);
+		const length = safeRead(value, "length", probe);
 		if (probe.diagnostics.length !== beforeLengthRead) {
 			return false;
 		}
 		if (typeof length !== "number" || !Number.isSafeInteger(length) || length < 0) {
 			addDiagnostic(probe, {
 				code: "advanced-plugin-collection-invalid",
-				level: "warning" as DiagnosticLevel,
+				level: "warning",
 				message: "The enabled Advanced Canvas plugin collection has an invalid array length.",
 			});
 			return false;
@@ -348,14 +347,14 @@ function containsPluginId(value: unknown, pluginId: string, probe: MutableProbe)
 		if (length > MAX_PLUGIN_COLLECTION_ITEMS) {
 			addDiagnostic(probe, {
 				code: "advanced-plugin-collection-limit-reached",
-				level: "warning" as DiagnosticLevel,
+				level: "warning",
 				message: `The enabled Advanced Canvas plugin collection exceeded the ${MAX_PLUGIN_COLLECTION_ITEMS}-item safety limit.`,
 			});
 			return false;
 		}
 		for (let index = 0; index < length; index += 1) {
 			const beforeEntryRead = probe.diagnostics.length;
-			const entry = safeRead(value as unknown as UnknownRecord, String(index), probe);
+			const entry = safeRead(value, String(index), probe);
 			if (probe.diagnostics.length !== beforeEntryRead) {
 				return false;
 			}
@@ -418,7 +417,7 @@ function locatePlugin(
 			} catch (error) {
 				addDiagnostic(probe, {
 					code: "advanced-plugin-lookup-failed",
-					level: "warning" as DiagnosticLevel,
+					level: "warning",
 					message: `Advanced Canvas plugin lookup failed: ${describeError(error)}.`,
 				});
 				return { plugin: undefined, lookedUp: true, lookupFailed: true };
@@ -511,13 +510,13 @@ function createProbe(
 			probe.status = "incompatible";
 			addDiagnostic(probe, {
 				code: "advanced-canvas-incompatible",
-				level: "warning" as DiagnosticLevel,
+				level: "warning",
 				message: "Advanced Canvas appears to be installed, but its runtime object could not be read safely.",
 			});
 		} else {
 			addDiagnostic(probe, {
 				code: "advanced-canvas-absent",
-				level: "info" as DiagnosticLevel,
+				level: "info",
 				message: "Advanced Canvas is not installed or is not enabled; optional integration is disabled.",
 			});
 		}
@@ -527,7 +526,7 @@ function createProbe(
 			probe.status = "absent";
 			addDiagnostic(probe, {
 				code: "advanced-canvas-absent",
-				level: "info" as DiagnosticLevel,
+				level: "info",
 				message: `Optional plugin "${pluginId}" was not found; discovered a different plugin instead.`,
 			});
 		} else {
@@ -538,7 +537,7 @@ function createProbe(
 				probe.status = "incompatible";
 				addDiagnostic(probe, {
 					code: "advanced-canvas-incompatible",
-					level: "warning" as DiagnosticLevel,
+					level: "warning",
 					message: "Advanced Canvas was found, but no supported metadata, event, or control capability was recognised.",
 				});
 			}
@@ -684,7 +683,7 @@ export class AdvancedCanvasAdapter {
 		}
 		addDiagnostic(probe, {
 			code: "advanced-capability-unavailable",
-			level: "warning" as DiagnosticLevel,
+			level: "warning",
 			message: "Advanced Canvas metadata is unavailable in this runtime.",
 			capability: ADVANCED_CANVAS_CAPABILITIES.metadata,
 		});
@@ -717,7 +716,7 @@ export class AdvancedCanvasAdapter {
 		if (target === undefined) {
 			addDiagnostic(probe, {
 				code: "advanced-capability-unavailable",
-				level: "warning" as DiagnosticLevel,
+				level: "warning",
 				message: "Advanced Canvas events are unavailable in this runtime.",
 				capability: ADVANCED_CANVAS_CAPABILITIES.events,
 			});
@@ -741,7 +740,7 @@ export class AdvancedCanvasAdapter {
 				} catch (error) {
 					this.addDiagnostic({
 						code: "advanced-event-dispose-failed",
-						level: "warning" as DiagnosticLevel,
+						level: "warning",
 						message: `Disposing Advanced Canvas listener failed: ${describeError(error)}.`,
 						capability: ADVANCED_CANVAS_CAPABILITIES.events,
 					});
@@ -772,7 +771,7 @@ export class AdvancedCanvasAdapter {
 		}
 		addDiagnostic(probe, {
 			code: "advanced-capability-unavailable",
-			level: "warning" as DiagnosticLevel,
+			level: "warning",
 			message: "Advanced Canvas event removal is unavailable in this runtime.",
 			capability: ADVANCED_CANVAS_CAPABILITIES.events,
 		});
@@ -808,7 +807,7 @@ export class AdvancedCanvasAdapter {
 			this.addDiagnostic({
 				code: "advanced-control-read-failed",
 				level: "warning",
-				message: `Reading Advanced Canvas control "${describePropertyKey(controlId as PropertyKey)}" failed.`,
+				message: `Reading Advanced Canvas control "${describePropertyKey(controlId)}" failed.`,
 				capability: ADVANCED_CANVAS_CAPABILITIES.controls,
 			});
 		}
@@ -820,7 +819,7 @@ export class AdvancedCanvasAdapter {
 		if (typeof safeRead(this.plugin, "registerControl", probe, ADVANCED_CANVAS_CAPABILITIES.controls) !== "function") {
 			addDiagnostic(probe, {
 				code: "advanced-capability-unavailable",
-				level: "warning" as DiagnosticLevel,
+				level: "warning",
 				message: "Advanced Canvas control registration is unavailable in this runtime.",
 				capability: ADVANCED_CANVAS_CAPABILITIES.controls,
 			});

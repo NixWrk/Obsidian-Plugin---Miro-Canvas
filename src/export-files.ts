@@ -122,7 +122,7 @@ const CRC32_TABLE = (() => {
 export function crc32(data: Uint8Array): number {
   let crc = 0xffffffff;
   for (let i = 0; i < data.length; i += 1) {
-    crc = CRC32_TABLE[(crc ^ data[i]!) & 0xff]! ^ (crc >>> 8);
+    crc = CRC32_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
@@ -219,17 +219,17 @@ export function jpegSize(image: Uint8Array): { readonly width: number; readonly 
   let offset = 2;
   while (offset + 3 < image.length) {
     if (image[offset] !== 0xff) return undefined;
-    const marker = image[offset + 1]!;
+    const marker = image[offset + 1];
     offset += 2;
     if (marker === 0xd9) return undefined; // EOI reached before any SOF
     if (isStandaloneMarker(marker)) continue;
     if (offset + 1 >= image.length) return undefined;
-    const length = (image[offset]! << 8) | image[offset + 1]!;
+    const length = (image[offset] << 8) | image[offset + 1];
     if (isSofMarker(marker)) {
       const payloadStart = offset + 2; // precision(1) height(2) width(2) ...
       if (payloadStart + 5 > image.length) return undefined;
-      const height = (image[payloadStart + 1]! << 8) | image[payloadStart + 2]!;
-      const width = (image[payloadStart + 3]! << 8) | image[payloadStart + 4]!;
+      const height = (image[payloadStart + 1] << 8) | image[payloadStart + 2];
+      const width = (image[payloadStart + 3] << 8) | image[payloadStart + 4];
       return width > 0 && height > 0 ? { width, height } : undefined;
     }
     if (marker === 0xda || length < 2) return undefined; // scan data reached, no SOF found
@@ -332,7 +332,7 @@ export function makePdf(pages: readonly ExportPage[], info: ExportInfo = {}): Ui
     const x = pdfNumber(placement.x);
     const y = pdfNumber(page.height - placement.y - placement.height);
 
-    beginObj(pageIds[index]!);
+    beginObj(pageIds[index]);
     writer.ascii(
       `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pdfNumber(page.width)} ${pdfNumber(page.height)}] ` +
       `/Resources << /XObject << /Im0 ${imageIds[index]} 0 R >> >> /Contents ${contentIds[index]} 0 R >>`,
@@ -340,11 +340,11 @@ export function makePdf(pages: readonly ExportPage[], info: ExportInfo = {}): Ui
     endObj();
 
     const content = UTF8_ENCODER.encode(`q ${w} 0 0 ${h} ${x} ${y} cm /Im0 Do Q\n`);
-    beginObj(contentIds[index]!);
+    beginObj(contentIds[index]);
     writer.ascii(`<< /Length ${content.length} >>\nstream\n`).bytes(content).ascii("\nendstream");
     endObj();
 
-    beginObj(imageIds[index]!);
+    beginObj(imageIds[index]);
     writer.ascii(
       `<< /Type /XObject /Subtype /Image /Width ${page.pixelWidth} /Height ${page.pixelHeight} ` +
       `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.image.length} >>\nstream\n`,
@@ -364,19 +364,19 @@ export function makePdf(pages: readonly ExportPage[], info: ExportInfo = {}): Ui
 
   // Outlines (bookmarks), only when at least one page has a title.
   if (outlinesId !== undefined) {
-    const firstId = outlineItemIds[0]!;
-    const lastId = outlineItemIds[outlineItemIds.length - 1]!;
+    const firstId = outlineItemIds[0];
+    const lastId = outlineItemIds[outlineItemIds.length - 1];
     beginObj(outlinesId);
     writer.ascii(`<< /Type /Outlines /First ${firstId} 0 R /Last ${lastId} 0 R /Count ${outlineItemIds.length} >>`);
     endObj();
 
     titledIndices.forEach((pageIndex, k) => {
-      const page = pages[pageIndex]!;
+      const page = pages[pageIndex];
       const parts = [`/Title ${pdfTextString(page.title!)}`, `/Parent ${outlinesId} 0 R`];
       if (k > 0) parts.push(`/Prev ${outlineItemIds[k - 1]} 0 R`);
       if (k < outlineItemIds.length - 1) parts.push(`/Next ${outlineItemIds[k + 1]} 0 R`);
       parts.push(`/Dest [${pageIds[pageIndex]} 0 R /Fit]`);
-      beginObj(outlineItemIds[k]!);
+      beginObj(outlineItemIds[k]);
       writer.ascii(`<< ${parts.join(" ")} >>`);
       endObj();
     });
@@ -639,8 +639,8 @@ export function makePptx(pages: readonly ExportPage[], info: ExportInfo = {}): U
   validatePages(pages);
 
   // PowerPoint has one slide size for the whole file; the first page sets it.
-  const slideWidthPt = pages[0]!.width;
-  const slideHeightPt = pages[0]!.height;
+  const slideWidthPt = pages[0].width;
+  const slideHeightPt = pages[0].height;
   const slideWidthEmu = toEmu(slideWidthPt);
   const slideHeightEmu = toEmu(slideHeightPt);
 

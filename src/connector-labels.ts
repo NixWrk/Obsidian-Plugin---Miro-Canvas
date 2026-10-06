@@ -174,7 +174,7 @@ export class ConnectorLabels {
       if (keep === undefined) return;
       event.preventDefault();
       finish(keep);
-      (this.element.closest(".canvas-wrapper") as HTMLElement | null)?.focus({ preventScroll: true });
+      this.element.closest<HTMLElement>(".canvas-wrapper")?.focus({ preventScroll: true });
     };
     const blur = (): void => finish(true);
     // A press anywhere else ends the writing, even one the board keeps focus from.

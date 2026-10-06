@@ -410,7 +410,7 @@ export function buildCanvasAnchorGeometry(
     const documentRect = rectFromNode(node);
     const base = documentRect === undefined ? undefined : measuredRect(documentRect, observed);
     const rotation = finite(observed?.rotation)
-      ? observed!.rotation!
+      ? observed.rotation
       : sourceScene.items.get(id)?.rotation ?? 0;
     const rect = base === undefined ? undefined : rotation === 0 ? base : {
       ...base, rotation,
@@ -710,8 +710,8 @@ function contourNormal(outline: readonly ShapePoint[], point: ShapePoint, width:
   const sx = width / 100, sy = height / 100;
   const candidates: { readonly distance: number; readonly normal: AnchorPoint }[] = [];
   for (let index = 0; index < outline.length; index += 1) {
-    const from = outline[index]!;
-    const to = outline[(index + 1) % outline.length]!;
+    const from = outline[index];
+    const to = outline[(index + 1) % outline.length];
     const dx = (to.x - from.x) * sx, dy = (to.y - from.y) * sy;
     const length = Math.hypot(dx, dy);
     if (length <= 1e-9) continue;

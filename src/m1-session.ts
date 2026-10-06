@@ -2479,7 +2479,7 @@ export class M1CanvasSession {
 			const plan = planLine(drawn.route, drawn.points);
 			return { ...plan, ends: { from: { point: plan.start }, to: { point: plan.end } }, imported: false };
 		}
-		const geometry = this.landingGeometry().geometry.edges?.[edgeId] as Record<string, unknown> | undefined;
+		const geometry = this.landingGeometry().geometry.edges?.[edgeId];
 		if (geometry === undefined || !Array.isArray(geometry.corners) || !Array.isArray(geometry.segments)
 			|| !isObject(geometry.ends) || typeof geometry.route !== "string") return undefined;
 		return geometry as unknown as ReturnType<M1CanvasSession["plannedRoute"]>;
@@ -2655,7 +2655,7 @@ export class M1CanvasSession {
 		const drawn = this.lineOf(edgeId);
 		if (drawn !== undefined) {
 			const points = drawn.points;
-			this.writeLine(edgeId, [points[0]!, ...bends, points[points.length - 1]!]);
+			this.writeLine(edgeId, [points[0], ...bends, points[points.length - 1]]);
 			return;
 		}
 		this.readInteractionState();
@@ -2843,13 +2843,13 @@ export class M1CanvasSession {
 			let nearest: { distance: number; anchor: CanvasAnchor; board: { x: number; y: number } } | undefined;
 			for (const edgeId of Object.keys(geometry.edges ?? {})) {
 				if (edgeId === excludeEdge) continue;
-				const candidate = edgeLanding(edgeId, geometry.edges![edgeId]!, board);
+				const candidate = edgeLanding(edgeId, geometry.edges![edgeId], board);
 				if (candidate !== undefined && candidate.distance <= magnet && (nearest === undefined || candidate.distance < nearest.distance)) nearest = candidate;
 			}
 			if (nearest !== undefined && (best === undefined || nearest.distance < best.distance)) return nearest;
 		}
 		if (best === undefined) return this.settings.connectorAllowFree ? { board, anchor: { type: "free", x: board.x, y: board.y } } : undefined;
-		const rect = geometry.nodes![best.nodeId]!;
+		const rect = geometry.nodes![best.nodeId];
 		const at = resolveAnchor(best.anchor, { nodes: { [best.nodeId]: rect } }).point;
 		return { board: at === undefined ? board : { x: at.x, y: at.y }, anchor: best.anchor, nodeId: best.nodeId };
 	}
@@ -2919,7 +2919,7 @@ export class M1CanvasSession {
 			this.addDiagnostic(`A connector endpoint could not be measured on the node outline (${fromAnchor === undefined ? fromNode : toNode}).`);
 		}
 		const nativeSide = (anchor: CanvasAnchor | undefined, fallback: HandleSide): ConnectorSide => {
-			if (anchor?.type !== "node") return fallback as ConnectorSide;
+			if (anchor?.type !== "node") return fallback;
 			const candidates: readonly [ConnectorSide, number][] = [
 				["top", anchor.v], ["right", 1 - anchor.u], ["bottom", 1 - anchor.v], ["left", anchor.u],
 			];
@@ -3858,7 +3858,7 @@ export class M1CanvasSession {
 				throw new Error(problem);
 			}
 			this.detachMissingCommentAnchors(mutation.metadata);
-			return mutation.metadata as Record<string, unknown>;
+			return mutation.metadata;
 		});
 		if (result?.status !== "applied" && result?.status !== "noop") {
 			this.options.onNotice?.(problem ?? result?.diagnostics[0]?.message ?? words().session.commentSaveFailed);
@@ -5038,7 +5038,7 @@ export class M1CanvasSession {
 			if (drawingTool) {
 				if (straight && (tool === "pen" || tool === "highlighter") && this.penPoints.length > 0) {
 					straightFrom ??= this.penPoints.length - 1;
-					const anchor = shown[straightFrom]!.split(",").map(Number) as [number, number];
+					const anchor = shown[straightFrom].split(",").map(Number) as [number, number];
 					const end = snapAngle({ x: anchor[0] + rootRect.left, y: anchor[1] + rootRect.top }, point);
 					const board = this.boardPoint(end);
 					if (board === undefined) return;
@@ -5140,7 +5140,7 @@ export class M1CanvasSession {
 				&& Math.hypot(pointer.clientX - start.x, pointer.clientY - start.y) <= TAP_SLOP
 				&& shown.every(pair => {
 					const [x, y] = pair.split(",").map(Number);
-					return Math.hypot(x! + rootRect.left - start.x, y! + rootRect.top - start.y) <= TAP_SLOP;
+					return Math.hypot(x + rootRect.left - start.x, y + rootRect.top - start.y) <= TAP_SLOP;
 				});
 			end();
 			if (gesture !== undefined) this.finishToolGesture(tool, start, { x: pointer.clientX, y: pointer.clientY }, gesture.from, event.shiftKey === true);
@@ -5285,12 +5285,12 @@ export class M1CanvasSession {
 		};
 		const course = (tip: StrokePoint, placed: readonly StrokePoint[]): StrokePoint[] =>
 			spec.input === "points" ? [...placed, tip]
-				: spec.route === "curved" ? [placed[0]!, bowPoint(placed[0]!, tip), tip] : [placed[0]!, tip];
+				: spec.route === "curved" ? [placed[0], bowPoint(placed[0], tip), tip] : [placed[0], tip];
 		const width = this.connectorWidth;
 		const show = (tip: StrokePoint, placed: readonly StrokePoint[]): void => {
 			const through = course(tip, placed);
 			if (spec.block === true) {
-				shape.setAttribute("points", blockArrowOutline(local(through[0]!), local(tip), width * this.zoom(), this.connectorHeadSize === undefined ? undefined : this.connectorHeadSize * this.zoom())
+				shape.setAttribute("points", blockArrowOutline(local(through[0]), local(tip), width * this.zoom(), this.connectorHeadSize === undefined ? undefined : this.connectorHeadSize * this.zoom())
 					.map((point) => `${point.x},${point.y}`).join(" "));
 				return;
 			}
@@ -5330,7 +5330,7 @@ export class M1CanvasSession {
 		const move = (moved: Event): void => {
 			const pointer = moved as PointerEvent;
 			if (pointer.pointerId !== event.pointerId) return;
-			const from = spec.input === "points" ? points[points.length - 1]! : first;
+			const from = spec.input === "points" ? points[points.length - 1] : first;
 			const next = aim({ x: pointer.clientX, y: pointer.clientY }, from, pointer.shiftKey === true);
 			if (next === undefined) return;
 			tip = next;
@@ -5365,9 +5365,9 @@ export class M1CanvasSession {
 		this.linePlacing = {
 			spec, points, finish,
 			place: (client, straight) => {
-				const point = aim(client, points[points.length - 1]!, straight);
+				const point = aim(client, points[points.length - 1], straight);
 				if (point === undefined) return;
-				const last = this.viewportPoint(points[points.length - 1]!);
+				const last = this.viewportPoint(points[points.length - 1]);
 				// A second click where the last one was is a double-click: done.
 				if (last !== undefined && Math.hypot(client.x - last.x, client.y - last.y) < 6) {
 					finish();
@@ -5398,8 +5398,8 @@ export class M1CanvasSession {
 		}
 		// Every drawing mode creates the same independent connector record.
 		// Arrowheads are style; removing one never removes its anchors.
-		const from = this.connectorLanding(this.viewportPoint(points[0]!) ?? points[0]!, undefined, points[points.length - 1], "");
-		const to = this.connectorLanding(this.viewportPoint(points[points.length - 1]!) ?? points[points.length - 1]!, from?.nodeId, points[0], "");
+		const from = this.connectorLanding(this.viewportPoint(points[0]) ?? points[0], undefined, points[points.length - 1], "");
+		const to = this.connectorLanding(this.viewportPoint(points[points.length - 1]) ?? points[points.length - 1], from?.nodeId, points[0], "");
 		if (from === undefined || to === undefined) {
 			this.options.onNotice?.(words().session.linePlacementRefused);
 			this.refresh(); return;
@@ -5531,7 +5531,7 @@ export class M1CanvasSession {
 		const widths = usePressure ? points.map(point => Math.round(this.penWidth * scaleByPoint.get(point)! * 100) / 100) : undefined;
 		const width = widths === undefined ? this.penWidth * (tool === "highlighter" ? HIGHLIGHTER_SCALE : 1) : Math.max(...widths);
 		this.penPressures = [];
-		const rect = strokeBounds(points.length === 1 ? [points[0]!, points[0]!] : points, width);
+		const rect = strokeBounds(points.length === 1 ? [points[0], points[0]] : points, width);
 		const stroke = {
 			color: this.penInk(),
 			width,
@@ -5544,8 +5544,8 @@ export class M1CanvasSession {
 			]),
 		};
 		// A single tap leaves a dot: two points at the same place.
-		if (stroke.points.length === 2) stroke.points.push(stroke.points[0]!, stroke.points[1]!);
-		if (widths?.length === 1) widths.push(widths[0]!);
+		if (stroke.points.length === 2) stroke.points.push(stroke.points[0], stroke.points[1]);
+		if (widths?.length === 1) widths.push(widths[0]);
 		const commit = (): void => {
 			if (this.disposed) return;
 			this.readInteractionState();
@@ -5957,7 +5957,7 @@ export class M1CanvasSession {
 		const canvas = [this.view, ...["canvas", "_canvas", "canvasView", "canvasRuntime"]
 			.map((key) => readRuntime(this.view, key))]
 			.find((candidate) => isObject(candidate) && observed !== undefined && readRuntime(candidate, "getData") === observed);
-		return isObject(canvas) ? canvas as UnknownRecord : undefined;
+		return isObject(canvas) ? canvas : undefined;
 	}
 
 	private handlesState(editable: boolean): SelectionHandlesState {
@@ -6248,7 +6248,7 @@ export class M1CanvasSession {
 				const index = pages.findIndex((page) => page.id === id);
 				const target = index + step;
 				if (index < 0 || target < 0 || target >= pages.length) return current;
-				[pages[index], pages[target]] = [pages[target]!, pages[index]!];
+				[pages[index], pages[target]] = [pages[target], pages[index]];
 				return { ...current, pages };
 			}),
 			onShowPage: (id) => {
@@ -6399,7 +6399,7 @@ export class M1CanvasSession {
 			this.renderExport();
 			const sheets = pages.map((page, index) => {
 				const size = paperSize(exporting.state.format, exporting.state.orientation, page);
-				const picture = pictures[index]!;
+				const picture = pictures[index];
 				return {
 					width: size.width, height: size.height, image: picture.jpeg, pixelWidth: picture.width, pixelHeight: picture.height,
 					...(page.name === undefined ? {} : { title: page.name }),
@@ -6799,7 +6799,7 @@ export class M1CanvasSession {
 		callRuntime(fragment.editor, "replaceRange", next, fragment.from, fragment.to);
 		const from = fragment.from as { line: number; ch: number };
 		const lines = next.split("\n");
-		const to = { line: from.line + lines.length - 1, ch: lines.length === 1 ? from.ch + next.length : lines[lines.length - 1]!.length };
+		const to = { line: from.line + lines.length - 1, ch: lines.length === 1 ? from.ch + next.length : lines[lines.length - 1].length };
 		callRuntime(fragment.editor, "setSelection", fragment.from, to);
 		this.textFragment = { ...fragment, text: next, to };
 		this.refresh();
@@ -6971,7 +6971,7 @@ export class M1CanvasSession {
 			if (next === undefined) {
 				throw new Error("The safety action was invalid or unsupported by the metadata schema.");
 			}
-			return next as Record<string, unknown>;
+			return next;
 		});
 		if (result?.status === "applied" && type.toLowerCase().includes("review")) {
 			// writeMetadata refreshes from the committed document.  Derive the
@@ -7591,7 +7591,7 @@ export class M1CanvasSession {
 			return separator < 0 ? [] : [commentSelectionId(key.slice(0, separator) as CommentOrigin, key.slice(separator + 1))];
 		});
 		const ids = [...this.selectedIds, ...commentIds];
-		const alone = ids.length < 2 && options.single !== true && !this.selectedRouteEnds.has(ids[0]!);
+		const alone = ids.length < 2 && options.single !== true && !this.selectedRouteEnds.has(ids[0]);
 		if (event.button !== 0 || event.shiftKey || ids.length === 0 || alone
 			|| this.closestTarget(event, "input,textarea,[contenteditable=true],.cm-editor")) return false;
 		const target = this.eventElementId(event.target);
@@ -8712,7 +8712,7 @@ export class M1CanvasSession {
 				const observer = new Construct((() => {
 					this.refresh();
 					this.updatePanelPositions();
-				}) as () => void);
+				}));
 				observer.observe(this.root);
 				this.disposers.push(() => observer.disconnect());
 				// The panels' own sizes too: `updatePanelPositions` starts watching each.

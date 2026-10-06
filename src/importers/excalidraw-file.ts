@@ -266,7 +266,7 @@ function readTextElements(data: string): Map<string, string> {
   let position = skipNewlines(body, 0);
   for (const anchor of body.matchAll(TEXT_BLOCK_ANCHOR)) {
     const anchorStart = anchor.index ?? 0;
-    const id = anchor[1]!;
+    const id = anchor[1];
     // Later entries win, as they do when the plugin reads its own note.
     texts.set(id, body.slice(position, anchorStart));
     position = skipNewlines(body, anchorStart + anchor[0].length);
@@ -290,15 +290,15 @@ function readEmbeddedFiles(data: string): Map<string, ExcalidrawEmbed> {
 
   const lines = body.split("\n");
   for (let index = 0; index < lines.length; index += 1) {
-    const entry = EMBED_LINE.exec(lines[index]!);
+    const entry = EMBED_LINE.exec(lines[index]);
     if (entry === null) continue;
-    const id = entry[1]!;
-    let value = entry[2]!.trim();
+    const id = entry[1];
+    let value = entry[2].trim();
     // A formula may run over several lines until its closing `$$`.
     if (value.startsWith("$$") && !closesFormula(value)) {
       while (index + 1 < lines.length) {
         index += 1;
-        value += "\n" + lines[index]!;
+        value += "\n" + lines[index];
         if (closesFormula(value.trimEnd())) break;
       }
       value = value.trimEnd();

@@ -562,7 +562,7 @@ function decorateLine(document: Document | undefined, layer: DomElementLike, des
   const route = (connector?.shape === "elbowed" || connector?.shape === "curved" || connector?.shape === "straight")
     ? connector.shape : line.route;
   if (block) {
-    const outline = blockArrowOutline(points[0]!, points[points.length - 1]!, width, connector?.headSize ?? line.headSize)
+    const outline = blockArrowOutline(points[0], points[points.length - 1], width, connector?.headSize ?? line.headSize)
       .map((point) => `${Math.round(point.x * 100) / 100},${Math.round(point.y * 100) / 100}`).join(" ");
     for (const [name, value] of Object.entries({ points: outline, fill: color, stroke: color, "stroke-width": "1", "stroke-linejoin": "round" })) {
       setOwnedElementAttribute(path, name, value);
@@ -1090,7 +1090,7 @@ function observeNodes(
   }
   if (ratios.length === 0) return {};
   ratios.sort((left, right) => left - right);
-  const scale = ratios[Math.floor(ratios.length / 2)]!;
+  const scale = ratios[Math.floor(ratios.length / 2)];
   if (!Number.isFinite(scale) || scale <= 0) return {};
   const measurements: Record<string, { width: number; height: number }> = Object.create(null);
   for (const [id, size] of observed) {
@@ -1162,7 +1162,7 @@ function localMap(path: DomElementLike): ((point: AnchorPoint) => AnchorPoint) |
   const values = ["a", "b", "c", "d", "e", "f"].map(key => safeGet(matrix, key));
   if (!values.every(value => typeof value === "number" && Number.isFinite(value))) return undefined;
   const [a, b, c, d, e, f] = values as number[];
-  return point => ({ x: a! * point.x + c! * point.y + e!, y: b! * point.x + d! * point.y + f! });
+  return point => ({ x: a * point.x + c * point.y + e, y: b * point.x + d * point.y + f });
 }
 
 /** A block arrow's outline along a route, from its tail to its head, in a native path's own space. */
@@ -1224,8 +1224,8 @@ function renderConnectorGeometry(document: Document | undefined, runtime: unknow
   }
   const color = descriptor.css.stroke ?? nativeConnectorColor(document, group);
   const scale = local ? LOCAL_CAP_SCALE : 1;
-  const startMarker = marker(document, caps[0]!, color, patches, group, scale, descriptor.connector?.headSize);
-  const endMarker = marker(document, caps[1]!, color, patches, group, scale, descriptor.connector?.headSize);
+  const startMarker = marker(document, caps[0], color, patches, group, scale, descriptor.connector?.headSize);
+  const endMarker = marker(document, caps[1], color, patches, group, scale, descriptor.connector?.headSize);
   if (startMarker === undefined || endMarker === undefined) {
     diagnostics.push(`connector-marker-fallback: ${id}.`);
     return undefined;
@@ -1282,7 +1282,7 @@ function connectorFollow(
   patches: RestorePatch[],
 ): NonNullable<RenderedItem["follow"]> {
   const display = routes.find(({ path }) => safeCall(safeGet(path, "classList"), "contains", ["canvas-interaction-path"]) !== true)?.path
-    ?? routes[0]!.path;
+    ?? routes[0].path;
   let written: string | undefined;
   patches.push(() => {
     if (written !== undefined && readAttribute(display, "d") === written) safeCall(runtime, "updatePath");
@@ -1548,7 +1548,7 @@ function applyConnector(
     diagnostics.push(`connector-dom-inaccessible: ${id}.`);
     return undefined;
   }
-  const primary = targets[0]!;
+  const primary = targets[0];
   const mindmapEdge = descriptor.structured?.mindmapEdge;
   for (const target of targets) {
     patchClass(target, OWNED_CLASS, patches);
@@ -2358,6 +2358,6 @@ export class SourceRenderer {
 /** Undo what was done, last first; exact-owned restoration is best-effort. */
 function rollBack(patches: readonly RestorePatch[]): void {
   for (let index = patches.length - 1; index >= 0; index -= 1) {
-    try { patches[index]!(); } catch { /* exact-owned restoration is best-effort */ }
+    try { patches[index](); } catch { /* exact-owned restoration is best-effort */ }
   }
 }

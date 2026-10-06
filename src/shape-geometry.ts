@@ -253,7 +253,7 @@ export function contourPoint(
   }
   let best: number | undefined;
   for (let index = 0; index < outline.length; index += 1) {
-    const hit = segmentHit(outline[index]!, outline[(index + 1) % outline.length]!, center, dx, dy);
+    const hit = segmentHit(outline[index], outline[(index + 1) % outline.length], center, dx, dy);
     if (hit !== undefined && (best === undefined || hit > best)) {
       best = hit;
     }
@@ -275,8 +275,8 @@ export function closestContourPoint(
   let best: ShapePoint | undefined;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (let index = 0; index < outline.length; index += 1) {
-    const from = outline[index]!;
-    const to = outline[(index + 1) % outline.length]!;
+    const from = outline[index];
+    const to = outline[(index + 1) % outline.length];
     const dx = (to.x - from.x) * scale.x;
     const dy = (to.y - from.y) * scale.y;
     const tx = (target.x - from.x) * scale.x;
@@ -297,8 +297,8 @@ export function closestContourPoint(
 function insideSpan(outline: readonly ShapePoint[], y: number): { readonly left: number; readonly right: number } | undefined {
   const crossings: number[] = [];
   for (let index = 0; index < outline.length; index += 1) {
-    const from = outline[index]!;
-    const to = outline[(index + 1) % outline.length]!;
+    const from = outline[index];
+    const to = outline[(index + 1) % outline.length];
     if ((from.y <= y && to.y > y) || (to.y <= y && from.y > y)) {
       crossings.push(from.x + ((y - from.y) / (to.y - from.y)) * (to.x - from.x));
     }
@@ -313,7 +313,7 @@ function insideSpan(outline: readonly ShapePoint[], y: number): { readonly left:
   // stretch around the centre is the one text is laid out in.
   let widest: { readonly left: number; readonly right: number } | undefined;
   for (let index = 0; index + 1 < crossings.length; index += 2) {
-    const stretch = { left: crossings[index]!, right: crossings[index + 1]! };
+    const stretch = { left: crossings[index], right: crossings[index + 1] };
     if (stretch.left <= 50 && stretch.right >= 50) return stretch;
     if (widest === undefined || stretch.right - stretch.left > widest.right - widest.left) widest = stretch;
   }
