@@ -303,6 +303,22 @@ describe("live pen pressure and finger drawing", () => {
 		pointer("pointerup", 2);
 		expect(history).toHaveLength(0);
 	});
+	it("uses the board window for a delayed dot and cancels it when the board closes", () => {
+		vi.useFakeTimers();
+		const { window, hooks, pointer, history, session } = fixture({ nodes: [], toolBar: true });
+		const start = vi.spyOn(window, "setTimeout");
+		const stop = vi.spyOn(window, "clearTimeout");
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 100 });
+		pointer("pointerup", 8, "pen", { x: 100, y: 100 });
+		const dot = start.mock.calls.findIndex((call) => call[1] > 500);
+		expect(dot).toBeGreaterThanOrEqual(0);
+		expect(history).toHaveLength(0);
+		session.dispose();
+		expect(stop).toHaveBeenCalledWith(start.mock.results[dot]!.value);
+		vi.advanceTimersByTime(1000);
+		expect(history).toHaveLength(0);
+	});
 	it("a double tap with small pen jitter leaves no drawing or history entry", () => {
 		vi.useFakeTimers();
 		const { hooks, pointer, history, canvas } = fixture({ nodes: [], toolBar: true });
@@ -588,6 +604,71 @@ describe("a pen held still at the end of a stroke", () => {
 		expect(nodes).toBe(1);
 		expect(strokes[0].points).toHaveLength(4);
 		expect(strokes[0].width).toBe(5);
+	});
+
+	it("straightens a pressure path before release and keeps both endpoint widths", () => {
+		vi.useFakeTimers();
+		const { canvas, history, hooks, pointer, root } = fixture({ nodes: [] });
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 300 }, { pressure: 0.2 });
+		for (const [x, y, pressure] of [[140, 320, 0.4], [180, 290, 0.8], [220, 330, 0.6], [260, 300, 0.7]]) {
+			pointer("pointermove", 8, "pen", { x: x!, y: y! }, { pressure });
+		}
+		const line = root.children.find(child => child.getAttribute("class")?.includes("tool-ghost"))!.children[0]!;
+		const wavy = line.getAttribute("d");
+		vi.advanceTimersByTime(510);
+		expect(line.tagName).toBe("PATH");
+		expect(line.getAttribute("d")).not.toBe(wavy);
+		expect(drawing(canvas).nodes).toBe(0);
+		expect(history).toHaveLength(0);
+		pointer("pointermove", 8, "pen", { x: 300, y: 340 }, { pressure: 0.9 });
+		pointer("pointerup", 8, "pen", { x: 300, y: 340 });
+		const stroke = drawing(canvas).strokes[0];
+		expect(stroke.points).toHaveLength(4);
+		expect(stroke.widths).toEqual([5 * strokeWidthScale([0.2]), 5 * strokeWidthScale([0.9])]);
+		expect(history).toHaveLength(1);
+	});
+
+	it.each([0, -1, 1])("keeps a held pressure line steady through stationary pulses and lift at zoom %s", zoom => {
+		vi.useFakeTimers();
+		const { canvas, history, hooks, pointer, root } = fixture({ nodes: [] });
+		canvas.setViewport(0, 0, zoom);
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 300 }, { pressure: 0.2 });
+		for (const [x, y] of [[140, 320], [180, 290], [220, 330], [260, 300]]) {
+			pointer("pointermove", 8, "pen", { x: x!, y: y! }, { pressure: 0.3 });
+		}
+		const line = root.children.find(child => child.getAttribute("class")?.includes("tool-ghost"))!.children[0]!;
+		const scales = () => (hooks as unknown as { penPressures: number[] }).penPressures;
+		vi.advanceTimersByTime(250);
+		pointer("pointermove", 8, "pen", { x: 262, y: 301 }, { pressure: 0.95 });
+		expect(scales().at(-1)).toBe(strokeWidthScale([0.3]));
+		// A pressure-only event must not become the width chosen by the hold timer.
+		pointer("pointermove", 8, "pen", { x: 262, y: 301 }, { pressure: 0.95 });
+		vi.advanceTimersByTime(260);
+		expect(scales()).toEqual([strokeWidthScale([0.2]), strokeWidthScale([0.3])]);
+		const held = line.getAttribute("d");
+		for (const pressure of [0.95, 0.05, 0, 0.5]) {
+			pointer("pointermove", 8, "pen", { x: 262, y: 301 }, { pressure });
+			expect(line.getAttribute("d")).toBe(held);
+		}
+		expect(history).toHaveLength(0);
+		pointer("pointerup", 8, "pen", { x: 262, y: 301 });
+		expect(drawing(canvas).strokes[0].widths).toEqual([5, 5.75]);
+		expect(history).toHaveLength(1);
+	});
+
+	it("keeps the last drawn width for a zero-pressure move with holding off and Shift down", () => {
+		const { canvas, hooks, pointer, root } = fixture({ nodes: [], settings: { ...DEFAULT_SETTINGS, holdStraightLine: false } });
+		hooks.armTool("pen");
+		pointer("pointerdown", 8, "pen", { x: 100, y: 300 }, { pressure: 0.2 });
+		pointer("pointermove", 8, "pen", { x: 160, y: 310 }, { pressure: 0.3, shiftKey: true });
+		const line = root.children.find(child => child.getAttribute("class")?.includes("tool-ghost"))!.children[0]!;
+		const beforeLift = line.getAttribute("d");
+		pointer("pointermove", 8, "pen", { x: 160, y: 310 }, { pressure: 0, shiftKey: true });
+		expect(line.getAttribute("d")).toBe(beforeLift);
+		pointer("pointerup", 8, "pen", { x: 160, y: 310 });
+		expect(drawing(canvas).strokes[0].widths).toEqual([5, 5.75]);
 	});
 
 	it("moves the line's far end with the pen once straight, and never goes back to freehand", () => {

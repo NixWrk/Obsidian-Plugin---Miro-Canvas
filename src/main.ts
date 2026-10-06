@@ -811,7 +811,7 @@ export default class MiroCanvasPlugin extends Plugin {
     const openWelcomeBoard = buttons.createEl("button", { text: strings.openWelcomeBoardButton, cls: "mod-cta" });
     openWelcomeBoard.addEventListener("click", () => {
       modal.close();
-      this.openWelcomeBoard();
+      void this.openWelcomeBoard();
     });
     const showMeHow = buttons.createEl("button", { text: strings.showMeHow });
     showMeHow.addEventListener("click", () => {

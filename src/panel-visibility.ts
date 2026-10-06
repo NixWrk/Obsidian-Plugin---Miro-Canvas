@@ -106,7 +106,9 @@ export class PanelVisibility {
         let dragged = false;
         let ready = false;
         let swiped = false;
-        const hold = setTimeout(() => {
+        const window = this.host.document.defaultView;
+        if (window === null) return;
+        const hold = window.setTimeout(() => {
           ready = true;
           button.setAttribute("data-panel-moving", "true");
         }, 450);
@@ -119,7 +121,7 @@ export class PanelVisibility {
           if (!ready) {
             if (Math.hypot(pointer.clientX - startX, pointer.clientY - startY) >= 8) {
               swiped = true;
-              clearTimeout(hold);
+              window.clearTimeout(hold);
             }
             return;
           }
@@ -148,7 +150,7 @@ export class PanelVisibility {
           pointer.preventDefault();
         };
         const cleanup = (): void => {
-          clearTimeout(hold);
+          window.clearTimeout(hold);
           button.removeAttribute("data-panel-moving");
           this.host.document.removeEventListener("pointermove", move);
           this.host.document.removeEventListener("pointerup", up);

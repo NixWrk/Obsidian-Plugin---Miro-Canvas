@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { APPEARANCE_ACTIONS, type AppearanceAction } from "../src/appearance";
 import { setLocale } from "../src/i18n";
@@ -214,6 +214,34 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
 }
 
 describe("selection toolbar", () => {
+  it("keeps an open menu inside the board after its bar moves and ignores closed menus", () => {
+    const { root, toolbar, update } = build();
+    const panel = panelOf(root, "More");
+    const properties = new Map<string, string>();
+    let left = 276;
+    const measure = vi.fn(() => ({ left, top: 200, right: left + 253, bottom: 300 }));
+    Object.assign(panel, {
+      getBoundingClientRect: measure,
+      closest: () => ({ getBoundingClientRect: () => ({ left: 0, top: 80, right: 384, bottom: 475 }) }),
+    });
+    Object.assign(panel.style, {
+      setProperty: (name: string, value: string) => properties.set(name, value),
+      removeProperty: (name: string) => properties.delete(name),
+    });
+    byLabel(root, "More").dispatch("click");
+    expect(properties.get("translate")).toBe("-153px 0");
+    left = 320;
+    update({ placement: { x: 170, y: 40 } });
+    expect(properties.get("translate")).toBe("-197px 0");
+    left = 330;
+    toolbar.keepOpenPopoversInView();
+    expect(properties.get("translate")).toBe("-207px 0");
+    byLabel(root, "More").dispatch("click");
+    measure.mockClear();
+    update();
+    toolbar.keepOpenPopoversInView();
+    expect(measure).not.toHaveBeenCalled();
+  });
   it("edits head size independently and rejects invalid or read-only changes", () => {
     const {root, styles, update} = build({...EDGE});
     const input = byLabel(root, "Arrowhead size");

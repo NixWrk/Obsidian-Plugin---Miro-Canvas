@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Keep pressure width steady during hold-to-straighten: ignore stationary pressure pulses and retain the last width through the zero-pressure move before pen lift. Preview and saved outlines agree; moving the pen still samples pressure.
+
+- Recognize tilted and uneven smart-drawn rectangles by their sides and corners. Preserve the orientation and local dimensions of rectangles, ellipses and triangles, rounding rotation to 45-degree steps in one native Undo/Redo action. Add pressure-enabled hold-to-straighten regressions in installed Android Obsidian.
+
+- Keep open selection menus inside the board when the toolbar moves or native menu contents change after opening. Verify repeated More opening on connected Android tablet/phone in both themes.
+- Add mandatory Android regression checks with real ADB touch/pen-source input, gesture previews, cancellation, Undo/Redo, minimap and viewport rotation; distinguish pen-source injection from hardware pressure/hover.
+
+- Use the board window for delayed touch/pen dots, panel hold gestures, refresh polling, resize observers and minimap pointer checks; cancel waits in their owning window.
+- Replace six native-selection-menu `:has()` selectors with explicit menu state. Preserve the inert snapshot while panning and the independent-connector Delete fallback; restore native buttons on plugin unload.
+- Keep native font fallback after a local font read fails; isolate failures and allow a later request to retry.
+- Require every lint fix to trace affected user actions and record mandatory regressions before implementation in docs/lint-remediation-checks.md.
+
 - Add a keyboard-accessible section selector to settings and move welcome/import actions to the top. Keep all parameters visible and separate developer diagnostics.
 - Document the existing Obsidian design foundation in DESIGN.md. Give README and the welcome introduction a short numbered route while preserving all twelve tutorial sections and real examples.
 - Explain moving and resizing export pages directly in the export panel, including on touch devices.

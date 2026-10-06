@@ -15,6 +15,18 @@ from the plugin.
 
 ## Current implementation status
 
+Smart drawing checks four straight sides and nearly right-angle turns before
+using area ratios, so a tilted or uneven rectangle is not mistaken for an oval.
+Closed shapes retain fitted local dimensions and center; their orientation
+is rounded to 45-degree steps. Ellipse axes use equal-distance samples,
+triangle orientation uses its base. Shape creation writes rotation into the
+existing local override in the same guarded history transaction.
+Hold-to-straighten needs its Drawing setting enabled and works with pressure
+paths; its preview is unsaved until release, with one native history step.
+Within the hold stillness radius (4 CSS px), pressure pulses retain the last
+width; meaningful movement resumes pressure sampling. Straightening uses the
+last width already shown, and a zero-pressure move before lift keeps it.
+
 `DESIGN.md` records the native Obsidian visual foundation. Settings start with
 a keyboard-accessible section selector and the welcome/import actions. Selecting
 a section scrolls to and focuses its native heading without hiding parameters.
@@ -2095,3 +2107,20 @@ Export-page tabs and resize corners belong to PANEL_SELECTOR so rectangle select
 ## Panel CSS states (0.2.6)
 
 PanelVisibility marks the main row with data-miro-panel-toggle-host and clears expanded spacing while folded. QuickTools mirrors its menu and settings state in attributes only when values change; stacking and the spare-tools tray use these states instead of :has. Horizontal panels choose the roomier side and wrap to the space between the button and board edge, matching the vertical panel height limit. Cancelled drags restore the previous width. The search live region uses opacity: 0 and remains in the accessibility tree without clip-path. CI reports advisory budgets of 90 !important declarations and 10 native-markup :has selectors; it does not certify them as required or eliminate the remaining directory warnings.
+
+## Lint remediation (2026-10-06)
+
+Every lint change first records its traced user actions and mandatory checks
+in [the regression register](lint-remediation-checks.md). The first batch uses
+the board window for dot/panel timers, refresh polling, resize observers and
+minimap pointer checks. Font read failures keep the native fallback and allow
+retry. Adopted native-menu state replaces six :has selectors; four remain
+for native selection, attachment labels and Markdown code previews. Remaining
+!important overrides need their own cascade evidence before removal.
+
+Physical Android follow-up (2026-10-06): the native-menu mirror and open-popover
+placement are verified on SM-X736B/Obsidian 1.13.8 and SM-A336E/1.12.7 (legacy
+additional check). Open selection popovers are re-clamped when the toolbar's
+placement or native contents change. Closed popovers do not cause measurements.
+The regression register records real ADB gestures, previews and cancellation,
+font failure/retry, Undo/Redo, viewport rotation and preserved test boards.

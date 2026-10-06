@@ -7,6 +7,7 @@
  * runtime boundary; MetadataWriter remains the only persistence boundary.
  */
 
+import { watchNativeMenuState } from "./native-menu-state";
 import {
 	APPEARANCE_ACTIONS,
 	mergeAppearanceMetadata,
@@ -1638,7 +1639,7 @@ export class M1CanvasSession {
 	private penPointerType = "mouse";
 	private penStartedAt = 0;
 	private penTap = false;
-	private pendingPenDot: { timer: ReturnType<typeof setTimeout>; commit: () => void } | undefined;
+	private pendingPenDot: { cancel: () => void; commit: () => void } | undefined;
 	private skipPenDotUntil = 0;
 	private erasing = new Set<string>();
 	/** When a stylus was last near this board, and whether this device has one at all. */
@@ -5091,10 +5092,13 @@ export class M1CanvasSession {
 		let held = false;
 		let stoppedAt = start;
 		let latest = start;
+		let pressureAt = start;
 		let holdTimer: number | undefined;
 		const straightenHeld = (): void => {
 			holdTimer = undefined;
 			if (Math.hypot(stoppedAt.x - start.x, stoppedAt.y - start.y) < HOLD_STRAIGHT_REACH) return;
+			// Keep the width already shown at the end, not an unsampled pressure pulse.
+			pressureScale = this.penPressures[this.penPressures.length - 1] ?? pressureScale;
 			held = true;
 			straightFrom = 0;
 			draw(latest, true);
@@ -5116,9 +5120,15 @@ export class M1CanvasSession {
 		const move = (moved: Event): void => {
 			if (!own(moved)) return;
 			const point = moved as PointerEvent;
-			// A stylus reports how hard it is pressed; see `strokeWidthScale`.
-			pressureScale = pressurePen ? strokeWidthScale([pressedPressure(point) ?? 0.5]) : 1;
 			const at = { x: point.clientX, y: point.clientY };
+			// Holding changes the line's direction, not its width with every tremor.
+			const movedForPressure = !holdable || Math.hypot(at.x - pressureAt.x, at.y - pressureAt.y) > HOLD_STRAIGHT_STILL;
+			if (pressurePen && movedForPressure) {
+				const pressure = pressedPressure(point);
+				// A last move at pressure zero is the pen lifting, not a new width.
+				if (pressure !== undefined) pressureScale = strokeWidthScale([pressure]);
+				pressureAt = at;
+			}
 			draw(at, point.shiftKey === true || held);
 			watchHold(at);
 		};
@@ -5487,6 +5497,7 @@ export class M1CanvasSession {
 		this.authoring ??= createCanvasAuthoring(this.view);
 		const created = this.authoring.createShape({
 			shape: shape.kind === "ellipse" ? "ellipse" : shape.kind,
+			rotation: shape.rotation,
 			text: "",
 			x: Math.round(shape.box.x), y: Math.round(shape.box.y),
 			width: Math.round(shape.box.width), height: Math.round(shape.box.height),
@@ -5549,10 +5560,13 @@ export class M1CanvasSession {
 			const pending = this.pendingPenDot;
 			this.cancelPendingPenDot();
 			pending?.commit();
-			this.pendingPenDot = { commit, timer: setTimeout(() => {
+			const window = ownerDocument(this.root)?.defaultView;
+			if (window == null) return;
+			const timer = window.setTimeout(() => {
 				this.pendingPenDot = undefined;
 				commit();
-			}, DOUBLE_TAP_MS + TAP_MAX_MS + 30) };
+			}, DOUBLE_TAP_MS + TAP_MAX_MS + 30);
+			this.pendingPenDot = { commit, cancel: () => window.clearTimeout(timer) };
 		} else {
 			const pending = this.pendingPenDot;
 			this.cancelPendingPenDot();
@@ -5562,7 +5576,7 @@ export class M1CanvasSession {
 	}
 
 	private cancelPendingPenDot(): void {
-		if (this.pendingPenDot !== undefined) clearTimeout(this.pendingPenDot.timer);
+		this.pendingPenDot?.cancel();
 		this.pendingPenDot = undefined;
 	}
 
@@ -5896,10 +5910,12 @@ export class M1CanvasSession {
 		} catch {
 			return;
 		}
+		const menuState = watchNativeMenuState(slot, menuEl, snapshot, () => this.toolbar.keepOpenPopoversInView());
 		let middlePointer: number | undefined;
 		const hideSnapshot = (): void => {
 			middlePointer = undefined;
 			snapshot.hidden = true;
+			menuState.refresh();
 		};
 		const down = (event: Event): void => {
 			const pointer = event as PointerEvent;
@@ -5908,7 +5924,8 @@ export class M1CanvasSession {
 			snapshot.replaceChildren(...Array.from(menuEl.children, (child) => child.cloneNode(true)));
 			snapshot.hidden = false;
 			// Keep the fallback armed: native menu clearing may happen on a later frame.
-			// CSS hides it whenever the real menu is populated.
+			// The menu state hides it whenever the real menu is populated.
+			menuState.refresh();
 		};
 		const up = (event: Event): void => {
 			const pointer = event as PointerEvent;
@@ -5924,6 +5941,7 @@ export class M1CanvasSession {
 			document.removeEventListener("pointerup", up, true);
 			document.removeEventListener("pointercancel", up, true);
 			document.defaultView?.removeEventListener("blur", hideSnapshot);
+			menuState.dispose();
 			snapshot.remove();
 			try {
 				if (menuEl.parentElement === slot) container.prepend(menuEl);
@@ -8620,7 +8638,7 @@ export class M1CanvasSession {
 			if (this.minimapDragStart === undefined) {
 				return;
 			}
-			const pointerConstructor = readRuntime(globalThis, "PointerEvent");
+			const pointerConstructor = readRuntime(ownerDocument(this.root)?.defaultView, "PointerEvent");
 			const point = typeof pointerConstructor === "function" && event instanceof pointerConstructor
 				? this.mapPoint(event as PointerEvent)
 				: undefined;
@@ -8686,7 +8704,7 @@ export class M1CanvasSession {
 		if (this.root === undefined) {
 			return;
 		}
-		const ResizeObserverConstructor = readRuntime(globalThis, "ResizeObserver");
+		const ResizeObserverConstructor = readRuntime(ownerDocument(this.root)?.defaultView, "ResizeObserver");
 		if (typeof ResizeObserverConstructor === "function") {
 			try {
 				type Observer = { observe: (target: HTMLElement) => void; disconnect: () => void };
@@ -8748,21 +8766,22 @@ export class M1CanvasSession {
 	 * unknown runtime methods or writing metadata on open.
 	 */
 	private attachRefreshPolling(): void {
-		const setIntervalValue = readRuntime(globalThis, "setInterval");
-		const clearIntervalValue = readRuntime(globalThis, "clearInterval");
+		const window = ownerDocument(this.root)?.defaultView;
+		const setIntervalValue = readRuntime(window, "setInterval");
+		const clearIntervalValue = readRuntime(window, "clearInterval");
 		if (typeof setIntervalValue !== "function" || typeof clearIntervalValue !== "function") {
 			this.addDiagnostic("Canvas state refresh polling is unavailable; selection and history changes require explicit refresh.");
 			return;
 		}
 		try {
-			const timer = Reflect.apply(setIntervalValue, globalThis, [() => this.pollRefresh(), REFRESH_INTERVAL_MS]);
+			const timer = Reflect.apply(setIntervalValue, window, [() => this.pollRefresh(), REFRESH_INTERVAL_MS]);
 			this.refreshTimer = timer as ReturnType<typeof setInterval>;
 			this.disposers.push(() => {
 				if (this.refreshTimer === undefined) {
 					return;
 				}
 				try {
-					Reflect.apply(clearIntervalValue, globalThis, [this.refreshTimer]);
+					Reflect.apply(clearIntervalValue, window, [this.refreshTimer]);
 				} catch {
 					// The host timer registry may already be unavailable during unload.
 				}

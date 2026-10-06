@@ -544,7 +544,11 @@ export class FontFaceRegistry {
       this.flushScheduled = false;
       const batch = [...this.pending];
       this.pending.clear();
-      for (const name of batch) this.startLoad(name);
+      for (const name of batch) {
+        // Missing local font files leave the native fallback in place; a later
+        // request can retry after the file is restored.
+        void this.startLoad(name).catch(() => undefined);
+      }
     });
   }
 
@@ -589,10 +593,15 @@ export class FontFaceRegistry {
     if (packFamily !== undefined) {
       const blobs: string[] = [];
       const rules: string[] = [];
-      for (const face of packFamily.faces) {
-        const url = await this.readAsBlobUrl(`${packFamily.dir}/${face.file}`);
-        blobs.push(url);
-        rules.push(faceRuleText(name, face, [`url(${cssString(url)}) format("woff2")`]));
+      try {
+        for (const face of packFamily.faces) {
+          const url = await this.readAsBlobUrl(`${packFamily.dir}/${face.file}`);
+          blobs.push(url);
+          rules.push(faceRuleText(name, face, [`url(${cssString(url)}) format("woff2")`]));
+        }
+      } catch (error: unknown) {
+        for (const url of blobs) URL.revokeObjectURL(url);
+        throw error;
       }
       this.loadedOwnerPack.set(name, packFamily.packId);
       this.rulesByOwner.set(name, rules);

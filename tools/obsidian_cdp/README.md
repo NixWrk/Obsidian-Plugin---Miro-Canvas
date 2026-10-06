@@ -510,3 +510,46 @@ CDP checks the preview while each swipe is held. It verifies moving, free
 resizing, A4 proportions, unchanged camera and native content, and reopening
 saved page geometry. The portrait fixture keeps controls away from the open
 export panel and toolbar; obscured controls fail explicitly.
+
+### Lint regression checks
+
+`node tools/obsidian_cdp/check-lint-regressions.mjs <port>` requires a disposable
+isolated desktop instance and creates a dedicated board. It checks native menu
+state, duplicate buttons, panning preview, both themes, plugin unload/reload
+and a new popout with real mouse and synthesized touch input. It moves the
+board to a separate window and changes its size; close the isolated instance
+with stop.py afterward. The mandatory register is
+[docs/lint-remediation-checks.md](../../docs/lint-remediation-checks.md).
+
+`node tools/obsidian_cdp/check-font-failures.mjs <port>` checks failed local
+font reads, native fallback width, partial Blob cleanup and alias retry in the
+real browser. It uses a temporary registry and removes its styles afterward.
+
+### Connected Android lint regressions
+
+`node tools/obsidian_cdp/check-android-lint-regressions.mjs --serial <device> --port <forwarded port>` runs only in MiroCanvasTest. Use `--only menus`,
+`panels`, `navigation` or `drawing` for a focused rerun. It creates a disposable
+board, uses real ADB touch/pen-source input, inspects previews before release,
+and restores the prior file, settings, theme and Android rotation preferences.
+The menu check asserts actual bounds after layout settles. Pen-source injection
+does not verify a person using physical pressure, hover or side buttons.
+`check-font-failures.mjs` also supports mobile with CDP_TITLE=Obsidian.
+
+### Held strokes and smart shapes on Android
+
+`node tools/obsidian_cdp/check-drawing-hold-shapes.mjs --serial <device>
+--port <forwarded-port>` runs in installed Obsidian, in MiroCanvasTest only.
+It checks pressure-enabled holds, endpoint movement, zoom, highlighter,
+setting off, cancellation, smart tilted rectangles/ellipse/triangle and
+real Undo/Redo taps. The shape matrix checks 45-degree rotation steps, local
+dimensions, actual rendering and touch selection after the native selection
+poll. Screenshots capture the selected tilted rectangle on each device.
+Drawing input uses the OS stylus source; an additional
+CDP case controls force in the actual WebView and is explicitly synthetic.
+The script restores original board/preferences/viewport, always cancels its
+pressed pointer, and saves baseline/results under `.out/drawing-*.json`.
+Keep Obsidian foreground on the device; a background WebView can suspend
+evaluations. `--hold-only`, `--shapes-only` and `--pressure-only` narrow a run.
+Pressure mode checks stationary pulses, zero-force lift, and saved/live SVG
+bounds at 50/100/200 percent, allowing native node rounding at the current
+zoom. Result filenames include the selected mode so evidence is not overwritten.

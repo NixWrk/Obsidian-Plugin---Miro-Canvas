@@ -297,6 +297,53 @@ const EXCALIFONT_PACK = {
 };
 
 describe("FontFaceRegistry", () => {
+  it("releases earlier face blobs when a later face cannot be read", async () => {
+    const registry = new FontFaceRegistry();
+    const doc = new FakeDocument();
+    registry.attach(doc as unknown as Document);
+    registry.configure([{ ...EXCALIFONT_PACK, families: [{ family: "Multi", faces: [
+      { style: "normal", weight: "400", file: "first.woff2" },
+      { style: "italic", weight: "400", file: "missing.woff2" },
+    ] }], aliases: [] }], [], "fonts/custom");
+    registry.setFileReader(async path => {
+      if (path.endsWith("missing.woff2")) throw new Error("missing second face");
+      return new Uint8Array([1, 2, 3, 4]).buffer;
+    });
+    const revoked: string[] = [];
+    const originalRevoke = URL.revokeObjectURL.bind(URL);
+    URL.revokeObjectURL = url => { revoked.push(url); originalRevoke(url); };
+    try {
+      registry.want(["Multi"]);
+      await flush();
+      expect(registry.facesRead).toBe(1);
+      expect(revoked).toHaveLength(1);
+      expect(doc.head.children[0]!.sheet.cssRules).toHaveLength(0);
+      registry.dispose();
+      expect(revoked).toHaveLength(1);
+    } finally {
+      URL.revokeObjectURL = originalRevoke;
+    }
+  });
+  it("isolates a failed family and can retry its alias after the local file returns", async () => {
+    const registry = new FontFaceRegistry();
+    let missing = true;
+    registry.setFileReader(async (path) => {
+      if (missing && path.includes("excalifont")) throw new Error("missing local font");
+      return new Uint8Array([1, 2, 3, 4]).buffer;
+    });
+    const doc = new FakeDocument();
+    registry.attach(doc as unknown as Document);
+    registry.configure([EXCALIFONT_PACK], [], "fonts/custom");
+    registry.want(["Excalidraw", "Nunito"]);
+    await flush();
+    const rules = doc.head.children[0]!.sheet.cssRules;
+    expect(rules).toHaveLength(1);
+    missing = false;
+    registry.want(["Excalidraw"]);
+    await flush();
+    expect(doc.head.children[0]!.sheet.cssRules).toHaveLength(3);
+    registry.dispose();
+  });
   it("reads and inserts nothing merely from being configured", async () => {
     const registry = new FontFaceRegistry();
     const { readFile, calls } = fakeReader();

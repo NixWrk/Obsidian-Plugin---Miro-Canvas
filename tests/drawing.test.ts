@@ -210,6 +210,66 @@ describe("recogniseStroke", () => {
     expect(recogniseStroke(ring(140, 60))?.kind).toBe("ellipse");
   });
 
+  it.each([5, 8, 15, 30, 45, 70, 110])("recognises a rectangle rotated by %s degrees", (degrees) => {
+    const angle = degrees * Math.PI / 180;
+    const box = corners([{ x: 0, y: 0 }, { x: 200, y: 4 }, { x: 198, y: 120 }, { x: 2, y: 118 }]);
+    const rotated = box.map(({ x, y }) => ({ x: x * Math.cos(angle) - y * Math.sin(angle), y: x * Math.sin(angle) + y * Math.cos(angle) }));
+    expect(recogniseStroke([...rotated, rotated[0]!])?.kind).toBe("rectangle");
+  });
+
+  it("keeps four uneven corners despite a side start, reversed traversal and a closing gap", () => {
+    const box = corners([{ x: 0, y: 0 }, { x: 180, y: 14 }, { x: 194, y: 112 }, { x: 8, y: 124 }]);
+    const fromSide = [...box.slice(5), ...box.slice(0, 5)];
+    for (const points of [fromSide, [...fromSide].reverse()]) {
+      expect(recogniseStroke(points)?.kind).toBe("rectangle");
+    }
+  });
+
+  it("tolerates small corner overshoot and jitter without losing the four sides", () => {
+    const box = corners([{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 120 }, { x: 0, y: 120 }]);
+    const points = box.map(({ x, y }, index) => ({ x: x + (index % 3 - 1) * 2, y: y + (index % 4 - 2) }));
+    points.splice(10, 0, { x: 207, y: 2 });
+    expect(recogniseStroke([...points, points[0]!])?.kind).toBe("rectangle");
+  });
+
+  it.each([[80, 80], [140, 60], [250, 24]])("keeps rounded strokes rounded at radii %s/%s", (rx, ry) => {
+    for (const count of [12, 32, 80]) {
+      const points = Array.from({ length: count + 1 }, (_, index) => {
+        const angle = index / count * Math.PI * 2;
+        return { x: rx * Math.cos(angle), y: ry * Math.sin(angle) };
+      });
+      expect(recogniseStroke(points)?.kind).toBe(rx === ry ? "circle" : "ellipse");
+    }
+  });
+
+  it.each([[-70, -90], [-30, -45], [8, 0], [30, 45], [60, 45], [80, 90]])("keeps a rectangle tilted %s degrees, rounded to %s", (degrees, expected) => {
+    const a = degrees * Math.PI / 180;
+    const points = corners([{ x: -100, y: -50 }, { x: 100, y: -50 }, { x: 100, y: 50 }, { x: -100, y: 50 }])
+      .map(({ x, y }) => ({ x: 300 + x * Math.cos(a) - y * Math.sin(a), y: 400 + x * Math.sin(a) + y * Math.cos(a) }));
+    for (const stroke of [[...points, points[0]!], [...points, points[0]!].reverse()]) {
+      const shape = recogniseStroke(stroke)!;
+      expect(shape.kind).toBe("rectangle");
+      expect(shape.rotation).toBe(expected);
+      expect(shape.box.width).toBeCloseTo(202);
+      expect(shape.box.height).toBeCloseTo(102);
+      expect(shape.box.x + shape.box.width / 2).toBeCloseTo(300);
+      expect(shape.box.y + shape.box.height / 2).toBeCloseTo(400);
+    }
+  });
+
+  it("keeps the orientation of tilted ellipses and triangles", () => {
+    const a = Math.PI / 6;
+    const rotate = ({ x, y }: { x: number; y: number }) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * Math.sin(a) + y * Math.cos(a) });
+    const ellipse = recogniseStroke(ring(140, 60).map(rotate))!;
+    expect(ellipse.kind).toBe("ellipse");
+    expect(ellipse.rotation).toBe(45);
+    expect(ellipse.box.width / ellipse.box.height).toBeGreaterThan(2);
+    const triangle = corners([{ x: 0, y: 120 }, { x: 100, y: 0 }, { x: 200, y: 120 }]);
+    const shape = recogniseStroke([...triangle, triangle[0]!].map(rotate))!;
+    expect(shape.kind).toBe("triangle");
+    expect(shape.rotation).toBe(45);
+  });
+
   it("says nothing of a mark too small to mean a shape, or of a stroke left open", () => {
     expect(recogniseStroke(ring(6, 6))).toBeUndefined();
     expect(recogniseStroke([{ x: 0, y: 0 }, { x: 80, y: 60 }, { x: 160, y: 0 }, { x: 240, y: 90 }])).toBeUndefined();

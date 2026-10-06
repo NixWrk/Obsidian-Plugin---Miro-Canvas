@@ -18,6 +18,11 @@ This section is written so that a task can be handed to an AI coding agent
 
 ### While working
 
+Before each lint fix, trace the code's callers and affected user actions, then
+record mandatory regressions in [the register](lint-remediation-checks.md)
+before editing the implementation. Run those checks and distinguish real-app,
+unit/synthetic and physical-device evidence.
+
 - **Words.** Every string a person reads lives in `src/locales/en.ts` and
   `src/locales/ru.ts`, with the same keys. Russian is phrased the way a Russian
   interface speaks, not word for word, with the interface's own terms: фрейм

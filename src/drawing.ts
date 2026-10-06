@@ -257,6 +257,7 @@ export function pointInLasso(ring: readonly StrokePoint[], point: StrokePoint): 
 }
 
 export interface StrokeShape {
+  readonly rotation?: number;
   readonly kind: "rectangle" | "circle" | "ellipse" | "triangle" | "line";
   readonly box: StrokeBox;
   readonly from: StrokePoint;
@@ -267,10 +268,10 @@ export interface StrokeShape {
  * The shape a rough stroke was meant to be, the way Miro's smart drawing
  * reads one, or nothing when the stroke says nothing in particular.
  *
- * A stroke that comes back to where it started is a closed shape, told apart
- * by how much of its box it fills: a rectangle fills nearly all of it, an
- * ellipse about four fifths, a triangle about half.  One that does not close
- * is a line when it hardly bends.
+ * Four nearly perpendicular sides identify a rectangle even when tilted.
+ * Other closed shapes are told apart by how much of their box they fill:
+ * an ellipse about four fifths, a triangle about half. An open stroke is a
+ * line when it hardly bends.
  */
 export function recogniseStroke(points: readonly StrokePoint[]): StrokeShape | undefined {
   if (points.length < 2) return undefined;
@@ -292,13 +293,132 @@ export function recogniseStroke(points: readonly StrokePoint[]): StrokeShape | u
   }
   // Closed when the ends meet, measured against how far the line travelled.
   if (chord > length * 0.25) return undefined;
+  const corners = strokeCorners(points, box);
+  const rectangle = rectangleAngle(corners);
+  const axis = rectangle ?? principalAngle(points);
+  const fitted = fitShapeBox(points, axis);
   const area = Math.abs(shoelace(points)) / 2;
-  const filled = area / Math.max(box.width * box.height, 1);
-  const kind = filled > 0.82 ? "rectangle"
+  const filled = area / Math.max(fitted.box.width * fitted.box.height, 1);
+  const kind = rectangle !== undefined || filled > 0.82 ? "rectangle"
     : filled > 0.62
-      ? (Math.abs(box.width - box.height) <= Math.max(box.width, box.height) * 0.2 ? "circle" : "ellipse")
+      ? (Math.abs(fitted.box.width - fitted.box.height) <= Math.max(fitted.box.width, fitted.box.height) * 0.2 ? "circle" : "ellipse")
       : "triangle";
-  return { kind, box, from: first, to: last };
+  const geometry = kind === "circle" ? { box, rotation: 0 }
+    : kind === "triangle" && corners.length === 3 ? fitShapeBox(points, triangleAngle(corners))
+    : fitted;
+  return { kind, ...geometry, from: first, to: last };
+}
+
+/** Corners without jitter or an extra corner where a stroke started on a side. */
+function strokeCorners(points: readonly StrokePoint[], box: StrokeBox): readonly StrokePoint[] {
+  const tolerance = Math.max(1, Math.min(box.width, box.height) * 0.06);
+  const corners = [...simplifyPoints([...points, points[0]], tolerance)];
+  corners.pop();
+  for (let index = 0; corners.length > 3 && index < corners.length;) {
+    const previous = corners[(index + corners.length - 1) % corners.length];
+    const next = corners[(index + 1) % corners.length];
+    if (distanceToSegment(corners[index], previous, next) <= tolerance) {
+      corners.splice(index, 1);
+      index = 0;
+    } else index += 1;
+  }
+  return corners;
+}
+
+/** The long side of a rectangle, with consistent, nearly right-angle turns. */
+function rectangleAngle(corners: readonly StrokePoint[]): number | undefined {
+  if (corners.length !== 4) return undefined;
+  let winding = 0;
+  for (let index = 0; index < 4; index += 1) {
+    const previous = corners[(index + 3) % 4];
+    const corner = corners[index];
+    const next = corners[(index + 1) % 4];
+    const ax = corner.x - previous.x;
+    const ay = corner.y - previous.y;
+    const bx = next.x - corner.x;
+    const by = next.y - corner.y;
+    const a = Math.hypot(ax, ay);
+    const b = Math.hypot(bx, by);
+    if (Math.min(a, b) === 0 || Math.abs(ax * bx + ay * by) > a * b * 0.35) return undefined;
+    const turn = Math.sign(ax * by - ay * bx);
+    if (turn === 0 || (winding !== 0 && turn !== winding)) return undefined;
+    winding = turn;
+  }
+  const [from, to] = longestSide(corners);
+  const degrees = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+  return ((degrees + 90) % 180 + 180) % 180 - 90;
+}
+
+function longestSide(corners: readonly StrokePoint[]): readonly [StrokePoint, StrokePoint] {
+  let longest = 0;
+  let side = 0;
+  for (let index = 0; index < corners.length; index += 1) {
+    const from = corners[index];
+    const to = corners[(index + 1) % corners.length];
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+    if (length > longest) {
+      longest = length;
+      side = index;
+    }
+  }
+  return [corners[side], corners[(side + 1) % corners.length]];
+}
+
+/** Native triangle points upwards from its base. Traversal must not flip it. */
+function triangleAngle(corners: readonly StrokePoint[]): number {
+  const [from, to] = longestSide(corners);
+  const tip = corners.find(point => point !== from && point !== to);
+  if (tip === undefined) return 0;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  return angle + (dx * (tip.y - from.y) - dy * (tip.x - from.x) > 0 ? 180 : 0);
+}
+
+/** Equal-distance samples keep a slow corner or a dense side from tilting an oval. */
+function principalAngle(points: readonly StrokePoint[]): number {
+  const ring = [...points, points[0]];
+  const distances = [0];
+  for (let index = 1; index < ring.length; index += 1) {
+    distances.push(distances[index - 1] + Math.hypot(ring[index].x - ring[index - 1].x, ring[index].y - ring[index - 1].y));
+  }
+  const length = distances[distances.length - 1];
+  if (length === 0) return 0;
+  const samples: StrokePoint[] = [];
+  let segment = 1;
+  for (let index = 0; index < 64; index += 1) {
+    const at = index * length / 64;
+    while (segment < ring.length - 1 && distances[segment] <= at) segment += 1;
+    const from = ring[segment - 1];
+    const to = ring[segment];
+    const span = distances[segment] - distances[segment - 1];
+    const t = span === 0 ? 0 : (at - distances[segment - 1]) / span;
+    samples.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
+  }
+  const center = samples.reduce((sum, point) => ({ x: sum.x + point.x / 64, y: sum.y + point.y / 64 }), { x: 0, y: 0 });
+  let xx = 0;
+  let yy = 0;
+  let xy = 0;
+  for (const point of samples) {
+    const x = point.x - center.x;
+    const y = point.y - center.y;
+    xx += x * x;
+    yy += y * y;
+    xy += x * y;
+  }
+  return Math.atan2(2 * xy, xx - yy) * 90 / Math.PI;
+}
+
+/** Fit dimensions in the drawn axes, keep the center, then round rotation to 45 degrees. */
+function fitShapeBox(points: readonly StrokePoint[], degrees: number): { box: StrokeBox; rotation: number } {
+  const angle = degrees * Math.PI / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const local = strokeBounds(points.map(point => ({ x: point.x * cos + point.y * sin, y: -point.x * sin + point.y * cos })));
+  const x = local.x + local.width / 2;
+  const y = local.y + local.height / 2;
+  const rotation = ((Math.round(degrees / 45) * 45 + 180) % 360 + 360) % 360 - 180;
+  return { box: { x: x * cos - y * sin - local.width / 2, y: x * sin + y * cos - local.height / 2, width: local.width, height: local.height }, rotation: rotation === 0 ? 0 : rotation };
 }
 
 function shoelace(points: readonly StrokePoint[]): number {

@@ -669,6 +669,13 @@ export class SelectionToolbar {
     target.button.setAttribute("aria-expanded", "true");
   }
 
+  /** An open menu follows its bar and any native buttons added after opening. */
+  public keepOpenPopoversInView(): void {
+    for (const popover of this.popovers) {
+      if (!popover.panel.hidden) keepPanelInView(popover.panel);
+    }
+  }
+
   private closePopovers(): void {
     for (const popover of this.popovers) {
       popover.panel.hidden = true;
@@ -1114,6 +1121,13 @@ export class SelectionToolbar {
     // Native Canvas's own delete takes the board's connectors with it; this one
     // stands in only when its menu has nothing to act on.
     refs.deleteSelection.hidden = state.independentOnly !== true;
+    // Before the native menu is adopted, only our fallback Delete can show.
+    if (refs.nativeSlot.getAttribute("data-miro-native-menu") === null) {
+      const visible = String(!refs.deleteSelection.hidden);
+      if (refs.nativeSlot.getAttribute("data-miro-native-visible") !== visible) {
+        refs.nativeSlot.setAttribute("data-miro-native-visible", visible);
+      }
+    }
     refs.deleteSelection.disabled=!state.editable;
     const hasNode = state.kinds.some((kind) => kind !== "edge");
     // A card's text row belongs to nodes that show text; a link, file or
@@ -1209,6 +1223,7 @@ export class SelectionToolbar {
     const reason = state.editable ? undefined : state.blockedReason ?? words().toolbar.locked;
     refs.status.hidden = reason === undefined;
     refs.status.textContent = reason ?? "";
+    this.keepOpenPopoversInView();
   }
 
   /** Swatches are rebuilt only when the palette they show actually changed. */

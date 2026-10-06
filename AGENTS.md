@@ -99,6 +99,13 @@ python -m pytest -q tools/obsidian_oracle/tests
   and moving a selection must not translate a far end outside the original
   rectangle. Preview, commit, undo, and repeated drags use the same
   captured-end mask for native and independent connectors.
+- Before each lint fix, trace where the affected code participates and record
+  its user actions and mandatory regression checks in
+  `docs/lint-remediation-checks.md` before editing the implementation. Distinguish
+  real-app evidence from unit/synthetic evidence and leave unverified checks pending.
+  If the change affects Android, run the affected checks on connected physical
+  Android test devices in MiroCanvasTest, recording each model/app version and
+  real ADB input separately from CDP synthesis or physical stylus handling.
 - Add or update focused tests for changed behaviour; run the commands above and
   `git diff --check`.
 - Verify user-facing behaviour in a real Obsidian vault with real input, not

@@ -197,6 +197,12 @@ describe("what a drag does not repeat", () => {
 	it("does not poll while a drag is being followed, and polls again when it stalls or ends", () => {
 		vi.useFakeTimers();
 		const f = fixture(10);
+		const window = {
+			setInterval: vi.fn((callback: () => void, delay: number) => setInterval(callback, delay)),
+			clearInterval: vi.fn((handle: ReturnType<typeof setInterval>) => clearInterval(handle)),
+		};
+		Object.assign(f.root, { ownerDocument: { createElement: () => new HostElement(), defaultView: window } });
+		f.internals.attachRefreshPolling();
 		const refresh = vi.spyOn(f.session, "refresh");
 		f.internals.pointerHeld = true;
 		f.internals.lastLiveReadAt = Date.now();
@@ -214,6 +220,8 @@ describe("what a drag does not repeat", () => {
 		f.internals.pointerHeld = false;
 		vi.advanceTimersByTime(800);
 		expect(refresh).toHaveBeenCalled();
+		f.session.dispose();
+		expect(window.clearInterval).toHaveBeenCalledWith(window.setInterval.mock.results[0]!.value);
 	});
 
 	it("does not measure the board for the export pages when nothing is being exported", () => {

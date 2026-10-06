@@ -94,7 +94,10 @@ to undo expanded panel spacing. The CSS regression check reports the remaining
 90 `!important` declarations and 10 `:has()` selectors and rejects increases.
 This is a regression budget, not the directory's CSS linter or a warning-free
 certification. Remaining selectors bridge native Canvas/Markdown markup;
-further cascade cleanup requires visual and interaction checks. The full
+further cascade cleanup requires visual and interaction checks.
+The current unreleased batch reduces :has to four by mirroring adopted native
+menu state; the !important count remains 90. Each further lint change must
+first enter its affected actions in [the regression register](lint-remediation-checks.md). The full
 repository scan also reports Node imports in `mcp/`, the optional standalone
 Node server. The submission packaging check rejects those imports in `main.js`.
 

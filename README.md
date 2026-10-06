@@ -181,6 +181,8 @@ You can also add titled code blocks, Markdown tables and website links.
 Native cards keep one rounded border. Their fill is painted once, including
 translucent colours, and survives editing and undoing a shape change.
 
+Selection menus stay inside the board when reopened or when the toolbar moves, including on phones.
+
 Select a card to open its toolbar. Change the shape, font, text size,
 formatting, alignment, line spacing, fill and border. Highlight words,
 add a list or turn text into a link.
@@ -221,7 +223,9 @@ on computers, tablets and phones, including after reopening the board.
 </details>
 
 The **pen** creates individual strokes; the **highlighter** leaves a translucent
-mark. Smart drawing straightens rough shapes and recognizes arrows.
+mark. Smart drawing straightens rough shapes and recognizes arrows. It recognizes
+rectangles by their sides and corners, including tilted sketches. Rectangles,
+ovals and triangles keep their tilt, rounded to the nearest 45° step.
 Erasers remove a whole stroke or just part of it.
 
 <details>
@@ -232,8 +236,10 @@ Erasers remove a whole stroke or just part of it.
 </details>
 
 Hold **Shift** to draw straight. Holding the pen at the end of a stroke for
-about half a second also straightens it. You can turn this off in drawing
-settings. Pressing the active pen or line button again hides its settings
+about half a second also straightens it, including with pressure enabled.
+Enable **Hold to draw a straight line** in drawing settings to use this.
+Thickness stays steady while holding and lifting the pen; movement continues
+to change thickness with pressure. Pressing the active pen or line button again hides its settings
 while keeping the tool selected.
 
 Line labels use the same fonts and formatting as card text. Snapping helps
@@ -565,6 +571,9 @@ listing text, release checks, policy disclosures and remaining review question.
 Read [AGENTS.md](AGENTS.md) and the [workflow, release and GIF recording
 instructions](docs/contributing.md) before changing the repository.
 For interface work, follow the existing host-based [design rules](DESIGN.md).
+Before a lint fix, trace its affected user actions and add their mandatory
+checks to [the regression register](docs/lint-remediation-checks.md). Keep
+unit, synthetic, real-app and physical-device evidence separate.
 Board reading and editing use the optional [MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
 The server is started separately by its owner's configuration; the plugin

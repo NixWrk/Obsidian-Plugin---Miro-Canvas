@@ -47,6 +47,7 @@ export interface CanvasShapeDescriptor {
 }
 
 export interface CanvasShapeAction {
+	readonly rotation?: unknown;
 	readonly text?: unknown;
 	readonly shape?: unknown;
 	readonly x?: unknown;
@@ -1171,6 +1172,7 @@ function readShapeAction(action: unknown, diagnostics: CanvasAuthoringDiagnostic
 	readonly height: number;
 	readonly id?: string;
 	readonly locked?: boolean;
+	readonly rotation?: number;
 	readonly colors?: unknown;
 	readonly typography?: unknown;
 	readonly borderStyle?: unknown;
@@ -1221,6 +1223,13 @@ function readShapeAction(action: unknown, diagnostics: CanvasAuthoringDiagnostic
 		}
 		locked = lockedValue.value;
 	}
+	const rotationValue = actionProperty(action, "rotation");
+	if (Object.getOwnPropertyDescriptor(action, "rotation") !== undefined
+		&& (!rotationValue.ok || (rotationValue.value !== undefined && !isFiniteNumber(rotationValue.value)))) {
+		addDiagnostic(diagnostics, "shape-rotation-invalid", "error", "Shape rotation must be a finite number.");
+		return undefined;
+	}
+	const rotation = rotationValue.ok && isFiniteNumber(rotationValue.value) ? normalizeRotation(rotationValue.value) : undefined;
 	const style = readStylePatch(action, diagnostics);
 	if (style === undefined) return undefined;
 	return {
@@ -1233,6 +1242,7 @@ function readShapeAction(action: unknown, diagnostics: CanvasAuthoringDiagnostic
 		height,
 		...(id === undefined ? {} : { id }),
 		...(locked === undefined ? {} : { locked }),
+		...(rotation === undefined ? {} : { rotation }),
 	};
 }
 
@@ -1312,6 +1322,7 @@ function updateShapeMetadata(
 	id: string,
 	shape: CanvasShapeKind,
 	locked: boolean | undefined,
+	rotation: number | undefined,
 	diagnostics: CanvasAuthoringDiagnostic[],
 ): UnknownRecord | undefined {
 	const metadata = readMetadataForUpdate(document, diagnostics);
@@ -1353,6 +1364,7 @@ function updateShapeMetadata(
 	if (locked !== undefined) {
 		setOwn(override, "locked", locked);
 	}
+	if (rotation !== undefined) setOwn(override, "rotation", rotation);
 	setOwn(overrides, id, override);
 	setOwn(metadata, "localOverrides", overrides);
 	const validation = validateMiroCanvasMetadata(metadata);
@@ -1790,7 +1802,7 @@ function buildShape(
 	}
 	const nodes = [...nodesValue.value, node];
 	setOwn(document, "nodes", nodes);
-	const metadata = updateShapeMetadata(document, allocated.id, parsed.shape, parsed.locked, diagnostics);
+	const metadata = updateShapeMetadata(document, allocated.id, parsed.shape, parsed.locked, parsed.rotation, diagnostics);
 	if (metadata === undefined) {
 		return undefined;
 	}

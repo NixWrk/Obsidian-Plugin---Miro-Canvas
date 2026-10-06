@@ -7,7 +7,11 @@ class ElementStub {
   attributes = new Map<string, string>();
   listeners = new Map<string, Set<(event: any) => void>>();
   style = { setProperty: vi.fn(), removeProperty: vi.fn() };
-  defaultView = null;
+  defaultView = {
+    getComputedStyle: () => ({ getPropertyValue: () => "0" }),
+    setTimeout: vi.fn((callback: () => void, delay: number) => setTimeout(callback, delay)),
+    clearTimeout: vi.fn((handle: ReturnType<typeof setTimeout>) => clearTimeout(handle)),
+  };
   appendChild(child: ElementStub) { this.children.push(child); }
   createElement() { return new ElementStub(); }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
@@ -52,6 +56,22 @@ function setup(collapsed: boolean, hidden = false, inBar = false, orientation: "
 afterEach(() => vi.useRealTimers());
 
 describe("panel buttons", () => {
+  it("owns the hold timer in the panel window and clears it on cancel and dispose", () => {
+    vi.useFakeTimers();
+    const rig = setup(false);
+    const window = rig.document.defaultView;
+    rig.button.fire("pointerdown");
+    const first = window.setTimeout.mock.results[0]!.value;
+    rig.document.fire("pointercancel");
+    expect(window.clearTimeout).toHaveBeenCalledWith(first);
+    rig.button.fire("pointerdown");
+    const second = window.setTimeout.mock.results[1]!.value;
+    rig.visibility.dispose();
+    expect(window.clearTimeout).toHaveBeenCalledWith(second);
+    vi.advanceTimersByTime(1000);
+    expect(rig.save).not.toHaveBeenCalled();
+    expect(rig.button.getAttribute("data-panel-moving")).toBeNull();
+  });
   it("does not rewrite bar layout when a refresh leaves the control state unchanged", () => {
     const rig = setup(false, false, true);
     rig.button.style.setProperty.mockClear();

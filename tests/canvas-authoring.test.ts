@@ -382,6 +382,27 @@ describe("CanvasAuthoring", () => {
 		expect(runtime.requestSaveSpy).not.toHaveBeenCalled();
 	});
 
+	it("creates a rotated shape in one native history step, preserving its source and unknown fields", () => {
+		const before = initialDocument();
+		const runtime = new NativeGraph(before);
+		const result = createCanvasAuthoring(runtime).createShape(action({ id: "tilted", rotation: 405 }));
+		expect(result.ok).toBe(true);
+		expect(runtime.getData()).toHaveProperty("miroCanvas.localOverrides.tilted.rotation", 45);
+		expect(runtime.history).toHaveLength(2);
+		const after = runtime.getData();
+		runtime.undo();
+		expect(runtime.getData()).toEqual(before);
+		runtime.redo();
+		expect(runtime.getData()).toEqual(after);
+	});
+
+	it.each([Number.NaN, Infinity, "45"])("rejects an invalid shape creation rotation %s", rotation => {
+		const runtime = new NativeGraph(initialDocument());
+		expect(createCanvasAuthoring(runtime).createShape({ ...action(), rotation }).ok).toBe(false);
+		expect(runtime.importDataSpy).not.toHaveBeenCalled();
+		expect(runtime.history).toHaveLength(1);
+	});
+
 	it("creates an editable text fallback, records shape metadata, and rebuilds native maps", () => {
 		const runtime = new NativeGraph(initialDocument());
 		const authoring = createCanvasAuthoring({ canvas: runtime });
