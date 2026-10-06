@@ -8,6 +8,8 @@ const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const port = Number(option('--port', '9346'));
 const serial = option('--serial');
+const background = args.includes('--background');
+assert.ok(!background || !serial, '--background is for isolated desktop Obsidian');
 const { send, close } = await connectByTitle(port, serial ? 'Obsidian' : undefined);
 const run = promisify(execFile);
 const adb = process.env.ADB ?? 'C:/Program Files/VirtualTablet Server/adb/adb.exe';
@@ -49,6 +51,9 @@ async function selection() {
  mark:f?.getAttribute('data-miro-native-outline'),history:c.history.current,data:c.getData()};`);
 }
 try {
+    if (background) {
+        await checked(`const w=require('@electron/remote').getCurrentWindow();w.webContents.setBackgroundThrottling(false);w.hide();return true;`);
+    }
     if(serial){await run(adb,['-s',serial,'shell','input keyevent KEYCODE_WAKEUP'],{windowsHide:true,timeout:12000});await run(adb,['-s',serial,'shell','am start -n md.obsidian/md.obsidian.MainActivity'],{windowsHide:true,timeout:12000});await wait(500);}
     if (serial && await checked(`return app.plugins.plugins['miro-canvas'].m1Session.root.getAttribute('data-miro-canvas-keyboard')==='open';`)) {
         await run(adb, ['-s', serial, 'shell', 'input keyevent KEYCODE_BACK'], { windowsHide: true, timeout: 12000 });
@@ -218,8 +223,12 @@ try {
         const captured = await run(adb, ['-s', serial, 'exec-out', 'screencap', '-p'], { windowsHide: true, encoding: 'buffer', maxBuffer: 12 * 1024 * 1024, timeout: 12000 });
         writeFileSync(new URL(`css-state-${serial}.png`, out), captured.stdout);
     }
-    else
+    else if (!background)
         writeFileSync(new URL('css-state-desktop.png', out), await screenshot(send));
+    if (background) {
+        assert.equal(await checked(`return require('@electron/remote').getCurrentWindow().isVisible();`), false, 'test window must remain hidden');
+        results.push({ windowsBackground: true, input: 'CDP renderer', windowHidden: true });
+    }
     results.push({ lateCode: true, unchangedData: true });
 }
 finally {
@@ -230,6 +239,8 @@ finally {
         await checked(`const p=app.plugins.plugins['miro-canvas'];p.m1Session.resetTools();await p.saveCanvasSettings(${JSON.stringify(saved.settings)});app.changeTheme(${JSON.stringify(saved.theme)});app.updateTheme();
   await app.workspace.getLeaf(false).openFile(app.vault.getAbstractFileByPath(${JSON.stringify(saved.file)}),{active:true});await new Promise(r=>setTimeout(r,500));
   app.workspace.activeLeaf.view.canvas.setViewport(${saved.viewport.tx},${saved.viewport.ty},${saved.viewport.zoom});return true;`);
+    if (background)
+        assert.equal(await checked(`return require('@electron/remote').getCurrentWindow().isVisible();`), false, 'restoration must not show the window');
     if (saved)
         assert.equal(await checked(`return await app.vault.read(app.vault.getAbstractFileByPath(${JSON.stringify(saved.file)}));`), saved.text, 'original board must remain unchanged');
     close();

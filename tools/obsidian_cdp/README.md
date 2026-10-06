@@ -567,3 +567,9 @@ tap. Late code/label DOM timing is synthesized and recorded separately.
 Screenshots and per-device results are saved under `.out/css-state-*`.
 The prior file, settings, theme and viewport are restored in finally; the
 runner never overwrites the original file. Keep Android unlocked/foreground.
+
+For Windows work alongside the owner, append `--background`. This desktop-only
+mode hides the isolated Obsidian window, keeps its renderer timers running,
+and skips screenshots/bringing the window to the foreground. CDP mouse/key
+input stays within that renderer and does not take the owner's OS input.
+The runner asserts the window stays hidden after checks and restoration.

@@ -528,3 +528,49 @@ targets. After foregrounding Obsidian the whole final matrix passes. Those
 missed/obscured attempts are excluded; the runner now checks Android native
 window focus before DOWN and sends no input when another app/system obscures
 Obsidian. No Wi-Fi/system preference was changed.
+
+## Windows background verification follow-up (2026-10-06, before harness edit)
+
+The owner requested a different method after Windows computer-use/manual
+input interfered with their desktop. Retire that route; use only CDP in the
+separate installed Windows Obsidian process. The test vault is guarded under
+tools/obsidian_cdp/.out. The foreground-stealing call is screenshot(send) ->
+Page.bringToFront at the end of check-css-state.mjs. Add a desktop-only
+background option: hide that isolated window, keep its renderer timers active,
+assert it remains hidden, and skip the screenshot/bring-to-front path. Do not
+send OS mouse/keyboard events or ask the owner to interact manually.
+Mandatory checks remain selection/themes, native-edge resize preview at
+50/125 percent, persisted preview/history/commit/Undo/Redo/Escape, code and
+attachment markup, reload, original document/settings restoration. Record
+this as CDP input in installed Windows Obsidian, not physical mouse evidence.
+The one earlier OS Escape key was received, but no mouse test was completed.
+
+### Windows background results
+
+Installed Obsidian 1.14.4 on Windows 10.0.19045.6456, isolated port 9346 /
+obsidian-win-input-20261006: the full --background matrix passes. Dark/light
+native and turned selection, edge paths before release at 50/125 percent,
+unsaved preview, one commit step, Undo/Redo/Escape cancellation, attachment
+name toggle/arrival/removal, code title/ordinary paragraph and plugin reload
+all passed. isVisible=false and isFocused=false were checked; restoration
+also leaves the window hidden. The original document/settings/theme/viewport
+were restored and the settled original file was byte-identical.
+
+The first run's original-file byte check failed because native Obsidian
+normalized the freshly created compact fixture to its own whitespace. Its
+parsed document was identical, including source/unknown fields. The check
+was retained unchanged; repeating with that settled original file passes.
+No original file was overwritten by the harness.
+
+Evidence: .out/css-state-desktop.json includes windowsBackground=true,
+input='CDP renderer', windowHidden=true. No screenshot was requested and no
+Page.bringToFront or OS mouse/keyboard input was sent by this mode. This
+verifies behavior inside installed Windows Obsidian; hardware input remains
+a distinct unverified claim. The owner has withdrawn the manual-input request.
+
+Only the desktop test runner/docs changed. Plugin build SHA-256 remains
+3a0fce60d0428c9433e1a7d6f9a98201ed08eb3ec388e0060cf2a4b0edd7a8a4.
+Android code/bundles are unchanged; no new Android behavior requires a rerun.
+Types, full 1,757-pass/one-skip unit suite, ESLint (0 errors / 381 warnings),
+CSS budget, all three synthetic browser modes, builds/schema, oracle tests
+and diff check pass for the harness update.
