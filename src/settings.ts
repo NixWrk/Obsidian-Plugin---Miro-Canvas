@@ -8,6 +8,8 @@
  * rejected, because a bad preference must never stop a board from opening.
  */
 
+import { hasValidFilenameCharacters } from "./control-characters";
+
 import { OFFERED_FONT_FAMILIES, isSafeFontFamily } from "./appearance";
 import { words } from "./i18n";
 import { normalizePanelLayout, type PanelLayout } from "./panel-layout";
@@ -336,7 +338,6 @@ function readLayouts(source: Record<string, unknown>): Readonly<Record<LayoutKin
 /** The pack ids `tools/build_font_packs.py` mints: lower-case words joined by hyphens. */
 const SAFE_FONT_PACK_ID = /^[a-z][a-z0-9-]{0,63}$/u;
 /** A custom font's own file name under `fonts/custom/`: no path, so it cannot climb out of that folder. */
-const SAFE_CUSTOM_FONT_FILE = /^[^/\\:*?"<>|\u0000-\u001f]{1,180}$/u;
 const MAX_FONT_PACKS = 32;
 const MAX_CUSTOM_FONTS = 200;
 const MAX_FONT_LIST_ENTRIES = 500;
@@ -369,7 +370,7 @@ function readCustomFonts(value: unknown): readonly CustomFontFile[] {
     const file = item.file;
     if (!isSafeFontFamily(family) || typeof file !== "string") continue;
     const trimmedFile = file.trim();
-    if (!SAFE_CUSTOM_FONT_FILE.test(trimmedFile) || trimmedFile === "." || trimmedFile === ".." || seenFiles.has(trimmedFile)) continue;
+    if (!hasValidFilenameCharacters(trimmedFile) || trimmedFile === "." || trimmedFile === ".." || seenFiles.has(trimmedFile)) continue;
     seenFiles.add(trimmedFile);
     fonts.push(Object.freeze({ family: family.trim(), file: trimmedFile }));
   }

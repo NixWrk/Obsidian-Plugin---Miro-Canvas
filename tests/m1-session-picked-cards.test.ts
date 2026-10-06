@@ -86,10 +86,11 @@ class HostElement extends HTMLElementStub {
 	classes = new Set<string>();
 	style = {
 		values: new Map<string, string>(),
-		setProperty(name: string, value: string) { this.values.set(name, value); },
-		removeProperty(name: string) { this.values.delete(name); },
+		priorities: new Map<string, string>(),
+		setProperty(name: string, value: string, priority = "") { this.values.set(name, value); this.priorities.set(name, priority); },
+		removeProperty(name: string) { this.values.delete(name); this.priorities.delete(name); },
 		getPropertyValue(name: string) { return this.values.get(name) ?? ""; },
-		getPropertyPriority() { return ""; },
+		getPropertyPriority(name: string) { return this.priorities.get(name) ?? ""; },
 	};
 	clientWidth = 800;
 	clientHeight = 600;
@@ -179,7 +180,7 @@ afterEach(() => {
 });
 
 /** A board with two cards, wired the way real Canvas exposes canvasEl and a MutationObserver-capable document. */
-function fixture() {
+function fixture(sizer?: HostElement) {
 	const root = new HostElement("canvas-wrapper");
 	const nodeLayer = new HostElement("canvas-node-layer");
 	root.appendChild(nodeLayer);
@@ -198,7 +199,13 @@ function fixture() {
 	};
 	class NativeNode {
 		nodeEl = nodeLayer.appendChild(new HostElement("canvas-node"));
-		constructor(public data: Data) {}
+		constructor(public data: Data) {
+			if (data.id === "styled" && sizer !== undefined) {
+				const preview = this.nodeEl.appendChild(new HostElement("markdown-preview-view"));
+				preview.appendChild(sizer);
+				this.nodeEl.querySelectorAll = (selector?: string) => selector === ".markdown-preview-view > .markdown-preview-sizer" ? [sizer] : [preview];
+			}
+		}
 		get id() { return this.data.id; }
 		getData() { return clone(this.data); }
 	}
@@ -233,6 +240,50 @@ function classChanged(observers: { readonly classes: FakeObserver }, card: HostE
 }
 
 describe("the session marks the cards a finger may drag by their text", () => {
+	it("reconciles late native Markdown layout without refreshing the board", () => {
+		const sizer = new HostElement("markdown-preview-sizer");
+		const { session } = fixture(sizer);
+		const observer = instances.find(item => item.target === sizer && item.options?.attributeFilter?.includes("style"));
+		expect(observer).toBeDefined();
+		const refresh = vi.spyOn(session, "refresh");
+		const write = vi.spyOn(sizer.style, "setProperty");
+		sizer.style.setProperty("padding-bottom", "18px");
+		observer!.callback([{ type: "attributes", target: sizer }]);
+		expect(sizer.style.getPropertyValue("padding-bottom")).toBe("0");
+		write.mockClear();
+		for (let index = 0; index < 1000; index += 1) observer!.callback([{ type: "attributes", target: sizer }]);
+		expect(write).not.toHaveBeenCalled();
+		expect(refresh).not.toHaveBeenCalled();
+		session.dispose();
+		expect(sizer.style.getPropertyValue("padding-bottom")).toBe("18px");
+	});
+	it("restores native sizer values and priorities when local alignment is reset", () => {
+		const sizer = new HostElement("markdown-preview-sizer");
+		sizer.style.setProperty("flex", "1 0 auto", "important");
+		sizer.style.setProperty("min-height", "100%");
+		sizer.style.setProperty("padding-bottom", "12px");
+		const { canvas, session } = fixture(sizer);
+		expect(sizer.style.getPropertyValue("flex")).toBe("0 0 auto");
+		expect(sizer.style.getPropertyPriority("flex")).toBe("");
+		canvas.data.miroCanvas.localOverrides = {};
+		canvas.data = clone(canvas.data);
+		session.refresh();
+		expect(sizer.style.getPropertyValue("flex")).toBe("1 0 auto");
+		expect(sizer.style.getPropertyPriority("flex")).toBe("important");
+		expect(sizer.style.getPropertyValue("min-height")).toBe("100%");
+		expect(sizer.style.getPropertyValue("padding-bottom")).toBe("12px");
+	});
+
+	it("leaves a later foreign priority on the sizer intact on unload", () => {
+		const sizer = new HostElement("markdown-preview-sizer");
+		const { session } = fixture(sizer);
+		sizer.style.setProperty("flex", "0 0 auto", "important");
+		session.dispose();
+		expect(sizer.style.getPropertyValue("flex")).toBe("0 0 auto");
+		expect(sizer.style.getPropertyPriority("flex")).toBe("important");
+		expect(sizer.style.getPropertyValue("min-height")).toBe("");
+	});
+
 	it("watches the board's card layer for class changes and for cards put on it", () => {
 		const { nodeLayer } = fixture();
 		const { classes, children } = pickedObservers(nodeLayer);

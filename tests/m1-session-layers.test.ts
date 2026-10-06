@@ -23,9 +23,12 @@ class HostElement extends EventTarget {
 	attributes = new Map<string, string>();
 	classes = new Set<string>();
 	properties = new Map<string, string>();
+	priorities = new Map<string, string>();
 	style = {
-		setProperty: (name: string, value: string) => { this.properties.set(name, value); },
-		removeProperty: (name: string) => { this.properties.delete(name); },
+		getPropertyValue: (name: string) => this.properties.get(name) ?? "",
+		getPropertyPriority: (name: string) => this.priorities.get(name) ?? "",
+		setProperty: (name: string, value: string, priority = "") => { this.properties.set(name, value); this.priorities.set(name, priority); },
+		removeProperty: (name: string) => { this.properties.delete(name); this.priorities.delete(name); },
 	};
 	clientWidth = 800;
 	clientHeight = 600;
@@ -194,5 +197,47 @@ describe("M1 session layer order", () => {
 		expect(nodes.get("a")!.zIndex).toBe(before);
 		expect(nodes.get("a")!.renderedZIndex).toBe(before);
 		expect(order()).toEqual(["frame", "a", "b"]);
+	});
+
+	it("owns one selected inline layer normally and restores the original priority on clear", () => {
+		const { session, nodes, selection } = fixture();
+		const card = nodes.get("a")!;
+		card.nodeEl.style.setProperty("z-index", "100000", "important");
+		selection.add(card);
+		session.refresh();
+		expect(card.nodeEl.properties.get("z-index")).toBe(String(card.zIndex));
+		expect(card.nodeEl.priorities.get("z-index")).toBe("");
+		selection.clear();
+		session.refresh();
+		expect(card.nodeEl.properties.get("z-index")).toBe("100000");
+		expect(card.nodeEl.priorities.get("z-index")).toBe("important");
+	});
+
+	it("does not overwrite a later external inline layer when the session ends", () => {
+		const { session, nodes, selection } = fixture();
+		const card = nodes.get("a")!;
+		selection.add(card);
+		session.refresh();
+		card.nodeEl.style.setProperty("z-index", "77", "important");
+		session.dispose();
+		expect(card.nodeEl.properties.get("z-index")).toBe("77");
+		expect(card.nodeEl.priorities.get("z-index")).toBe("important");
+	});
+
+	it("repaints a native lift synchronously without changing runtime/file order", () => {
+		const { session, nodes, selection, order } = fixture();
+		const card = nodes.get("a")!;
+		card.renderZIndex = function () { this.nodeEl.style.setProperty("z-index", "100000"); };
+		selection.add(card);
+		session.refresh();
+		card.renderZIndex();
+		expect(card.nodeEl.properties.get("z-index")).toBe(String(card.zIndex));
+		expect(order()).toEqual(["frame", "a", "b"]);
+		selection.clear();
+		session.refresh();
+		selection.add(card);
+		session.refresh();
+		card.renderZIndex();
+		expect(card.nodeEl.properties.get("z-index")).toBe(String(card.zIndex));
 	});
 });

@@ -9,6 +9,8 @@
  * `miroSource`.
  */
 
+import { hasAsciiControl } from "./control-characters";
+
 import {
   isSafeFontFamily,
   isValidFontSize,
@@ -1320,7 +1322,7 @@ function validateMetadataObject(value: unknown): MiroCanvasMetadataValidationRes
   if (authorNames.state === "error") addError(diagnostics, "property-read-failed", "miroCanvas.commentAuthorNames", "Comment author names could not be read.");
   else if (authorNames.state === "present" && (!isRecord(authorNames.value) || Object.keys(authorNames.value).length > 10000
     || Object.values(authorNames.value).some(group => !isRecord(group) || Object.keys(group).length > 1000
-      || Object.values(group).some(name => typeof name !== "string" || name.length < 1 || name.length > 256 || /[\u0000-\u001f\u007f]/u.test(name))))) {
+      || Object.values(group).some(name => typeof name !== "string" || name.length < 1 || name.length > 256 || hasAsciiControl(name))))) {
     addError(diagnostics, "object-expected", "miroCanvas.commentAuthorNames", "Author aliases must be bounded message-to-name maps.");
   }
   const decorations = readOwn(value, "commentDecorations");
@@ -1475,7 +1477,7 @@ function assertSerializablePrimitive(value: unknown): void {
 function assertPlainObject(value: object): void {
   let prototype: object | null;
   try {
-    prototype = Object.getPrototypeOf(value);
+    prototype = Object.getPrototypeOf(value) as object | null;
   } catch {
     throw new MetadataCloneError("Metadata object prototype could not be read.");
   }

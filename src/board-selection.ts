@@ -4,7 +4,7 @@
  * pins move together, and a connector caught by one end moves only that end.
  */
 
-import { boardConnectors, translateConnector, type BoardConnector } from "./board-connectors";
+import { boardConnectors, type BoardConnector } from "./board-connectors";
 import { normalizeAnchor, type AnchorPoint, type CanvasAnchor } from "./anchors";
 import { buildCanvasAnchorGeometry } from "./connector-endpoints";
 import { listCommentThreads, type CommentOrigin } from "./local-comments";
@@ -104,6 +104,15 @@ interface SelectionDocument extends Record<string, unknown> {
   miroCanvas?: SelectionMetadata | null;
 }
 
+// A carried end keeps its extensions, but no longer holds its old attachment.
+function freeAnchorAt(anchor: unknown, point: AnchorPoint): CanvasAnchor {
+  const fields: Record<string, unknown> = anchor !== null && typeof anchor === "object" && !Array.isArray(anchor) ? { ...anchor } : {};
+  for (const key of ["type", "kind", "x", "y", "nodeId", "edgeId", "commentId", "origin", "targetId", "elementId", "u", "v", "t"]) {
+    delete fields[key];
+  }
+  return { ...fields, type: "free", x: point.x, y: point.y };
+}
+
 type MovedConnector = { -readonly [Key in keyof BoardConnector]: BoardConnector[Key] };
 
 /**
@@ -166,7 +175,7 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     return next.miroCanvas;
   };
   const selected = new Set(ids);
-  const shift = (point: { x: number; y: number }): { x: number; y: number } => ({ x: point.x + dx, y: point.y + dy });
+  const shift = <Point extends AnchorPoint>(point: Point): Point => ({ ...point, x: point.x + dx, y: point.y + dy });
   const geometry = Object.keys(routeEnds).length > 0 ? buildCanvasAnchorGeometry(document) : undefined;
   // Whether an end goes with the selection because what holds it does.
   const follows = (anchor: unknown, fallback?: string): boolean => {
@@ -185,11 +194,12 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     for (const comment of comments) {
       const point = pins[comment.key], thread = threads.get(comment.key);
       if (point === undefined || thread === undefined) continue;
-      const anchor = normalizeAnchor(canvas().commentPlaces![comment.key] ?? thread.anchor).anchor;
+      const storedAnchor = canvas().commentPlaces![comment.key] ?? thread.anchor;
+      const anchor = normalizeAnchor(storedAnchor).anchor;
       // A selected parent carries its child comment already. Keep that link.
       const carried = ((anchor?.type === "node" || anchor?.type === "image") && selected.has(anchor.nodeId))
         || (anchor?.type === "comment" && selected.has(commentSelectionId(anchor.origin, anchor.commentId)));
-      if (!carried) canvas().commentPlaces![comment.key] = { type: "free", ...shift(point) };
+      if (!carried) canvas().commentPlaces![comment.key] = freeAnchorAt(storedAnchor, shift(point));
     }
   }
 
@@ -210,7 +220,13 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     if (!selected.has(connector.id)) continue;
     const mask = routeEnds[connector.id];
     if (mask === undefined) {
-      canvas().connectors![connector.id] = translateConnector(connector, dx, dy);
+      canvas().connectors![connector.id] = {
+        ...connector,
+        id: connector.id,
+        from: connector.from.type === "free" ? freeAnchorAt(connector.from, shift(connector.from)) : connector.from,
+        to: connector.to.type === "free" ? freeAnchorAt(connector.to, shift(connector.to)) : connector.to,
+        ...(connector.waypoints === undefined ? {} : { waypoints: connector.waypoints.map(shift) }),
+      };
       continue;
     }
     const route = geometry?.edges?.[connector.id];
@@ -218,8 +234,8 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     for (const end of ["from", "to"] as const) {
       if (!mask[end]) continue;
       const anchor = connector[end], point = end === "from" ? route?.start : route?.end;
-      if (anchor.type === "free") shifted[end] = { ...anchor, ...shift(anchor) };
-      else if (!follows(anchor) && point !== undefined) shifted[end] = { type: "free", ...shift(point) };
+      if (anchor.type === "free") shifted[end] = freeAnchorAt(anchor, shift(anchor));
+      else if (!follows(anchor) && point !== undefined) shifted[end] = freeAnchorAt(anchor, shift(point));
     }
     if (mask.wholeRoute && connector.waypoints !== undefined) shifted.waypoints = connector.waypoints.map(shift);
     canvas().connectors![connector.id] = shifted;
@@ -238,7 +254,7 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
       if (own.connector?.waypoints !== undefined) own.connector.waypoints = own.connector.waypoints.map(shift);
       for (const end of ["from", "to"] as const) {
         const anchor = own.connectorAnchors?.[end];
-        if (anchor?.type === "free") Object.assign(anchor, shift(anchor));
+        if (anchor?.type === "free") own.connectorAnchors![end] = freeAnchorAt(anchor, shift(anchor));
       }
       continue;
     }
@@ -247,7 +263,7 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     for (const end of ["from", "to"] as const) {
       const point = end === "from" ? route?.start : route?.end;
       if (mask[end] && !follows(override?.connectorAnchors?.[end], edge[`${end}Node`]) && point !== undefined) {
-        replacements[end] = { type: "free", ...shift(point) };
+        replacements[end] = freeAnchorAt(override?.connectorAnchors?.[end], shift(point));
       }
     }
     if (Object.keys(replacements).length > 0) {

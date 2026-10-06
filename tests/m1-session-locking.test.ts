@@ -217,6 +217,57 @@ describe("formatting a fragment through the native editor", () => {
 		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setFormat, format: { bold: true } });
 		expect(rig.editor.replaceRange).not.toHaveBeenCalled();
 	});
+
+	it("does not stringify an unknown node value while capturing a plain text fragment", () => {
+		const rig = editing();
+		const stringify = vi.fn(() => { throw Error("unexpected conversion"); });
+		rig.node.text = { toString: stringify };
+		expect(() => rig.internal.captureTextFragment()).not.toThrow();
+		expect(rig.internal.textFragment.html).toBe(false);
+		expect(stringify).not.toHaveBeenCalled();
+	});
+
+	it("recognizes actual HTML strings while preserving the native selected fragment", () => {
+		const rig = editing();
+		rig.node.text = "<p>HTML body</p>";
+		rig.internal.captureTextFragment();
+		expect(rig.internal.textFragment.html).toBe(true);
+		expect(rig.internal.textFragment.text).toBe("середина");
+	});
+});
+
+describe("native clipboard command capabilities", () => {
+
+	it.each([false, "throw", "missing"])("does not change the board when legacy clipboard capability fails: %s", (failure) => {
+		const rig = fixture();
+		const original = clone(rig.canvas.data);
+		Object.assign(rig.root, { focus: vi.fn() });
+		const document = {
+			createElement: () => undefined,
+			...(failure === "missing" ? {} : { execCommand: vi.fn(function (this: unknown, action: string) {
+				expect(this).toBe(document);
+				expect(action).toBe("cut");
+				if (failure === "throw") throw Error("clipboard unavailable");
+				return false;
+			}) }),
+		};
+		Object.assign(rig.root, { ownerDocument: document });
+		const internal = rig.session as unknown as { clipboardCommand(action: "cut"): void };
+		expect(() => internal.clipboardCommand("cut")).not.toThrow();
+		expect(rig.canvas.data).toEqual(original);
+	});
+
+	it("prefers the owner window's native editing command over browser fallback", () => {
+		const rig = fixture();
+		Object.assign(rig.root, { focus: vi.fn() });
+		const contents = { copy: vi.fn(function (this: unknown) { expect(this).toBe(contents); }) };
+		const fallback = vi.fn(() => true);
+		Object.assign(rig.root, { ownerDocument: { createElement: () => undefined, execCommand: fallback, defaultView: { electron: { remote: { getCurrentWebContents: () => contents } } } } });
+		const internal = rig.session as unknown as { clipboardCommand(action: "copy"): void };
+		internal.clipboardCommand("copy");
+		expect(contents.copy).toHaveBeenCalledOnce();
+		expect(fallback).not.toHaveBeenCalled();
+	});
 });
 
 describe("M1 session lock enforcement", () => {

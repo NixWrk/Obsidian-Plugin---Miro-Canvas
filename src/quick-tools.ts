@@ -1,3 +1,4 @@
+import { createHtmlElement, createSvgElement } from "./dom-elements";
 /**
  * The board's creation tools, at the bottom of the view where native Canvas
  * keeps its own card menu: Miro's quick-access set of select, text, sticky
@@ -310,11 +311,11 @@ function drawingTools(): readonly ToolSpec[] {
 /** A line kind's picture: its course, and a block arrow filled. */
 function linePicture(document: Document, spec: LineKindSpec): SVGSVGElement | undefined {
   if (typeof document.createElementNS !== "function") return undefined;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const svg = createSvgElement(document, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("class", "miro-canvas-shape-icon miro-canvas-shape-icon--square miro-canvas-line-icon");
   svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  const path = createSvgElement(document, "path");
   path.setAttribute("d", spec.icon);
   if (spec.block === true) path.setAttribute("fill", "currentColor");
   svg.appendChild(path);
@@ -328,14 +329,14 @@ function linePicture(document: Document, spec: LineKindSpec): SVGSVGElement | un
  */
 function shapesPicture(document: Document): SVGSVGElement | undefined {
   if (typeof document.createElementNS !== "function") return undefined;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const svg = createSvgElement(document, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("class", "svg-icon miro-canvas-shapes-icon");
   svg.setAttribute("aria-hidden", "true");
-  const square = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  const square = createSvgElement(document, "rect");
   for (const [name, value] of [["x", "3"], ["y", "3"], ["width", "11"], ["height", "11"], ["rx", "1.5"]]) square.setAttribute(name, value);
   svg.appendChild(square);
-  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  const circle = createSvgElement(document, "circle");
   for (const [name, value] of [["cx", "15.5"], ["cy", "15.5"], ["r", "5.5"]]) circle.setAttribute(name, value);
   svg.appendChild(circle);
   return svg;
@@ -372,6 +373,10 @@ export interface QuickToolsOptions {
 export const QUICK_TOOL_KEYS: ReadonlyMap<string, QuickTool> = new Map(
   TOOLBAR_TOOL_ICONS.filter((spec) => spec.key !== undefined).map((spec) => [spec.key!, spec.tool]),
 );
+
+function defaultDocument(): Document | undefined {
+  return typeof document === "undefined" ? undefined : document;
+}
 
 export class QuickTools {
   public readonly element: HTMLElement;
@@ -421,7 +426,8 @@ export class QuickTools {
   private readonly markedNative = new Set<HTMLElement>();
 
   public constructor(private readonly actions: QuickToolsActions, private readonly options: QuickToolsOptions = {}) {
-    const document = options.document ?? globalThis.document;
+    const document = options.document ?? defaultDocument();
+    if (document === undefined) throw new Error("QuickTools requires a Document.");
     this.document = document;
     const root = this.make("div", "miro-canvas-toolbar miro-canvas-tools");
     this.connectorBar = root.appendChild(this.make("div", "miro-canvas-toolbar__bar miro-canvas-tools__connectors"));
@@ -1062,7 +1068,7 @@ export class QuickTools {
   }
 
   private make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
-    const element = this.document.createElement(tag);
+    const element = createHtmlElement(this.document, tag);
     element.className = className;
     if (text !== undefined) element.textContent = text;
     return element;

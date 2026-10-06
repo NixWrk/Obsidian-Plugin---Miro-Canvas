@@ -12,6 +12,7 @@
  * The camera is restored after success, failure or cancellation.
  */
 
+import { createHtmlElement } from "./dom-elements";
 import {
   PAPER_FORMATS, captureTiles, exportPixels, paperLabels, type ExportPageRecord, type ExportQuality, type ExportRect,
   type ExportState, type PaperFormat, type PaperOrientation,
@@ -51,7 +52,7 @@ export class ExportPanel {
   private readonly listeners: (() => void)[] = [];
 
   public constructor(private readonly document: Document, private readonly actions: ExportPanelActions) {
-    this.element = document.createElement("div");
+    this.element = createHtmlElement(document, "div");
     this.element.className = "miro-canvas-export";
     this.element.setAttribute("role", "dialog");
     this.element.setAttribute("aria-label", words().export.dialogLabel);
@@ -150,8 +151,8 @@ export class ExportPanel {
     return row;
   }
 
-  private add(parent: Element, tag: string, className: string, text?: string): HTMLElement {
-    const element = this.document.createElement(tag);
+  private add(parent: Element, tag: keyof HTMLElementTagNameMap, className: string, text?: string): HTMLElement {
+    const element = createHtmlElement(this.document, tag);
     if (className !== "") element.className = className;
     if (text !== undefined) element.textContent = text;
     parent.appendChild(element);
@@ -213,7 +214,7 @@ export class ExportOverlay {
     private readonly onChange: (id: string, rect: { left: number; top: number; width: number; height: number }, commit: boolean) => void,
     private readonly ratio: () => number | undefined,
   ) {
-    this.element = document.createElement("div");
+    this.element = createHtmlElement(document, "div");
     this.element.className = "miro-canvas-export-pages";
     this.element.setAttribute("aria-hidden", "true");
   }
@@ -244,16 +245,16 @@ export class ExportOverlay {
   }
 
   private buildPage(page: OverlayPage, editable: boolean): OverlayEntry {
-    const frame = this.element.appendChild(this.document.createElement("div"));
+    const frame = this.element.appendChild(createHtmlElement(this.document, "div"));
     frame.className = "miro-canvas-export-page";
     Object.assign(frame.style, { left: `${page.left}px`, top: `${page.top}px`, width: `${page.width}px`, height: `${page.height}px` });
-    const tab = frame.appendChild(this.document.createElement("div"));
+    const tab = frame.appendChild(createHtmlElement(this.document, "div"));
     tab.className = "miro-canvas-export-page__tab";
     tab.textContent = page.label;
     tab.title = words().export.movePageHint;
     const entry: OverlayEntry = { id: page.id, frame, tab, page };
     if (editable) {
-      const corner = frame.appendChild(this.document.createElement("div"));
+      const corner = frame.appendChild(createHtmlElement(this.document, "div"));
       corner.className = "miro-canvas-export-page__corner";
       corner.title = words().export.resizePageHint;
       // Read the page fresh from `entry`: it is kept up to date between drags.
@@ -385,11 +386,11 @@ export async function capturePages(
   const view = document.defaultView;
   if (view === null) throw new Error(words().export.unavailable);
   const saved = { x: canvas.x, y: canvas.y, zoom: canvas.zoom, screenshotting: canvas.screenshotting };
-  const status = document.createElement("div");
+  const status = createHtmlElement(document, "div");
   status.className = "miro-canvas-export-progress";
   status.setAttribute("role", "status");
-  const label = document.createElement("span");
-  const stop = document.createElement("button");
+  const label = createHtmlElement(document, "span");
+  const stop = createHtmlElement(document, "button");
   stop.type = "button";
   stop.textContent = words().export.stop;
   status.append(label, stop);
@@ -416,7 +417,7 @@ export async function capturePages(
     const total = plans.reduce((sum, plan) => sum + plan.tiles.length, 0);
     let done = 0;
     for (const { pixels, tiles } of plans) {
-      const sheet = document.createElement("canvas");
+      const sheet = createHtmlElement(document, "canvas");
       activeSheet = sheet;
       sheet.width = pixels.width;
       sheet.height = pixels.height;

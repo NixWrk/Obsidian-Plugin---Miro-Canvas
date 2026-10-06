@@ -66,6 +66,68 @@ function fixture(shape = "triangle", routing = "straight", document: Document = 
 }
 
 describe("reversible source geometry DOM", () => {
+  it("uses its existing rotation observer for late paint and restores the latest host intent", () => {
+    const observers: { callback: (records: unknown[]) => void; targets: unknown[]; connected: boolean }[] = [];
+    class Observer {
+      targets: unknown[] = [];
+      connected = true;
+      constructor(public callback: (records: unknown[]) => void) { observers.push(this); }
+      observe(target: unknown) { this.targets.push(target); }
+      disconnect() { this.connected = false; }
+    }
+    const document = { ...dom, defaultView: { MutationObserver: Observer } } as unknown as Document;
+    const f = fixture("rectangle", "straight", document);
+    Object.assign(f.nodeEl, { matches: (selector: string) => selector.startsWith('[data-miro-source-kind="shape"]') });
+    f.data.miroCanvas.localOverrides.a = { rotation: 24 };
+    const before = JSON.stringify(f.data);
+    f.renderer.refresh();
+    expect(observers).toHaveLength(1);
+    const observer = observers[0]!;
+    f.nodeEl.style.setProperty("background-color", "late-native", "important");
+    f.nodeEl.style.setProperty("transform", "translate(30px, 40px)");
+    observer.callback([{ type: "attributes", target: f.nodeEl }]);
+    expect(f.nodeEl.style.getPropertyValue("background-color")).toBe("");
+    expect(f.nodeEl.style.getPropertyValue("transform")).toBe("translate(30px, 40px) rotate(24deg)");
+    const write = vi.spyOn(f.nodeEl.style, "setProperty");
+    const remove = vi.spyOn(f.nodeEl.style, "removeProperty");
+    const query = vi.spyOn(f.nodeEl, "querySelectorAll");
+    for (let index = 0; index < 1000; index += 1) observer.callback([{ type: "attributes", target: f.nodeEl }]);
+    expect(write).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+    expect(JSON.stringify(f.data)).toBe(before);
+    f.renderer.dispose();
+    expect(observer.connected).toBe(false);
+    expect(f.nodeEl.style.getPropertyValue("background-color")).toBe("late-native");
+    expect(f.nodeEl.style.getPropertyPriority("background-color")).toBe("important");
+    expect(f.nodeEl.style.getPropertyValue("transform")).toBe("translate(30px, 40px)");
+  });
+  it("restores native inline paint priority after its scoped CSS projection", () => {
+    const f = fixture();
+    Object.assign(f.nodeEl, { matches: (selector: string) => selector.startsWith('[data-miro-source-kind="shape"]') });
+    f.nodeEl.style.setProperty("background-color", "red", "important");
+    f.nodeEl.style.setProperty("border-color", "blue", "important");
+    const before = JSON.stringify(f.data);
+    f.renderer.refresh();
+    expect(f.nodeEl.style.getPropertyValue("background-color")).toBe("");
+    f.renderer.dispose();
+    expect(f.nodeEl.style.getPropertyValue("background-color")).toBe("red");
+    expect(f.nodeEl.style.getPropertyPriority("background-color")).toBe("important");
+    expect(f.nodeEl.style.getPropertyValue("border-color")).toBe("blue");
+    expect(f.nodeEl.style.getPropertyPriority("border-color")).toBe("important");
+    expect(JSON.stringify(f.data)).toBe(before);
+  });
+
+  it("keeps a later foreign paint declaration through projection teardown", () => {
+    const f = fixture();
+    Object.assign(f.nodeEl, { matches: (selector: string) => selector.startsWith('[data-miro-source-kind="shape"]') });
+    f.renderer.refresh();
+    f.nodeEl.style.setProperty("background-color", "purple", "important");
+    f.renderer.dispose();
+    expect(f.nodeEl.style.getPropertyValue("background-color")).toBe("purple");
+    expect(f.nodeEl.style.getPropertyPriority("background-color")).toBe("important");
+  });
+
   it.each([
     ["126, 126, 126", "rgb(var(--canvas-color))"],
     [" 12.5, 84, 240 ", "rgb(var(--canvas-color))"],
@@ -1638,5 +1700,41 @@ describe("telling places apart without writing them out", () => {
     expect(sameRoundedData(null, {})).toBe(false);
     expect(sameRoundedData("a", "a")).toBe(true);
     expect(sameRoundedData("a", "b")).toBe(false);
+  });
+});
+
+
+describe("source renderer document ownership", () => {
+  const emptyHost = { getDocument: () => ({nodes: [], edges: []}), getNodes: () => [], getEdges: () => [] };
+
+  it("keeps an injected board document even when another window is active", () => {
+    vi.stubGlobal("window", { document: { createElement: vi.fn() } });
+    try {
+      const renderer = new SourceRenderer(emptyHost, dom);
+      expect(Reflect.get(renderer, "document")).toBe(dom);
+      renderer.dispose();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("retains the actual fallback document after the window changes", () => {
+    const first = { createElement: vi.fn() };
+    vi.stubGlobal("window", { document: first });
+    try {
+      const renderer = new SourceRenderer(emptyHost);
+      vi.stubGlobal("window", { document: { createElement: vi.fn() } });
+      expect(Reflect.get(renderer, "document")).toBe(first);
+      renderer.dispose();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("fails closed without a browser window and does not take a Node global document", () => {
+    vi.stubGlobal("document", { createElement: vi.fn() });
+    try {
+      expect(typeof window).toBe("undefined");
+      const renderer = new SourceRenderer(emptyHost);
+      expect(Reflect.get(renderer, "document")).toBeUndefined();
+      expect(renderer.refresh()).toEqual([]);
+      renderer.dispose();
+    } finally { vi.unstubAllGlobals(); }
   });
 });

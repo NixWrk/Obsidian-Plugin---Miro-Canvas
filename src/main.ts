@@ -1,3 +1,5 @@
+import { replaceInvalidFilenameCharacters } from "./control-characters";
+import { createHtmlElement } from "./dom-elements";
 import * as obsidian from "obsidian";
 import { Component, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, getLanguage, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
@@ -63,7 +65,7 @@ const NATIVE_CANVAS_VIEW_TYPE = "canvas";
 
 /** A font file's own name, safe on every filesystem the plugin's vaults run on. */
 function sanitizeFontFileName(name: string): string {
-  const cleaned = name.replace(/[/\\:*?"<>|\u0000-\u001f]/gu, "_").trim();
+  const cleaned = replaceInvalidFilenameCharacters(name).trim();
   return cleaned === "" ? "font" : cleaned.slice(0, 180);
 }
 
@@ -443,7 +445,7 @@ export default class MiroCanvasPlugin extends Plugin {
     // private runtime after active-leaf-change. Never bind permanently to the
     // half-initialized object or carry a previous file's review overlay across.
     this.registerEvent(this.app.workspace.on("file-open", () => {
-      const leaf = this.app.workspace.activeLeaf;
+      const leaf = this.focusedLeaf();
       // Obsidian says a file was opened whenever a card's editor takes the focus - one card picked, for one -
       // with the same board still on screen.  Its session keeps what it holds, an armed lasso among it.
       if (!stillTheBoard(this.currentCanvasBinding, leaf?.view, this.m1Session?.status === "ready")) this.handleActiveLeafChange(leaf);
@@ -451,10 +453,10 @@ export default class MiroCanvasPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("layout-change", () => {
       const currentClosed = this.currentCanvasView !== null && !this.currentCanvasStillOpen();
       if (currentClosed || this.m1Session?.status !== "ready") {
-        this.handleActiveLeafChange(this.app.workspace.activeLeaf);
+        this.handleActiveLeafChange(this.focusedLeaf());
       }
     }));
-    this.handleActiveLeafChange(this.app.workspace.activeLeaf);
+    this.handleActiveLeafChange(this.focusedLeaf());
     // Asked once, after Obsidian's own startup has settled; a plugin-only
     // person can decline it without ever seeing Miro mentioned again outside
     // the settings tab's own button.
@@ -559,7 +561,7 @@ export default class MiroCanvasPlugin extends Plugin {
     if ((!mounted || this.metadataWriter === null) && attempt < 20) {
       this.initializationRetry = this.initializationTimerHost.setTimeout(() => {
         this.initializationRetry = null;
-        if (this.app.workspace.activeLeaf === leaf) this.handleActiveLeafChange(leaf, attempt + 1);
+        if (this.focusedLeaf() === leaf) this.handleActiveLeafChange(leaf, attempt + 1);
       }, 250);
     }
   };
@@ -575,7 +577,7 @@ export default class MiroCanvasPlugin extends Plugin {
     this.canvasSettings = mergeSettings(this.settingsOfThisDevice(), patch);
     setAuthorColors(this.canvasSettings.commentAuthorColors);
     await this.persistSettings();
-    const leaf = this.app.workspace.activeLeaf;
+    const leaf = this.focusedLeaf();
     if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
       this.handleActiveLeafChange(leaf);
     }
@@ -615,7 +617,7 @@ export default class MiroCanvasPlugin extends Plugin {
     this.canvasSettings = settingsFromExternalChange(before, await this.loadData());
     setAuthorColors(this.canvasSettings.commentAuthorColors);
     if (sameOnThisDevice(before, this.canvasSettings)) return;
-    const leaf = this.app.workspace.activeLeaf;
+    const leaf = this.focusedLeaf();
     if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
       this.handleActiveLeafChange(leaf);
     }
@@ -717,13 +719,12 @@ export default class MiroCanvasPlugin extends Plugin {
     const session = this.activeM1Session();
     if (session === null) return;
     const sourceView = this.currentCanvasView;
-    const sourcePath = this.app.workspace.activeLeaf?.view instanceof obsidian.FileView
-      ? (this.app.workspace.activeLeaf.view).file?.path
-      : undefined;
+    const focusedView = this.app.workspace.getActiveViewOfType(obsidian.FileView);
+    const sourcePath = focusedView?.file?.path;
     const menu = new Menu();
     menu.addItem(item => item.setTitle(labels.fromVault).setIcon("vault").onClick(fromVault));
     menu.addItem(item => item.setTitle(labels.fromDevice).setIcon("upload").onClick(() => {
-      const input = button.ownerDocument.createElement("input");
+      const input = createHtmlElement(button.ownerDocument, "input");
       input.type = "file";
       input.multiple = true;
       input.hidden = true;
@@ -760,8 +761,12 @@ export default class MiroCanvasPlugin extends Plugin {
     setting?.openTabById?.(this.manifest.id);
   }
 
+  private focusedLeaf(): WorkspaceLeaf | null {
+    return this.app.workspace.getActiveViewOfType(obsidian.View)?.leaf ?? null;
+  }
+
   private activeM1Session(): M1CanvasSession | null {
-    const view = this.app.workspace.activeLeaf?.view;
+    const view = this.focusedLeaf()?.view;
     return this.m1Session !== null && view === this.currentCanvasView
       ? this.m1Session
       : null;
@@ -906,12 +911,12 @@ export default class MiroCanvasPlugin extends Plugin {
   }
 
   private ensureMetadataWriter(): MetadataWriter | null {
-    const view = this.app.workspace.activeLeaf?.view;
+    const view = this.focusedLeaf()?.view;
     if (!isNativeCanvasView(view)) {
       return null;
     }
     if (this.currentCanvasView !== view) {
-      this.handleActiveLeafChange(this.app.workspace.activeLeaf);
+      this.handleActiveLeafChange(this.focusedLeaf());
       return this.metadataWriter;
     }
     if (this.metadataWriter) {
@@ -941,13 +946,13 @@ export default class MiroCanvasPlugin extends Plugin {
       ? "canvas"
       : "idle";
     if (!isCanvas) {
-      this.statusBarItem.setText("miro-canvas");
+      this.statusBarItem.setText(this.manifest.id);
       return;
     }
 
     const inspection = this.canvasInspection;
     if (!inspection) {
-      this.statusBarItem.setText("miro-canvas · Canvas");
+      this.statusBarItem.setText(`${this.manifest.id} · Canvas`);
       return;
     }
 
@@ -957,7 +962,7 @@ export default class MiroCanvasPlugin extends Plugin {
     const writerStatus = this.metadataStoreProbe?.status ?? "unavailable";
     const m1Status = this.m1Session?.status ?? "unavailable";
     this.statusBarItem.setText(
-      `miro-canvas · Canvas (${inspection.adapter.status}/${inspection.metadata.status}/${writerStatus}/${m1Status})${issueMarker}`,
+      `${this.manifest.id} · Canvas (${inspection.adapter.status}/${inspection.metadata.status}/${writerStatus}/${m1Status})${issueMarker}`,
     );
   }
 
@@ -1132,7 +1137,7 @@ export default class MiroCanvasPlugin extends Plugin {
   /** A file picker for one font file; resolves to undefined where nothing was chosen. */
   private pickFontFile(): Promise<File | undefined> {
     return new Promise((resolve) => {
-      const input = document.createElement("input");
+      const input = createHtmlElement(document, "input");
       input.type = "file";
       input.accept = ".ttf,.otf,.woff,.woff2";
       input.hidden = true;

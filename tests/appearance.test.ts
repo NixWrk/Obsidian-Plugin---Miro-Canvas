@@ -311,6 +311,40 @@ describe("appearance core", () => {
     expect(Object.isFrozen(payload)).toBe(true);
   });
 
+  it("copies null-prototype unknown records without retaining their nested values", () => {
+    const nested = { values: ["kept", 42] };
+    const record = Object.assign(Object.create(null), { nested });
+    const input = { fontSize: 20, future: record };
+
+    const normalized = normalizeTypography(input);
+
+    expect(normalized).toMatchObject({ fontSize: 20, future: { nested: { values: ["kept", 42] } } });
+    expect(normalized.future).not.toBe(record);
+    nested.values.push("later");
+    expect(normalized.future).toEqual({ nested: { values: ["kept", 42] } });
+    expect(input.future).toBe(record);
+  });
+
+  it("drops unsupported unknown prototypes, cycles and hostile records while retaining owned values", () => {
+    class FutureRecord {
+      public value = "untrusted prototype";
+    }
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    const throwing = Object.defineProperty({}, "value", {
+      enumerable: true,
+      get() { throw new Error("Unreadable unknown value."); },
+    });
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+
+    for (const future of [new FutureRecord(), cycle, throwing, revoked.proxy]) {
+      const normalized = normalizeTypography({ fontSize: 20, future });
+      expect(normalized.fontSize).toBe(20);
+      expect(Object.prototype.hasOwnProperty.call(normalized, "future")).toBe(false);
+    }
+  });
+
   it("does not throw when an array proxy has been revoked", () => {
     const revoked = Proxy.revocable([{ color: "#123456" }], {});
     revoked.revoke();

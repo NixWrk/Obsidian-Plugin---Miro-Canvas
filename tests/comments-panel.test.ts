@@ -105,6 +105,24 @@ const localThread: CommentThread = {
 };
 
 describe("comments panel", () => {
+  it("renders primitive message text without invoking object conversion hooks", () => {
+    const noop = () => undefined;
+    const values: readonly unknown[] = ["<b>text</b>", 23, false, null, undefined,
+      { toString: () => { throw new Error("unexpected conversion"); } }];
+    for (const value of values) {
+      const panel = new CommentsPanel({
+        onAddComment: noop, onEditComment: noop, onDeleteComment: noop,
+        onReplyComment: noop, onResolveComment: noop, onFilterChange: noop,
+      }, { document: new FakeDocument() as unknown as Document });
+      const supplied = { ...localThread, text: value } as unknown as CommentThread;
+      panel.update({ threads: [supplied] });
+      const root = panel.element as unknown as FakeElement;
+      const body = descendants(root).find((item) => item.className === "miro-canvas-comment-card__body")!;
+      expect(body.textContent).toBe(value === undefined || typeof value === "object" && value !== null ? "" : String(value));
+      expect(supplied.text).toBe(value);
+    }
+  });
+
   it("emits add/edit/reply/resolve/filter and anchor callbacks with safe textContent", () => {
     const calls: Array<{ readonly kind: string; readonly args: readonly unknown[] }> = [];
     let scope: CommentScope = "board";

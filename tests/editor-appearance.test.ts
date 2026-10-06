@@ -161,6 +161,24 @@ function ownedStyle(doc: FakeDocument): FakeStyleElement | null {
 }
 
 describe("applyEditorAppearanceToFrame", () => {
+  it("creates and removes the editor style through the frame owner window", () => {
+    const doc = new FakeDocument();
+    const style = new FakeStyleElement();
+    const owner = { createEl: vi.fn(function (this: unknown, tag: string) {
+      expect(this).toBe(owner);
+      expect(tag).toBe("style");
+      return style;
+    }) };
+    Object.assign(doc, { defaultView: owner });
+    const native = vi.spyOn(doc, "createElement");
+    const frame = new FakeFrame(doc);
+    applyEditorAppearanceToFrame(frame, buildEditorAppearanceRules(typography, undefined));
+    expect(ownedStyle(doc)).toBe(style);
+    expect(owner.createEl).toHaveBeenCalledOnce();
+    expect(native).not.toHaveBeenCalled();
+    applyEditorAppearanceToFrame(frame, []);
+    expect(style.removed).toBe(true);
+  });
   it("paints declarations into one owned style element via the CSSOM", () => {
     const frame = new FakeFrame();
     applyEditorAppearanceToFrame(frame, buildEditorAppearanceRules(typography, { text: "#4262ff" }));

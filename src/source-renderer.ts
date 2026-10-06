@@ -1,4 +1,6 @@
 import { CodeHeadingMarks } from "./native-markup-state";
+import { projectNativeCardStyles } from "./native-card-styles";
+import { NativeStyleProperties } from "./native-style-properties";
 import {
   buildCanvasAnchorGeometry, nativeAnchorEnd, nativeEdgeEnd, nativeEdgeRoute, nativeFreeEnd, roundCoordinate,
   type NativeEdgeEnd, type NodeMeasurements,
@@ -61,6 +63,7 @@ interface RenderedItem {
   readonly expectedRotations?: readonly { readonly element: DomElementLike; readonly rotation: number }[];
   readonly descriptor: SourceItemDescriptor;
   readonly markup?: { readonly element: DomElementLike; readonly refresh: () => void };
+  readonly styleOwnership?: NativeStyleProperties;
   /** The host element this item decorates, and the runtime properties that expose it. */
   readonly anchor: { readonly keys: readonly string[]; readonly element: DomElementLike };
   /** Replaces the marker check for an item that puts no marker on the host. */
@@ -359,7 +362,7 @@ function createElement(document: Document, tagName: string): DomElementLike | un
 }
 
 function defaultDocument(): Document | undefined {
-  const candidate = safeGet(globalThis, "document");
+  const candidate = typeof window === "undefined" ? undefined : safeGet(window, "document");
   return isObject(candidate) && typeof safeGet(candidate, "createElement") === "function"
     ? candidate as unknown as Document
     : undefined;
@@ -1000,7 +1003,7 @@ function domSize(element: DomElementLike | undefined): { readonly width: number;
   const measure = safeGet(element, "getBoundingClientRect");
   if (typeof measure !== "function") return undefined;
   try {
-    const rect = Reflect.apply(measure, element, []);
+    const rect: unknown = Reflect.apply(measure, element, []);
     const width = safeGet(rect, "width"), height = safeGet(rect, "height");
     return typeof width === "number" && typeof height === "number"
       && Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
@@ -1094,7 +1097,7 @@ function observeNodes(
   ratios.sort((left, right) => left - right);
   const scale = ratios[Math.floor(ratios.length / 2)];
   if (!Number.isFinite(scale) || scale <= 0) return {};
-  const measurements: Record<string, { width: number; height: number }> = Object.create(null);
+  const measurements = Object.create(null) as Record<string, { width: number; height: number }>;
   for (const [id, size] of observed) {
     const declaredSize = declared.get(id)!;
     const width = size.width / scale, height = size.height / scale;
@@ -1184,7 +1187,7 @@ function localRoute(path: DomElementLike, geometry: AnchorEdgeGeometry): string 
   const segments = geometry.segments as readonly RouteSegment[] | undefined;
   if (Array.isArray(segments)) return routePath(start, segments, map);
   const p = (point: AnchorPoint): string => { const q = map(point); return `${q.x} ${q.y}`; };
-  const controls = geometry.controls;
+  const controls = geometry.controls as AnchorPoint[] | undefined;
   if (Array.isArray(controls) && controls.length === 2) return `M ${p(start)} C ${p(controls[0])} ${p(controls[1])} ${p(end)}`;
   return `M ${p(start)}` + (geometry.points ?? [start, end]).slice(1).map(point => ` L ${p(point)}`).join("");
 }
@@ -1860,9 +1863,18 @@ function applyNode(
   const expectedRotations = applyRotation(runtime, shell, rotation, patches, diagnostics, id)
     .map((element) => ({ element, rotation }));
   const ownedChildren = [layer, tagLayer].filter((item): item is DomElementLike => item !== undefined);
+  const styleOwnership = new NativeStyleProperties();
+  const projectStyles = (): void => {
+    styleOwnership.retain(element => element === (shell as unknown) || safeCall(shell, "contains", [element]) === true);
+    projectNativeCardStyles(shell as unknown as HTMLElement,
+      (element, property, value, variable) => styleOwnership.write(element, property, value, variable));
+  };
+  patches.push(() => styleOwnership.restore());
+  projectStyles();
   return {
     id, kind: "node", element: primary, marker: shell, ownedChildren, expectedRotations, descriptor,
-    ...(codeHeadings === undefined ? {} : { markup: { element: shell, refresh: () => codeHeadings.refresh() } }),
+    markup: { element: shell, refresh: () => { codeHeadings?.refresh(); projectStyles(); } },
+    styleOwnership,
     anchor: { keys: NODE_SHELL_KEYS, element: shell },
   };
 }
@@ -2300,20 +2312,46 @@ export class SourceRenderer {
   private watchLive(): void {
     const keepers = new Map<unknown, { readonly attribute: string; readonly keep: () => void }>();
     const markup = new Map<unknown, () => void>();
+    const registeredStyles = new Map<RenderedItem, Set<HTMLElement>>();
+    const ownedStyles = new Set<HTMLElement>();
+    let observer: unknown;
+    const registerStyles = (item: RenderedItem): void => {
+      const ownership = item.styleOwnership;
+      if (ownership === undefined) return;
+      const registered = registeredStyles.get(item) ?? new Set<HTMLElement>();
+      registeredStyles.set(item, registered);
+      const current = new Set(ownership.elements);
+      for (const element of registered) {
+        if (current.has(element)) continue;
+        registered.delete(element);
+        ownedStyles.delete(element);
+        keepers.delete(element);
+      }
+      for (const element of ownership.elements) {
+        if (registered.has(element)) continue;
+        registered.add(element);
+        ownedStyles.add(element);
+        const previous = keepers.get(element);
+        keepers.set(element, { attribute: "style", keep: () => { previous?.keep(); ownership.refresh(element); } });
+        // The existing markup shell watch sees current descendants; removed ones
+        // cease observation automatically and are absent from the keeper map.
+      }
+    };
     for (const item of [...this.cardItems, ...this.lineItems]) {
-      if (item.markup !== undefined) markup.set(item.markup.element, item.markup.refresh);
+      if (item.markup !== undefined) markup.set(item.markup.element, () => { item.markup?.refresh(); registerStyles(item); });
       for (const expected of item.expectedRotations ?? []) {
         keepers.set(expected.element, { attribute: "style", keep: () => keepRotation(expected.element, expected.rotation) });
       }
       if (item.follow !== undefined) {
         keepers.set(item.follow.element, { attribute: item.follow.attribute, keep: item.follow.apply });
       }
+      registerStyles(item);
     }
     if (keepers.size === 0 && markup.size === 0) return;
     const Observer = safeGet(safeGet(this.document, "defaultView"), "MutationObserver");
     if (typeof Observer !== "function") return;
     try {
-      const observer: unknown = Reflect.construct(Observer, [(records: unknown) => {
+      observer = Reflect.construct(Observer, [(records: unknown) => {
         if (!Array.isArray(records)) return;
         const due = new Set<() => void>();
         for (const record of records) {
@@ -2337,12 +2375,13 @@ export class SourceRenderer {
         for (const keep of due) keep();
       }]);
       for (const [element, keeper] of keepers) {
+        if (ownedStyles.has(element as HTMLElement)) continue;
         safeCall(observer, "observe", [element, { attributes: true, attributeFilter: [keeper.attribute] }]);
       }
       for (const [element] of markup) {
         const keeper = keepers.get(element);
         safeCall(observer, "observe", [element, { childList: true, subtree: true,
-          ...(keeper === undefined ? {} : { attributes: true, attributeFilter: [keeper.attribute] }) }]);
+          attributes: true, attributeFilter: [keeper?.attribute ?? "style"] }]);
       }
       this.liveWatch = observer;
     } catch {

@@ -1,4 +1,5 @@
 import { watchAttachmentLabel } from "./native-markup-state";
+import { createHtmlElement, createSvgElement } from "./dom-elements";
 /**
  * Runtime owner for the M1 feature set.
  *
@@ -9,6 +10,8 @@ import { watchAttachmentLabel } from "./native-markup-state";
  */
 
 import { watchNativeMenuState } from "./native-menu-state";
+import { watchNativeUiVisibility } from "./native-ui-visibility";
+import { NativeStyleProperties } from "./native-style-properties";
 import {
 	APPEARANCE_ACTIONS,
 	mergeAppearanceMetadata,
@@ -557,14 +560,11 @@ export function nativeToolbarItemOf(button: Element, index: number): NativeToolb
 }
 
 function ownerDocument(value: unknown): Document | undefined {
-	const document = readRuntime(value, "ownerDocument");
-	if (document !== undefined && typeof readRuntime(document, "createElement") === "function") {
-		return document as Document;
+	const ownedDocument = readRuntime(value, "ownerDocument");
+	if (ownedDocument !== undefined && typeof readRuntime(ownedDocument, "createElement") === "function") {
+		return ownedDocument as Document;
 	}
-	if (typeof globalThis.document !== "undefined") {
-		return globalThis.document;
-	}
-	return undefined;
+	return typeof document === "undefined" ? undefined : document;
 }
 
 /** The shared selection frame's box, in pixels from the board's top left. */
@@ -588,7 +588,7 @@ function boundingRect(value: unknown): { readonly left: number; readonly top: nu
 		return undefined;
 	}
 	try {
-		const rect = Reflect.apply(measure, value, []);
+		const rect: unknown = Reflect.apply(measure, value, []);
 		const left = finite(readRuntime(rect, "left"));
 		const top = finite(readRuntime(rect, "top"));
 		const right = finite(readRuntime(rect, "right"));
@@ -612,8 +612,8 @@ function readStyleValue(element: unknown, property: string): string | undefined 
 		const view = readRuntime(readRuntime(element, "ownerDocument"), "defaultView");
 		const compute = readRuntime(view, "getComputedStyle");
 		if (typeof compute !== "function") return undefined;
-		const style = Reflect.apply(compute, view, [element]);
-		const value = Reflect.apply(readRuntime(style, "getPropertyValue") as (name: string) => string, style, [property]);
+		const style: unknown = Reflect.apply(compute, view, [element]);
+		const value: unknown = Reflect.apply(readRuntime(style, "getPropertyValue") as (name: string) => string, style, [property]);
 		return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 	} catch {
 		return undefined;
@@ -752,6 +752,9 @@ const APPEARANCE_STYLE_PROPERTIES = [
 	"text-decoration",
 	"text-align",
 	"line-height",
+	"flex",
+	"min-height",
+	"padding-bottom",
 	"--miro-canvas-vertical-align",
 	"justify-content",
 	"color",
@@ -848,7 +851,8 @@ function restoreStyleProperties(element: HTMLElement, styles: Map<string, StyleP
 		return;
 	}
 	for (const [property, snapshot] of styles) {
-		if (snapshot.applied === undefined || readStyleProperty(element, property).value !== snapshot.applied) {
+		const current = readStyleProperty(element, property);
+		if (snapshot.applied === undefined || current.value !== snapshot.applied || current.priority !== "") {
 			continue;
 		}
 		try {
@@ -1264,7 +1268,7 @@ export class M1CanvasSession {
 		if (stroke !== undefined && /^#[0-9a-f]{6}$/iu.test(stroke)) return stroke.toLowerCase();
 		const edge = [...(this.adapter.getEdges() ?? [])].find((item) => readCanvasElementId(item) === edgeId);
 		const path = readRuntime(readRuntime(edge, "lineGroupEl"), "querySelector");
-		const drawn = typeof path === "function" ? Reflect.apply(path, readRuntime(edge, "lineGroupEl"), ["path.canvas-display-path"]) : undefined;
+		const drawn: unknown = typeof path === "function" ? Reflect.apply(path, readRuntime(edge, "lineGroupEl"), ["path.canvas-display-path"]) : undefined;
 		const view = ownerDocument(this.root)?.defaultView;
 		const computed = isElement(drawn) && view !== undefined && view !== null ? view.getComputedStyle(drawn).stroke : "";
 		const channels = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/u.exec(computed ?? "");
@@ -1436,6 +1440,9 @@ export class M1CanvasSession {
 	/** Not readonly: `applyPanelLayout` updates its own copy of `panelLayout` without a full session rebuild. */
 	private settings: MiroCanvasSettings;
 	private readonly disposers: Array<() => void> = [];
+	private nativeUiVisibility: ReturnType<typeof watchNativeUiVisibility> | undefined;
+	private nativeIndependentOnly = false;
+	private readonly appearanceSizerStyles = new NativeStyleProperties();
 	private readonly sourceRenderer: SourceRenderer | undefined;
 	private slideShow: SlideShow | undefined;
 	private readonly readonlyOriginal: boolean | undefined;
@@ -1505,7 +1512,7 @@ export class M1CanvasSession {
 	private interactionBlock: string | undefined;
 	private rotationPreview: { readonly id: string; readonly rotation: number } | undefined;
 	/** The one selected card kept on its own layer, which native Canvas would lift to the top. */
-	private shownLayer: { readonly id: string; readonly element: HTMLElement } | undefined;
+	private shownLayer: { readonly id: string; readonly node: unknown; readonly element: HTMLElement; readonly previous: StylePropertySnapshot } | undefined;
 	private rotationGestureTarget: string | undefined;
 	/** What the last rotation gesture actually did, for the selection dump. */
 	private lastRotationAttempt = "none";
@@ -2099,7 +2106,7 @@ export class M1CanvasSession {
 			queryDelay: () => ((this.searchIndexCache?.index.length ?? 0) > SEARCH_DEBOUNCE_ENTRIES ? SEARCH_DEBOUNCE_MS : 0),
 			...(this.options.setIcon === undefined ? {} : { setIcon: this.options.setIcon }),
 		});
-		const hit = document.createElement("div");
+		const hit = createHtmlElement(document, "div");
 		hit.className = "miro-canvas-search-hit";
 		hit.setAttribute("aria-hidden", "true");
 		hit.hidden = true;
@@ -2293,12 +2300,12 @@ export class M1CanvasSession {
 		const known = this.searchHitTarget;
 		if (known !== undefined && known.key === entry.key && known.element.isConnected !== false) return known.element;
 		const root = this.root;
-		if (root === undefined || typeof root.querySelector !== "function") return undefined;
+		if (root === undefined) return undefined;
 		const id = cssString(entry.targetId);
 		const selector = entry.kind === "label"
 			? `.miro-canvas-connector-label[data-connector-id="${id}"]`
 			: `.miro-canvas-comment-marker[data-comment-id="${id}"][data-comment-origin="${cssString(entry.origin ?? "local")}"]`;
-		const element = root.querySelector<HTMLElement>(selector) ?? undefined;
+		const element = (typeof root.find === "function" ? root.find(selector) : root.querySelector<HTMLElement>(selector)) ?? undefined;
 		this.searchHitTarget = element === undefined ? undefined : { key: entry.key, element };
 		return element;
 	}
@@ -3205,7 +3212,7 @@ export class M1CanvasSession {
 					const getter = readRuntime(style, "getPropertyValue");
 					if (typeof getter !== "function") return "?";
 					try {
-						const value = Reflect.apply(getter, style, [property]);
+						const value: unknown = Reflect.apply(getter, style, [property]);
 						return typeof value === "string" && value.length > 0 ? value : "-";
 					} catch {
 						return "?";
@@ -3328,18 +3335,40 @@ export class M1CanvasSession {
 			return;
 		}
 		// Another card, or the same card built again by native Canvas.
-		if (this.shownLayer !== undefined && this.shownLayer.element !== element) this.hideShownLayer();
-		this.shownLayer = { id, element };
+		if (this.shownLayer !== undefined && (this.shownLayer.element !== element || this.shownLayer.node !== node)) this.hideShownLayer();
+		if (this.shownLayer === undefined) {
+			this.shownLayer = { id, node, element, previous: readStyleProperty(element, "z-index") };
+		}
 		element.classList.add("miro-canvas-layer-shown");
 		element.style.setProperty("--miro-canvas-layer", String(zIndex));
+		const paint = (): void => {
+			const shown = this.shownLayer;
+			if (shown === undefined || shown.element !== element || shown.node !== node) return;
+			const currentLayer = readRuntime(node, "zIndex");
+			if (typeof currentLayer !== "number") return;
+			const value = String(currentLayer);
+			const current = readStyleProperty(element, "z-index");
+			if (current.value !== value || current.priority !== "") writeStyleProperty(element, "z-index", value);
+			shown.previous.applied = value;
+		};
+		paint();
+		this.guardNativeMethod(node, "renderZIndex", (original, receiver, args) => {
+			const result: unknown = Reflect.apply(original, receiver, args);
+			paint();
+			return result;
+		});
 	}
 
 	private hideShownLayer(): void {
-		const element = this.shownLayer?.element;
+		const shown = this.shownLayer;
+		const element = shown?.element;
 		this.shownLayer = undefined;
 		if (element === undefined) return;
 		element.classList.remove("miro-canvas-layer-shown");
 		element.style.removeProperty("--miro-canvas-layer");
+		if (shown !== undefined && readStyleProperty(element, "z-index").priority === "") {
+			restoreStyleProperties(element, new Map([["z-index", shown.previous]]));
+		}
 	}
 
 	/** A native node by its id, without walking every node of a large board. */
@@ -3415,6 +3444,7 @@ export class M1CanvasSession {
 			return false;
 		}
 		this.adoptNativeMenu();
+		this.watchNativeUi();
 		this.attachQuickTools();
 		this.panelVisibility?.mount();
 		this.attachClipboard();
@@ -3674,6 +3704,8 @@ export class M1CanvasSession {
 		if (toolbarSignature !== this.lastToolbarSignature) {
 			this.lastToolbarSignature = toolbarSignature;
 			this.toolbar.update(toolbarState);
+			this.nativeIndependentOnly = toolbarState.independentOnly === true;
+			this.nativeUiVisibility?.refresh();
 			this.updateQuickTools();
 		}
 		this.lastToolbarState = toolbarState;
@@ -3783,7 +3815,7 @@ export class M1CanvasSession {
 				onHideImported: (id) => {
 					if (this.commentLocked(id, "imported")) return;
 					this.writeMetadata("hide-imported-comment", (draft) => {
-						const previous = Array.isArray(draft.hiddenImportedComments) ? draft.hiddenImportedComments : [];
+						const previous: readonly unknown[] = Array.isArray(draft.hiddenImportedComments) ? draft.hiddenImportedComments : [];
 						draft.hiddenImportedComments = [...new Set([...previous, id])];
 						this.detachMissingCommentAnchors(draft);
 						return draft;
@@ -4269,7 +4301,7 @@ export class M1CanvasSession {
 	private rectangleSelect(root: HTMLElement, view: Window, event: PointerEvent): void {
 		const first = { x: event.clientX, y: event.clientY };
 		const bounds = boundingRect(root);
-		const marquee = root.ownerDocument.createElement("div");
+		const marquee = createHtmlElement(root.ownerDocument, "div");
 		marquee.className = "miro-canvas-rectangle-marquee";
 		marquee.hidden = true;
 		root.appendChild(marquee);
@@ -4549,7 +4581,7 @@ export class M1CanvasSession {
 			const route = routes[connector.id];
 			return route === undefined ? [] : [{ id: connector.id, ...route }];
 		});
-		this.scene = { nodes: document.nodes, edges: [...document.edges, ...ownEdges] };
+		this.scene = { nodes: document.nodes, edges: [...(document.edges as readonly unknown[]), ...ownEdges] };
 		// Read only when something moved, so a new token is as good as a description.
 		this.liveGeneration += 1;
 		this.lastSceneSignature = `live:${this.liveGeneration}`;
@@ -4693,7 +4725,7 @@ export class M1CanvasSession {
 			return;
 		}
 		if (this.brush === undefined) {
-			const brush = root.ownerDocument.createElement("div");
+			const brush = createHtmlElement(root.ownerDocument, "div");
 			brush.className = "miro-canvas-brush";
 			brush.setAttribute("aria-hidden", "true");
 			root.appendChild(brush);
@@ -4980,14 +5012,14 @@ export class M1CanvasSession {
 		const view = document.defaultView;
 		const svg = drawing || erasing;
 		const ghost = svg
-			? document.createElementNS("http://www.w3.org/2000/svg", "svg") as unknown as HTMLElement
-			: document.createElement("div");
+			? createSvgElement(document, "svg") as unknown as HTMLElement
+			: createHtmlElement(document, "div");
 		ghost.setAttribute("class", `miro-canvas-tool-ghost miro-canvas-tool-ghost--${tool}`);
 		// A lasso shows the ring it closes; an eraser the trail it wipes; a pen
 		// the line it will leave.
 		const pressurePen = tool === "pen" && pointer === "pen" && this.settings.penPressure;
 		let pressureScale = pressurePen ? strokeWidthScale([pressedPressure(event) ?? 0.5]) : 1;
-		const line = svg ? document.createElementNS("http://www.w3.org/2000/svg", pressurePen ? "path" : tool === "lasso" ? "polygon" : "polyline") : undefined;
+		const line = svg ? createSvgElement(document, pressurePen ? "path" : tool === "lasso" ? "polygon" : "polyline") : undefined;
 		const zoom = finite(readRuntime(this.viewport.getViewport(), "zoom")) ?? 1;
 		if (line !== undefined) {
 			line.setAttribute("class", "miro-canvas-tool-ghost__line");
@@ -5259,9 +5291,9 @@ export class M1CanvasSession {
 		event.stopImmediatePropagation();
 		const document = root.ownerDocument;
 		const view = document.defaultView;
-		const ghost = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		const ghost = createSvgElement(document, "svg");
 		ghost.setAttribute("class", "miro-canvas-tool-ghost miro-canvas-tool-ghost--line");
-		const shape = document.createElementNS("http://www.w3.org/2000/svg", spec.block === true ? "polygon" : "path");
+		const shape = createSvgElement(document, spec.block === true ? "polygon" : "path");
 		shape.setAttribute("class", "miro-canvas-tool-ghost__line");
 		ghost.appendChild(shape);
 		root.appendChild(ghost);
@@ -5709,7 +5741,7 @@ export class M1CanvasSession {
 	private editNode(id: string, line?: number): void {
 		const canvas = this.nativeCanvas();
 		const nodes = readRuntime(canvas, "nodes");
-		const node = nodes instanceof Map ? nodes.get(id) : undefined;
+		const node: unknown = nodes instanceof Map ? nodes.get(id) : undefined;
 		if (node === undefined) return;
 		this.callNative("selectOnly", [node]);
 		const start = readRuntime(node, "startEditing");
@@ -5817,12 +5849,12 @@ export class M1CanvasSession {
 		const root = this.root;
 		if (root === undefined) return;
 		const document = root.ownerDocument;
-		const form = document.createElement("form");
+		const form = createHtmlElement(document, "form");
 		form.className = "miro-canvas-link-prompt";
 		const rootRect = root.getBoundingClientRect();
 		form.style.left = `${client.x - rootRect.left}px`;
 		form.style.top = `${client.y - rootRect.top}px`;
-		const input = document.createElement("input");
+		const input = createHtmlElement(document, "input");
 		input.type = "url";
 		input.placeholder = words().session.webAddressPlaceholder;
 		input.setAttribute("aria-label", words().session.webAddress);
@@ -5936,6 +5968,23 @@ export class M1CanvasSession {
 				// A container native Canvas has already destroyed needs nothing back.
 			}
 		});
+	}
+
+	/** Capture the native controls once; their local observers follow later style writes. */
+	private watchNativeUi(): void {
+		const root = this.root;
+		if (root === undefined || this.nativeUiVisibility !== undefined) return;
+		const elements: { element: HTMLElement; kind: "controls" | "menu" }[] = [];
+		const controls = callRuntime(root, "querySelectorAll", ".canvas-controls");
+		const menus = callRuntime(root, "querySelectorAll", ".canvas-card-menu, .canvas-menu");
+		for (const [collection, kind] of [[controls, "controls"], [menus, "menu"]] as const) {
+			const length = finite(readRuntime(collection, "length")) ?? 0;
+			for (let index = 0; index < length; index += 1) {
+				const element = readRuntime(collection, index);
+				if (isElement(element)) elements.push({ element, kind });
+			}
+		}
+		if (elements.length > 0) this.nativeUiVisibility = watchNativeUiVisibility(root, elements, () => this.nativeIndependentOnly);
 	}
 
 	/** The native Canvas runtime this session drives, found the way the adapter finds it. */
@@ -6776,9 +6825,10 @@ export class M1CanvasSession {
 			if (!isObject(editor)) continue;
 			const text = callRuntime(editor, "getSelection");
 			if (typeof text !== "string" || text === "") continue;
+			const nodeText = readRuntime(node, "text");
 			this.textFragment = {
 				id, editor, text, from: callRuntime(editor, "getCursor", "from"),
-				to: callRuntime(editor, "getCursor", "to"), html: isHtmlText(String(readRuntime(node, "text") ?? "")),
+				to: callRuntime(editor, "getCursor", "to"), html: typeof nodeText === "string" && isHtmlText(nodeText),
 			};
 			return;
 		}
@@ -7267,7 +7317,9 @@ export class M1CanvasSession {
 		} catch {
 			// Fall back on the document's command below.
 		}
-		if (ownerDocument(this.root)?.execCommand?.(action) !== true) {
+		// Native Canvas reads trusted ClipboardEvent MIME; async web formats are incompatible.
+		// Probe the legacy capability through the guarded host bridge; missing/throwing hosts fail closed.
+		if (callRuntime(ownerDocument(this.root), "execCommand", action) !== true) {
 			this.options.onNotice?.(words().session.clipboardUnavailable);
 		}
 	}
@@ -7523,11 +7575,11 @@ export class M1CanvasSession {
 			return;
 		}
 		if (this.mixedSelectionFrame === undefined) {
-			const frame = root.ownerDocument.createElement("div");
+			const frame = createHtmlElement(root.ownerDocument, "div");
 			frame.className = "miro-canvas-mixed-selection-frame";
 			frame.setAttribute("aria-label", words().session.moveSelectedElements);
 			for (const side of ["top", "right", "bottom", "left"]) {
-				frame.appendChild(root.ownerDocument.createElement("div")).className = `miro-canvas-mixed-selection-frame__${side}`;
+				frame.appendChild(createHtmlElement(root.ownerDocument, "div")).className = `miro-canvas-mixed-selection-frame__${side}`;
 			}
 			root.appendChild(frame);
 			this.mixedSelectionFrame = frame;
@@ -7901,6 +7953,7 @@ export class M1CanvasSession {
 	}
 
 	private restoreAppearanceDom(): void {
+		this.appearanceSizerStyles.restore();
 		for (const [element, snapshot] of this.appearanceDom) {
 			restoreStyleProperties(element, snapshot.styles);
 			restoreAttribute(element, APPEARANCE_ATTRIBUTE, snapshot.appearance);
@@ -7994,7 +8047,7 @@ export class M1CanvasSession {
 			return result;
 		}
 		try {
-			const matches = Reflect.apply(querySelectorAll, element, [
+			const matches: unknown = Reflect.apply(querySelectorAll, element, [
 				".canvas-node-container, .canvas-node-content, .markdown-preview-view, .canvas-node-content-container",
 			]);
 			const length = finite(readRuntime(matches, "length")) ?? 0;
@@ -8032,6 +8085,24 @@ export class M1CanvasSession {
 		for (const content of targets.slice(1)) {
 			// Keep fonts on native surfaces and paint the card's fill once.
 			this.applyElementAppearance(content, override?.typography, override?.colors, false, true, fillSurface);
+		}
+		if (override?.typography !== undefined && verticalJustification(override.typography.verticalAlign).vertical !== "top") {
+			const query = readRuntime(dom, "querySelectorAll");
+			if (typeof query === "function") {
+				const sizers = callRuntime(dom, "querySelectorAll", ".markdown-preview-view > .markdown-preview-sizer");
+				if (isObject(sizers)) {
+					const length = finite(readRuntime(sizers, "length")) ?? 0;
+					for (let index = 0; index < length; index += 1) {
+						const sizer = readRuntime(sizers, index);
+						if (!isElement(sizer)) continue;
+						this.captureAppearanceDom(sizer);
+						this.appearanceSizerStyles.write(sizer, "flex", "0 0 auto");
+						this.appearanceSizerStyles.write(sizer, "min-height", "0");
+						this.appearanceSizerStyles.write(sizer, "padding-bottom", "0");
+						this.appearanceObserver?.observe(sizer, { attributes: true, attributeFilter: ["style"] });
+					}
+				}
+			}
 		}
 		this.refreshEditorAppearance(node, dom, override?.typography, override?.colors);
 	}
@@ -8093,8 +8164,8 @@ export class M1CanvasSession {
 			});
 		}
 		try {
-			// Attributes are never watched: the plugin's own style and attribute
-			// writes must not wake this observer into an endless loop.
+			// The layer watches replacements only; fixed sizers additionally watch
+			// style. Their reconciler ignores echoes without scheduling a frame.
 			this.appearanceObserver.observe(canvasEl, { childList: true, subtree: true });
 			this.appearanceObserverTarget = canvasEl;
 		} catch {
@@ -8148,6 +8219,33 @@ export class M1CanvasSession {
 		if (this.disposed) {
 			return;
 		}
+		let childrenChanged = false;
+		for (const record of Array.isArray(records) ? records as readonly unknown[] : []) {
+			const target = readRuntime(record, "target");
+			if (readRuntime(record, "type") === "attributes" && isElement(target)) this.appearanceSizerStyles.refresh(target);
+			if (readRuntime(record, "type") !== "attributes") childrenChanged = true;
+		}
+		if (!childrenChanged) return;
+		const root = this.appearanceObserverTarget;
+		if (root !== undefined) {
+			const removed = this.appearanceSizerStyles.retain(element => root.contains(element));
+			// MutationObserver has no per-target unobserve. Rebind only on content
+			// replacement, so it retains current sizers rather than detached previews.
+			if (removed > 0) {
+				this.appearanceObserver?.disconnect();
+				this.appearanceObserver?.observe(root, { childList: true, subtree: true });
+				for (const element of this.appearanceSizerStyles.elements) {
+					this.appearanceObserver?.observe(element, { attributes: true, attributeFilter: ["style"] });
+				}
+			}
+			for (const [element, snapshot] of this.appearanceDom) {
+				if (root.contains(element)) continue;
+				restoreStyleProperties(element, snapshot.styles);
+				restoreAttribute(element, APPEARANCE_ATTRIBUTE, snapshot.appearance);
+				restoreAttribute(element, VERTICAL_ALIGN_ATTRIBUTE, snapshot.verticalAlign);
+				this.appearanceDom.delete(element);
+			}
+		}
 		if (!this.pendingAppearanceEverything) {
 			const shells = this.pendingAppearanceShells ?? new Set<HTMLElement>();
 			this.pendingAppearanceShells = shells;
@@ -8175,7 +8273,7 @@ export class M1CanvasSession {
 		const closest = readRuntime(element, "closest");
 		if (typeof closest === "function") {
 			try {
-				const shell = Reflect.apply(closest, element, [".canvas-node"]);
+				const shell: unknown = Reflect.apply(closest, element, [".canvas-node"]);
 				if (isElement(shell)) {
 					// closest() checks the element itself first, so this also
 					// covers the common case: a card's own shell added whole.
@@ -8192,7 +8290,7 @@ export class M1CanvasSession {
 			return;
 		}
 		try {
-			const matches = Reflect.apply(querySelectorAll, element, [".canvas-node"]);
+			const matches: unknown = Reflect.apply(querySelectorAll, element, [".canvas-node"]);
 			const length = finite(readRuntime(matches, "length")) ?? 0;
 			for (let index = 0; index < length; index += 1) {
 				const candidate = readRuntime(matches, index);
@@ -8317,7 +8415,7 @@ export class M1CanvasSession {
 			return undefined;
 		}
 		try {
-			const frame = Reflect.apply(querySelector, dom, ["iframe.embed-iframe"]);
+			const frame: unknown = Reflect.apply(querySelector, dom, ["iframe.embed-iframe"]);
 			return isElement(frame) ? frame : undefined;
 		} catch {
 			// A node mid-teardown can throw on its own querySelector.
@@ -8341,7 +8439,7 @@ export class M1CanvasSession {
 			return result;
 		}
 		try {
-			const matches = Reflect.apply(querySelectorAll, element, [
+			const matches: unknown = Reflect.apply(querySelectorAll, element, [
 				".canvas-node-label, .file-embed-title, .internal-embed-title",
 			]);
 			const length = finite(readRuntime(matches, "length")) ?? 0;
@@ -8502,7 +8600,7 @@ export class M1CanvasSession {
 			if (document === undefined) {
 				continue;
 			}
-			const label = document.createElement("span");
+			const label = createHtmlElement(document, "span");
 			label.className = "miro-canvas-attachment-label";
 			label.setAttribute("data-miro-canvas-attachment-label", "true");
 			label.setAttribute("aria-hidden", "true");
@@ -8778,7 +8876,7 @@ export class M1CanvasSession {
 			return;
 		}
 		try {
-			const timer = Reflect.apply(setIntervalValue, window, [() => this.pollRefresh(), REFRESH_INTERVAL_MS]);
+			const timer: unknown = Reflect.apply(setIntervalValue, window, [() => this.pollRefresh(), REFRESH_INTERVAL_MS]);
 			this.refreshTimer = timer as ReturnType<typeof setInterval>;
 			this.disposers.push(() => {
 				if (this.refreshTimer === undefined) {
@@ -8959,9 +9057,9 @@ export class M1CanvasSession {
 		if (typeof original !== "function") return;
 		try {
 			const descriptor = Object.getOwnPropertyDescriptor(target, key);
-			const session = this;
+			const isDisposed = (): boolean => this.disposed;
 			const wrapper = function(this: unknown, ...args: unknown[]): unknown {
-				return session.disposed ? Reflect.apply(original, this, args) : run(original as (this: unknown, ...args: unknown[]) => unknown, this, args);
+				return isDisposed() ? Reflect.apply(original, this, args) : run(original as (this: unknown, ...args: unknown[]) => unknown, this, args);
 			};
 			Object.defineProperty(target, key, { configurable: true, writable: true, enumerable: descriptor?.enumerable ?? false, value: wrapper });
 			const keys = this.guardedMethods.get(target) ?? new Set<string>();
@@ -9170,11 +9268,11 @@ export class M1CanvasSession {
 		const closest = readRuntime(target, "closest");
 		if (typeof closest === "function") {
 			try {
-				const element = Reflect.apply(closest, target, ["[data-miro-canvas-id], [data-node-id], [data-edge-id], [data-id]"]);
+				const element: unknown = Reflect.apply(closest, target, ["[data-miro-canvas-id], [data-node-id], [data-edge-id], [data-id]"]);
 				for (const key of ["data-miro-canvas-id", "data-node-id", "data-edge-id", "data-id"] as const) {
 					const value = readRuntime(element, "getAttribute");
 					if (typeof value === "function") {
-						const id = Reflect.apply(value, element, [key]);
+						const id: unknown = Reflect.apply(value, element, [key]);
 						if (typeof id === "string" && id.length > 0) {
 							return id;
 						}
@@ -9226,7 +9324,7 @@ export class M1CanvasSession {
 		const closest = readRuntime(target, "closest");
 		if (typeof closest !== "function") return undefined;
 		try {
-			const found = Reflect.apply(closest, target, [selector]);
+			const found: unknown = Reflect.apply(closest, target, [selector]);
 			return isElement(found) ? found : undefined;
 		} catch {
 			return undefined;
@@ -9444,6 +9542,8 @@ export class M1CanvasSession {
 			return;
 		}
 		this.disposed = true;
+		this.nativeUiVisibility?.dispose();
+		this.nativeUiVisibility = undefined;
 		this.cancelPendingPenDot();
 		this.selectionMoveEnd?.();
 		this.slideShow?.stop();

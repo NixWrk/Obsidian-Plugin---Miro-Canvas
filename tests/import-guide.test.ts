@@ -175,6 +175,11 @@ describe("import guide", () => {
     expect(vaultFolderPath({}, "main")).toBe("main");
     expect(vaultFolderPath({ getBasePath: () => { throw new Error("no"); } }, "main")).toBe("main");
     expect(vaultFolderPath(null, "main")).toBe("main");
+    for (const path of ["", "   ", 23, null, { unexpected: true }]) {
+      expect(vaultFolderPath({ getBasePath: () => path }, "main")).toBe("main");
+    }
+    const adapter = { base: "J:/board vault", getBasePath() { return this.base; } };
+    expect(vaultFolderPath(adapter, "main")).toBe(adapter.base);
   });
 
   it("opens the Miro app setup guide in the language in use", () => {

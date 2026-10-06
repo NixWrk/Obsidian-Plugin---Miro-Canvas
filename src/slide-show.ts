@@ -6,6 +6,7 @@
  * keyboard listener.
  */
 
+import { createHtmlElement } from "./dom-elements";
 import { words } from "./i18n";
 import { TOOLTIP_DELAY } from "./tooltips";
 
@@ -88,12 +89,12 @@ export class SlideShow {
 
   private mount(): void {
     const document = this.root.ownerDocument;
-    const bar = document.createElement("div");
+    const bar = createHtmlElement(document, "div");
     bar.className = "miro-canvas-slideshow";
     bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", words().slideShow.ariaLabel);
     const button = (label: string, icon: string, glyph: string, run: () => void): HTMLButtonElement => {
-      const element = document.createElement("button");
+      const element = createHtmlElement(document, "button");
       element.type = "button";
       element.className = "miro-canvas-slideshow__button";
       element.setAttribute("aria-label", label);
@@ -105,7 +106,7 @@ export class SlideShow {
       return element;
     };
     button(words().slideShow.previousSlide, "chevron-left", "‹", () => this.previous()).classList.add("miro-canvas-slideshow__previous");
-    const counter = document.createElement("span");
+    const counter = createHtmlElement(document, "span");
     counter.className = "miro-canvas-slideshow__counter";
     bar.appendChild(counter);
     button(words().slideShow.nextSlide, "chevron-right", "›", () => this.next()).classList.add("miro-canvas-slideshow__next");

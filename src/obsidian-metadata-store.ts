@@ -222,7 +222,7 @@ function cloneJsonValue(
 
 	let prototype: object | null;
 	try {
-		prototype = Object.getPrototypeOf(value);
+		prototype = Object.getPrototypeOf(value) as object | null;
 	} catch (error) {
 		throw new NativeShapeError(`The Canvas object prototype could not be read at ${path}: ${describeError(error)}.`);
 	}
@@ -558,7 +558,7 @@ class ObsidianRootMetadataStore implements MetadataDocumentStore {
 		try {
 			// `true` asks native Canvas to record this exact root snapshot in its
 			// own undo/redo history and then schedule the normal view save.
-			const saveResult = Reflect.apply(save.value, this.runtime, [true]);
+			const saveResult: unknown = Reflect.apply(save.value, this.runtime, [true]);
 			// Obsidian 1.12.7's requestSave is synchronous and returns void.  A
 			// thenable cannot be verified by this synchronous writer, so it is
 			// rejected instead of pretending that an async save is atomic.

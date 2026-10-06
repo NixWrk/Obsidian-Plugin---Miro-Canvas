@@ -586,7 +586,7 @@ function metadataWithReportBinding(document: Record<string, unknown>, binding: {
  * names the source.
  */
 export function addReportCard(result: ImportResult, newId: () => string): ImportResult {
-	const nodes = Array.isArray(result.document.nodes) ? result.document.nodes : [];
+	const nodes: readonly unknown[] = Array.isArray(result.document.nodes) ? result.document.nodes : [];
 	const bounds = boardBounds(nodes);
 	const text = reportCardMarkdown(result.report);
 	const lineCount = text.split("\n").length;

@@ -236,6 +236,11 @@ function moreOrder(root: FakeElement): ToolbarItem[] {
 }
 
 describe("quick tools", () => {
+  it("fails explicitly without an injected or ambient document in Node", () => {
+    expect(() => new QuickTools({ onArm: () => {}, onShape: () => {}, onPen: () => {} }))
+      .toThrow("QuickTools requires a Document.");
+  });
+
   it("keeps menu and settings stacking states correct through reopening and Escape", () => {
     const { root, tools } = build();
     const more = byLabel(root, "More tools");

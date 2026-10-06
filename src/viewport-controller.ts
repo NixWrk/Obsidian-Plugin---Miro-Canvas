@@ -245,7 +245,7 @@ function safeDiagnostics(source: unknown): readonly ViewportDiagnostic[] {
 		}
 		const length = Math.min(value.length, 10_000);
 		for (let index = 0; index < length; index += 1) {
-			const item = value[index];
+			const item: unknown = value[index];
 			if (isObject(item)) {
 				const code = safeRead(item, "code");
 				const message = safeRead(item, "message");
@@ -280,7 +280,7 @@ function capabilitiesFromAdapter(source: unknown): Set<string> {
 				}
 			} else if (Array.isArray(raw)) {
 				for (let index = 0; index < Math.min(raw.length, 10_000); index += 1) {
-					const value = raw[index];
+					const value: unknown = raw[index];
 					if (typeof value === "string") {
 						result.add(value);
 					}
@@ -671,7 +671,7 @@ export class ViewportController {
 		const callback = safeRead(this.options, "getViewportSize");
 		if (typeof callback === "function") {
 			try {
-				const result = Reflect.apply(callback, this.options, []);
+				const result: unknown = Reflect.apply(callback, this.options, []);
 				const normalized = normalizeSize(result);
 				if (normalized !== undefined) {
 					return normalized;

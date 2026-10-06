@@ -1,3 +1,5 @@
+import { replaceInvalidFilenameCharacters } from "./control-characters";
+
 export interface DeviceFile {
   readonly name: string;
   arrayBuffer(): Promise<ArrayBuffer>;
@@ -12,7 +14,7 @@ export interface DeviceFileHost<T> {
 export async function storeDeviceFiles<T>(files: readonly DeviceFile[], host: DeviceFileHost<T>): Promise<T[]> {
   const stored: T[] = [];
   for (const file of files) {
-    const name = file.name.replace(/[/\\:*?"<>|\u0000-\u001f]/gu, "_").replace(/^\.+/u, "_").trim();
+    const name = replaceInvalidFilenameCharacters(file.name).replace(/^\.+/u, "_").trim();
     if (name === "") throw new Error("The selected file has no usable name.");
     const bytes = await file.arrayBuffer();
     const path = await host.availablePath(name);

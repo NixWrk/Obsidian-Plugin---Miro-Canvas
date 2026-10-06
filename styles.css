@@ -33,9 +33,9 @@
 
 .miro-canvas-root [data-miro-canvas-vertical-align="middle"] .markdown-preview-view > .markdown-preview-sizer,
 .miro-canvas-root [data-miro-canvas-vertical-align="bottom"] .markdown-preview-view > .markdown-preview-sizer {
-  flex: 0 0 auto !important;
-  min-height: 0 !important;
-  padding-bottom: 0 !important;
+  flex: 0 0 auto;
+  min-height: 0;
+  padding-bottom: 0;
 }
 
 .miro-canvas-root [data-miro-canvas-vertical-align="middle"] .markdown-preview-pusher,
@@ -49,9 +49,9 @@
    board has one set of view controls.  Selectors are doubled where
    Obsidian styles every button. */
 .miro-canvas-root .canvas-controls {
-  /* Other Canvas plugins show the native controls again with an inline
-     style (seen on Android with Advanced Canvas and Canvas Minimap). */
-  display: none !important;
+  /* M1 tracks native visibility and restores each original inline value
+     when these native controls return to their owner. */
+  display: none;
 }
 
 .miro-canvas-dock {
@@ -73,11 +73,6 @@
 
 .miro-canvas-dock > * {
   pointer-events: auto;
-}
-
-.miro-canvas-dock[hidden],
-.miro-canvas-dock [hidden] {
-  display: none !important;
 }
 
 .miro-canvas-dock__map,
@@ -661,9 +656,10 @@
   background: var(--interactive-hover);
 }
 
-.miro-canvas-m2-tools__primary-action {
+.miro-canvas-m2-tools button.miro-canvas-m2-tools__primary-action,
+.miro-canvas-m2-tools button.miro-canvas-m2-tools__primary-action:hover:not(:disabled) {
   color: var(--text-on-accent);
-  background: var(--interactive-accent) !important;
+  background: var(--interactive-accent);
 }
 
 .miro-canvas-m2-tools__actions {
@@ -1290,12 +1286,18 @@
 
 /* A drawing is only its stroke: the node that carries it shows nothing of its
    own, and the stroke scales with the node. */
-.miro-source-drawing,
-.miro-source-drawing > .canvas-node-container,
-.miro-source-drawing .canvas-node-content {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper .miro-source-drawing,
+.miro-canvas-root.canvas-wrapper .miro-source-drawing > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-drawing .canvas-node-content {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-drawing.miro-source-rendered[data-miro-source-kind],
+.miro-canvas-root.canvas-wrapper .miro-source-drawing.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-drawing.miro-source-rendered[data-miro-source-kind] .canvas-node-content {
+  box-shadow: none;
 }
 
 .miro-source-drawing .canvas-node-content {
@@ -1341,10 +1343,10 @@
   display: none;
 }
 
-.miro-source-line.is-focused > .canvas-node-container,
-.miro-source-line.is-selected > .canvas-node-container {
-  box-shadow: none !important;
-  outline: none !important;
+.miro-canvas-root.canvas-wrapper .miro-source-line.miro-source-rendered[data-miro-source-kind].is-focused > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-line.miro-source-rendered[data-miro-source-kind].is-selected > .canvas-node-container {
+  box-shadow: none;
+  outline: none;
 }
 
 /* The pen's own row, above the tool bar while one of its tools is armed:
@@ -1580,41 +1582,6 @@
   width: 100%;
   height: 100%;
   color: var(--interactive-accent);
-}
-
-/* The pointer says what a press will do: a circle for a pen or an eraser,
-   a cross for anything a press places.  Touch drawing needs the browser to
-   leave the gesture alone. */
-.miro-canvas-root:is(
-  [data-miro-canvas-tool="pen"],
-  [data-miro-canvas-tool="highlighter"],
-  [data-miro-canvas-tool="smart"],
-  [data-miro-canvas-tool="eraser"],
-  [data-miro-canvas-tool="erase-part"]
-) :is(.canvas, .canvas *) {
-  cursor: none !important;
-}
-
-.miro-canvas-root[data-miro-canvas-tool]:not(
-  [data-miro-canvas-tool="select"],
-  [data-miro-canvas-tool="pen"],
-  [data-miro-canvas-tool="highlighter"],
-  [data-miro-canvas-tool="smart"],
-  [data-miro-canvas-tool="eraser"],
-  [data-miro-canvas-tool="erase-part"]
-) :is(.canvas, .canvas *) {
-  cursor: crosshair !important;
-}
-
-.miro-canvas-root[data-miro-canvas-tool]:not([data-miro-canvas-tool="select"]) .canvas {
-  touch-action: none;
-}
-
-/* With the lasso armed a press on what is selected moves it, as with the select
-   tool, and the pointer says so; anywhere else it is the cross of a new lasso. */
-.miro-canvas-root[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused),
-.miro-canvas-root[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused) * {
-  cursor: move !important;
 }
 
 .miro-canvas-link-prompt {
@@ -2077,8 +2044,9 @@
    corners of the card's unturned box, next to the frame of a turned card, and
    stay where the card was while it is dragged; the frame's own grips replace
    them on every screen. */
-.miro-canvas-root .canvas-node-interaction-layer .canvas-node-resizer {
-  display: none !important;
+.miro-canvas-root .canvas-node-interaction-layer .canvas-node-resizer,
+.is-mobile .miro-canvas-root.canvas-wrapper:not(.mod-readonly) .canvas-node-interaction-layer .canvas-node-resizer[data-resize] {
+  display: none;
 }
 
 .miro-canvas-resizer {
@@ -2268,7 +2236,7 @@
 }
 
 .miro-canvas-toolbar[data-miro-independent-only="true"] .canvas-menu,
-.miro-canvas-toolbar[data-miro-independent-only="true"] .miro-canvas-toolbar__native-snapshot { display:none !important; }
+.miro-canvas-toolbar[data-miro-independent-only="true"] .miro-canvas-toolbar__native-snapshot { display:none; }
 
 .miro-canvas-toolbar__native[data-miro-native-menu="true"] > .miro-canvas-toolbar__native-snapshot {
   display: none;
@@ -2448,26 +2416,41 @@
    has to step aside.  Which descendant paints it differs between Obsidian
    builds and its rule can outrank an inline style, so the marker this plugin
    sets carries the override; both markers disappear with the decoration. */
-[data-miro-source-kind="shape"],
-[data-miro-source-kind="shape"] > .canvas-node-container,
-[data-miro-source-kind="shape"] .canvas-node-content,
-[data-miro-source-kind="shape"] .markdown-preview-view,
-[data-miro-source-kind="shape"] .markdown-embed {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"],
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"] .canvas-node-content,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"] .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"] .markdown-embed {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"].miro-source-rendered,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"].miro-source-rendered > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"].miro-source-rendered .canvas-node-content,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"].miro-source-rendered .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"].miro-source-rendered .markdown-embed {
+  box-shadow: none;
 }
 
 /* Miro text is only its words: no card around them, unless the item has a
    fill of its own.  Only Miro text is meant, from the board source or made
    with the text tool; a Canvas card the plugin merely turned keeps its card. */
-.miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) > .canvas-node-container,
-.miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .canvas-node-content,
-.miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .markdown-preview-view,
-.miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .markdown-embed {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper .miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .markdown-embed {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-text.miro-source-rendered[data-miro-source-kind]:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-text.miro-source-rendered[data-miro-source-kind]:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-text.miro-source-rendered[data-miro-source-kind]:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-text.miro-source-rendered[data-miro-source-kind]:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node) .markdown-embed {
+  box-shadow: none;
 }
 
 /* Text inked against what lies under it. */
@@ -2485,14 +2468,22 @@
 /* A sticky note is a flat sheet of its colour with a soft shadow under the
    lower edge and no outline, its text centred and inked for contrast.  The
    native surface steps aside, as it does for a shape. */
-.miro-source-sticky,
-.miro-source-sticky > .canvas-node-container,
-.miro-source-sticky .canvas-node-content,
-.miro-source-sticky .markdown-preview-view,
-.miro-source-sticky .markdown-embed {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper .miro-source-sticky,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky .markdown-embed {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-sticky.miro-source-rendered[data-miro-source-kind],
+.miro-canvas-root.canvas-wrapper .miro-source-sticky.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky.miro-source-rendered[data-miro-source-kind] .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky.miro-source-rendered[data-miro-source-kind] .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-sticky.miro-source-rendered[data-miro-source-kind] .markdown-embed {
+  box-shadow: none;
 }
 
 .miro-source-sticky > .miro-source-decoration-sticky {
@@ -2513,13 +2504,17 @@
   --text-muted: var(--miro-sticky-ink, #1a1a1a);
   /* Native Canvas pads text by a fixed amount; a note keeps a margin in step
      with its size, the one its fitted text is measured against. */
-  padding: 8% !important;
+
   overflow: hidden;
   /* Obsidian keeps room for a scrollbar a note never shows; that room would
      narrow the text below the width its size was fitted to, and break words. */
   scrollbar-gutter: auto;
   color: var(--miro-sticky-ink, #1a1a1a);
   line-height: 1.3;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-sticky.miro-source-rendered[data-miro-source-kind] .markdown-preview-view {
+  padding: 8%;
 }
 
 /* Where Miro places text in a note or a shape: the middle unless it says
@@ -2541,9 +2536,9 @@
 
 .miro-source-rendered[data-miro-source-valign] .markdown-preview-view > .markdown-preview-sizer {
   /* Native Canvas stretches the sizer over the whole node. */
-  flex: 0 0 auto !important;
-  min-height: 0 !important;
-  padding-bottom: 0 !important;
+  flex: 0 0 auto;
+  min-height: 0;
+  padding-bottom: 0;
 }
 
 .miro-source-rendered[data-miro-source-valign] .markdown-preview-pusher {
@@ -2556,8 +2551,8 @@
 }
 
 .miro-source-sticky[data-miro-source-fit="true"] .markdown-preview-view :is(div, p, span)[style] {
-  font-size: inherit !important;
-  line-height: inherit !important;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .miro-source-sticky .markdown-preview-view p {
@@ -2567,26 +2562,38 @@
 /* A grid is an ordinary Markdown table, which Canvas renders and edits on its
    own, drawn the way Miro draws a grid: columns of one width, thin edges, no
    heading of its own, and its name above it. */
-.miro-source-table,
-.miro-source-table > .canvas-node-container,
-.miro-source-table .canvas-node-content,
-.miro-source-table .markdown-preview-view,
-.miro-source-table .markdown-embed {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper .miro-source-table,
+.miro-canvas-root.canvas-wrapper .miro-source-table > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-table .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-table .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-table .markdown-embed {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-table.miro-source-rendered[data-miro-source-kind],
+.miro-canvas-root.canvas-wrapper .miro-source-table.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-table.miro-source-rendered[data-miro-source-kind] .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-table.miro-source-rendered[data-miro-source-kind] .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-table.miro-source-rendered[data-miro-source-kind] .markdown-embed {
+  box-shadow: none;
 }
 
 .miro-source-table .markdown-preview-view {
-  padding: 0 !important;
+
   overflow: auto;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-table.miro-source-rendered[data-miro-source-kind] .markdown-preview-view {
+  padding: 0;
 }
 
 /* The grid fills the node, as Miro's does: every row shares its height. */
 .miro-source-table .markdown-preview-view > .markdown-preview-sizer {
-  height: 100% !important;
-  min-height: 0 !important;
-  padding: 0 !important;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
 }
 
 .miro-source-table .markdown-preview-sizer > :is(.el-table, .table-wrapper, div) {
@@ -2626,14 +2633,21 @@
   --miro-code-dim: rgb(244 244 251 / 38%);
 }
 
-.miro-source-code,
-.miro-source-code > .canvas-node-container,
-.miro-source-code .canvas-node-content,
-.miro-source-code .markdown-preview-view,
-.miro-source-code .markdown-embed {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+.miro-canvas-root.canvas-wrapper .miro-source-code,
+.miro-canvas-root.canvas-wrapper .miro-source-code > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-code .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-code .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-code .markdown-embed {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind],
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind] .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind] .markdown-preview-view,
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind] .markdown-embed {
+  box-shadow: none;
 }
 
 .miro-source-code > .miro-source-decoration-code {
@@ -2664,15 +2678,19 @@
   display: flex;
   flex-direction: column;
   justify-content: safe center;
-  padding: 0 !important;
+
   overflow: hidden;
   color: var(--miro-code-ink);
 }
 
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind] .markdown-preview-view {
+  padding: 0;
+}
+
 .miro-source-code .markdown-preview-view > .markdown-preview-sizer {
-  flex: 0 0 auto !important;
-  min-height: 0 !important;
-  padding-bottom: 0 !important;
+  flex: 0 0 auto;
+  min-height: 0;
+  padding-bottom: 0;
 }
 
 .miro-source-code .markdown-preview-pusher,
@@ -2682,15 +2700,18 @@
 
 .miro-source-code .markdown-preview-view pre {
   position: relative;
-  margin: 0 !important;
-  padding: 10px 14px !important;
   overflow: hidden;
-  color: var(--miro-code-ink) !important;
-  font-family: var(--font-monospace) !important;
-  white-space: pre !important;
-  background: transparent !important;
-  border: 0 !important;
-  border-radius: 0 !important;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind] .markdown-preview-view pre {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--miro-code-ink);
+  font-family: var(--font-monospace);
+  white-space: pre;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .miro-source-code .markdown-preview-view pre code {
@@ -2699,8 +2720,8 @@
   background: transparent;
 }
 
-.miro-source-code[data-miro-source-code-numbered="true"] .markdown-preview-view pre {
-  padding-left: calc(var(--miro-code-gutter, 1ch) + 32px) !important;
+.miro-canvas-root.canvas-wrapper .miro-source-code.miro-source-rendered[data-miro-source-kind][data-miro-source-code-numbered="true"] .markdown-preview-view pre {
+  padding-left: calc(var(--miro-code-gutter, 1ch) + 32px);
 }
 
 .miro-source-code[data-miro-source-code-numbered="true"] .markdown-preview-view pre::before {
@@ -2782,14 +2803,28 @@
 .miro-source-preview > .canvas-node-container,
 .miro-source-document > .canvas-node-container,
 .miro-source-embed > .canvas-node-container {
-  border-color: transparent !important;
   border-radius: 10px;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 4px 14px rgb(0 0 0 / 14%) !important;
+
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-preview > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-document > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-embed > .canvas-node-container {
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-preview.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-document.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-embed.miro-source-rendered[data-miro-source-kind] > .canvas-node-container {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 4px 14px rgb(0 0 0 / 14%);
 }
 
 .miro-source-embed > .canvas-node-container {
   padding: 6px;
-  background: var(--background-primary) !important;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-embed > .canvas-node-container {
+  background: var(--background-primary);
 }
 
 .miro-source-embed > .canvas-node-container :is(iframe, img, .canvas-node-content) {
@@ -2798,9 +2833,9 @@
 
 /* Native Canvas hands a selected link's pointer to its page, which the card
    hides; a converted document is still edited as text. */
-.miro-source-preview[data-miro-source-host="link"].is-focused .canvas-node-content-blocker,
-.miro-source-document[data-miro-source-host="link"].is-focused .canvas-node-content-blocker {
-  display: block !important;
+.miro-canvas-root .miro-source-preview[data-miro-source-host="link"].is-focused .canvas-node-content-blocker,
+.miro-canvas-root .miro-source-document[data-miro-source-host="link"].is-focused .canvas-node-content-blocker {
+  display: block;
 }
 
 .miro-source-document.is-editing > .miro-source-decoration-document {
@@ -2936,10 +2971,17 @@
    bar over its corner instead of a group label.  The bar keeps one size on
    screen, as native labels do.  Slides are thin-edged thumbnails. */
 .miro-source-deck > .canvas-node-container {
-  background-color: var(--background-primary) !important;
-  border-color: transparent !important;
   border-radius: 6px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 10%), 0 6px 20px rgb(0 0 0 / 10%) !important;
+
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-deck > .canvas-node-container {
+  background-color: var(--background-primary);
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-deck.miro-source-rendered[data-miro-source-kind] > .canvas-node-container {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%), 0 6px 20px rgb(0 0 0 / 10%);
 }
 
 .miro-source-deck > .canvas-group-label,
@@ -2948,9 +2990,16 @@
 }
 
 .miro-source-slide > .canvas-node-container {
-  border: 1px solid var(--background-modifier-border) !important;
   border-radius: 2px;
-  box-shadow: none !important;
+
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-slide > .canvas-node-container {
+  border: 1px solid var(--background-modifier-border);
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-slide.miro-source-rendered[data-miro-source-kind] > .canvas-node-container {
+  box-shadow: none;
 }
 
 .miro-source-deck-bar {
@@ -3029,14 +3078,18 @@
 }
 
 /* A Miro group is invisible: its items show, and a selection outlines it. */
-.miro-source-group > .canvas-node-container {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper .miro-source-group > .canvas-node-container {
+  background-color: transparent;
+  border-color: transparent;
 }
 
-.miro-source-group .canvas-node-content {
-  background-color: transparent !important;
+.miro-canvas-root.canvas-wrapper .miro-source-group.miro-source-rendered[data-miro-source-kind] > .canvas-node-container {
+  box-shadow: none;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-group .canvas-node-content {
+  background-color: transparent;
 }
 
 .miro-source-group > .canvas-group-label {
@@ -3045,7 +3098,14 @@
 
 .miro-source-group.is-selected > .canvas-node-container,
 .miro-source-group.is-focused > .canvas-node-container {
-  border: 1px dashed var(--interactive-accent) !important;
+  --miro-source-group-border-width: 1px;
+  --miro-source-group-border-style: dashed;
+  --miro-source-group-border-color: var(--interactive-accent);
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-group.is-selected > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-group.is-focused > .canvas-node-container {
+  border: 1px dashed var(--interactive-accent);
 }
 
 /* While slides are shown, only the slide and the presenter's bar remain. */
@@ -3058,7 +3118,7 @@
   .canvas-card-menu,
   .canvas-menu
 ) {
-  display: none !important;
+  display: none;
 }
 
 /* While a page is being photographed for export, the board is laid over
@@ -3083,7 +3143,7 @@
   .canvas-card-menu,
   .canvas-menu
 ) {
-  display: none !important;
+  display: none;
 }
 
 .miro-canvas-slideshow {
@@ -3136,13 +3196,20 @@
 
 /* Mind-map nodes keep native editable text. The source layer restores root and
    branch silhouettes; hierarchy edges remain ordinary Canvas edges. */
-.miro-source-mindmap-node,
-.miro-source-mindmap-node > .canvas-node-container,
-.miro-source-mindmap-node .canvas-node-content,
-.miro-source-mindmap-node .markdown-preview-view {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node,
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node .markdown-preview-view {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node.miro-source-rendered[data-miro-source-kind],
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node.miro-source-rendered[data-miro-source-kind] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node.miro-source-rendered[data-miro-source-kind] .canvas-node-content,
+.miro-canvas-root.canvas-wrapper .miro-source-mindmap-node.miro-source-rendered[data-miro-source-kind] .markdown-preview-view {
+  box-shadow: none;
 }
 
 .miro-source-decoration-mindmap-node {
@@ -3184,8 +3251,8 @@
   place-items: center;
   width: 32px;
   height: 32px;
-  min-width: 32px !important;
-  min-height: 32px !important;
+  min-width: 32px;
+  min-height: 32px;
   --miro-canvas-button-padding: 0;
   padding: var(--miro-canvas-button-padding);
   color: #ffffff;
@@ -3195,7 +3262,7 @@
   border: 0;
   border-radius: 50% 50% 50% 0;
   box-shadow: none;
-  transform: translate(0, -100%) !important;
+  transform: translate(0, -100%);
   cursor: pointer;
   pointer-events: auto;
 }
@@ -3644,29 +3711,37 @@
    different depths, so do not depend on one exact child chain: any preview in
    a turned node must paint with the board instead of being rasterised first
    and then enlarged/turned as a finished bitmap. */
-[data-miro-source-rotated="true"] .canvas-node-content,
+.miro-canvas-root.canvas-wrapper [data-miro-source-rotated="true"].miro-source-rendered .canvas-node-content,
 [data-miro-source-rotated="true"] .markdown-preview-view {
-  backface-visibility: visible !important;
-  will-change: auto !important;
+  backface-visibility: visible;
+  will-change: auto;
 }
 
-[data-miro-source-rotated="true"] .markdown-preview-view {
-  transform: none !important;
+.miro-canvas-root.canvas-wrapper [data-miro-source-rotated="true"].miro-source-rendered .markdown-preview-view {
+  transform: none;
+}
+
+.miro-canvas-root.canvas-wrapper [data-miro-source-rotated="true"].miro-source-rendered .markdown-preview-view {
+  transform: none;
 }
 
 /* A source shape supplies its own vector contour, so only its native rectangular
    paint must step aside while the complete node rotates as one unit. */
-[data-miro-source-kind="shape"][data-miro-source-rotated="true"] {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"][data-miro-source-rotated="true"] {
+  background-color: transparent;
+  border-color: transparent;
 }
 
-/* A selected card stays on its own layer, as in Miro: native Canvas lifts a
-   lone selected card above all others.  Only a rule marked important
-   outranks the z-index native Canvas writes inline. */
+.miro-canvas-root.canvas-wrapper [data-miro-source-kind="shape"].miro-source-rendered[data-miro-source-rotated="true"] {
+  box-shadow: none;
+}
+
+/* A selected card stays on its own layer, as in Miro.  M1 restores its normal
+   inline layer after native Canvas paints a selection lift; this rule is the
+   fallback while that selected-layer owner is attached. */
 .canvas-node.miro-canvas-layer-shown {
-  z-index: var(--miro-canvas-layer) !important;
+  z-index: var(--miro-canvas-layer);
 }
 
 /* The export panel: paper, pages, quality and the two ways out.  Mounted
@@ -4918,7 +4993,49 @@
 
 /* Owned hidden states outrank their component display rules, including the
    adopted native menu. Keep this after the component rules for equal weights. */
-.miro-canvas-root :is(.miro-canvas-toolbar, .miro-canvas-handles, .miro-canvas-thread)[hidden],
-.miro-canvas-root :is(.miro-canvas-toolbar, .miro-canvas-handles, .miro-canvas-thread) [hidden] {
+.miro-canvas-root :is(.miro-canvas-dock, .miro-canvas-toolbar, .miro-canvas-handles, .miro-canvas-thread)[hidden],
+.miro-canvas-root :is(.miro-canvas-dock, .miro-canvas-toolbar, .miro-canvas-handles, .miro-canvas-thread) [hidden] {
   display: none;
+}
+
+/* The pointer says what a press will do: a circle for a pen or an eraser,
+   a cross for anything a press places.  Touch drawing needs the browser to
+   leave the gesture alone. */
+.miro-canvas-root.canvas-wrapper:is(
+  [data-miro-canvas-tool="pen"],
+  [data-miro-canvas-tool="highlighter"],
+  [data-miro-canvas-tool="smart"],
+  [data-miro-canvas-tool="eraser"],
+  [data-miro-canvas-tool="erase-part"]
+) :is(.canvas, .canvas *),
+.miro-canvas-root.canvas-wrapper:is(
+  [data-miro-canvas-tool="pen"],
+  [data-miro-canvas-tool="highlighter"],
+  [data-miro-canvas-tool="smart"],
+  [data-miro-canvas-tool="eraser"],
+  [data-miro-canvas-tool="erase-part"]
+) .canvas-node .canvas-node-container {
+  cursor: none;
+}
+
+.miro-canvas-root.canvas-wrapper[data-miro-canvas-tool]:not(
+  [data-miro-canvas-tool="select"],
+  [data-miro-canvas-tool="pen"],
+  [data-miro-canvas-tool="highlighter"],
+  [data-miro-canvas-tool="smart"],
+  [data-miro-canvas-tool="eraser"],
+  [data-miro-canvas-tool="erase-part"]
+) :is(.canvas, .canvas *) {
+  cursor: crosshair;
+}
+
+.miro-canvas-root[data-miro-canvas-tool]:not([data-miro-canvas-tool="select"]) .canvas {
+  touch-action: none;
+}
+
+/* With the lasso armed a press on what is selected moves it, as with the select
+   tool, and the pointer says so; anywhere else it is the cross of a new lasso. */
+.miro-canvas-root.canvas-wrapper[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused),
+.miro-canvas-root.canvas-wrapper[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused) * {
+  cursor: move;
 }

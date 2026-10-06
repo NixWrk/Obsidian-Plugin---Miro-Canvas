@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { describeLocalDocument, navigateDocument, openLocalDocument, type DocumentHost, type LocalDocument } from "./document-viewer";
 import { words } from "./i18n";
 
@@ -13,32 +14,32 @@ export class DocumentControls {
 
   constructor(private readonly host: DocumentHost, file: unknown, document: Document, subpath?: unknown) {
     this.current = describeLocalDocument(file, { subpath });
-    this.element = document.createElement("section");
+    this.element = createHtmlElement(document, "section");
     this.element.className = "miro-canvas-document-controls";
-    const heading = document.createElement("h3");
+    const heading = createHtmlElement(document, "h3");
     heading.textContent = this.current?.title ?? words().documents.unavailableTitle;
     this.element.append(heading);
-    this.status = document.createElement("p");
+    this.status = createHtmlElement(document, "p");
     this.status.setAttribute("role", "status");
     this.status.textContent = this.current ? words().documents.localFileHint : words().documents.invalidPath;
     this.element.append(this.status);
-    this.pageInput = document.createElement("input");
+    this.pageInput = createHtmlElement(document, "input");
     this.pageInput.type = "number";
     this.pageInput.min = "1";
     this.pageInput.max = "1000000";
     this.pageInput.step = "1";
     this.pageInput.value = String(this.current?.page ?? 1);
     this.pageInput.setAttribute("aria-label", words().documents.pageAriaLabel);
-    this.fitInput = document.createElement("select");
+    this.fitInput = createHtmlElement(document, "select");
     this.fitInput.setAttribute("aria-label", words().documents.fitAriaLabel);
     for (const [value, label] of [["page", words().documents.fitPage], ["width", words().documents.fitWidth]]) {
-      const option = document.createElement("option");
+      const option = createHtmlElement(document, "option");
       option.value = value;
       option.textContent = label;
       this.fitInput.append(option);
     }
     const button = (label: string, click: () => void): void => {
-      const control = document.createElement("button");
+      const control = createHtmlElement(document, "button");
       control.type = "button";
       control.textContent = label;
       control.disabled = this.current === null;

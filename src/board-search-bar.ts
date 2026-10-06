@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * The search bar at the board's top right: a field, a counter ("3 / 12"),
  * previous and next buttons and a close button.  It only reports what the
@@ -32,8 +33,8 @@ export interface BoardSearchResult {
 }
 
 type TimerHost = {
-  setTimeout: (callback: () => void, delay: number) => number;
-  clearTimeout: (handle: number) => void;
+  setTimeout: (callback: () => void, delay: number) => number | ReturnType<typeof setTimeout>;
+  clearTimeout: (handle: number | ReturnType<typeof setTimeout>) => void;
 };
 
 export class BoardSearchBar {
@@ -44,15 +45,15 @@ export class BoardSearchBar {
   private readonly previousButton: HTMLButtonElement;
   private readonly nextButton: HTMLButtonElement;
   private readonly timers: TimerHost;
-  private pendingQuery: number | undefined;
+  private pendingQuery: ReturnType<TimerHost["setTimeout"]> | undefined;
   private readonly cleanups: (() => void)[] = [];
 
   public constructor(private readonly document: Document, private readonly host: BoardSearchBarHost) {
     const labels = words().search;
     const view = document.defaultView as unknown as TimerHost | null;
-    this.timers = view !== null && typeof view?.setTimeout === "function"
+    this.timers = view !== null && typeof view?.setTimeout === "function" && typeof view?.clearTimeout === "function"
       ? view
-      : (globalThis);
+      : typeof window === "undefined" ? { setTimeout, clearTimeout } : window;
 
     const bar = this.make("div", "miro-canvas-panel miro-canvas-search");
     bar.setAttribute("role", "search");
@@ -192,7 +193,7 @@ export class BoardSearchBar {
   }
 
   private make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {
-    const element = this.document.createElement(tag);
+    const element = createHtmlElement(this.document, tag);
     element.className = className;
     return element;
   }

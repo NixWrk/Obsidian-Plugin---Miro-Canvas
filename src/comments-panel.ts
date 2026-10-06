@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * Small dependency-free comments panel.  It owns only DOM presentation and
  * emits explicit callbacks; comment persistence is delegated to the host.
@@ -64,9 +65,12 @@ function append<T extends Node>(parent: Node, child: T): T {
 }
 
 function make<K extends keyof HTMLElementTagNameMap>(document: Document, tag: K, text?: unknown): HTMLElementTagNameMap[K] {
-  const element = document.createElement(tag);
+  const element = createHtmlElement(document, tag);
   if (text !== undefined) {
-    element.textContent = typeof text === "string" ? text : String(text);
+    element.textContent = text === null || typeof text === "string" || typeof text === "number"
+      || typeof text === "boolean" || typeof text === "bigint" || typeof text === "symbol"
+      ? String(text)
+      : "";
   }
   return element;
 }

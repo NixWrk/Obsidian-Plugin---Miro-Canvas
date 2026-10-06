@@ -9,6 +9,7 @@
 /** A node or connector id as native Canvas makes one: sixteen hex digits. */
 export function newCanvasId(): string {
 	const bytes = new Uint8Array(8);
-	globalThis.crypto.getRandomValues(bytes);
+	const cryptoHost = typeof window === "undefined" ? crypto : window.crypto;
+	cryptoHost.getRandomValues(bytes);
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

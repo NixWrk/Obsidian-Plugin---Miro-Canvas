@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * A card's own look, carried into the frame its text is edited in.
  *
@@ -86,7 +87,7 @@ function readSafe<T>(read: () => T): T | undefined {
 
 function isDocumentLike(value: unknown): value is Document {
 	return typeof value === "object" && value !== null
-		&& typeof (value as Document).createElement === "function"
+		&& typeof (value as { readonly createElement?: unknown }).createElement === "function"
 		&& (value as Document).head != null;
 }
 
@@ -108,7 +109,7 @@ function ownedStyleElement(doc: Document): HTMLStyleElement | undefined {
 		if (isStyleElementLike(existing)) {
 			return existing;
 		}
-		const created = doc.createElement("style");
+		const created = createHtmlElement(doc, "style");
 		created.setAttribute(EDITOR_APPEARANCE_ATTRIBUTE, "true");
 		doc.head.appendChild(created);
 		return created;

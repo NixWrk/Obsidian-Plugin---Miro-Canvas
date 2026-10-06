@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * The "Import boards from Miro" guide.
  *
@@ -52,7 +53,7 @@ export function vaultFolderPath(adapter: unknown, vaultName: string): string {
 	const getBasePath = (adapter as { getBasePath?: unknown } | null)?.getBasePath;
 	if (typeof getBasePath !== "function") return vaultName;
 	try {
-		const path = Reflect.apply(getBasePath, adapter, []);
+		const path: unknown = Reflect.apply(getBasePath, adapter, []);
 		return typeof path === "string" && path.trim() !== "" ? path : vaultName;
 	} catch {
 		// A mobile or plugin-backed adapter may expose the member and still
@@ -100,7 +101,7 @@ function append<T extends Node>(parent: Node, child: T): T {
 function make<K extends keyof HTMLElementTagNameMap>(
 	document: Document, tag: K, className?: string, text?: string,
 ): HTMLElementTagNameMap[K] {
-	const element = document.createElement(tag);
+	const element = createHtmlElement(document, tag);
 	if (className !== undefined) element.className = className;
 	if (text !== undefined) element.textContent = text;
 	return element;

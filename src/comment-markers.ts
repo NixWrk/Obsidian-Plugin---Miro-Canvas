@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /** Detached comment marker geometry and DOM. The host owns mounting and refreshes. */
 import { resolveAnchor, type AnchorGeometry, type AnchorPoint } from "./anchors";
 import {
@@ -154,7 +155,7 @@ export class CommentMarkers {
     const dom = options.document ?? (typeof document === "undefined" ? undefined : document);
     if (dom === undefined) throw new Error("CommentMarkers requires a Document.");
     this.document = dom;
-    this.element = dom.createElement("div");
+    this.element = createHtmlElement(dom, "div");
     this.element.className = "miro-canvas-comment-markers";
     this.element.setAttribute("role", "group");
     this.element.setAttribute("aria-label", words().comments.markers.ariaLabel);
@@ -186,11 +187,11 @@ export class CommentMarkers {
     for (const marker of model.markers) {
       let entry = this.entries.get(marker.key);
       if (entry === undefined) {
-        const button = this.document.createElement("button");
+        const button = createHtmlElement(this.document, "button");
         button.type = "button";
         button.className = "miro-canvas-comment-marker";
         Object.assign(button.style, {
-          position: "absolute", pointerEvents: "auto", transform: "translate(-50%, -50%)",
+          position: "absolute", pointerEvents: "auto",
           minWidth: "32px", minHeight: "32px",
         });
         const pin = this.createPin();
@@ -347,9 +348,9 @@ export class CommentMarkers {
   private createPin(): { readonly shape: Element; readonly initial: HTMLElement; readonly tick: HTMLElement } {
     const shape = this.svgElement("svg", { class: "miro-canvas-comment-marker__shape", viewBox: BUBBLE_VIEW_BOX });
     shape.appendChild(this.svgElement("path", { d: BUBBLE_PATH }));
-    const initial = this.document.createElement("span");
+    const initial = createHtmlElement(this.document, "span");
     initial.className = "miro-canvas-comment-marker__initial";
-    const tick = this.document.createElement("span");
+    const tick = createHtmlElement(this.document, "span");
     tick.className = "miro-canvas-comment-marker__tick";
     tick.hidden = true;
     const tickShape = this.svgElement("svg", { viewBox: "0 0 24 24" });

@@ -34,6 +34,7 @@
  */
 
 import { words } from "./i18n";
+import { hasAsciiControl } from "./control-characters";
 
 export const DEFAULT_FONT_FAMILY = "Inter" as const;
 export const DEFAULT_FONT_SIZE = 16 as const;
@@ -313,7 +314,7 @@ function isSafeObjectKey(value: unknown): value is string {
   if (key.length === 0 || key.length > 256 || RESERVED_KEYS.has(key.toLowerCase())) {
     return false;
   }
-  return !/[\u0000-\u001f\u007f]/u.test(key);
+  return !hasAsciiControl(key);
 }
 
 function isSafeLabel(value: unknown): value is string {
@@ -324,7 +325,7 @@ function isSafeLabel(value: unknown): value is string {
   if (label.length === 0 || label.length > 80) {
     return false;
   }
-  return !/[\u0000-\u001f\u007f<>]/u.test(label);
+  return !hasAsciiControl(label) && !label.includes("<") && !label.includes(">");
 }
 
 function defineOwn<T extends object>(record: T, key: string, value: unknown): void {
@@ -382,7 +383,7 @@ function cloneUnknown(value: unknown, visiting = new Set<object>()): unknown {
       }
       return result;
     }
-    const prototype = Object.getPrototypeOf(value);
+    const prototype: unknown = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype) {
       return INVALID;
     }

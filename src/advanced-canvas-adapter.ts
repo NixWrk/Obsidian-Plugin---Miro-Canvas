@@ -410,7 +410,7 @@ function locatePlugin(
 		const getPlugin = safeRead(registry, "getPlugin", probe);
 		if (typeof getPlugin === "function") {
 			try {
-				const candidate = Reflect.apply(getPlugin, registry, [pluginId]);
+				const candidate: unknown = Reflect.apply(getPlugin, registry, [pluginId]);
 				if (candidate !== undefined && candidate !== null) {
 					return { plugin: candidate, lookedUp: true, lookupFailed: false };
 				}

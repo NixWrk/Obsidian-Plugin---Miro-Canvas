@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * Downloadable font packs: reading the ZIP a release publishes, validating
  * its manifest, turning it into `@font-face` rules, and orchestrating the
@@ -460,7 +461,7 @@ export class FontFaceRegistry {
     if (doc === undefined || doc === null || this.styles.has(doc) || doc.head === null) {
       return;
     }
-    const style = doc.createElement("style");
+    const style = createHtmlElement(doc, "style");
     style.setAttribute("data-miro-canvas-fonts", "true");
     doc.head.appendChild(style);
     this.styles.set(doc, style);
@@ -679,14 +680,15 @@ export const FONT_PACKS_RELEASE_BASE = "https://github.com/NixWrk/Obsidian-Plugi
 
 /**
  * The address a download starts from: the real release, unless a harness's
- * own devtools console has set `globalThis.__miroCanvasFontPacksTestBaseUrl`
+ * own devtools console has set `window.__miroCanvasFontPacksTestBaseUrl`
  * first.  That property is never a user setting and nothing in the plugin
  * ever sets it; it exists only so a verification run can point a download at
  * a local server instead of GitHub's real release, which does not carry the
  * packs yet.
  */
 export function fontPackDownloadUrl(file: string): string {
-  const testBase = (globalThis as { __miroCanvasFontPacksTestBaseUrl?: string }).__miroCanvasFontPacksTestBaseUrl;
+  const testBase = typeof window === "undefined" ? undefined
+    : (window as Window & { __miroCanvasFontPacksTestBaseUrl?: string }).__miroCanvasFontPacksTestBaseUrl;
   return `${testBase ?? FONT_PACKS_RELEASE_BASE}${file}`;
 }
 

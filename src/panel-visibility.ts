@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { setElementStyles } from "./dom-styles";
 import { words } from "./i18n";
 import { applyPanelPositionSettled, effectivePanelOrientation, positionFromPoint, type PanelId, type PanelPosition } from "./panel-layout";
@@ -28,7 +29,7 @@ export class PanelVisibility {
     for (const id of ["toolbar", "dockBar"] as const) {
       const panel = this.host.panels()[id];
       if (panel === undefined || this.buttons.has(id)) continue;
-      const button = this.host.document.createElement("button");
+      const button = createHtmlElement(this.host.document, "button");
       button.type = "button";
       button.className = "miro-canvas-panel-toggle clickable-icon";
       const buttonHost = this.bar(id, panel) ?? panel;

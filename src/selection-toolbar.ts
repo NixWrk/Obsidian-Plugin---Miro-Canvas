@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { setElementStyles } from "./dom-styles";
 /**
  * Floating, selection-scoped formatting toolbar.
@@ -333,7 +334,7 @@ function append<T extends Node>(parent: Node, child: T): T {
 function make<K extends keyof HTMLElementTagNameMap>(
   document: Document, tag: K, className?: string, label?: string,
 ): HTMLElementTagNameMap[K] {
-  const element = document.createElement(tag);
+  const element = createHtmlElement(document, tag);
   if (className !== undefined) element.className = className;
   if (label !== undefined) element.textContent = label;
   return element;

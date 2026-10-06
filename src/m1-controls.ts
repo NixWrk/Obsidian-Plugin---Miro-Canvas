@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { setElementStyles } from "./dom-styles";
 /**
  * Namespaced, framework-free controls for the M1 Canvas session.
@@ -213,7 +214,7 @@ function makeElement<K extends keyof HTMLElementTagNameMap>(
 	className?: string,
 	label?: string,
 ): HTMLElementTagNameMap[K] {
-	const element = document.createElement(tag);
+	const element = createHtmlElement(document, tag);
 	if (className !== undefined) {
 		element.className = className;
 	}

@@ -6,6 +6,8 @@
  * malformed values resolve to a hidden/empty result instead of throwing.
  */
 
+import { hasControlOrFormat } from "./control-characters";
+
 export const DEFAULT_SHOW_ATTACHMENT_NAMES = true as const;
 export const MAX_ATTACHMENT_LABEL_LENGTH = 512 as const;
 
@@ -48,7 +50,6 @@ export interface AttachmentLabelDecision {
 
 type UnknownRecord = Record<string, unknown>;
 
-const CONTROL_OR_FORMAT = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u200b\u200c\u200e\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/u;
 const PATH_SEPARATOR = /[\\/]/u;
 
 function isArray(value: unknown): value is readonly unknown[] {
@@ -67,7 +68,7 @@ function isPlainObject(value: unknown): value is UnknownRecord {
 		if (Array.isArray(value)) {
 			return false;
 		}
-		const prototype = Object.getPrototypeOf(value);
+		const prototype: unknown = Object.getPrototypeOf(value);
 		return prototype === null || prototype === Object.prototype;
 	} catch {
 		return false;
@@ -148,7 +149,7 @@ export function sanitizeAttachmentLabel(value: unknown): string | undefined {
 	if (normalized.length === 0 || normalized.length > MAX_ATTACHMENT_LABEL_LENGTH || PATH_SEPARATOR.test(normalized)) {
 		return undefined;
 	}
-	if (CONTROL_OR_FORMAT.test(normalized)) {
+	if (hasControlOrFormat(normalized)) {
 		return undefined;
 	}
 	const trimmed = normalized.trim();
@@ -165,7 +166,7 @@ export function sanitizeAttachmentLabel(value: unknown): string | undefined {
 }
 
 function segmentFromPath(path: string): string | undefined {
-	if (path.length === 0 || CONTROL_OR_FORMAT.test(path) || !isValidUnicode(path)) {
+	if (path.length === 0 || hasControlOrFormat(path) || !isValidUnicode(path)) {
 		return undefined;
 	}
 	// Canvas paths may use either separator even on Windows.  Reject a trailing

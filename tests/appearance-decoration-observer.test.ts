@@ -186,7 +186,9 @@ let instances: FakeObserver[] = [];
  * where the marks' only watches the cards laid directly on the board.
  */
 function appearanceObserverInstance(): FakeObserver {
-	const found = [...instances].reverse().find((observer) => observer.options?.childList === true && observer.options.subtree === true);
+	const found = [...instances].reverse().find((observer) => observer.target instanceof HostElement
+		&& observer.target.classList.contains("canvas-node-layer")
+		&& observer.options?.childList === true && observer.options.subtree === true);
 	if (found === undefined) {
 		throw new Error("no appearance-decoration MutationObserver was constructed");
 	}

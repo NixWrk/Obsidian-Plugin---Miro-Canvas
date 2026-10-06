@@ -6,6 +6,8 @@
  * persistence remains the MetadataWriter's explicit responsibility.
  */
 
+import { hasAsciiControl } from "./control-characters";
+
 import {
   normalizeAnchor,
   type CanvasAnchor,
@@ -22,7 +24,7 @@ function displayAuthorName(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const name = value.trim();
   return name.length > 0 && name.length <= MAX_COMMENT_AUTHOR_NAME_LENGTH
-    && !/[\u0000-\u001f\u007f]/u.test(name) ? name : undefined;
+    && !hasAsciiControl(name) ? name : undefined;
 }
 
 export interface CommentAuthor {
@@ -175,8 +177,8 @@ function safeKey(value: unknown): value is string {
   return typeof value === "string"
     && value.trim().length > 0
     && value.trim().length <= 256
-    && !/^[\u0000-\u001f\u007f]/u.test(value)
-    && !/[\u0000-\u001f\u007f]/u.test(value)
+    && !hasAsciiControl(value.charAt(0))
+    && !hasAsciiControl(value)
     && !["__proto__", "prototype", "constructor"].includes(value.trim().toLowerCase());
 }
 
@@ -198,7 +200,7 @@ function cloneJson(value: unknown, visiting = new Set<object>()): unknown {
     if (Array.isArray(value)) {
       return Array.from(value, (item) => cloneJson(item, visiting));
     }
-    const prototype = Object.getPrototypeOf(value);
+    const prototype: unknown = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype) {
       throw new Error("non-plain metadata object");
     }
@@ -879,7 +881,7 @@ export function deleteLocalReply(metadataInput: unknown, threadId: unknown, repl
   if (!safeKey(replyId)) return failure(prepared.metadata, diagnostic("id-invalid", "Reply ID is unsafe."));
   const replies = readOwn(located.comment, "replies");
   if (!Array.isArray(replies)) return failure(prepared.metadata, diagnostic("reply-invalid", "Comment replies must be an array."));
-  const reply = replies.find(item => isRecord(item) && readOwn(item, "id") === replyId.trim());
+  const reply: unknown = replies.find(item => isRecord(item) && readOwn(item, "id") === replyId.trim());
   if (!isRecord(reply)) return failure(prepared.metadata, diagnostic("comment-not-found", "Reply was not found."));
   if (originOf(reply) === "imported") return failure(prepared.metadata, diagnostic("comment-immutable", "Imported replies cannot be deleted."));
   located.comment.replies = replies.filter(item => item !== reply);

@@ -194,7 +194,7 @@ function cloneSnapshotValue(
 
 	let prototype: object | null;
 	try {
-		prototype = Object.getPrototypeOf(value);
+		prototype = Object.getPrototypeOf(value) as object | null;
 	} catch {
 		throw new SnapshotError(`The Canvas object prototype could not be read at ${path}.`);
 	}

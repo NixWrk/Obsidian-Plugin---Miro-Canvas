@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { setElementStyles } from "./dom-styles";
 /**
  * Hover text for a stylus, on a phone or a tablet.
@@ -191,14 +192,14 @@ export class PenTooltips {
     const label = control.getAttribute("aria-label");
     if (label === null || label === "") return;
     const body = state.document.body;
-    const tooltip = state.document.createElement("div");
+    const tooltip = createHtmlElement(state.document, "div");
     tooltip.className = "tooltip miro-canvas-pen-tooltip";
     tooltip.setAttribute("role", "tooltip");
     setElementStyles(tooltip, { "position": "fixed" });
     setElementStyles(tooltip, { "pointer-events": "none" });
     setElementStyles(tooltip, { "visibility": "hidden" });
     tooltip.appendChild(state.document.createTextNode(label));
-    const arrow = state.document.createElement("div");
+    const arrow = createHtmlElement(state.document, "div");
     arrow.className = "tooltip-arrow";
     tooltip.appendChild(arrow);
     body.appendChild(tooltip);

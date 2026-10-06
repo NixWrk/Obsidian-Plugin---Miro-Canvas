@@ -414,10 +414,10 @@ class AdvancedCanvasCopy {
 	 */
 	private notePortalEdges(node: UnknownRecord): void {
 		const lines: unknown[] = [];
-		if (Array.isArray(node.interdimensionalEdges)) lines.push(...node.interdimensionalEdges);
+		if (Array.isArray(node.interdimensionalEdges)) lines.push(...(node.interdimensionalEdges as readonly unknown[]));
 		if (isRecord(node.edgesToNodeFromPortal)) {
 			for (const group of Object.values(node.edgesToNodeFromPortal)) {
-				if (Array.isArray(group)) lines.push(...group);
+				if (Array.isArray(group)) lines.push(...(group as readonly unknown[]));
 			}
 		}
 		lines.forEach((line, index) => {

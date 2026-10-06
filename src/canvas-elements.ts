@@ -8,11 +8,12 @@
  * guessing private fields independently.
  */
 
+import { hasAsciiControl } from "./control-characters";
+
 type UnknownRecord = Record<PropertyKey, unknown>;
 
 const MAX_ELEMENT_ID_LENGTH = 512;
 const MAX_SELECTION_ITEMS = 100_000;
-const INVALID_ID_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 function isObject(value: unknown): value is UnknownRecord {
   return (typeof value === "object" && value !== null) || typeof value === "function";
@@ -47,7 +48,7 @@ function asStableId(value: unknown): string | undefined {
     value.length === 0 ||
     value.length > MAX_ELEMENT_ID_LENGTH ||
     value.trim() !== value ||
-    INVALID_ID_CHARACTERS.test(value)
+    hasAsciiControl(value)
   ) {
     return undefined;
   }

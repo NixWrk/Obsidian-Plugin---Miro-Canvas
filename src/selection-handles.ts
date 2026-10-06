@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * Selection handles drawn over the Canvas: the dashed box a node is drawn in,
  * with resize grips on its corners and sides, a rotation grip, and one
@@ -307,7 +308,7 @@ function hasDocument(value: unknown): value is Document {
 function make<K extends keyof HTMLElementTagNameMap>(
   document: Document, tag: K, className: string, label?: string,
 ): HTMLElementTagNameMap[K] {
-  const element = document.createElement(tag);
+  const element = createHtmlElement(document, tag);
   element.className = className;
   if (label !== undefined) element.textContent = label;
   return element;

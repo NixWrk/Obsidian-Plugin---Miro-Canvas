@@ -4,6 +4,8 @@
  * the Miro source snapshot about local edits.
  */
 
+import { hasAsciiControl } from "./control-characters";
+
 export type AnchorType = "free" | "node" | "image" | "edge" | "comment";
 export interface CommentAnchor {
   readonly type: "comment";
@@ -170,7 +172,7 @@ function cloneJson(value: unknown, visiting = new Set<object>()): unknown {
     if (Array.isArray(value)) {
       return Array.from(value, (item) => cloneJson(item, visiting));
     }
-    const prototype = Object.getPrototypeOf(value);
+    const prototype: unknown = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype) {
       throw new Error("non-plain metadata object");
     }
@@ -201,7 +203,7 @@ function isSafeKey(value: unknown): value is string {
     && value.length > 0
     && value.length <= 256
     && !RESERVED_KEYS.has(value.toLowerCase())
-    && !/[\u0000-\u001f\u007f]/u.test(value);
+    && !hasAsciiControl(value);
 }
 
 function safeId(value: unknown): value is string {

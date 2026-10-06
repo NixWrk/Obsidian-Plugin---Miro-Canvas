@@ -153,6 +153,8 @@ describe("comment marker DOM renderer", () => {
     const root = renderer.element as unknown as Element;
     expect(root.attributes.get("aria-label")).toBe("Canvas comments");
     expect(root.style.pointerEvents).toBe("none");
+    // The stylesheet owns the bubble tail; creation must not re-center it.
+    expect(root.children[0].style.transform).toBeUndefined();
     const [local, imported] = root.children;
     expect(local.tagName).toBe("button");
     expect(local.type).toBe("button");

@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { setElementStyles } from "./dom-styles";
 /**
  * "Arrange panels": a mode, entered from the dock's board menu or its
@@ -141,31 +142,31 @@ export class PanelArrangeMode {
     this.activeState = true;
     const labels = words().arrange;
     const document = this.host.document;
-    this.banner = document.createElement("div");
+    this.banner = createHtmlElement(document, "div");
     this.banner.className = "miro-canvas-arrange-banner";
     this.banner.setAttribute("role", "status");
-    const text = this.banner.appendChild(document.createElement("span"));
+    const text = this.banner.appendChild(createHtmlElement(document, "span"));
     text.className = "miro-canvas-arrange-banner__text";
     text.textContent = labels.bannerText;
-    const reset = this.banner.appendChild(document.createElement("button"));
+    const reset = this.banner.appendChild(createHtmlElement(document, "button"));
     reset.type = "button";
     reset.className = "miro-canvas-arrange-banner__button";
     reset.textContent = labels.reset;
     reset.addEventListener("click", () => this.host.resetLayout());
-    const done = this.banner.appendChild(document.createElement("button"));
+    const done = this.banner.appendChild(createHtmlElement(document, "button"));
     done.type = "button";
     done.className = "miro-canvas-arrange-banner__button miro-canvas-arrange-banner__button--done";
     done.textContent = labels.done;
     done.addEventListener("click", () => this.exit());
     this.host.boardRoot.appendChild(this.banner);
 
-    this.tray = document.createElement("div");
+    this.tray = createHtmlElement(document, "div");
     this.tray.className = "miro-canvas-arrange-tray";
     this.tray.setAttribute("aria-label", labels.trayAriaLabel);
-    const heading = this.tray.appendChild(document.createElement("div"));
+    const heading = this.tray.appendChild(createHtmlElement(document, "div"));
     heading.className = "miro-canvas-arrange-tray__heading";
     heading.textContent = labels.trayHeading;
-    this.trayList = this.tray.appendChild(document.createElement("div"));
+    this.trayList = this.tray.appendChild(createHtmlElement(document, "div"));
     this.trayList.className = "miro-canvas-arrange-tray__list";
     this.host.boardRoot.appendChild(this.tray);
     this.renderTray();
@@ -178,16 +179,16 @@ export class PanelArrangeMode {
       // inside its flow - so a packed bar still has room to drag by, and
       // the mode's own chrome never grows the panel into a neighbour (the
       // minimap sits right above the dock's default place).
-      const handle = document.createElement("span");
+      const handle = createHtmlElement(document, "span");
       handle.className = "miro-canvas-arrange-handle";
       element.prepend(handle);
       this.handles.push(handle);
       this.panelHandles.set(id, handle);
-      const grip = handle.appendChild(document.createElement("span"));
+      const grip = handle.appendChild(createHtmlElement(document, "span"));
       grip.className = "miro-canvas-arrange-grip";
       grip.setAttribute("aria-hidden", "true");
       if (id === "minimap") {
-        const resize = document.createElement("button");
+        const resize = createHtmlElement(document, "button");
         resize.type = "button";
         resize.className = "miro-canvas-arrange-resize";
         resize.setAttribute("aria-label", labels.resizeMinimap);
@@ -198,7 +199,7 @@ export class PanelArrangeMode {
       // Only the tool bar and the dock's icon row have an orientation of
       // their own to turn; the minimap always keeps the same shape.
       if (id !== "toolbar" && id !== "dockBar") continue;
-      const flip = handle.appendChild(document.createElement("button"));
+      const flip = handle.appendChild(createHtmlElement(document, "button"));
       flip.type = "button";
       flip.className = "miro-canvas-arrange-flip";
       flip.setAttribute("aria-label", labels.turnPanel);
@@ -269,13 +270,13 @@ export class PanelArrangeMode {
     const document = this.host.document;
     for (const item of ALL_TOOLBAR_ITEMS) {
       if (onBar.has(item)) continue;
-      const row = list.appendChild(document.createElement("div"));
+      const row = list.appendChild(createHtmlElement(document, "div"));
       row.className = "miro-canvas-arrange-tray__item";
       row.setAttribute("data-tool", item);
-      const icon = row.appendChild(document.createElement("span"));
+      const icon = row.appendChild(createHtmlElement(document, "span"));
       icon.className = "miro-canvas-arrange-tray__icon";
       paintToolbarIcon(icon, item, document, this.host.setIcon);
-      const label = row.appendChild(document.createElement("span"));
+      const label = row.appendChild(createHtmlElement(document, "span"));
       label.className = "miro-canvas-arrange-tray__label";
       label.textContent = toolbarItemLabel(item);
       row.addEventListener("pointerdown", (event) => {
@@ -532,15 +533,15 @@ export class PanelArrangeMode {
     const bar = this.host.toolbarBar();
     if (bar === undefined) return;
     const document = this.host.document;
-    const ghost = document.createElement("div");
+    const ghost = createHtmlElement(document, "div");
     ghost.className = "miro-canvas-arrange-ghost";
-    const icon = ghost.appendChild(document.createElement("span"));
+    const icon = ghost.appendChild(createHtmlElement(document, "span"));
     icon.className = "miro-canvas-arrange-ghost__icon";
     paintToolbarIcon(icon, item, document, this.host.setIcon);
-    const label = ghost.appendChild(document.createElement("span"));
+    const label = ghost.appendChild(createHtmlElement(document, "span"));
     label.textContent = toolbarItemLabel(item);
     document.body.appendChild(ghost);
-    const marker = document.createElement("div");
+    const marker = createHtmlElement(document, "div");
     marker.className = "miro-canvas-arrange-insertion";
     marker.setAttribute("aria-hidden", "true");
     bar.appendChild(marker);

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   FontFaceRegistry,
@@ -297,6 +297,26 @@ const EXCALIFONT_PACK = {
 };
 
 describe("FontFaceRegistry", () => {
+  it("creates each stylesheet in its document owner window and removes it on detach", () => {
+    const registry = new FontFaceRegistry();
+    const doc = new FakeDocument();
+    const style = new FakeStyleElement();
+    const owner = { createEl: vi.fn(function (this: unknown, tag: string) {
+      expect(this).toBe(owner);
+      expect(tag).toBe("style");
+      return style;
+    }) };
+    Object.assign(doc, { defaultView: owner });
+    const native = vi.spyOn(doc, "createElement");
+    registry.attach(doc as unknown as Document);
+    registry.attach(doc as unknown as Document);
+    expect(doc.head.children).toEqual([style]);
+    expect(owner.createEl).toHaveBeenCalledOnce();
+    expect(native).not.toHaveBeenCalled();
+    registry.detach(doc as unknown as Document);
+    expect(style.removed).toBe(true);
+    registry.dispose();
+  });
   it("releases earlier face blobs when a later face cannot be read", async () => {
     const registry = new FontFaceRegistry();
     const doc = new FakeDocument();
@@ -550,16 +570,25 @@ describe("FontFaceRegistry", () => {
 });
 
 describe("fontPackDownloadUrl", () => {
+  it("ignores a Node global test endpoint and resolves from the invoking window", () => {
+    vi.stubGlobal("__miroCanvasFontPacksTestBaseUrl", "http://unrelated-global/");
+    try {
+      expect(fontPackDownloadUrl("pack.zip")).toContain("fonts-0.0.4/pack.zip");
+      vi.stubGlobal("window", { __miroCanvasFontPacksTestBaseUrl: "http://window-a/" });
+      expect(fontPackDownloadUrl("pack.zip")).toBe("http://window-a/pack.zip");
+      vi.stubGlobal("window", { __miroCanvasFontPacksTestBaseUrl: "http://window-b/" });
+      expect(fontPackDownloadUrl("pack.zip")).toBe("http://window-b/pack.zip");
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("starts from the real release by default, and only from a harness's own test override", () => {
     expect(fontPackDownloadUrl("fonts-word.zip")).toBe(
       "https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/fonts-0.0.4/fonts-word.zip",
     );
-    const testGlobal = globalThis as { __miroCanvasFontPacksTestBaseUrl?: string };
-    testGlobal.__miroCanvasFontPacksTestBaseUrl = "http://127.0.0.1:8199/";
+    vi.stubGlobal("window", { __miroCanvasFontPacksTestBaseUrl: "http://127.0.0.1:8199/" });
     try {
       expect(fontPackDownloadUrl("fonts-word.zip")).toBe("http://127.0.0.1:8199/fonts-word.zip");
     } finally {
-      delete testGlobal.__miroCanvasFontPacksTestBaseUrl;
+      vi.unstubAllGlobals();
     }
   });
 });

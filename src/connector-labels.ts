@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import { setElementStyles } from "./dom-styles";
 /**
  * Labels on connectors - native edges and the board's own alike - placed at
@@ -70,7 +71,7 @@ export class ConnectorLabels {
   private editing: string | undefined;
 
   public constructor(private readonly document: Document, private readonly host: ConnectorLabelsHost) {
-    this.element = document.createElement("div");
+    this.element = createHtmlElement(document, "div");
     this.element.className = "miro-canvas-connector-labels";
   }
 
@@ -202,10 +203,10 @@ export class ConnectorLabels {
   }
 
   private add(item: ConnectorLabel): Entry {
-    const wrapper = this.document.createElement("div");
+    const wrapper = createHtmlElement(this.document, "div");
     wrapper.className = "miro-canvas-connector-label";
     wrapper.setAttribute("data-connector-id", item.id);
-    const label = wrapper.appendChild(this.document.createElement("div"));
+    const label = wrapper.appendChild(createHtmlElement(this.document, "div"));
     label.className = "canvas-path-label";
     const placeholder = item.native?.querySelector(".canvas-path-label")?.getAttribute("data-placeholder");
     label.setAttribute("data-placeholder", placeholder ?? words().connector.labelPlaceholder);

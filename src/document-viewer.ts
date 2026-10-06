@@ -1,4 +1,6 @@
 /** Local document navigation only: no fetching, iframe URLs, or Canvas writes. */
+
+import { hasAsciiControl } from "./control-characters";
 export type DocumentKind = "pdf" | "markdown" | "image" | "file";
 export type DocumentFit = "page" | "width";
 
@@ -25,7 +27,7 @@ export type DocumentOpenResult =
 /** Do not interpret URL schemes, aliases, fragments, or parent traversals. */
 export function localDocumentPath(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0 || value.length > 4096
-    || value !== value.trim() || /[\u0000-\u001f\u007f]/u.test(value)) return null;
+    || value !== value.trim() || hasAsciiControl(value)) return null;
   const path = value.replace(/\\/g, "/");
   if (path.startsWith("/") || /[:?*<>|]/u.test(path)) return null;
   const segments = path.split("/");
@@ -50,7 +52,9 @@ export function describeLocalDocument(
   const safeSubpath = typeof options.subpath === "string"
     && options.subpath.length <= 1024
     && options.subpath === options.subpath.trim()
-    && /^#[^\u0000-\u001f\u007f<>]*$/u.test(options.subpath)
+    && options.subpath.startsWith("#")
+    && !hasAsciiControl(options.subpath)
+    && !options.subpath.includes("<") && !options.subpath.includes(">")
     ? options.subpath : undefined;
   const subpage = safeSubpath === undefined ? undefined : /^#page=(\d+)$/u.exec(safeSubpath)?.[1];
   const requested = options.page ?? (subpage ? Number(subpage) : 1);

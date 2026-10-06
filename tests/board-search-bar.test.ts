@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BoardSearchBar, type BoardSearchBarHost } from "../src/board-search-bar";
 import { setLocale } from "../src/i18n";
@@ -100,9 +100,51 @@ function build(delay = 0) {
   return { bar, root, input, calls, document };
 }
 
-afterEach(() => setLocale("en"));
+afterEach(() => {
+  setLocale("en");
+  vi.useRealTimers();
+});
 
 describe("the board's search bar", () => {
+  it("keeps owner-realm element creation detached and ignores the native fallback when a helper exists", () => {
+    const doc = new FakeDocument();
+    const tags: string[] = [];
+    Object.assign(doc.defaultView, {
+      createEl(tag: string) {
+        expect(this).toBe(doc.defaultView);
+        tags.push(tag);
+        return new FakeElement(tag);
+      },
+    });
+    doc.createElement = () => { throw new Error("unexpected native fallback"); };
+    const bar = new BoardSearchBar(doc as unknown as Document, {
+      onQuery: () => {}, onStep: () => {}, onClose: () => {},
+    });
+    expect(tags).toEqual(["div", "input", "span", "button", "button", "button", "span"]);
+    expect((bar.element as unknown as FakeElement).parentNode).toBeUndefined();
+    bar.dispose();
+  });
+
+  it("debounces and cancels with a captured Node timer pair when the injected document has no complete owner", () => {
+    vi.useFakeTimers();
+    for (const owner of [null, { setTimeout: () => { throw new Error("partial owner used"); } }]) {
+      const doc = new FakeDocument();
+      Object.defineProperty(doc, "defaultView", { value: owner });
+      const calls: string[] = [];
+      const bar = new BoardSearchBar(doc as unknown as Document, {
+        onQuery: query => calls.push(query), onStep: () => {}, onClose: () => {}, queryDelay: () => 25,
+      });
+      type(bar.input as unknown as FakeElement, "first");
+      type(bar.input as unknown as FakeElement, "latest");
+      vi.advanceTimersByTime(25);
+      expect(calls).toEqual(["latest"]);
+      type(bar.input as unknown as FakeElement, "cancelled");
+      bar.dispose();
+      vi.runAllTimers();
+      expect(calls).toEqual(["latest"]);
+    }
+  });
+
   it("is a panel at the board's top right, hidden until opened, with its field focused on open", () => {
     const { bar, root, input } = build();
     expect(root.className).toBe("miro-canvas-panel miro-canvas-search");

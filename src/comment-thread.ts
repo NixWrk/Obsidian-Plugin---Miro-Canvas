@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 /**
  * A comment thread the way Miro opens it beside its pin: a tick that
  * resolves it, each message under its author's initial, name and time, and
@@ -420,7 +421,7 @@ export class CommentThreadCard {
   }
 
   private make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
-    const element = this.document.createElement(tag);
+    const element = createHtmlElement(this.document, tag);
     element.className = className;
     if (text !== undefined) element.textContent = text;
     return element;

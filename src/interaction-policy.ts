@@ -184,7 +184,7 @@ function isPlainObject(value: unknown): value is UnknownRecord {
 		if (Array.isArray(value)) {
 			return false;
 		}
-		const prototype = Object.getPrototypeOf(value);
+		const prototype: unknown = Object.getPrototypeOf(value);
 		return prototype === null || prototype === Object.prototype;
 	} catch {
 		return false;

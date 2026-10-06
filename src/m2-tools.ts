@@ -1,3 +1,4 @@
+import { createHtmlElement } from "./dom-elements";
 import type { M1CanvasSession } from "./m1-session";
 import { CommentsPanel } from "./comments-panel";
 import { addAnchor, normalizeAnchor, resolveAnchor, type CanvasAnchor } from "./anchors";
@@ -67,9 +68,9 @@ function appendLabeled<T extends HTMLInputElement | HTMLSelectElement>(
   label: string,
   control: T,
 ): T {
-  const wrapper = document.createElement("label");
+  const wrapper = createHtmlElement(document, "label");
   wrapper.className = "miro-canvas-m2-tools__field";
-  const text = document.createElement("span");
+  const text = createHtmlElement(document, "span");
   text.textContent = label;
   control.setAttribute("aria-label", label);
   wrapper.append(text, control);
@@ -106,33 +107,33 @@ export class M2CanvasTools {
     this.initialComment = initialComment;
     session.refresh();
     this.authoring = createCanvasAuthoring(session.view);
-    this.element = document.createElement("div");
+    this.element = createHtmlElement(document, "div");
     this.element.className = "miro-canvas-m2-tools";
-    this.status = document.createElement("p");
+    this.status = createHtmlElement(document, "p");
     this.status.className = "miro-canvas-m2-tools__status";
     this.status.setAttribute("role", "status");
     this.element.append(this.status);
 
-    const shapeFields = document.createElement("fieldset");
+    const shapeFields = createHtmlElement(document, "fieldset");
     shapeFields.className = "miro-canvas-m2-tools__section miro-canvas-m2-tools__section--shape";
-    const shapeLegend = document.createElement("legend");
+    const shapeLegend = createHtmlElement(document, "legend");
     shapeLegend.textContent = words().localTools.createShape;
     shapeFields.append(shapeLegend);
-    const shapeGrid = document.createElement("div");
+    const shapeGrid = createHtmlElement(document, "div");
     shapeGrid.className = "miro-canvas-m2-tools__grid";
     shapeFields.append(shapeGrid);
-    const shape = appendLabeled(document, shapeGrid, words().localTools.shapeKind, document.createElement("select"));
+    const shape = appendLabeled(document, shapeGrid, words().localTools.shapeKind, createHtmlElement(document, "select"));
     for (const [value, label] of shapeOptions()) {
-      const option = document.createElement("option");
+      const option = createHtmlElement(document, "option");
       option.value = value;
       option.textContent = label;
       shape.append(option);
     }
-    const shapeText = appendLabeled(document, shapeGrid, words().localTools.shapeText, document.createElement("input"));
+    const shapeText = appendLabeled(document, shapeGrid, words().localTools.shapeText, createHtmlElement(document, "input"));
     shapeText.type = "text";
     shapeText.value = words().localTools.shapeTextDefault;
     const shapeNumber = (label: string, value: string) => {
-      const input = document.createElement("input");
+      const input = createHtmlElement(document, "input");
       input.type = "number";
       input.step = "any";
       input.value = value;
@@ -142,7 +143,7 @@ export class M2CanvasTools {
     const shapeY = shapeNumber(words().localTools.shapeY, "100");
     const shapeWidth = shapeNumber(words().localTools.shapeWidth, "240");
     const shapeHeight = shapeNumber(words().localTools.shapeHeight, "140");
-    const createShape = document.createElement("button");
+    const createShape = createHtmlElement(document, "button");
     createShape.type = "button";
     createShape.textContent = words().localTools.createShape;
     createShape.className = "miro-canvas-m2-tools__primary-action";
@@ -184,16 +185,16 @@ export class M2CanvasTools {
     shapeFields.append(createShape);
     this.element.append(shapeFields);
 
-    const anchorFields = document.createElement("fieldset");
+    const anchorFields = createHtmlElement(document, "fieldset");
     anchorFields.className = "miro-canvas-m2-tools__section miro-canvas-m2-tools__section--anchor";
-    const legend = document.createElement("legend");
+    const legend = createHtmlElement(document, "legend");
     legend.textContent = words().localTools.anchorLegend;
     anchorFields.append(legend);
-    const anchorGrid = document.createElement("div");
+    const anchorGrid = createHtmlElement(document, "div");
     anchorGrid.className = "miro-canvas-m2-tools__grid";
     anchorFields.append(anchorGrid);
     const number = (name: string) => {
-      const input = document.createElement("input");
+      const input = createHtmlElement(document, "input");
       input.type = "number";
       input.step = "any";
       input.value = "0.5";
@@ -201,8 +202,8 @@ export class M2CanvasTools {
     };
     this.x = number(words().localTools.anchorXLabel);
     this.y = number(words().localTools.anchorYLabel);
-    this.anchorTarget = appendLabeled(document, anchorGrid, words().localTools.anchorTarget, document.createElement("select"));
-    const save = document.createElement("button");
+    this.anchorTarget = appendLabeled(document, anchorGrid, words().localTools.anchorTarget, createHtmlElement(document, "select"));
+    const save = createHtmlElement(document, "button");
     save.textContent = words().localTools.saveAnchor;
     save.type = "button";
     save.className = "miro-canvas-m2-tools__primary-action";
@@ -215,23 +216,23 @@ export class M2CanvasTools {
     anchorFields.append(save);
     this.element.append(anchorFields);
 
-    const connectorFields = document.createElement("fieldset");
+    const connectorFields = createHtmlElement(document, "fieldset");
     connectorFields.className = "miro-canvas-m2-tools__section miro-canvas-m2-tools__section--connector";
-    const connectorLegend = document.createElement("legend");
+    const connectorLegend = createHtmlElement(document, "legend");
     connectorLegend.textContent = words().localTools.connectorLegend;
     connectorFields.append(connectorLegend);
-    const connectorGrid = document.createElement("div");
+    const connectorGrid = createHtmlElement(document, "div");
     connectorGrid.className = "miro-canvas-m2-tools__grid";
     connectorFields.append(connectorGrid);
-    this.connectorEdge = appendLabeled(document, connectorGrid, words().localTools.connectorField, document.createElement("select"));
-    this.connectorEnd = appendLabeled(document, connectorGrid, words().localTools.connectorEndField, document.createElement("select"));
+    this.connectorEdge = appendLabeled(document, connectorGrid, words().localTools.connectorField, createHtmlElement(document, "select"));
+    this.connectorEnd = appendLabeled(document, connectorGrid, words().localTools.connectorEndField, createHtmlElement(document, "select"));
     for (const [value, label] of [["from", words().localTools.endFrom], ["to", words().localTools.endTo]] as const) {
-      const option = document.createElement("option");
+      const option = createHtmlElement(document, "option");
       option.value = value;
       option.textContent = label;
       this.connectorEnd.append(option);
     }
-    const setEndpoint = document.createElement("button");
+    const setEndpoint = createHtmlElement(document, "button");
     setEndpoint.type = "button";
     setEndpoint.textContent = words().localTools.setConnectorEndpoint;
     setEndpoint.className = "miro-canvas-m2-tools__primary-action";
@@ -252,22 +253,22 @@ export class M2CanvasTools {
     connectorFields.append(setEndpoint);
     this.element.append(connectorFields);
 
-    const geometryFields = document.createElement("fieldset");
+    const geometryFields = createHtmlElement(document, "fieldset");
     geometryFields.className = "miro-canvas-m2-tools__section miro-canvas-m2-tools__section--geometry";
-    const geometryLegend = document.createElement("legend");
+    const geometryLegend = createHtmlElement(document, "legend");
     geometryLegend.textContent = words().localTools.geometryLegend;
     geometryFields.append(geometryLegend);
-    const geometryGrid = document.createElement("div");
+    const geometryGrid = createHtmlElement(document, "div");
     geometryGrid.className = "miro-canvas-m2-tools__grid";
     geometryFields.append(geometryGrid);
-    const geometryActions = document.createElement("div");
+    const geometryActions = createHtmlElement(document, "div");
     geometryActions.className = "miro-canvas-m2-tools__actions";
-    const rotation = document.createElement("input");
+    const rotation = createHtmlElement(document, "input");
     rotation.type = "number";
     rotation.step = "any";
     rotation.value = "0";
     appendLabeled(document, geometryGrid, words().localTools.rotationDegrees, rotation);
-    const applyRotation = document.createElement("button");
+    const applyRotation = createHtmlElement(document, "button");
     applyRotation.type = "button";
     applyRotation.textContent = words().localTools.applyRotation;
     applyRotation.addEventListener("click", () => {
@@ -282,7 +283,7 @@ export class M2CanvasTools {
     });
     geometryActions.append(applyRotation);
     for (const { direction, label } of layerActions()) {
-      const button = document.createElement("button");
+      const button = createHtmlElement(document, "button");
       button.type = "button";
       button.textContent = label;
       button.addEventListener("click", () => {
@@ -323,7 +324,7 @@ export class M2CanvasTools {
       this.documents = new DocumentControls(documentHost, file, document);
       this.element.append(this.documents.element);
     } else {
-      const hint = document.createElement("p");
+      const hint = createHtmlElement(document, "p");
       hint.className = "miro-canvas-m2-tools__document-hint";
       hint.textContent = words().localTools.selectFileHint;
       this.element.append(hint);
@@ -444,12 +445,12 @@ export class M2CanvasTools {
     const currentValue = select.value;
     if (nextKey !== currentKey) {
       select.textContent = "";
-      const empty = this.document.createElement("option");
+      const empty = createHtmlElement(this.document, "option");
       empty.value = "";
       empty.textContent = options.length > 0 ? words().localTools.choosePlaceholder : words().localTools.noTargetsAvailable;
       select.append(empty);
       for (const item of options) {
-        const option = this.document.createElement("option");
+        const option = createHtmlElement(this.document, "option");
         option.value = item.value;
         option.textContent = item.label;
         select.append(option);
