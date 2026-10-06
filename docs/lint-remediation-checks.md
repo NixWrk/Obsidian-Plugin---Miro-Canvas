@@ -1049,3 +1049,57 @@ css-state-R52Y808PDJB.json and l17-installed.json. Types, all 113 unit files
 schema, all three synthetic smokes (including the new consumed-press case),
 25 oracle tests and diff check pass. English/Russian README/design notes,
 CHANGELOG and the installed-check harness guide describe the dismissal fix.
+
+
+## L18: complete remaining-warning inventory and reconnected phone (2026-10-06)
+
+No implementation lint fix in this batch. Fresh src report is 0 errors / 332
+warnings and CSS is 83 priorities / zero :has on baseline 96420fa. The group
+map in lint-remediation-groups.md and complete lint-remaining-sites.json assigns
+every diagnostic once: 332 plugin, 83 CSS, plus 23 separately scanned MCP sites.
+The JSON includes rule/selector, current locations/context and 51 file hashes;
+438 entries and all group/rule sums are checked by the generator in .out.
+Future fixes still require their own pre-edit participation/mandatory checks.
+
+MCP diagnostic scan uses the same plugin rule set with correct Node globals,
+without changing project ESLint config: 21 warnings / two errors, the latter
+being the intentional console log/info redirects that keep protocol stdout
+clean. Node-only imports (9), redirects (2), config paths (4), assertions (6),
+async dispatch (1) and path regex (1) are all recorded. Current src/package
+checks do not include this standalone Node server; this distinction is explicit,
+not a claim that the broader directory report is clean. Custom config-directory
+support is a real MCP behavior gap; Node imports are a distinct runtime scope.
+
+
+### L18 phone evidence and gates
+
+Reconnected Samsung SM-A336E / RZCW101PJVN / Obsidian 1.12.7,
+MiroCanvasTest port 9341: deployed the current L17 executable/styles and ran
+all three matrices successfully. Owned-hidden has 37 states / 15,363 forced
+DOM cases; actual ADB menu/pin/help/Close/outside presses pass both themes and
+comment close/reopen/compose states. Search/export saves an actual 36,280-byte
+PDF and hides/restores capture roots. CSS state passes native/turned selection,
+attached-edge paths before release at 50/125 percent, no preview save,
+one-step commit/Undo/Redo/CANCEL, late code/attachment names and unload/reload.
+Programmatically prepared selections/review/draft/search text/hidden probes
+are recorded separately from ADB input. Original Export touch test.canvas
+restoration checks pass; no original snapshot was overwritten. No new
+physical-stylus handling claim. 1.12.7 remains additional legacy evidence below
+manifest minAppVersion 1.13.7, not a supported-version minimum certification.
+
+Readback main SHA 8849bb6d1da0e83e7f7ceb239921b2d62b5e944cba4a4bef862a1573f1a47b2f
+and CSS SHA 572acf04c0fc163ebeba19847f34d29441b901756bec23e722164424bb3eff28
+match this build. The final asynchronous read waited behind NotificationShade;
+only a native Back/foreground attempt was used, not an Obsidian test gesture.
+Artifacts: hidden-RZCW101PJVN-current.json, visibility-RZCW101PJVN.json,
+css-state-RZCW101PJVN.json, l18-phone-css.log and l18-phone-installed.json in
+.out. This closes the previously pending current-build phone matrix.
+
+All required repository gates pass: types, 113 unit files (1,758 passed / one
+existing skip), configured ESLint, CSS budget, both builds, pinned schema,
+three synthetic smokes, 25 oracle tests and diff check. Local submission
+packaging check passes; it does not certify directory acceptance. Production
+main/CSS/MCP hashes are unchanged by this documentation audit. MCP SHA remains
+ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
+SDK/tool versions are recorded in the inventory. No new Windows/tablet input
+run was needed for these byte-identical artifacts; L17 evidence still applies.
