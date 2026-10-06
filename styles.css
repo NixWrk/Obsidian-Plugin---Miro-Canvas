@@ -390,7 +390,7 @@
    Canvas adds its label as it draws the card, which can be after the
    plugin looked, so the plugin's name steps aside once Canvas's is there
    instead of showing the file's name twice. */
-.canvas-node:has(> .canvas-node-label) > .miro-canvas-attachment-label {
+.canvas-node > .miro-canvas-attachment-label[data-miro-native-label="true"] {
   display: none;
 }
 
@@ -1322,7 +1322,7 @@
    only as far up as the nearest scroll container, and a card's text holds
    several (the preview itself, a code block, a table cell, a callout).
    Reading the mark, rather than asking of every element of every card whether
-   its card is picked and holds a frame (`:has()`), keeps a move of any drag on
+   its card is picked and holds a frame, keeps a move of any drag on
    a large board as cheap as it was; and only a touch screen needs the rule. */
 @media (any-pointer: coarse) {
   .miro-canvas-root [data-miro-canvas-picked] .canvas-node-content,
@@ -2072,11 +2072,11 @@
 
 /* For an unrotated native node the host already supplies the visible border.
    Keep our grips, but do not paint a second border on top of its selection. */
-.miro-canvas-root:has(.canvas-selection) .miro-canvas-handles__frame[data-miro-canvas-resizable="true"][data-miro-canvas-turned="false"] {
+.miro-canvas-root .miro-canvas-handles__frame[data-miro-native-outline="true"][data-miro-canvas-resizable="true"][data-miro-canvas-turned="false"] {
   outline: none;
 }
 
-.miro-canvas-root:has(.canvas-selection) .miro-canvas-handles[data-miro-canvas-resizing] .miro-canvas-handles__frame[data-miro-canvas-resizable="true"] {
+.miro-canvas-root .miro-canvas-handles[data-miro-canvas-resizing] .miro-canvas-handles__frame[data-miro-canvas-resizable="true"] {
   outline: 1px dashed var(--interactive-accent);
 }
 
@@ -2686,7 +2686,7 @@
 }
 
 .miro-source-code .markdown-preview-pusher,
-.miro-source-code .markdown-preview-view p:has(+ pre) {
+.miro-source-code .markdown-preview-view [data-miro-code-heading="true"] {
   display: none;
 }
 

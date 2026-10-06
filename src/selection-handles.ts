@@ -35,6 +35,8 @@ export interface HandleRect {
 }
 
 export interface SelectionHandlesState {
+  /** The native selected card already supplies its visible border. */
+  readonly nativeOutline?: boolean;
   /** Viewport rectangle of the selection, before rotation. */
   readonly rect?: HandleRect;
   readonly rotation: number;
@@ -890,6 +892,8 @@ export class SelectionHandles {
       : state;
     const refs = this.refs;
     if (refs === undefined) return;
+    const nativeOutline = String(this.state.nativeOutline === true);
+    if (refs.frame.getAttribute("data-miro-native-outline") !== nativeOutline) refs.frame.setAttribute("data-miro-native-outline", nativeOutline);
     refs.frame.setAttribute("data-miro-canvas-turned", Math.abs(this.state.rotation % 360) > 0.01 ? "true" : "false");
     // A gesture keeps the handles it started with rather than hiding them, but
     // it still tracks where the node is: writing only the angle left the frame

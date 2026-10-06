@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Remove the four remaining CSS `:has()` selectors. Keep one selection outline on native cards and one code title with Obsidian's wrapped Markdown preview. Track late attachment labels and code markup with reversible local state.
+- Cancel a resize without adding an empty Undo step; preserve the live attached-line preview and one history step on release.
+- Remove 367 redundant TypeScript assertions; verify byte-identical plugin and MCP builds for that cleanup.
+
 - Keep pressure width steady during hold-to-straighten: ignore stationary pressure pulses and retain the last width through the zero-pressure move before pen lift. Preview and saved outlines agree; moving the pen still samples pressure.
 
 - Recognize tilted and uneven smart-drawn rectangles by their sides and corners. Preserve the orientation and local dimensions of rectangles, ellipses and triangles, rounding rotation to 45-degree steps in one native Undo/Redo action. Add pressure-enabled hold-to-straighten regressions in installed Android Obsidian.

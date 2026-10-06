@@ -360,3 +360,171 @@ remain enabled. The tablet was temporarily unplugged, then reconnected
 before this confirmation. This is installed-build verification, not a new
 physical input claim; earlier L09 real-app/input evidence applies to the
 identical executable. No new Android behavior was introduced by this batch.
+
+## L11: remaining native-markup :has selectors (traced before edits)
+
+Four remaining selectors: fallback attachment label when a direct native
+canvas-node-label arrives; two selection-overlay outline rules keyed on a
+native canvas-selection; and the paragraph immediately before a pre inside
+a source-code Markdown preview. Trace: M1.refreshDecorations creates fallback
+labels and removes them on refresh/dispose; native label markup arrives
+asynchronously. M1.refresh/handlesState -> SelectionHandles.update marks
+resizable/turned/resizing states while native Canvas owns its selection frame.
+SourceRenderer.renderNode -> code decoration keeps native Markdown and creates
+code-title chrome; native preview can mount/re-render after source projection.
+SourceRenderer.watchLive already observes rotations and edge routes, so any
+extension must preserve those immediate preview callbacks and cleanup.
+
+Before editing, inspect the actual native frame parent and code/label markup
+in installed desktop Obsidian and both connected Android apps. Replace
+ancestor :has invalidation with local explicit attributes. Selection presence
+must be driven only by relevant direct-child mutations, with no card scan
+on every frame. A fallback label watches its own shell only while it exists.
+Code paragraphs use a reversible mark refreshed by the existing shared
+source-renderer observer for the changed code card, not another per-card
+frame loop. Disconnect observers and restore pre-existing attributes before
+teardown; changing decoration must not modify board JSON/source evidence.
+
+Mandatory unit checks: frame add/remove/retarget, unrelated additions ignored
+and no repeated writes; late native attachment label hides fallback and
+removal restores it; code paragraph adjacency/reorder/remount with ordinary
+paragraphs untouched; original marks restored and queued callbacks inert
+after cleanup. Full source/selection/large-board tests and normal gates.
+Mandatory real-app checks: native single selection has one outline, turned
+selection and active resize preserve their outline; native edge follows a
+resize before release, with one history step/Undo/Redo and cancel; code title
+not duplicated after late Markdown mount/preview refresh; fallback/name
+visibility and plugin unload/reload; themes and non-default zoom. ADB input
+on each connected Android, real mouse in the isolated desktop; markup
+synthesis used to simulate late native DOM is recorded separately. Lower
+CSS :has budget to zero only when these checks pass.
+
+L11 native inspection before implementation: on Obsidian 1.14.4 desktop,
+1.13.8 tablet and 1.12.7 phone, single-card selection has no canvas-selection
+element. Instead canvas-node.is-focused owns a native border and a 2 px
+accent shadow on canvas-node-container, while the plugin frame is also
+dashed: the old :has rule fails to remove this duplicate outline. Therefore
+drive the owned frame's native-outline flag from the selected native node's
+actual is-focused/is-selected class, looked up through the native nodes map
+in constant time, and update it through the existing handles update cycle.
+No new global frame observer or repeated card scan is needed.
+
+All three apps render Markdown paragraphs/pre blocks under adjacent .el-p/
+.el-pre wrappers. A paragraph itself has no next sibling; old p:has(+ pre)
+fails and leaves the code-title paragraph visible alongside the plugin title.
+Mark direct p/pre adjacency and the observed wrapped adjacency; hide the
+wrapper too when it contains only that paragraph, preserving ordinary
+paragraphs. Native input selection and the baseline CSS runner reproduce
+both defects. State update/cleanup tests replace the provisional direct-frame
+observer tests above because actual native single selection uses focused
+node classes, not the assumed canvas-selection element.
+
+L11 synthetic-host follow-up traced before editing: m1-browser.ts select()
+only changes the runtime selection Set and never mirrors native focused
+node classes. Its controls assertion still creates a canvas-selection for
+a single card, contrary to all three installed versions. Mirror is-focused
+on the selected node shell only in this focused-selection regression,
+restore it afterward, and assert the explicit native-outline mark. Preserve the mixed-selection canvas-selection checks.
+This updates synthetic evidence to the actual native contract.
+
+L11 type-guard follow-up before edit: inspecting querySelectorAll as a
+function value selects Obsidian's deprecated overload, adding one advisory.
+Use Reflect.get for the defensive fake/unknown-host capability guard, while
+keeping the DOM method call itself typed. Recheck helper tests and lint;
+this changes no supported native DOM behavior.
+
+## L12: resize cancellation history (traced before edits)
+
+L11 real renderer and tablet ADB resize checks expose an extra history step
+on cancellation: geometry/path restore correctly, but history advances.
+Trace SelectionHandles.cancelGesture -> M1.cancelHandleResize -> resizeNode
+(native moveAndResize) -> adapter.requestSave; preview uses the native live
+node without saving. Inspect native requestSave/history semantics before
+changing cancellation. Mandatory regression: before-release edge following,
+commit exactly one history step, cancel none, Undo/Redo, repeat at 50/125
+percent in installed desktop and both Androids. Preserve source/unknown
+fields and native adapter tests; distinguish renderer input from Windows
+mouse input. Windows capture helper failed after recovery, so OS mouse
+evidence remains pending rather than claimed.
+
+L12 native inspection: requestSave defaults its argument to true and always
+requests a history push; history.push does not deduplicate identical data.
+Resize previews did not persist, so restoring the live node needs refresh
+only. Remove the cancellation save, retain the release save. Test the full
+preview/cancel/commit sequence against the real adapter rather than deleting
+history entries after the fact.
+
+The broader fixture select() focus emulation affected its intentionally
+Set-only touch model: deselecting the Set left a focused class. Keep that
+fixture unchanged and scope the native class to the specific outline check.
+Repeat interactions and controls to prove no stale touch-selection state.
+
+### L11/L12 results (2026-10-06)
+
+All four remaining :has selectors removed; CSS budget now forbids any :has.
+The 90 !important declarations remain for subsequent traced batches. Explicit
+local marks remove the duplicate native selection outline and wrapped code
+heading. Native attachment names suppress the fallback on arrival and restore
+it on removal; disabling the plugin removes marks/observers and preserves the
+fixture's source/unknown fields. Ordinary paragraphs after code stay visible.
+
+Installed-app evidence, check-css-state.mjs:
+- Desktop Obsidian 1.14.4, isolated vault / port 9346: renderer mouse input
+  through CDP, dark/light single and rotated selection, 50/125 percent resize
+  preview with native edge following, unchanged persisted preview, one-step
+  commit, Undo/Redo and Escape cancellation; name toggle and reload passed.
+- Samsung SM-X736B / R52Y808PDJB / Obsidian 1.13.8, MiroCanvasTest / port 9340:
+  actual ADB touchscreen DOWN/MOVE/UP/CANCEL, same selection/themes and resize
+  checks at 50/125 percent, actual Undo/Redo/menu taps and reload passed.
+- Samsung SM-A336E / RZCW101PJVN / Obsidian 1.12.7, MiroCanvasTest / port 9341:
+  same actual ADB input and checks passed. This version is additional legacy
+  evidence below the declared minimum; the minimum remains 1.13.7.
+
+Selection is prepared programmatically for the resize matrix to avoid a
+second native text-card tap opening its editor/keyboard; selection-outline
+checks themselves use actual ADB taps (desktop CDP mouse). The runner checks
+control hit targets and dismisses an open Android keyboard with Back.
+Native code remount/adjacency and late-label timing use controlled DOM
+synthesis in the installed apps, separately from ADB gesture evidence.
+Final screenshots on all three apps show one code title and the preserved
+ordinary paragraph. Results: .out/css-state-desktop.json and per-serial JSON.
+
+The Windows computer-use helper failed window capture after its prescribed
+recovery. OS-injected desktop mouse evidence remains pending; CDP renderer
+mouse evidence is recorded above. Hardware stylus/pressure and iOS are not
+new claims for this CSS/resize batch. Original file/settings/theme/viewport
+are reopened/restored in the runner's finally; no original board is overwritten.
+
+The cancellation regression reproduced an extra native history push before
+the fix in desktop and tablet. Native requestSave defaults to pushing history
+and does not deduplicate. Cancellation now only restores the unsaved native
+node and refreshes. Focused real-adapter tests verify no preview/cancel save,
+and exactly one commit save; installed-app preview paths and source equality
+verify that this preserves the native line and file invariants.
+
+Final gates: 113 unit files, 1,757 passed / one existing skip; type check,
+plugin and MCP builds, pinned schema, ESLint 0 errors / 381 unchanged warnings,
+CSS budget, all three synthetic browser modes, 25 oracle tests and diff check.
+The controls smoke mirrors the observed native focused class only for its
+outline check; the shared touch fixture remains unchanged.
+
+L12 Escape follow-up traced before edit: attachClipboard's owning-window
+Escape handler calls resetTools. resetTools cancels tool/rotation/selection
+previews but omits SelectionHandles.cancelGesture, so an active resize stays
+live and the later pointerup commits even after Escape. Add handle cancellation
+before native deselection; retain ordinary Escape reset semantics. Mandatory
+checks: focused resetTools->resize restore/no save, existing handle cancel tests,
+board-key/double-tap regressions, full gates and the installed desktop Escape
+matrix; rerun Android because shared tool reset also participates there.
+
+Final Escape retest: resetTools now cancels handle gestures before deselecting
+native items. Installed desktop CDP Escape and both Android CANCEL matrices
+pass at 50/125 percent with the final build. Both actual app theme classes
+are asserted after changeTheme/updateTheme, and the original file's text is
+compared byte-for-byte after finally restores it. No original board changed.
+The tablet's last rerun exposed a native WiFiNoInternetDialog over Obsidian,
+which explains the earlier missed ADB tap/drag despite valid WebView hit
+targets. After foregrounding Obsidian the whole final matrix passes. Those
+missed/obscured attempts are excluded; the runner now checks Android native
+window focus before DOWN and sends no input when another app/system obscures
+Obsidian. No Wi-Fi/system preference was changed.

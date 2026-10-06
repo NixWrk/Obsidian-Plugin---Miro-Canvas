@@ -1504,14 +1504,14 @@ def main() -> int:
                   const n=b.runtime.getData().nodes.find(item=>item.id==='n1');
                   const old=b.nativeFrameBefore.nodes.find(item=>item.id==='n1');
                   if(n.x!==old.x+50||n.y!==old.y+30)throw Error('Native frame did not move twice');
-                  b.runtime.importData=b.nativeFrameImport;b.select('n1');s.refresh();
-                  const nativeBox=b.root.appendChild(document.createElement('div'));
-                  nativeBox.className='canvas-selection';
+                  b.runtime.importData=b.nativeFrameImport;b.select('n1');
+                  const focused=b.runtime.nodes.get('n1').nodeEl;focused.classList.add('is-focused');s.refresh();
                   const handles=b.root.querySelector('.miro-canvas-handles__frame');
                   if(!handles||handles.getAttribute('data-miro-canvas-turned')!=='false'
+                    ||handles.getAttribute('data-miro-native-outline')!=='true'
                     ||getComputedStyle(handles).outlineStyle!=='none')
                     throw Error('Unrotated node still has two selection outlines');
-                  nativeBox.remove();
+                  focused.classList.remove('is-focused');s.refresh();
                 }""")
                 page.evaluate("""() => {
                   const b=miroBrowser,s=b.session,document=b.runtime.getData();

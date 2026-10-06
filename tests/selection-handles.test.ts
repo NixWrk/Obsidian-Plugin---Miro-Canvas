@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setLocale } from "../src/i18n";
 import {
@@ -539,6 +539,20 @@ describe("resizing the box a node is drawn in", () => {
     expect(grips.every((item) => item.hidden)).toBe(true);
     update({ isEdge: true, editable: true });
     expect(grips.every((item) => item.hidden)).toBe(true);
+  });
+
+  it("mirrors the native outline while preserving the turned frame and avoiding repeated writes", () => {
+    const { root, update } = build({ nativeOutline: true });
+    const frame = root.children[0]!;
+    expect(frame.getAttribute("data-miro-native-outline")).toBe("true");
+    const write = vi.spyOn(frame, "setAttribute");
+    update({ nativeOutline: true });
+    expect(write.mock.calls.filter(([name]) => name === "data-miro-native-outline")).toHaveLength(0);
+    update({ nativeOutline: false });
+    expect(frame.getAttribute("data-miro-native-outline")).toBe("false");
+    update({ nativeOutline: true, rotation: 45 });
+    expect(frame.getAttribute("data-miro-native-outline")).toBe("true");
+    expect(frame.getAttribute("data-miro-canvas-turned")).toBe("true");
   });
 
   it("previews a resize, keeps showing it over stale reports, and commits once", () => {

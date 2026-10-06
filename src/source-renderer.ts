@@ -1,3 +1,4 @@
+import { CodeHeadingMarks } from "./native-markup-state";
 import {
   buildCanvasAnchorGeometry, nativeAnchorEnd, nativeEdgeEnd, nativeEdgeRoute, nativeFreeEnd, roundCoordinate,
   type NativeEdgeEnd, type NodeMeasurements,
@@ -59,6 +60,7 @@ interface RenderedItem {
   readonly ownedChildren?: readonly DomElementLike[];
   readonly expectedRotations?: readonly { readonly element: DomElementLike; readonly rotation: number }[];
   readonly descriptor: SourceItemDescriptor;
+  readonly markup?: { readonly element: DomElementLike; readonly refresh: () => void };
   /** The host element this item decorates, and the runtime properties that expose it. */
   readonly anchor: { readonly keys: readonly string[]; readonly element: DomElementLike };
   /** Replaces the marker check for an item that puts no marker on the host. */
@@ -1617,6 +1619,9 @@ function applyNode(
   if (descriptor.localItem !== undefined) patchAttribute(shell, "data-miro-local-item", descriptor.localItem, patches);
   if (descriptor.shape !== undefined) patchAttribute(shell, "data-miro-source-shape", descriptor.shape, patches);
   const sourceCode = descriptor.structured?.code;
+  const codeHeadings = descriptor.kind === "code" ? new CodeHeadingMarks(shell as unknown as Element) : undefined;
+  codeHeadings?.refresh();
+  if (codeHeadings !== undefined) patches.push(() => codeHeadings.dispose());
   const sourceAppCard = descriptor.structured?.appCard;
   const sourceCard = descriptor.structured?.card;
   const sourcePreview = descriptor.structured?.preview;
@@ -1857,6 +1862,7 @@ function applyNode(
   const ownedChildren = [layer, tagLayer].filter((item): item is DomElementLike => item !== undefined);
   return {
     id, kind: "node", element: primary, marker: shell, ownedChildren, expectedRotations, descriptor,
+    ...(codeHeadings === undefined ? {} : { markup: { element: shell, refresh: () => codeHeadings.refresh() } }),
     anchor: { keys: NODE_SHELL_KEYS, element: shell },
   };
 }
@@ -2293,7 +2299,9 @@ export class SourceRenderer {
    */
   private watchLive(): void {
     const keepers = new Map<unknown, { readonly attribute: string; readonly keep: () => void }>();
+    const markup = new Map<unknown, () => void>();
     for (const item of [...this.cardItems, ...this.lineItems]) {
+      if (item.markup !== undefined) markup.set(item.markup.element, item.markup.refresh);
       for (const expected of item.expectedRotations ?? []) {
         keepers.set(expected.element, { attribute: "style", keep: () => keepRotation(expected.element, expected.rotation) });
       }
@@ -2301,7 +2309,7 @@ export class SourceRenderer {
         keepers.set(item.follow.element, { attribute: item.follow.attribute, keep: item.follow.apply });
       }
     }
-    if (keepers.size === 0) return;
+    if (keepers.size === 0 && markup.size === 0) return;
     const Observer = safeGet(safeGet(this.document, "defaultView"), "MutationObserver");
     if (typeof Observer !== "function") return;
     try {
@@ -2309,13 +2317,32 @@ export class SourceRenderer {
         if (!Array.isArray(records)) return;
         const due = new Set<() => void>();
         for (const record of records) {
-          const keeper = keepers.get(safeGet(record, "target"));
-          if (keeper !== undefined) due.add(keeper.keep);
+          let target = safeGet(record, "target");
+          if (safeGet(record, "type") === "childList") {
+            let depth = 0;
+            while (target !== undefined && target !== null && depth < 64) {
+              depth += 1;
+              const refresh = markup.get(target);
+              if (refresh !== undefined) {
+                due.add(refresh);
+                break;
+              }
+              target = safeGet(target, "parentNode");
+            }
+          } else {
+            const keeper = keepers.get(target);
+            if (keeper !== undefined) due.add(keeper.keep);
+          }
         }
         for (const keep of due) keep();
       }]);
       for (const [element, keeper] of keepers) {
         safeCall(observer, "observe", [element, { attributes: true, attributeFilter: [keeper.attribute] }]);
+      }
+      for (const [element] of markup) {
+        const keeper = keepers.get(element);
+        safeCall(observer, "observe", [element, { childList: true, subtree: true,
+          ...(keeper === undefined ? {} : { attributes: true, attributeFilter: [keeper.attribute] }) }]);
       }
       this.liveWatch = observer;
     } catch {

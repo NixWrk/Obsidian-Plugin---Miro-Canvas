@@ -135,6 +135,38 @@ describe("selection frame follows the displayed card", () => {
 	});
 });
 
+describe("resize history", () => {
+	it("restores a cancelled preview without saving, then commits a later resize once", () => {
+		const { canvas, free, session } = fixture();
+		canvas.selectOnly(free);
+		const internal = session as any;
+		internal.refresh();
+		for (const key of ["x", "y", "width", "height"]) {
+			Object.defineProperty(free, key, { get: () => free.data[key] });
+		}
+		const original = clone(free.data);
+		const target = { x: 0, y: -20, width: 140, height: 100 };
+		vi.spyOn(internal, "boardBox").mockReturnValue(target);
+		const save = vi.spyOn(canvas, "requestSave");
+		const rect = { left: 0, top: 0, width: 140, height: 100 };
+		internal.applyHandleResize(rect, false);
+		expect(free.data.width).toBe(140);
+		expect(save).not.toHaveBeenCalled();
+		const cancel = vi.spyOn(internal.handles, "cancelGesture").mockImplementation(() => internal.cancelHandleResize());
+		internal.resetTools();
+		expect(cancel).toHaveBeenCalledTimes(1);
+		expect(free.data).toEqual(original);
+		expect(save).not.toHaveBeenCalled();
+		canvas.selectOnly(free);
+		internal.refresh();
+		internal.applyHandleResize(rect, false);
+		internal.applyHandleResize(rect, true);
+		expect(save).toHaveBeenCalledTimes(1);
+		expect(free.data).toEqual({ ...original, ...target });
+	});
+});
+
+
 describe("formatting a fragment through the native editor", () => {
 	function editing(locked = false) {
 		const rig = fixture();

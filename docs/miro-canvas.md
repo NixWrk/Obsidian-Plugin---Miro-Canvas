@@ -15,6 +15,16 @@ from the plugin.
 
 ## Current implementation status
 
+Native single-card selection uses the node's is-focused/is-selected state,
+looked up by ID, to keep the plugin's handle overlay transparent when the
+native card already supplies its outline. Turned and actively resized frames
+retain their outline. Cancelling a live native resize restores geometry and
+refreshes without requestSave, which would push an empty native history step.
+The source renderer's shared observer marks the duplicate code-title paragraph
+in direct p/pre or adjacent .el-p/.el-pre markup; ordinary paragraphs remain.
+Fallback attachment names watch direct native labels only while the fallback
+exists. All marks/observers are reversible; no CSS :has selectors remain.
+
 Smart drawing checks four straight sides and nearly right-angle turns before
 using area ratios, so a tilted or uneven rectangle is not mistaken for an oval.
 Closed shapes retain fitted local dimensions and center; their orientation

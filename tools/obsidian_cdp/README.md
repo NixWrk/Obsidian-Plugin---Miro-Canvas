@@ -553,3 +553,17 @@ evaluations. `--hold-only`, `--shapes-only` and `--pressure-only` narrow a run.
 Pressure mode checks stationary pulses, zero-force lift, and saved/live SVG
 bounds at 50/100/200 percent, allowing native node rounding at the current
 zoom. Result filenames include the selected mode so evidence is not overwritten.
+
+### Native CSS state and resize history
+
+`node tools/obsidian_cdp/check-css-state.mjs --port <port> --expect-marks`
+requires an isolated desktop vault; add `--serial <device>` for MiroCanvasTest.
+It checks dark/light native and rotated selection, native-edge resize previews,
+50/125 percent commit/cancel history, Undo/Redo, attachment-name toggles and
+plugin reload. Desktop mouse input uses CDP; Android gestures/menu taps use
+ADB touchscreen input. Native selection is prepared programmatically only
+for the resize matrix, avoiding text-edit entry on a repeated selected-card
+tap. Late code/label DOM timing is synthesized and recorded separately.
+Screenshots and per-device results are saved under `.out/css-state-*`.
+The prior file, settings, theme and viewport are restored in finally; the
+runner never overwrites the original file. Keep Android unlocked/foreground.

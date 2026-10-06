@@ -1,3 +1,4 @@
+import { watchAttachmentLabel } from "./native-markup-state";
 /**
  * Runtime owner for the M1 feature set.
  *
@@ -944,6 +945,7 @@ export class M1CanvasSession {
 	/** Put every tool, gesture and selection away, as Escape does. */
 	public resetTools(): void {
 		this.cancelPendingPenDot();
+		this.handles.cancelGesture();
 		this.rectangleSelectionEnd?.();
 		this.selectedRouteEnds.clear();
 		this.selectionMoveEnd?.();
@@ -1474,6 +1476,7 @@ export class M1CanvasSession {
 	/** Editor frames this session has painted; teardown clears each one's style element. */
 	private readonly editorAppearanceFrames = new Set<HTMLElement>();
 	private readonly attachmentLabels: HTMLElement[] = [];
+	private readonly attachmentLabelWatches: Array<() => void> = [];
 	private readonly hiddenNativeAttachmentLabels = new Map<HTMLElement, {
 		readonly styles: Map<string, StylePropertySnapshot>;
 		readonly hidden: AttributeSnapshot;
@@ -2438,7 +2441,7 @@ export class M1CanvasSession {
 		if (gesture === undefined) return;
 		this.resizeGesture = undefined;
 		this.resizeNode(gesture.node, gesture.before);
-		this.adapter.requestSave();
+		// The preview was never saved; restoring it must not push native history.
 		this.refresh();
 	}
 
@@ -5960,6 +5963,20 @@ export class M1CanvasSession {
 		return isObject(canvas) ? canvas : undefined;
 	}
 
+	/** Native single-card selection already paints its border; query its map entry only. */
+	private nativeSelectionOutline(id: string | undefined): boolean {
+		if (id === undefined) return false;
+		const nodes = readRuntime(this.nativeCanvas(), "nodes");
+		const get = readRuntime(nodes, "get");
+		if (typeof get !== "function") return false;
+		try {
+			const dom = readCanvasElementDom(Reflect.apply(get, nodes, [id]));
+			return dom !== undefined && (dom.classList.contains("is-focused") || dom.classList.contains("is-selected"));
+		} catch {
+			return false;
+		}
+	}
+
 	private handlesState(editable: boolean): SelectionHandlesState {
 		// A selected comment pin has no handles; it is moved by itself.
 		if (this.selectedCommentKeys.size > 0) return { selectedIds: [], rotation: 0, editable, isEdge: false };
@@ -5967,6 +5984,7 @@ export class M1CanvasSession {
 		const { geometry, scene } = this.landingGeometry();
 		return {
 			selectedIds: this.selectedIds,
+			nativeOutline: this.nativeSelectionOutline(id),
 			rotation: id === undefined
 				? 0
 				: this.rotationPreview?.id === id
@@ -8426,6 +8444,7 @@ export class M1CanvasSession {
 	}
 
 	private refreshDecorations(): void {
+		for (const stop of this.attachmentLabelWatches.splice(0)) stop();
 		for (const label of this.attachmentLabels.splice(0)) {
 			try {
 				label.remove();
@@ -8507,6 +8526,7 @@ export class M1CanvasSession {
 			try {
 				dom.appendChild(label);
 				this.attachmentLabels.push(label);
+				this.attachmentLabelWatches.push(watchAttachmentLabel(dom, label).dispose);
 			} catch {
 				label.remove();
 			}
@@ -9462,6 +9482,7 @@ export class M1CanvasSession {
 		for (const dispose of this.disposers.splice(0)) {
 			dispose();
 		}
+		for (const stop of this.attachmentLabelWatches.splice(0)) stop();
 		for (const label of this.attachmentLabels.splice(0)) {
 			try {
 				label.remove();

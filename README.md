@@ -199,6 +199,9 @@ menus open above the toolbar.
 
 </details>
 
+A selected native card keeps one outline. Resizing shows its attached lines
+before release; cancelling a resize restores the card without an Undo step.
+
 The round handle below a card rotates it; **Shift** uses 15° steps.
 Side arrows create connected neighbouring cards. Drag a side arrow to draw
 a line to another item.
