@@ -3,7 +3,7 @@ import {
   buildCanvasAnchorGeometry, nativeAnchorEnd, nativeEdgeEnd, nativeEdgeRoute, nativeFreeEnd, roundCoordinate,
   type NativeEdgeEnd, type NodeMeasurements,
 } from "./connector-endpoints";
-import { SHAPE_CLIP_PATHS, inscribedInsets, shapeOutline, shapePath, type ShapePoint } from "./shape-geometry";
+import { inscribedInsets, shapeOutline, shapePath, type ShapePoint } from "./shape-geometry";
 import { CAP_PATHS, capFilled, strokeDash, headMarkerAttributes } from "./connector-style";
 import { fontStack } from "./appearance";
 import { readableInk } from "./miro-palette";

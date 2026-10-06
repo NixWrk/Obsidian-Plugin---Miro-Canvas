@@ -433,8 +433,8 @@ function installNativeCameraPatch(
 		refCount: 1,
 	};
 	const patchedMethod = function(this: unknown, ...args: unknown[]): unknown {
-		const tx = toFiniteNumber(args[0]);
-		const ty = toFiniteNumber(args[1]);
+		toFiniteNumber(args[0]);
+		toFiniteNumber(args[1]);
 		const requestedTZoom = toFiniteNumber(args[2]);
 		const boundedTZoom = requestedTZoom === undefined ? undefined : clampNativeSafeTZoom(requestedTZoom);
 		const callArgs = boundedTZoom === undefined

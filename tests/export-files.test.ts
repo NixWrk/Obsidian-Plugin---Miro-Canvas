@@ -232,6 +232,30 @@ describe("makePdf", () => {
     expect(titled.match(/\/Dest \[/gu) ?? []).toHaveLength(2);
   });
 
+  it("links bookmarks to the correct pages across untitled pages and keeps every xref offset valid", () => {
+    const text = latin1(makePdf([
+      page({ width: 200, height: 200, title: "First" }),
+      page({ width: 220, height: 200 }),
+      page({ width: 240, height: 200, title: "Last" }),
+    ]));
+    const kids = /\/Kids \[([^\]]+)\]/u.exec(text)![1]!;
+    const pageIds = [...kids.matchAll(/(\d+) 0 R/gu)].map(match => Number(match[1]));
+    expect(pageIds).toHaveLength(3);
+    const bookmarks = [...text.matchAll(/(\d+) 0 obj\n<< \/Title [^\n]+ \/Dest \[(\d+) 0 R \/Fit\][^\n]* >>/gu)];
+    expect(bookmarks.map(match => Number(match[2]))).toEqual([pageIds[0], pageIds[2]]);
+    const firstId = bookmarks[0]![1]!;
+    const lastId = bookmarks[1]![1]!;
+    expect(bookmarks[0]![0]).toContain(`/Next ${lastId} 0 R`);
+    expect(bookmarks[1]![0]).toContain(`/Prev ${firstId} 0 R`);
+    const offset = Number(/startxref\n(\d+)/u.exec(text)![1]);
+    const xref = text.slice(offset).split("\n");
+    const count = Number(xref[1]!.split(" ")[1]);
+    for (let id = 1; id < count; id += 1) {
+      const objectOffset = Number(xref[id + 2]!.slice(0, 10));
+      expect(text.slice(objectOffset, objectOffset + `${id} 0 obj`.length)).toBe(`${id} 0 obj`);
+    }
+  });
+
   it("places the image using the given placement, converted to PDF's bottom-left origin", () => {
     const pages = [page({
       width: 400,

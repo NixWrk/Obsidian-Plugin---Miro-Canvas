@@ -85,20 +85,6 @@ function readOwn(value: UnknownRecord, key: string): { readonly ok: boolean; rea
 	}
 }
 
-function ownKeys(value: UnknownRecord): readonly string[] | undefined {
-	try {
-		const symbols = Object.getOwnPropertySymbols(value);
-		for (const symbol of symbols) {
-			if (Object.prototype.propertyIsEnumerable.call(value, symbol)) {
-				return undefined;
-			}
-		}
-		return Object.keys(value);
-	} catch {
-		return undefined;
-	}
-}
-
 function readArrayItems(value: unknown): readonly unknown[] | undefined {
 	if (!isArray(value)) {
 		return undefined;
@@ -124,14 +110,6 @@ function readArrayItems(value: unknown): readonly unknown[] | undefined {
 		}
 	}
 	return result;
-}
-
-function hasOwn(value: UnknownRecord, key: string): boolean {
-	try {
-		return Object.prototype.hasOwnProperty.call(value, key);
-	} catch {
-		return false;
-	}
 }
 
 function isValidUnicode(value: string): boolean {

@@ -12,7 +12,6 @@ import {
 	CANVAS_CAPABILITIES,
 	CanvasAdapter,
 	createCanvasAdapter,
-	type CanvasViewport,
 } from "./canvas-adapter";
 
 export const DEFAULT_MIN_ZOOM = 2 ** -12;
@@ -166,10 +165,6 @@ function clampPositive(value: number, min: number, max: number): number {
 		return min;
 	}
 	return Math.min(max, Math.max(min, value));
-}
-
-function readMode(options: unknown): ViewportCoordinateMode {
-	return configuredMode(options) ?? "transform";
 }
 
 function configuredMode(options: unknown): ViewportCoordinateMode | undefined {

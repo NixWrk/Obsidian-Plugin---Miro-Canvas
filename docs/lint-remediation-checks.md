@@ -733,3 +733,86 @@ Result JSON: .out/css-state-desktop.json, css-state-R52Y808PDJB.json,
 visibility-Windows.json and visibility-R52Y808PDJB.json. No new iOS/hardware
 pressure claims. User-facing behavior is unchanged, so no README/release-note
 behavior amendment is needed for this annotation cleanup.
+
+## L15: unused declarations and allocation loop values (before edits)
+
+Baseline 3ffd0c4 has 14 unused-variable diagnostics in seven modules.
+Traced source searches show attachment-labels ownKeys (88)/hasOwn (129),
+M1 nativeSideOf (288)/safeText (544), viewport-controller readMode (171)
+are private uncalled declarations; remove these bodies, not the active
+readOwn/configuredMode/geometry implementations. Type-only unused imports:
+M1 PanelArrangeHost (135), metadata-writer MiroCanvasMetadata (6), viewport
+CanvasViewport (15). Source-renderer SHAPE_CLIP_PATHS (6) is an unused import;
+shape-geometry retains its constant and live contour/inset readers.
+
+Canvas adapter patchNativeCamera patchedMethod tx/ty (436/437) initializes
+from toFiniteNumber(args[0/1]) but uses the original coordinates in callArgs;
+remove the bindings while preserving the calls/order and all zoom clamping.
+M1 renderExport view (6352) reads ownerDocument(root).defaultView and then
+rebuilds the panel/overlay without using the local: remove only the binding
+and retain that read as an explicit void expression so getters still run.
+
+makePdf export-files (284/297) allocates three object IDs for each page and
+one bookmark ID per titled index; the for-of values are unused. Use counted
+loops over page and titled-index array lengths, preserving the interleaved
+ID order. Validation, rendering and title selection already use the arrays'
+indexed entries; do not change those phases or JPEG/date/Unicode encoding.
+
+Mandatory checks: attachment native/fallback/visibility cleanup; full native
+camera/viewport adapter and controller tests including invalid zoom, original
+coordinates/arguments/this and restoration; source/shape/M1 export tests;
+PDF tests for empty/bad input, multiple-page xref object offsets, titled and
+untitled pages, bookmark destinations/Prev/Next including a gap in titles,
+Unicode strings and JPEG bytes. Add a focused PDF object-link regression.
+Run full types/tests/lint/builds/schema/CSS/three smokes/oracle/diff gates,
+compare production outputs to pre-edit hashes and inspect all differences.
+If runtime output changes, run background installed Windows selection/resize/
+edge/history/cancel plus search/export, and real ADB checks on the connected
+SM-X736B. Phone SM-A336E remains disconnected and its new-build check is
+pending; do not repeat the reconnection request already outstanding.
+Before hashes: main 3155e5bc4ae84ab1ac6f0d4903416c1abc2f11caadb003c1ca83ad2039fca043;
+MCP ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
+
+### L15 results (2026-10-06)
+
+All 14 unused-declaration advisories removed; zero no-unused-vars remains.
+ESLint is 0 errors / 337 warnings (351 before). No linter rule was disabled.
+The five private functions were uncalled; active helpers and exported shape
+constants remain. Coordinate validation calls and the document/window getter
+read still execute in their original order. PDF object IDs stay interleaved;
+bookmarks still target their original page IDs with correct Prev/Next links.
+
+The new PDF regression verifies a three-page file with an untitled middle
+page, bookmark targets/links and every xref object offset. With a fixed clock,
+old/new makePdf produce byte-identical files for 1/3/8 native-style pages with
+mixed Unicode titles. Main production SHA is now
+b69a0b881218828bcf6ee5c1f95a94f9d335927e3b81b39c16d8a829803c4b7e;
+MCP bytes remain identical (ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150).
+No byte-identity claim is made for the plugin bundle because allocation loop
+syntax and unused declarations changed; it was rebuilt and exercised below.
+
+Installed-app checks on the new build:
+- Windows 10.0.19045.6456 / Obsidian 1.14.4, hidden isolated port 9346:
+  search/export and background selection/resize matrices pass in both themes,
+  with paths before release, 50/125 percent zoom, one commit step, Undo/Redo,
+  Escape cancellation, attachment/code markup and unload/reload. Actual PDF
+  saved (37,407 bytes); panel/pages hide during capture and restore/close.
+  Input is confined to CDP renderer; no OS mouse/key input or foregrounding.
+- Samsung SM-X736B / R52Y808PDJB / Obsidian 1.13.8 in MiroCanvasTest port 9340:
+  same matrices pass using ADB selection/resize/CANCEL and menu/close taps.
+  Search text, late DOM and capture instrumentation remain explicitly synthetic.
+  Actual PDF saved (37,317 bytes). Installed main.js readback matches the new
+  SHA; original test-board data/settings/theme/viewport are restored.
+- Phone SM-A336E remains disconnected; its new-build verification is pending.
+
+The first Windows restoration byte check observed the startup welcome board's
+native group-array settlement on reopen. Old L14 and new L15 startup snapshots
+contain exactly the same complete data when native node/edge iteration order
+is disregarded. That attempt is excluded as full restoration evidence. After
+settlement, repeating the unchanged strict byte check passes; the harness was
+not relaxed and no original document was overwritten by an agent write.
+
+Types, 113 unit files (1,758 passed / one existing skip), plugin/MCP builds,
+ESLint, CSS budget (86 priorities / zero :has), three synthetic browser modes,
+pinned schema, 25 oracle tests and diff check pass. No user-facing behavior
+or file format changed; no README/release behavior amendment is needed.

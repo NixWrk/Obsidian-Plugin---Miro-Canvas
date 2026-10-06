@@ -132,7 +132,7 @@ import {
 	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type ArmedTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
 } from "./quick-tools";
 import { replayNativeDrag } from "./native-drag";
-import { PanelArrangeMode, type PanelArrangeHost } from "./panel-arrange";
+import { PanelArrangeMode } from "./panel-arrange";
 import { PanelVisibility } from "./panel-visibility";
 import { applyPanelPositionSettled, defaultPanelsFit, hostFootInset, PANEL_IDS, type PanelId, type PanelPosition } from "./panel-layout";
 import { LOCAL_ITEM_SIZES, MAX_LINE_POINTS, MAX_STROKE_POINTS, TABLE_TEMPLATE, type LocalItem, type LocalLine } from "./local-items";
@@ -282,15 +282,6 @@ interface BoardBeforePalm {
 /** Whether a colour lets what lies under it show: a hex colour with less than full alpha. */
 function seeThrough(color: unknown): boolean {
 	return typeof color === "string" && /^#[0-9a-f]{6}[0-9a-f]{2}$/iu.test(color) && !/ff$/iu.test(color);
-}
-
-/** The native side a connector end sits on, from where its anchor lies on the node. */
-function nativeSideOf(anchor: CanvasAnchor | undefined, fallback: ConnectorSide): ConnectorSide {
-	if (anchor?.type !== "node") return fallback;
-	const candidates: readonly [ConnectorSide, number][] = [
-		["top", anchor.v], ["right", 1 - anchor.u], ["bottom", 1 - anchor.v], ["left", anchor.u],
-	];
-	return candidates.reduce((best, candidate) => candidate[1] < best[1] ? candidate : best)[0];
 }
 /** Frames a still board is still followed for, while native Canvas finishes an animated pan or zoom. */
 const SETTLE_FRAMES = 20;
@@ -539,16 +530,6 @@ export function labelFont(
 		if (value !== undefined) style[property] = value;
 	}
 	return Object.keys(style).length === 0 ? undefined : style;
-}
-
-function safeText(value: unknown): string {
-	if (typeof value === "string") {
-		return value;
-	}
-	if (value instanceof Error && value.message) {
-		return value.message;
-	}
-	return String(value);
 }
 
 function isElement(value: unknown): value is HTMLElement {
@@ -6349,7 +6330,7 @@ export class M1CanvasSession {
 	private renderExport(): void {
 		const exporting = this.exporting;
 		if (exporting === undefined) return;
-		const view = ownerDocument(this.root)?.defaultView;
+		void ownerDocument(this.root)?.defaultView;
 		exporting.panel.update({
 			mode: exporting.mode,
 			title: exporting.title,

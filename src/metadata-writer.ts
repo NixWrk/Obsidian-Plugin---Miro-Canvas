@@ -3,7 +3,6 @@ import {
 	createDefaultMiroCanvasMetadata,
 	parseMiroCanvasMetadata,
 	validateMiroCanvasMetadata,
-	type MiroCanvasMetadata,
 	type MiroCanvasMetadataParseOptions,
 } from "./metadata";
 import { graphDrift } from "./native-graph";

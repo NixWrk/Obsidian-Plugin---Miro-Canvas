@@ -281,7 +281,7 @@ export function makePdf(pages: readonly ExportPage[], info: ExportInfo = {}): Ui
   const pageIds: number[] = [];
   const contentIds: number[] = [];
   const imageIds: number[] = [];
-  for (const _page of pages) {
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
     pageIds.push(nextId++);
     contentIds.push(nextId++);
     imageIds.push(nextId++);
@@ -294,7 +294,9 @@ export function makePdf(pages: readonly ExportPage[], info: ExportInfo = {}): Ui
   const outlineItemIds: number[] = [];
   if (titledIndices.length > 0) {
     outlinesId = nextId++;
-    for (const _index of titledIndices) outlineItemIds.push(nextId++);
+    for (let titleIndex = 0; titleIndex < titledIndices.length; titleIndex += 1) {
+      outlineItemIds.push(nextId++);
+    }
   }
 
   const writer = new ByteWriter();
