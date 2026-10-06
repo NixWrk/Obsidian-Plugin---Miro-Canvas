@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Close comment threads and unsaved drafts before Select or another board gesture consumes the outside press. Keep thread and pin controls interactive. Replace three CSS priorities for owned hidden toolbar, handle and thread states with scoped selectors.
+
 - Keep the search close button above folded panel controls on phones. Remove four redundant CSS priorities for hidden search/export roots and screenshot search outlines; verify search and actual PDF capture in installed Windows/Android Obsidian.
 
 - Remove the four remaining CSS `:has()` selectors. Keep one selection outline on native cards and one code title with Obsidian's wrapped Markdown preview. Track late attachment labels and code markup with reversible local state.

@@ -939,12 +939,6 @@
   transform: translate(-50%, 12px);
 }
 
-/* Author `display` rules outrank the browser's `[hidden]` rule, so the plugin
-   must restore it explicitly or a hidden control would still be painted. */
-.miro-canvas-toolbar[hidden],
-.miro-canvas-toolbar [hidden] {
-  display: none !important;
-}
 
 .miro-canvas-toolbar__bar {
   display: flex;
@@ -2052,10 +2046,6 @@
   pointer-events: none;
 }
 
-.miro-canvas-handles[hidden],
-.miro-canvas-handles [hidden] {
-  display: none !important;
-}
 
 /* The dashed box a node is drawn in turns with it and carries the resize
    grips: a corner scales evenly, a side stretches.  Native resizers step
@@ -3337,10 +3327,6 @@
   box-shadow: var(--shadow-l);
 }
 
-.miro-canvas-thread[hidden],
-.miro-canvas-thread [hidden] {
-  display: none !important;
-}
 
 /* Keep native Canvas's visible selection for native-only groups. Its own box
    can never include independent connectors, so only those groups need our
@@ -4928,4 +4914,11 @@
 .miro-canvas-export-progress button {
   --miro-canvas-button-padding: 4px 12px;
   padding: var(--miro-canvas-button-padding);
+}
+
+/* Owned hidden states outrank their component display rules, including the
+   adopted native menu. Keep this after the component rules for equal weights. */
+.miro-canvas-root :is(.miro-canvas-toolbar, .miro-canvas-handles, .miro-canvas-thread)[hidden],
+.miro-canvas-root :is(.miro-canvas-toolbar, .miro-canvas-handles, .miro-canvas-thread) [hidden] {
+  display: none;
 }

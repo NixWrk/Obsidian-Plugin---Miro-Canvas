@@ -899,3 +899,153 @@ SM-X736B readback on port 9340 matches the production SHA above. Only that
 tablet is currently listed by ADB; SM-A336E phone installed/input verification
 remains pending. No additional OS input or physical stylus claim is made.
 No user-facing behavior or format changed; release behavior docs stay as-is.
+
+
+## L17: owned toolbar, handle and thread hidden states (before edits)
+
+Baseline db66aa2: styles.css 946/2057/3342 hide selection-toolbar,
+selection-handles and comment-thread roots/descendants with three priorities.
+SelectionToolbar.update sets root hidden for empty/unplaced selections and
+hides node/edge/media-specific rows, link/delete actions, recent colors and
+status. makePopover/togglePopover/closePopovers hide formatting and More menus;
+M1 adoptNativeMenu hides its inert snapshot again after a middle-button pan.
+Handles.update hides the root/frame/end grips and rotate/connect/resize grips
+for empty, edge, locked or review selections. CommentThreadCard compose/show/
+hide/showHelp hides the whole card, help, unavailable imported/local actions,
+reply composer/note and message list. M1 mounts all three under its native
+canvas-wrapper root and updates/closes the card on pin/outside presses.
+
+Their author display rules override the browser hidden rule: toolbar root,
+buttons/rows/popovers/native slot, handles and thread root/buttons/messages/
+composer. Replace only these three priority rules with a shared rule scoped
+to miro-canvas-root and those owned roots, ordered after component display
+rules so equal-specificity native-slot rules cannot reveal hidden children.
+Keep native controls/resizers, independent-only menu hiding, presentation and
+capture overrides unchanged in this batch. No JS state/observers/persistence
+changes are intended. Check every matched hidden element against the actual
+Obsidian stylesheet instead of assuming the cascade is sufficient.
+
+Mandatory new installed-app matrix in both themes: empty selection hides
+bar/handles; native node/edge and mixed native selection show only applicable
+rows/grips; lock and review hide edit grips; formatting/More popovers open,
+close and disappear on deselect; native snapshot stays hidden at rest; inert
+or hidden controls have zero rect and do not receive focus or a hit. Force
+hidden on each owned styled descendant as labeled DOM instrumentation, then
+restore its original attribute, to catch less common display conflicts.
+Local/imported/locked comment pins must open, help must toggle, unsupported
+reply/delete/hide controls must stay hidden, outside/Close must close and a
+second pin press must reopen. New-comment compose hides thread-only actions
+and closing it must not save. Source and unknown fields/history must survive.
+
+Run background installed Windows 1.14.4 via CDP renderer input without OS
+mouse/keyboard or foreground takeover, and physical SM-X736B 1.13.8 in
+MiroCanvasTest with actual ADB pin/menu/close taps. Record DOM instrumentation,
+programmatically prepared selections/locks/review separately from input.
+Phone SM-A336E is absent; its fresh CSS checks remain pending. Also run the
+existing CSS selection/resize/native-edge-before-release/history/cancel matrix
+at 50/125 percent, search/export capture restore, and full repository gates.
+Lower the CSS advisory budget from 86 to 83 only if all three rules pass.
+User-facing appearance/behavior should be identical; fix any cascade failure
+before marking the new checks passed.
+
+
+### L17 comment outside-press finding (before JS edits)
+
+The baseline Windows matrix on the old installed CSS passes hidden descendants
+and Close/reopen, but fails outside-close on blank board while Select is armed.
+The point is inside the 1280x800 renderer and hits canvas-wrapper. The late
+root capture listener does not receive pointerdown: attachRectangleSelection's
+earlier root handler consumes that press with stopImmediatePropagation to own
+the single marquee. ensureCommentCard currently registers its outside handler
+only after the first thread opens, so its order loses to that handler.
+
+Move only this scoped outside handler to the owning window capture phase
+(document fallback for a detached host). Check that the target is inside this
+board root before closing; preserve all presses inside the thread or comment
+markers. Capture the original root/target for exact paired listener removal
+on session disposal, including owner-window/popout compatibility. Do not change
+selection routing, native history or pointer prevention. Mandatory additional
+regression: composing/open comment closes before a consumed Select press;
+thread/pin/help presses stay open, other roots/panes are ignored, outside-close
+and reopen pass with actual background renderer input and physical tablet ADB,
+plugin reload cleans up and the press still has only one marquee/history action.
+Add the consumed-press case to the synthetic DOM controls suite, keeping its
+evidence separate from installed-app input. This is a pre-existing behavior
+bug found by the required CSS-state matrix, not attributed to the new cascade.
+
+
+The window capture listener also sees a directly dispatched Window-target
+pointerdown, unlike the old root-only listener. Before calling root.contains,
+ignore non-Node targets (safe nodeType read) and cover that case in the controls
+regression. This keeps the widened listener failing closed across owner realms.
+Harness correction before accepting Android results: a programmatically focused
+composer does not always open the IME, so unconditional ADB Back may navigate
+the test board away. Close the draft with its actual button; send Back only
+if the board's keyboard state explicitly reports open, then verify its file.
+The first Windows strict restore check sees the known welcome-board native
+array settlement; exclude that attempt and retain the unchanged strict check.
+
+
+### L17 results (2026-10-06)
+
+CSS is 83 !important declarations (86 before), zero :has; source ESLint stays
+at 0 errors / 332 warnings. The three hidden priorities are replaced by one
+late scoped rule with specificity (0,3,0). No native inline-style bridging,
+independent-only, presentation or screenshot override was removed. Current
+production main SHA 8849bb6d1da0e83e7f7ceb239921b2d62b5e944cba4a4bef862a1573f1a47b2f;
+CSS SHA 572acf04c0fc163ebeba19847f34d29441b901756bec23e722164424bb3eff28.
+MCP remains ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
+Installed main/CSS readback matches both current hashes on Windows and tablet.
+
+The comment outside handler now captures in its own window before Select or
+other board handlers claim the press. It ignores other roots and non-Node
+Window targets, leaves card/pin controls open, and removes the same listener
+on dispose. The new controls-suite DOM regression verifies the owner-window
+registration, isolated non-Node callback, other-pane/card presses and a consumed
+Select press closing an unsaved draft without leaving a second marquee.
+The artificial Window-target case is invoked on that captured callback only:
+broadcasting such a target also exercised unrelated existing window listeners
+that assume actual Node targets, and those errors are excluded from this test.
+
+New installed-app evidence on the current build:
+- Windows 10.0.19045.6456 / Obsidian 1.14.4 (copied installed
+  obsidian-1.14.4.asar), hidden isolated port 9346. All three matrices pass:
+  check-owned-hidden, check-owned-visibility and check-css-state --background.
+  Both themes, empty/native-node/native-edge/mixed/locked/review selection,
+  formatting/More open-close-deselect, native snapshot hidden at rest, comment
+  local/imported/locked open/help/Close/reopen/outside-close and unsaved draft
+  Close, reload and restoration pass. Input is CDP renderer synthesis, with
+  selections/review/draft/probes prepared programmatically; no OS input or
+  foreground switch during the matrix. Actual PDF saved (37,407 bytes).
+- Samsung SM-X736B / R52Y808PDJB / Obsidian 1.13.8, MiroCanvasTest port 9340.
+  Same three matrices pass with actual ADB menu/pin/help/close/outside taps
+  and resize DOWN/MOVE/UP/CANCEL plus Undo/Redo taps. Search text and prepared
+  selections/review/draft/hidden probes remain DOM/CDP instrumentation.
+  Actual PDF saved (37,322 bytes). Original Export touch test.canvas data,
+  preferences/theme/viewport are restored; its original snapshot was not
+  overwritten. The unconditional-Back harness attempts are excluded.
+- Each owned-hidden matrix checks 37 states and 15,258 forced hidden cases:
+  computed display none, no hit rectangle and no direct focus. This count is
+  instrumentation on installed Obsidian DOM, not a count of physical gestures.
+- Both platforms' CSS-state matrices pass native/turned selection, attached
+  edge geometry before resize release at 50/125 percent, no preview save,
+  one-step commit, Undo/Redo, cancellation and late code/attachment/reload.
+- Phone SM-A336E remains absent from ADB; this build's phone check is pending.
+  No hardware-stylus, iOS or new real popout input claim is made.
+
+Initial Windows restore assertions on the generated welcome board detected
+native node/group-array iteration reordering, as in the earlier startup checks.
+Those attempts are excluded; their strict checks were not relaxed. The final
+three complete matrices start from a newly created, group-free native baseline
+in the isolated vault, serialized through native requestSave(false); every
+original-restoration assertion passes, including the unchanged CSS-state byte
+comparison. Welcome-board ordering remains a separate lifecycle follow-up;
+no agent write restored or reordered an original snapshot.
+
+Artifacts: .out/hidden-Windows-current.json, hidden-R52Y808PDJB-current.json,
+visibility-Windows.json, visibility-R52Y808PDJB.json, css-state-desktop.json,
+css-state-R52Y808PDJB.json and l17-installed.json. Types, all 113 unit files
+(1,758 passed / one existing skip), ESLint/CSS, plugin/MCP builds, pinned
+schema, all three synthetic smokes (including the new consumed-press case),
+25 oracle tests and diff check pass. English/Russian README/design notes,
+CHANGELOG and the installed-check harness guide describe the dismissal fix.

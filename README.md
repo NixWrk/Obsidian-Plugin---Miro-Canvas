@@ -253,7 +253,8 @@ are experimental and disabled by default.
 
 Press **C** and choose a place for a comment: a card, picture, line or empty
 area. Click the pin to read the thread. Reply, mark it resolved or reopen it
-later. A separate panel lists comments for the board or selected item.
+later. Click outside the thread on the board to close it, including while
+Select is active. A separate panel lists comments for the board or selected item.
 
 <details>
 <summary>Reply and resolve a comment</summary>

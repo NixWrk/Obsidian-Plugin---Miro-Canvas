@@ -111,6 +111,15 @@ saved settings in `.obsidian/plugins/miro-canvas/data.json`) is whatever an
 earlier run left behind. **Pass `--fresh` before recording anything you
 intend to keep**, so the state is exactly what `launch.py` itself produces.
 
+`node tools/obsidian_cdp/check-owned-hidden.mjs --port 9346` checks owned
+hidden toolbar/handle/thread roots and descendants, formatting popovers,
+node/edge/mixed/locked/review selection and local/imported/locked comment
+open/help/close/reopen/draft states in both themes. Desktop runs hidden and
+uses CDP renderer input; no OS input or foregrounding. Add `--port 9340
+--serial <device>` for real ADB pin/menu/close taps in MiroCanvasTest. Prepared
+selection/review/draft and exhaustive hidden/display/focus probes are DOM
+instrumentation, recorded separately. Original data/theme/viewport are restored.
+
 `node tools/obsidian_cdp/check-panel-toggle.mjs 9336` checks repeated folding
 at all four corners in both orientations, followed by a held drag and more
 folds. It uses real input in the isolated desktop window and restores its

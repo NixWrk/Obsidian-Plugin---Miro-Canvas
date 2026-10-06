@@ -3800,14 +3800,17 @@ export class M1CanvasSession {
 			});
 			this.root.appendChild(card.element);
 			// A press anywhere else on the board closes the card, as in Miro.
+			const root = this.root;
+			const outsideTarget = document.defaultView ?? document;
 			const outside = (event: Event): void => {
 				const target = event.target as Node | null;
-				if ((this.openThread === undefined && !card.composingComment) || target === null) return;
+				if ((this.openThread === undefined && !card.composingComment) || target === null || typeof readRuntime(target, "nodeType") !== "number" || !root.contains(target)) return;
 				if (card.element.contains(target) || this.commentMarkers?.element.contains(target)) return;
 				this.closeCommentThread();
 			};
-			this.root.addEventListener("pointerdown", outside, true);
-			this.disposers.push(() => this.root?.removeEventListener("pointerdown", outside, true));
+			// Close before selection or drawing claims the board press.
+			outsideTarget.addEventListener("pointerdown", outside, true);
+			this.disposers.push(() => outsideTarget.removeEventListener("pointerdown", outside, true));
 			this.commentCard = card;
 		}
 		return this.commentCard;

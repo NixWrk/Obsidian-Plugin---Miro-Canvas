@@ -50,6 +50,32 @@ def main() -> int:
             page.add_script_tag(path=str(bundle))
             assert page.evaluate("miroBrowser.mounted"), "M1 controls did not mount on real DOM"
             if args.controls:
+                # Outside-close must run before Select consumes the board press.
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session;
+                  s.resetTools();
+                  const add=window.addEventListener;let outside;
+                  window.addEventListener=function(type,listener,options){
+                    if(type==='pointerdown'&&options===true)outside=listener;
+                    return Reflect.apply(add,this,[type,listener,options]);
+                  };
+                  try{s.composeComment({x:300,y:240},{x:300,y:240});}
+                  finally{window.addEventListener=add;}
+                  if(!s.commentCard.composingComment)throw Error('Comment draft did not open');
+                  if(typeof outside!=='function')throw Error('Outside-close did not use the owning window');
+                  outside.call(window,{target:window});
+                  if(s.commentCard.element.hidden)throw Error('Window-target event closed the board comment');
+                  const other=document.body.appendChild(document.createElement('div'));
+                  other.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:991,bubbles:true}));
+                  if(s.commentCard.element.hidden)throw Error('Another pane closed the board comment');
+                  other.remove();
+                  s.commentCard.element.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:992,bubbles:true}));
+                  if(s.commentCard.element.hidden)throw Error('Comment card closed itself');
+                  b.root.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerType:'mouse',pointerId:993,clientX:1100,clientY:700,bubbles:true,cancelable:true}));
+                  if(!s.commentCard.element.hidden)throw Error('Select swallowed comment outside-close');
+                  window.dispatchEvent(new PointerEvent('pointerup',{button:0,pointerType:'mouse',pointerId:993,clientX:1100,clientY:700,bubbles:true}));
+                  if(b.root.querySelectorAll('.miro-canvas-rectangle-marquee:not([hidden])').length)throw Error('Outside-close left a marquee');
+                }""")
                 page.evaluate("document.querySelector('.miro-canvas-dock__map').hidden = false")
                 page.locator('.miro-canvas-dock button[aria-label="Board settings"]').click()
                 page.evaluate("""() => {

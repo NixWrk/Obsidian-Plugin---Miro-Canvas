@@ -15,6 +15,11 @@ from the plugin.
 
 ## Current implementation status
 
+Owned toolbar, handle and thread hidden states use scoped rules after their
+component display rules. Comment outside-close listens in the owning window
+capture phase, before selection/drawing consumes the press, and stays scoped
+to that board. Thread/pin presses stay open; disposal removes the same listener.
+
 Search uses layer 140 above saved-panel toggles (120) and popovers (130),
 so its Close button stays reachable when panels share the top-right corner.
 Hidden search/export roots rely on their specific selectors without CSS
