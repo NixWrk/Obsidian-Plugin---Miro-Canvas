@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Retain one timer owner for board initialization retries and PDF readiness deadlines, including cancellation on leaf switch or plugin unload. Keep the existing native PDF controls fallback when automatic fitting is unavailable.
+- Replace unsafe private Canvas type boundaries without changing executable behavior; remove six more redundant MCP assertions. Assign remaining lint sites to dependency-ordered work packages with mandatory regression checks.
+
 - Close comment threads and unsaved drafts before Select or another board gesture consumes the outside press. Keep thread and pin controls interactive. Replace three CSS priorities for owned hidden toolbar, handle and thread states with scoped selectors.
 
 - Keep the search close button above folded panel controls on phones. Remove four redundant CSS priorities for hidden search/export roots and screenshot search outlines; verify search and actual PDF capture in installed Windows/Android Obsidian.

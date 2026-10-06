@@ -138,6 +138,69 @@ describe("the board's rules", () => {
 });
 
 describe("lines", () => {
+	it("restyles a native edge without changing its ends or the Miro import", () => {
+		const root = makeFixtureVault();
+		const call = toolsFor(root);
+		const board = "boards/plugin-authored-board.canvas";
+		const file = boardFile(root, "plugin-authored-board.canvas");
+		const before = readJson(file);
+		const edge = before.edges.find((item: Answer) => item.id === "edge-1");
+		const result = call("set_style", { path: board, ids: ["edge-1"], connector: { route: "elbowed", color: "#abcdef", width: 6 } });
+		expect(result.status).toBe("applied");
+		const after = readJson(file);
+		expect(after.edges.find((item: Answer) => item.id === "edge-1")).toMatchObject({
+			fromNode: edge.fromNode, toNode: edge.toNode, fromSide: edge.fromSide, toSide: edge.toSide,
+		});
+		expect(after.miroCanvas.localOverrides["edge-1"].connector).toMatchObject({ route: "elbowed", color: "#abcdef", width: 6 });
+		expect(after.miroSource).toStrictEqual(before.miroSource);
+		expect(call("validate_board", { path: board }).valid).toBe(true);
+	});
+
+	it("clears a connector label and normalizes color while retaining its other fields", () => {
+		const root = makeFixtureVault();
+		const call = toolsFor(root);
+		const board = "boards/plugin-authored-board.canvas";
+		const file = boardFile(root, "plugin-authored-board.canvas");
+		const before = readJson(file);
+		const connector = before.miroCanvas.connectors["conn-1"];
+		connector.label = "remove this";
+		connector.futureConnectorField = { sentinel: "keep-line" };
+		writeFileSync(file, JSON.stringify(before));
+		const result = call("update_connector", { path: board, id: "conn-1", label: "", color: "#ABCDEF" });
+		expect(result.status).toBe("applied");
+		const after = readJson(file);
+		const { label: _label, ...retained } = connector;
+		expect(after.miroCanvas.connectors["conn-1"]).toStrictEqual({ ...retained, color: "#abcdef" });
+		expect(after.miroSource).toStrictEqual(before.miroSource);
+		expect(call("validate_board", { path: board }).valid).toBe(true);
+		const bytes = readFileSync(file);
+		expect(call("update_connector", { path: board, id: "conn-1", label: "" }).status).toBe("noop");
+		expect(readFileSync(file).equals(bytes)).toBe(true);
+	});
+
+	for (const protection of ["lock", "review"] as const) {
+		it(`refuses native and independent line changes under ${protection}`, () => {
+			const root = makeFixtureVault();
+			const call = toolsFor(root);
+			const board = "boards/plugin-authored-board.canvas";
+			const file = boardFile(root, "plugin-authored-board.canvas");
+			if (protection === "lock") {
+				expect(call("lock", { path: board, ids: ["edge-1", "conn-1"], locked: true }).status).toBe("applied");
+			} else {
+				const document = readJson(file);
+				document.miroCanvas.settings.reviewMode = true;
+				writeFileSync(file, JSON.stringify(document));
+			}
+			const bytes = readFileSync(file);
+			for (const id of ["edge-1", "conn-1"]) {
+				expect(call("update_connector", { path: board, id, color: "#ABCDEF" }).status).toBe("rejected");
+			}
+			expect(call("set_style", { path: board, ids: ["edge-1"], connector: { width: 6 } }).status).toBe("rejected");
+			expect(readFileSync(file).equals(bytes)).toBe(true);
+			expect(leftovers(path.dirname(file))).toEqual([]);
+		});
+	}
+
 	it("joins two cards with a native edge and its record", () => {
 		const root = makeFixtureVault();
 		const call = toolsFor(root);

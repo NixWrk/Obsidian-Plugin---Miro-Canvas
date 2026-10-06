@@ -138,7 +138,8 @@ export default class MiroCanvasPlugin extends Plugin {
   private importGuideModal: Modal | null = null;
   /** The status bar's mark while a newer release is known; absent otherwise. */
   private updateIndicator: HTMLElement | undefined;
-  private initializationRetry: ReturnType<typeof setTimeout> | null = null;
+  private readonly initializationTimerHost: Window = window;
+  private initializationRetry: number | null = null;
   public canvasSettings: MiroCanvasSettings = DEFAULT_SETTINGS;
   /** The `<style>` this plugin owns in every window's head; loads a family's faces lazily, only once something wants it. */
   private readonly fontFaces = new FontFaceRegistry();
@@ -475,7 +476,7 @@ export default class MiroCanvasPlugin extends Plugin {
   ): void => {
     if (this.shellDisposed) return;
     this.settingsOfThisDevice();
-    if (this.initializationRetry !== null) clearTimeout(this.initializationRetry);
+    if (this.initializationRetry !== null) this.initializationTimerHost.clearTimeout(this.initializationRetry);
     this.initializationRetry = null;
     const view = leaf?.view;
     if (!isNativeCanvasView(view)) {
@@ -556,7 +557,7 @@ export default class MiroCanvasPlugin extends Plugin {
     // members the metadata store needs.  Mounting alone is therefore not
     // enough: without persistence every write is refused, so keep probing.
     if ((!mounted || this.metadataWriter === null) && attempt < 20) {
-      this.initializationRetry = setTimeout(() => {
+      this.initializationRetry = this.initializationTimerHost.setTimeout(() => {
         this.initializationRetry = null;
         if (this.app.workspace.activeLeaf === leaf) this.handleActiveLeafChange(leaf, attempt + 1);
       }, 250);
@@ -1196,7 +1197,7 @@ export default class MiroCanvasPlugin extends Plugin {
     }
 
     this.shellDisposed = true;
-    if (this.initializationRetry !== null) clearTimeout(this.initializationRetry);
+    if (this.initializationRetry !== null) this.initializationTimerHost.clearTimeout(this.initializationRetry);
     this.initializationRetry = null;
     this.toolsModal?.close();
     this.toolsModal = null;

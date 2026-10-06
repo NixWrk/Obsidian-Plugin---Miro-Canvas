@@ -2138,6 +2138,15 @@ retry. Adopted native-menu state replaces six :has selectors; four remain
 for native selection, attachment labels and Markdown code previews. Remaining
 !important overrides need their own cascade evidence before removal.
 
+The [execution plan](lint-execution-plan.md) assigns baseline sites once,
+distinguishing contract dependencies from shared-file and app-input leases.
+Initialization retries capture the plugin window for both schedule and cancel;
+the unchanged 250ms/20-attempt guard never switches timer owners mid-wait.
+PDF readiness captures the view's document window, or a complete window/Node
+fallback pair, for its unchanged two-second race and cleanup. Installed-app
+checks preserve the existing unsupported-fit/native-controls fallback; desktop
+popout ownership remains a separately pending real-app scenario in L19.
+
 Physical Android follow-up (2026-10-06): the native-menu mirror and open-popover
 placement are verified on SM-X736B/Obsidian 1.13.8 and SM-A336E/1.12.7 (legacy
 additional check). Open selection popovers are re-clamped when the toolbar's

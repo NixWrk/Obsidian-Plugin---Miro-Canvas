@@ -522,6 +522,16 @@ export panel and toolbar; obscured controls fail explicitly.
 
 ### Lint regression checks
 
+`node tools/obsidian_cdp/check-timer-owners.mjs --port 9346` checks the installed
+plugin's captured retry owner, native leaf switch and unload/reload with unchanged
+original board bytes, then opens/reuses a real PDF exported by check-owned-visibility.
+Add `--serial <device>` for a forwarded MiroCanvasTest app. Windows stays hidden
+and never uses OS input. Forced mount/rejected/never-ready/late renderer probes
+are explicitly instrumented; the other Android matrices supply real ADB input.
+The native PDF fit result is compared with baseline 85cb6cd, and unsupported
+private fields retain the diagnostic/native controls fallback. A passing result
+does not certify automatic fit or desktop popout ownership.
+
 `node tools/obsidian_cdp/check-lint-regressions.mjs <port>` requires a disposable
 isolated desktop instance and creates a dedicated board. It checks native menu
 state, duplicate buttons, panning preview, both themes, plugin unload/reload

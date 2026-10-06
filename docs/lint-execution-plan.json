@@ -1,0 +1,4838 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "85cb6cd",
+  "inventory": "lint-remaining-sites.json",
+  "baselineSites": 438,
+  "owners": {
+    "data": {
+      "name": "Sagan",
+      "agentId": "01a11235-419d-7a41-9f11-c7328d49c4a3",
+      "files": [
+        "src/anchors.ts",
+        "src/attachment-labels.ts",
+        "src/board-selection.ts",
+        "src/canvas-elements.ts",
+        "src/connector-endpoints.ts",
+        "src/device-files.ts",
+        "src/document-viewer.ts",
+        "src/interaction-policy.ts",
+        "src/local-comments.ts",
+        "src/metadata-writer.ts",
+        "src/metadata.ts",
+        "src/obsidian-metadata-store.ts",
+        "src/settings.ts"
+      ],
+      "count": 90,
+      "jobIds": [
+        "D-EXTENSIONS",
+        "D-RECORDS",
+        "D-SEL",
+        "D-VALID"
+      ]
+    },
+    "authoring": {
+      "name": "Helmholtz",
+      "agentId": "01a11235-42fc-7400-9da7-e0692420df74",
+      "files": [
+        "src/advanced-canvas-adapter.ts",
+        "src/canvas-authoring.ts",
+        "src/importers/advanced-canvas.ts",
+        "src/importers/board-builder.ts",
+        "src/viewport-controller.ts"
+      ],
+      "count": 65,
+      "jobIds": [
+        "A-AUTH",
+        "A-RECORDS"
+      ]
+    },
+    "foundation": {
+      "name": "James",
+      "agentId": "01a11239-ba3d-7fa3-a9d0-335ac8e2176d",
+      "files": [
+        "src/appearance.ts",
+        "src/minimap-model.ts"
+      ],
+      "count": 5,
+      "jobIds": [
+        "F-RECORDS",
+        "F-TYPES",
+        "F-VALID"
+      ]
+    },
+    "platform": {
+      "name": "Parfit",
+      "agentId": "01a11235-4a6d-7fa0-8fea-54c202e3c860",
+      "files": [
+        "src/canvas-ids.ts",
+        "src/editor-appearance.ts",
+        "src/font-packs.ts",
+        "src/main.ts",
+        "src/obsidian-document-host.ts",
+        "src/source-renderer.ts"
+      ],
+      "count": 32,
+      "jobIds": [
+        "P-CONTEXT",
+        "P-DOM",
+        "P-DOM-PROBE",
+        "P-ID-TEXT",
+        "P-LEAF",
+        "P-PDFCOMPAT",
+        "P-RENDER-DATA",
+        "P-TIMERS",
+        "P-VALID"
+      ]
+    },
+    "core": {
+      "name": "Coordinator",
+      "agentId": null,
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "count": 35,
+      "jobIds": [
+        "K-CLIPBOARD",
+        "K-CONTEXT",
+        "K-DOM",
+        "K-GUARDS",
+        "K-RECORDS",
+        "K-SEARCH",
+        "K-TEXT"
+      ]
+    },
+    "interface": {
+      "name": "Anscombe",
+      "agentId": "01a11235-4fc8-7423-bb96-d143c57f489e",
+      "files": [
+        "src/board-export.ts",
+        "src/board-search-bar.ts",
+        "src/comment-markers.ts",
+        "src/comment-thread.ts",
+        "src/comments-panel.ts",
+        "src/connector-labels.ts",
+        "src/document-controls.ts",
+        "src/import-guide.ts",
+        "src/m1-controls.ts",
+        "src/m2-tools.ts",
+        "src/panel-arrange.ts",
+        "src/panel-visibility.ts",
+        "src/pen-tooltips.ts",
+        "src/quick-tools.ts",
+        "src/selection-handles.ts",
+        "src/selection-toolbar.ts",
+        "src/settings-tab.ts",
+        "src/slide-show.ts",
+        "styles.css"
+      ],
+      "count": 188,
+      "jobIds": [
+        "C8-SIZE",
+        "C8-TRANSFORM",
+        "U-C1",
+        "U-C10",
+        "U-C2",
+        "U-C3",
+        "U-C4",
+        "U-C5",
+        "U-C6",
+        "U-C7",
+        "U-C9",
+        "U-CONTEXT",
+        "U-DOM",
+        "U-RECORDS",
+        "U-SETTINGS",
+        "U-TEXT"
+      ]
+    },
+    "mcp": {
+      "name": "Carver",
+      "agentId": "01a11235-4619-7bc2-815d-4b07fd9ec05a",
+      "files": [
+        "mcp/src/board-file.ts",
+        "mcp/src/json-rpc.ts",
+        "mcp/src/server.ts",
+        "mcp/src/tools-edit.ts",
+        "mcp/src/vault.ts"
+      ],
+      "count": 23,
+      "jobIds": [
+        "M-M1",
+        "M-M2",
+        "M-M3",
+        "M-M4",
+        "M-M5",
+        "M-M6"
+      ]
+    }
+  },
+  "jobs": [
+    {
+      "id": "A-RECORDS",
+      "owner": "authoring",
+      "diagnosticIndices": [
+        0,
+        177,
+        178,
+        179,
+        329,
+        330,
+        331
+      ],
+      "files": [
+        "src/advanced-canvas-adapter.ts",
+        "src/importers/advanced-canvas.ts",
+        "src/importers/board-builder.ts",
+        "src/viewport-controller.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 7,
+      "changeImpact": 1,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "D-RECORDS",
+      "owner": "data",
+      "diagnosticIndices": [
+        1,
+        8,
+        157,
+        180,
+        184,
+        185,
+        277,
+        279,
+        283,
+        284
+      ],
+      "files": [
+        "src/anchors.ts",
+        "src/attachment-labels.ts",
+        "src/connector-endpoints.ts",
+        "src/interaction-policy.ts",
+        "src/local-comments.ts",
+        "src/metadata-writer.ts",
+        "src/metadata.ts",
+        "src/obsidian-metadata-store.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 10,
+      "changeImpact": 1,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "D-VALID",
+      "owner": "data",
+      "diagnosticIndices": [
+        2,
+        7,
+        148,
+        161,
+        169,
+        170,
+        181,
+        182,
+        183,
+        278,
+        320
+      ],
+      "files": [
+        "src/anchors.ts",
+        "src/attachment-labels.ts",
+        "src/canvas-elements.ts",
+        "src/device-files.ts",
+        "src/document-viewer.ts",
+        "src/local-comments.ts",
+        "src/metadata.ts",
+        "src/settings.ts"
+      ],
+      "groups": [
+        "S3"
+      ],
+      "count": 11,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "F-VALID",
+      "owner": "foundation",
+      "diagnosticIndices": [
+        3,
+        4
+      ],
+      "files": [
+        "src/appearance.ts"
+      ],
+      "groups": [
+        "S3"
+      ],
+      "count": 2,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "F-RECORDS",
+      "owner": "foundation",
+      "diagnosticIndices": [
+        5
+      ],
+      "files": [
+        "src/appearance.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 1,
+      "changeImpact": 0,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "F-TYPES",
+      "owner": "foundation",
+      "diagnosticIndices": [
+        6,
+        280
+      ],
+      "files": [
+        "src/appearance.ts",
+        "src/minimap-model.ts"
+      ],
+      "groups": [
+        "S8"
+      ],
+      "count": 2,
+      "changeImpact": 0,
+      "failureImpact": 1,
+      "wave": 1,
+      "status": "worker-complete",
+      "integrationStatus": "integrated-scoped-native-main-checks-passed",
+      "pendingChecks": [
+        "popout owner-window coverage",
+        "real native PDF fit compatibility and actual native viewer failure coverage where supported"
+      ]
+    },
+    {
+      "id": "U-DOM",
+      "owner": "interface",
+      "diagnosticIndices": [
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        158,
+        159,
+        160,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        176,
+        186,
+        222,
+        223,
+        224,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253,
+        254,
+        255,
+        256,
+        285,
+        286,
+        287,
+        288,
+        289,
+        290,
+        291,
+        292,
+        293,
+        294,
+        295,
+        296,
+        297,
+        298,
+        299,
+        300,
+        301,
+        302,
+        303,
+        304,
+        305,
+        306,
+        307,
+        308,
+        309,
+        310,
+        312,
+        313,
+        314,
+        321,
+        322,
+        323
+      ],
+      "files": [
+        "src/board-export.ts",
+        "src/board-search-bar.ts",
+        "src/comment-markers.ts",
+        "src/comment-thread.ts",
+        "src/comments-panel.ts",
+        "src/connector-labels.ts",
+        "src/document-controls.ts",
+        "src/import-guide.ts",
+        "src/m1-controls.ts",
+        "src/m2-tools.ts",
+        "src/panel-arrange.ts",
+        "src/panel-visibility.ts",
+        "src/pen-tooltips.ts",
+        "src/quick-tools.ts",
+        "src/selection-handles.ts",
+        "src/selection-toolbar.ts",
+        "src/slide-show.ts"
+      ],
+      "groups": [
+        "S2"
+      ],
+      "count": 96,
+      "changeImpact": 1,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued",
+      "scopeNotes": "Independent component/module leases; preserve injected owner documents, HTML/SVG namespaces, attributes, order, focus/listeners and fallback test hosts. Completing all 96 sites is not required before unrelated UI/CSS work."
+    },
+    {
+      "id": "U-CONTEXT",
+      "owner": "interface",
+      "diagnosticIndices": [
+        19,
+        311
+      ],
+      "files": [
+        "src/board-search-bar.ts",
+        "src/quick-tools.ts"
+      ],
+      "groups": [
+        "S4"
+      ],
+      "count": 2,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "D-SEL",
+      "owner": "data",
+      "diagnosticIndices": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89
+      ],
+      "files": [
+        "src/board-selection.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 69,
+      "changeImpact": 0,
+      "failureImpact": 3,
+      "wave": 1,
+      "status": "worker-complete",
+      "integrationStatus": "integrated-scoped-native-main-checks-passed",
+      "pendingChecks": [
+        "popout owner-window coverage",
+        "real native PDF fit compatibility and actual native viewer failure coverage where supported"
+      ]
+    },
+    {
+      "id": "D-EXTENSIONS",
+      "owner": "data",
+      "diagnosticIndices": [],
+      "files": [
+        "src/board-selection.ts"
+      ],
+      "groups": [],
+      "count": 0,
+      "changeImpact": 3,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued",
+      "kind": "extra-behavior-follow-up",
+      "inventoryScope": "Outside the original 438 diagnostics; no new inventory assignment.",
+      "scopeNotes": "Sagan: preserve unknown extension fields currently lost by shift(point) and replacement of native attachment anchors with free anchors; preserve known-field semantics and omit obsolete known attachment fields. Follow D-SEL before subsequent runtime movement changes.",
+      "mandatoryChecks": [
+        "Pre-edit caller/action trace; unchanged input and miroSource; unknown fields at every affected nesting level.",
+        "Repeated mixed/group/native/independent/comment movement; caught-end masks and far ends; native and connector chains before pointer release at non-default zoom.",
+        "Preview/commit parity, no preview saves, CANCEL/Undo/Redo/native history and real Windows/both-Android evidence."
+      ]
+    },
+    {
+      "id": "A-AUTH",
+      "owner": "authoring",
+      "diagnosticIndices": [
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147
+      ],
+      "files": [
+        "src/canvas-authoring.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 58,
+      "changeImpact": 0,
+      "failureImpact": 3,
+      "wave": 1,
+      "status": "worker-complete",
+      "integrationStatus": "integrated-scoped-native-main-checks-passed",
+      "pendingChecks": [
+        "popout owner-window coverage",
+        "real native PDF fit compatibility and actual native viewer failure coverage where supported"
+      ]
+    },
+    {
+      "id": "P-CONTEXT",
+      "owner": "platform",
+      "diagnosticIndices": [
+        149,
+        174,
+        324
+      ],
+      "files": [
+        "src/canvas-ids.ts",
+        "src/font-packs.ts",
+        "src/source-renderer.ts"
+      ],
+      "groups": [
+        "S4"
+      ],
+      "count": 3,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued",
+      "scopeNotes": "Three separate concerns: portable IDs used by MCP, font-pack test endpoint, and SourceRenderer document fallback. This aggregate job is not a universal owner-document prerequisite for UI."
+    },
+    {
+      "id": "U-TEXT",
+      "owner": "interface",
+      "diagnosticIndices": [
+        156
+      ],
+      "files": [
+        "src/comments-panel.ts"
+      ],
+      "groups": [
+        "S7"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 1,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "P-DOM-PROBE",
+      "owner": "platform",
+      "diagnosticIndices": [
+        171
+      ],
+      "files": [
+        "src/editor-appearance.ts"
+      ],
+      "groups": [
+        "S5"
+      ],
+      "count": 1,
+      "changeImpact": 1,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "P-DOM",
+      "owner": "platform",
+      "diagnosticIndices": [
+        172,
+        173,
+        269,
+        275
+      ],
+      "files": [
+        "src/editor-appearance.ts",
+        "src/font-packs.ts",
+        "src/main.ts"
+      ],
+      "groups": [
+        "S2"
+      ],
+      "count": 4,
+      "changeImpact": 1,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-RECORDS",
+      "owner": "interface",
+      "diagnosticIndices": [
+        175
+      ],
+      "files": [
+        "src/import-guide.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 1,
+      "changeImpact": 1,
+      "failureImpact": 1,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-CONTEXT",
+      "owner": "core",
+      "diagnosticIndices": [
+        187,
+        188
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S4"
+      ],
+      "count": 2,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-RECORDS",
+      "owner": "core",
+      "diagnosticIndices": [
+        189,
+        190,
+        191,
+        194,
+        195,
+        197,
+        204,
+        211,
+        212,
+        213,
+        214,
+        215,
+        217,
+        219,
+        220,
+        221
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 16,
+      "changeImpact": 1,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-DOM",
+      "owner": "core",
+      "diagnosticIndices": [
+        192,
+        196,
+        198,
+        199,
+        200,
+        201,
+        202,
+        203,
+        205,
+        206,
+        209,
+        210,
+        216
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S2"
+      ],
+      "count": 13,
+      "changeImpact": 1,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-SEARCH",
+      "owner": "core",
+      "diagnosticIndices": [
+        193
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S5"
+      ],
+      "count": 1,
+      "changeImpact": 1,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-TEXT",
+      "owner": "core",
+      "diagnosticIndices": [
+        207
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S7"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-CLIPBOARD",
+      "owner": "core",
+      "diagnosticIndices": [
+        208
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S5"
+      ],
+      "count": 1,
+      "changeImpact": 3,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "K-GUARDS",
+      "owner": "core",
+      "diagnosticIndices": [
+        218
+      ],
+      "files": [
+        "src/m1-session.ts"
+      ],
+      "groups": [
+        "S8"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "P-VALID",
+      "owner": "platform",
+      "diagnosticIndices": [
+        257
+      ],
+      "files": [
+        "src/main.ts"
+      ],
+      "groups": [
+        "S3"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "P-ID-TEXT",
+      "owner": "platform",
+      "diagnosticIndices": [
+        258,
+        273,
+        274
+      ],
+      "files": [
+        "src/main.ts"
+      ],
+      "groups": [
+        "S9"
+      ],
+      "count": 3,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "P-LEAF",
+      "owner": "platform",
+      "diagnosticIndices": [
+        259,
+        260,
+        261,
+        264,
+        265,
+        266,
+        267,
+        268,
+        270,
+        271,
+        272
+      ],
+      "files": [
+        "src/main.ts"
+      ],
+      "groups": [
+        "S5"
+      ],
+      "count": 11,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "P-TIMERS",
+      "owner": "platform",
+      "diagnosticIndices": [
+        262,
+        263,
+        276,
+        281,
+        282
+      ],
+      "files": [
+        "src/main.ts",
+        "src/obsidian-document-host.ts"
+      ],
+      "groups": [
+        "S4"
+      ],
+      "count": 5,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 1,
+      "status": "worker-complete",
+      "integrationStatus": "integrated-scoped-native-main-checks-passed",
+      "pendingChecks": [
+        "popout owner-window coverage",
+        "real native PDF fit compatibility and actual native viewer failure coverage where supported"
+      ]
+    },
+    {
+      "id": "P-PDFCOMPAT",
+      "owner": "platform",
+      "diagnosticIndices": [],
+      "files": [
+        "src/obsidian-document-host.ts"
+      ],
+      "groups": [],
+      "count": 0,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued",
+      "kind": "extra-compatibility-follow-up",
+      "inventoryScope": "Existing baseline fallback issue outside the original 438 lint diagnostics.",
+      "scopeNotes": "Private PDF fit fields unsupported on all three actual hosts. Baseline 85cb6cd and current applyNativePdfFit both return false with the same native fallback/two diagnostics; real PDF view open/reuse passed. Trace supported native viewer fit behavior before any compatibility patch; no source changes after freeze.",
+      "mandatoryChecks": [
+        "Supported host/viewer compatibility and successful real native fit evidence before claiming automatic fit.",
+        "Popout owner-window lifecycle and real native viewer readiness/failure where available; 2000ms owner-window synthetic facade remains synthetic evidence.",
+        "Preserve existing fallback, diagnostics, timeout owner/cleanup and opening/reusing actual PDF views."
+      ]
+    },
+    {
+      "id": "U-SETTINGS",
+      "owner": "interface",
+      "diagnosticIndices": [
+        315,
+        316,
+        317,
+        318,
+        319
+      ],
+      "files": [
+        "src/settings-tab.ts"
+      ],
+      "groups": [
+        "S6"
+      ],
+      "count": 5,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "P-RENDER-DATA",
+      "owner": "platform",
+      "diagnosticIndices": [
+        325,
+        326,
+        327,
+        328
+      ],
+      "files": [
+        "src/source-renderer.ts"
+      ],
+      "groups": [
+        "S1"
+      ],
+      "count": 4,
+      "changeImpact": 1,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C5",
+      "owner": "interface",
+      "diagnosticIndices": [
+        332,
+        333,
+        334,
+        357,
+        358,
+        359,
+        360,
+        361,
+        362,
+        366,
+        367,
+        368,
+        369,
+        373,
+        374,
+        375,
+        376,
+        377,
+        378,
+        379,
+        380,
+        381,
+        382,
+        383,
+        384,
+        385
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C5"
+      ],
+      "count": 26,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C2",
+      "owner": "interface",
+      "diagnosticIndices": [
+        335,
+        346
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C2"
+      ],
+      "count": 2,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C1",
+      "owner": "interface",
+      "diagnosticIndices": [
+        336,
+        337,
+        347
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C1"
+      ],
+      "count": 3,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "U-C4",
+      "owner": "interface",
+      "diagnosticIndices": [
+        338,
+        339,
+        340,
+        341,
+        342,
+        348,
+        349,
+        350,
+        351,
+        352,
+        353,
+        354,
+        355,
+        356,
+        363,
+        364,
+        365,
+        370,
+        371,
+        372,
+        386,
+        387,
+        388,
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399,
+        402,
+        403,
+        404,
+        411,
+        412,
+        413
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C4"
+      ],
+      "count": 39,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C3",
+      "owner": "interface",
+      "diagnosticIndices": [
+        343,
+        344,
+        345
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C3"
+      ],
+      "count": 3,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C6",
+      "owner": "interface",
+      "diagnosticIndices": [
+        389
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C6"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C7",
+      "owner": "interface",
+      "diagnosticIndices": [
+        400,
+        401
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C7"
+      ],
+      "count": 2,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued",
+      "validationAfterJobs": [
+        "U-C4",
+        "U-C5",
+        "U-C9"
+      ],
+      "scopeNotes": "Presentation/capture visibility are separate lifecycles; content/rotated-preview validation follows C4/C5/C9. Actual multi-page PDF success/Stop/failure must restore camera, screenshotting flags and export roots."
+    },
+    {
+      "id": "C8-SIZE",
+      "owner": "interface",
+      "diagnosticIndices": [
+        405,
+        406
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C8"
+      ],
+      "count": 2,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued",
+      "scopeNotes": "Early CSS-only min-width/min-height slice; preserve 32px inline minima, width/height and tablet padding contract. Keep transform unchanged.",
+      "mandatoryChecks": [
+        "Both Android models and Windows: 32x32 hit box in both themes at 50/125% zoom, native/tablet button sizing and real pin taps.",
+        "Keep --miro-canvas-button-padding and do not scale pin dimensions with board zoom."
+      ]
+    },
+    {
+      "id": "C8-TRANSFORM",
+      "owner": "interface",
+      "diagnosticIndices": [
+        407
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C8"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 3,
+      "status": "queued",
+      "scopeNotes": "Later coordinated CSS/actual JS writer slice, not a generic permission barrier. CommentMarkers.update writes translate(-50%, -50%); CSS overrides it with translate(0, -100%). Reconcile the actual owner before deleting the priority.",
+      "conditionalFiles": [
+        {
+          "file": "src/comment-markers.ts",
+          "when": "Only if this patch changes the existing inline transform writer; acquire the corresponding component file lease."
+        }
+      ],
+      "mandatoryChecks": [
+        "Pin bottom-left tail remains at the projected anchor; 32x32 size at 50/125% zoom.",
+        "Real tap versus drag, preview attached paths before release, commit/Undo/Redo/CANCEL/blur and no preview persistence."
+      ]
+    },
+    {
+      "id": "U-C9",
+      "owner": "interface",
+      "diagnosticIndices": [
+        408,
+        409,
+        410
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C9"
+      ],
+      "count": 3,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "U-C10",
+      "owner": "interface",
+      "diagnosticIndices": [
+        414
+      ],
+      "files": [
+        "styles.css"
+      ],
+      "groups": [
+        "C10"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 3,
+      "status": "queued"
+    },
+    {
+      "id": "M-M1",
+      "owner": "mcp",
+      "diagnosticIndices": [
+        415,
+        416,
+        417,
+        419,
+        420,
+        424,
+        425,
+        432,
+        433
+      ],
+      "files": [
+        "mcp/src/board-file.ts",
+        "mcp/src/json-rpc.ts",
+        "mcp/src/tools-edit.ts",
+        "mcp/src/vault.ts"
+      ],
+      "groups": [
+        "M1"
+      ],
+      "count": 9,
+      "changeImpact": 0,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued",
+      "disposition": "runtime-scope review; do not remove necessary Node APIs or stderr routing"
+    },
+    {
+      "id": "M-M4",
+      "owner": "mcp",
+      "diagnosticIndices": [
+        418,
+        427,
+        428,
+        429,
+        430,
+        431
+      ],
+      "files": [
+        "mcp/src/board-file.ts",
+        "mcp/src/tools-edit.ts"
+      ],
+      "groups": [
+        "M4"
+      ],
+      "count": 6,
+      "changeImpact": 0,
+      "failureImpact": 3,
+      "wave": 1,
+      "status": "worker-complete",
+      "integrationStatus": "integrated-scoped-native-main-checks-passed",
+      "pendingChecks": [
+        "popout owner-window coverage",
+        "real native PDF fit compatibility and actual native viewer failure coverage where supported"
+      ]
+    },
+    {
+      "id": "M-M5",
+      "owner": "mcp",
+      "diagnosticIndices": [
+        421
+      ],
+      "files": [
+        "mcp/src/json-rpc.ts"
+      ],
+      "groups": [
+        "M5"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 2,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "M-M2",
+      "owner": "mcp",
+      "diagnosticIndices": [
+        422,
+        423
+      ],
+      "files": [
+        "mcp/src/server.ts"
+      ],
+      "groups": [
+        "M2"
+      ],
+      "count": 2,
+      "changeImpact": 0,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued",
+      "disposition": "runtime-scope review; do not remove necessary Node APIs or stderr routing"
+    },
+    {
+      "id": "M-M3",
+      "owner": "mcp",
+      "diagnosticIndices": [
+        426,
+        434,
+        435,
+        437
+      ],
+      "files": [
+        "mcp/src/tools-edit.ts",
+        "mcp/src/vault.ts"
+      ],
+      "groups": [
+        "M3"
+      ],
+      "count": 4,
+      "changeImpact": 3,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued"
+    },
+    {
+      "id": "M-M6",
+      "owner": "mcp",
+      "diagnosticIndices": [
+        436
+      ],
+      "files": [
+        "mcp/src/vault.ts"
+      ],
+      "groups": [
+        "M6"
+      ],
+      "count": 1,
+      "changeImpact": 2,
+      "failureImpact": 3,
+      "wave": 2,
+      "status": "queued"
+    }
+  ],
+  "assignments": [
+    {
+      "site": "W001",
+      "inventoryIndex": 0,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W002",
+      "inventoryIndex": 1,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W003",
+      "inventoryIndex": 2,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W004",
+      "inventoryIndex": 3,
+      "job": "F-VALID",
+      "owner": "foundation"
+    },
+    {
+      "site": "W005",
+      "inventoryIndex": 4,
+      "job": "F-VALID",
+      "owner": "foundation"
+    },
+    {
+      "site": "W006",
+      "inventoryIndex": 5,
+      "job": "F-RECORDS",
+      "owner": "foundation"
+    },
+    {
+      "site": "W007",
+      "inventoryIndex": 6,
+      "job": "F-TYPES",
+      "owner": "foundation"
+    },
+    {
+      "site": "W008",
+      "inventoryIndex": 7,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W009",
+      "inventoryIndex": 8,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W010",
+      "inventoryIndex": 9,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W011",
+      "inventoryIndex": 10,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W012",
+      "inventoryIndex": 11,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W013",
+      "inventoryIndex": 12,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W014",
+      "inventoryIndex": 13,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W015",
+      "inventoryIndex": 14,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W016",
+      "inventoryIndex": 15,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W017",
+      "inventoryIndex": 16,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W018",
+      "inventoryIndex": 17,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W019",
+      "inventoryIndex": 18,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W020",
+      "inventoryIndex": 19,
+      "job": "U-CONTEXT",
+      "owner": "interface"
+    },
+    {
+      "site": "W021",
+      "inventoryIndex": 20,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W022",
+      "inventoryIndex": 21,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W023",
+      "inventoryIndex": 22,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W024",
+      "inventoryIndex": 23,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W025",
+      "inventoryIndex": 24,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W026",
+      "inventoryIndex": 25,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W027",
+      "inventoryIndex": 26,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W028",
+      "inventoryIndex": 27,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W029",
+      "inventoryIndex": 28,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W030",
+      "inventoryIndex": 29,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W031",
+      "inventoryIndex": 30,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W032",
+      "inventoryIndex": 31,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W033",
+      "inventoryIndex": 32,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W034",
+      "inventoryIndex": 33,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W035",
+      "inventoryIndex": 34,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W036",
+      "inventoryIndex": 35,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W037",
+      "inventoryIndex": 36,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W038",
+      "inventoryIndex": 37,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W039",
+      "inventoryIndex": 38,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W040",
+      "inventoryIndex": 39,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W041",
+      "inventoryIndex": 40,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W042",
+      "inventoryIndex": 41,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W043",
+      "inventoryIndex": 42,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W044",
+      "inventoryIndex": 43,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W045",
+      "inventoryIndex": 44,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W046",
+      "inventoryIndex": 45,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W047",
+      "inventoryIndex": 46,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W048",
+      "inventoryIndex": 47,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W049",
+      "inventoryIndex": 48,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W050",
+      "inventoryIndex": 49,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W051",
+      "inventoryIndex": 50,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W052",
+      "inventoryIndex": 51,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W053",
+      "inventoryIndex": 52,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W054",
+      "inventoryIndex": 53,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W055",
+      "inventoryIndex": 54,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W056",
+      "inventoryIndex": 55,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W057",
+      "inventoryIndex": 56,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W058",
+      "inventoryIndex": 57,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W059",
+      "inventoryIndex": 58,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W060",
+      "inventoryIndex": 59,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W061",
+      "inventoryIndex": 60,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W062",
+      "inventoryIndex": 61,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W063",
+      "inventoryIndex": 62,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W064",
+      "inventoryIndex": 63,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W065",
+      "inventoryIndex": 64,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W066",
+      "inventoryIndex": 65,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W067",
+      "inventoryIndex": 66,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W068",
+      "inventoryIndex": 67,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W069",
+      "inventoryIndex": 68,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W070",
+      "inventoryIndex": 69,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W071",
+      "inventoryIndex": 70,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W072",
+      "inventoryIndex": 71,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W073",
+      "inventoryIndex": 72,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W074",
+      "inventoryIndex": 73,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W075",
+      "inventoryIndex": 74,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W076",
+      "inventoryIndex": 75,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W077",
+      "inventoryIndex": 76,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W078",
+      "inventoryIndex": 77,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W079",
+      "inventoryIndex": 78,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W080",
+      "inventoryIndex": 79,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W081",
+      "inventoryIndex": 80,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W082",
+      "inventoryIndex": 81,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W083",
+      "inventoryIndex": 82,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W084",
+      "inventoryIndex": 83,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W085",
+      "inventoryIndex": 84,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W086",
+      "inventoryIndex": 85,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W087",
+      "inventoryIndex": 86,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W088",
+      "inventoryIndex": 87,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W089",
+      "inventoryIndex": 88,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W090",
+      "inventoryIndex": 89,
+      "job": "D-SEL",
+      "owner": "data"
+    },
+    {
+      "site": "W091",
+      "inventoryIndex": 90,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W092",
+      "inventoryIndex": 91,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W093",
+      "inventoryIndex": 92,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W094",
+      "inventoryIndex": 93,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W095",
+      "inventoryIndex": 94,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W096",
+      "inventoryIndex": 95,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W097",
+      "inventoryIndex": 96,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W098",
+      "inventoryIndex": 97,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W099",
+      "inventoryIndex": 98,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W100",
+      "inventoryIndex": 99,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W101",
+      "inventoryIndex": 100,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W102",
+      "inventoryIndex": 101,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W103",
+      "inventoryIndex": 102,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W104",
+      "inventoryIndex": 103,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W105",
+      "inventoryIndex": 104,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W106",
+      "inventoryIndex": 105,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W107",
+      "inventoryIndex": 106,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W108",
+      "inventoryIndex": 107,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W109",
+      "inventoryIndex": 108,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W110",
+      "inventoryIndex": 109,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W111",
+      "inventoryIndex": 110,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W112",
+      "inventoryIndex": 111,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W113",
+      "inventoryIndex": 112,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W114",
+      "inventoryIndex": 113,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W115",
+      "inventoryIndex": 114,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W116",
+      "inventoryIndex": 115,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W117",
+      "inventoryIndex": 116,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W118",
+      "inventoryIndex": 117,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W119",
+      "inventoryIndex": 118,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W120",
+      "inventoryIndex": 119,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W121",
+      "inventoryIndex": 120,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W122",
+      "inventoryIndex": 121,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W123",
+      "inventoryIndex": 122,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W124",
+      "inventoryIndex": 123,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W125",
+      "inventoryIndex": 124,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W126",
+      "inventoryIndex": 125,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W127",
+      "inventoryIndex": 126,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W128",
+      "inventoryIndex": 127,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W129",
+      "inventoryIndex": 128,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W130",
+      "inventoryIndex": 129,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W131",
+      "inventoryIndex": 130,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W132",
+      "inventoryIndex": 131,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W133",
+      "inventoryIndex": 132,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W134",
+      "inventoryIndex": 133,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W135",
+      "inventoryIndex": 134,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W136",
+      "inventoryIndex": 135,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W137",
+      "inventoryIndex": 136,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W138",
+      "inventoryIndex": 137,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W139",
+      "inventoryIndex": 138,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W140",
+      "inventoryIndex": 139,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W141",
+      "inventoryIndex": 140,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W142",
+      "inventoryIndex": 141,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W143",
+      "inventoryIndex": 142,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W144",
+      "inventoryIndex": 143,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W145",
+      "inventoryIndex": 144,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W146",
+      "inventoryIndex": 145,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W147",
+      "inventoryIndex": 146,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W148",
+      "inventoryIndex": 147,
+      "job": "A-AUTH",
+      "owner": "authoring"
+    },
+    {
+      "site": "W149",
+      "inventoryIndex": 148,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W150",
+      "inventoryIndex": 149,
+      "job": "P-CONTEXT",
+      "owner": "platform"
+    },
+    {
+      "site": "W151",
+      "inventoryIndex": 150,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W152",
+      "inventoryIndex": 151,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W153",
+      "inventoryIndex": 152,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W154",
+      "inventoryIndex": 153,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W155",
+      "inventoryIndex": 154,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W156",
+      "inventoryIndex": 155,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W157",
+      "inventoryIndex": 156,
+      "job": "U-TEXT",
+      "owner": "interface"
+    },
+    {
+      "site": "W158",
+      "inventoryIndex": 157,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W159",
+      "inventoryIndex": 158,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W160",
+      "inventoryIndex": 159,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W161",
+      "inventoryIndex": 160,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W162",
+      "inventoryIndex": 161,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W163",
+      "inventoryIndex": 162,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W164",
+      "inventoryIndex": 163,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W165",
+      "inventoryIndex": 164,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W166",
+      "inventoryIndex": 165,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W167",
+      "inventoryIndex": 166,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W168",
+      "inventoryIndex": 167,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W169",
+      "inventoryIndex": 168,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W170",
+      "inventoryIndex": 169,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W171",
+      "inventoryIndex": 170,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W172",
+      "inventoryIndex": 171,
+      "job": "P-DOM-PROBE",
+      "owner": "platform"
+    },
+    {
+      "site": "W173",
+      "inventoryIndex": 172,
+      "job": "P-DOM",
+      "owner": "platform"
+    },
+    {
+      "site": "W174",
+      "inventoryIndex": 173,
+      "job": "P-DOM",
+      "owner": "platform"
+    },
+    {
+      "site": "W175",
+      "inventoryIndex": 174,
+      "job": "P-CONTEXT",
+      "owner": "platform"
+    },
+    {
+      "site": "W176",
+      "inventoryIndex": 175,
+      "job": "U-RECORDS",
+      "owner": "interface"
+    },
+    {
+      "site": "W177",
+      "inventoryIndex": 176,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W178",
+      "inventoryIndex": 177,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W179",
+      "inventoryIndex": 178,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W180",
+      "inventoryIndex": 179,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W181",
+      "inventoryIndex": 180,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W182",
+      "inventoryIndex": 181,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W183",
+      "inventoryIndex": 182,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W184",
+      "inventoryIndex": 183,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W185",
+      "inventoryIndex": 184,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W186",
+      "inventoryIndex": 185,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W187",
+      "inventoryIndex": 186,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W188",
+      "inventoryIndex": 187,
+      "job": "K-CONTEXT",
+      "owner": "core"
+    },
+    {
+      "site": "W189",
+      "inventoryIndex": 188,
+      "job": "K-CONTEXT",
+      "owner": "core"
+    },
+    {
+      "site": "W190",
+      "inventoryIndex": 189,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W191",
+      "inventoryIndex": 190,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W192",
+      "inventoryIndex": 191,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W193",
+      "inventoryIndex": 192,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W194",
+      "inventoryIndex": 193,
+      "job": "K-SEARCH",
+      "owner": "core"
+    },
+    {
+      "site": "W195",
+      "inventoryIndex": 194,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W196",
+      "inventoryIndex": 195,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W197",
+      "inventoryIndex": 196,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W198",
+      "inventoryIndex": 197,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W199",
+      "inventoryIndex": 198,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W200",
+      "inventoryIndex": 199,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W201",
+      "inventoryIndex": 200,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W202",
+      "inventoryIndex": 201,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W203",
+      "inventoryIndex": 202,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W204",
+      "inventoryIndex": 203,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W205",
+      "inventoryIndex": 204,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W206",
+      "inventoryIndex": 205,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W207",
+      "inventoryIndex": 206,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W208",
+      "inventoryIndex": 207,
+      "job": "K-TEXT",
+      "owner": "core"
+    },
+    {
+      "site": "W209",
+      "inventoryIndex": 208,
+      "job": "K-CLIPBOARD",
+      "owner": "core"
+    },
+    {
+      "site": "W210",
+      "inventoryIndex": 209,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W211",
+      "inventoryIndex": 210,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W212",
+      "inventoryIndex": 211,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W213",
+      "inventoryIndex": 212,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W214",
+      "inventoryIndex": 213,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W215",
+      "inventoryIndex": 214,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W216",
+      "inventoryIndex": 215,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W217",
+      "inventoryIndex": 216,
+      "job": "K-DOM",
+      "owner": "core"
+    },
+    {
+      "site": "W218",
+      "inventoryIndex": 217,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W219",
+      "inventoryIndex": 218,
+      "job": "K-GUARDS",
+      "owner": "core"
+    },
+    {
+      "site": "W220",
+      "inventoryIndex": 219,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W221",
+      "inventoryIndex": 220,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W222",
+      "inventoryIndex": 221,
+      "job": "K-RECORDS",
+      "owner": "core"
+    },
+    {
+      "site": "W223",
+      "inventoryIndex": 222,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W224",
+      "inventoryIndex": 223,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W225",
+      "inventoryIndex": 224,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W226",
+      "inventoryIndex": 225,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W227",
+      "inventoryIndex": 226,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W228",
+      "inventoryIndex": 227,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W229",
+      "inventoryIndex": 228,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W230",
+      "inventoryIndex": 229,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W231",
+      "inventoryIndex": 230,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W232",
+      "inventoryIndex": 231,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W233",
+      "inventoryIndex": 232,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W234",
+      "inventoryIndex": 233,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W235",
+      "inventoryIndex": 234,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W236",
+      "inventoryIndex": 235,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W237",
+      "inventoryIndex": 236,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W238",
+      "inventoryIndex": 237,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W239",
+      "inventoryIndex": 238,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W240",
+      "inventoryIndex": 239,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W241",
+      "inventoryIndex": 240,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W242",
+      "inventoryIndex": 241,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W243",
+      "inventoryIndex": 242,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W244",
+      "inventoryIndex": 243,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W245",
+      "inventoryIndex": 244,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W246",
+      "inventoryIndex": 245,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W247",
+      "inventoryIndex": 246,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W248",
+      "inventoryIndex": 247,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W249",
+      "inventoryIndex": 248,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W250",
+      "inventoryIndex": 249,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W251",
+      "inventoryIndex": 250,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W252",
+      "inventoryIndex": 251,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W253",
+      "inventoryIndex": 252,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W254",
+      "inventoryIndex": 253,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W255",
+      "inventoryIndex": 254,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W256",
+      "inventoryIndex": 255,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W257",
+      "inventoryIndex": 256,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W258",
+      "inventoryIndex": 257,
+      "job": "P-VALID",
+      "owner": "platform"
+    },
+    {
+      "site": "W259",
+      "inventoryIndex": 258,
+      "job": "P-ID-TEXT",
+      "owner": "platform"
+    },
+    {
+      "site": "W260",
+      "inventoryIndex": 259,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W261",
+      "inventoryIndex": 260,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W262",
+      "inventoryIndex": 261,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W263",
+      "inventoryIndex": 262,
+      "job": "P-TIMERS",
+      "owner": "platform"
+    },
+    {
+      "site": "W264",
+      "inventoryIndex": 263,
+      "job": "P-TIMERS",
+      "owner": "platform"
+    },
+    {
+      "site": "W265",
+      "inventoryIndex": 264,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W266",
+      "inventoryIndex": 265,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W267",
+      "inventoryIndex": 266,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W268",
+      "inventoryIndex": 267,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W269",
+      "inventoryIndex": 268,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W270",
+      "inventoryIndex": 269,
+      "job": "P-DOM",
+      "owner": "platform"
+    },
+    {
+      "site": "W271",
+      "inventoryIndex": 270,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W272",
+      "inventoryIndex": 271,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W273",
+      "inventoryIndex": 272,
+      "job": "P-LEAF",
+      "owner": "platform"
+    },
+    {
+      "site": "W274",
+      "inventoryIndex": 273,
+      "job": "P-ID-TEXT",
+      "owner": "platform"
+    },
+    {
+      "site": "W275",
+      "inventoryIndex": 274,
+      "job": "P-ID-TEXT",
+      "owner": "platform"
+    },
+    {
+      "site": "W276",
+      "inventoryIndex": 275,
+      "job": "P-DOM",
+      "owner": "platform"
+    },
+    {
+      "site": "W277",
+      "inventoryIndex": 276,
+      "job": "P-TIMERS",
+      "owner": "platform"
+    },
+    {
+      "site": "W278",
+      "inventoryIndex": 277,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W279",
+      "inventoryIndex": 278,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W280",
+      "inventoryIndex": 279,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W281",
+      "inventoryIndex": 280,
+      "job": "F-TYPES",
+      "owner": "foundation"
+    },
+    {
+      "site": "W282",
+      "inventoryIndex": 281,
+      "job": "P-TIMERS",
+      "owner": "platform"
+    },
+    {
+      "site": "W283",
+      "inventoryIndex": 282,
+      "job": "P-TIMERS",
+      "owner": "platform"
+    },
+    {
+      "site": "W284",
+      "inventoryIndex": 283,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W285",
+      "inventoryIndex": 284,
+      "job": "D-RECORDS",
+      "owner": "data"
+    },
+    {
+      "site": "W286",
+      "inventoryIndex": 285,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W287",
+      "inventoryIndex": 286,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W288",
+      "inventoryIndex": 287,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W289",
+      "inventoryIndex": 288,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W290",
+      "inventoryIndex": 289,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W291",
+      "inventoryIndex": 290,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W292",
+      "inventoryIndex": 291,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W293",
+      "inventoryIndex": 292,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W294",
+      "inventoryIndex": 293,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W295",
+      "inventoryIndex": 294,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W296",
+      "inventoryIndex": 295,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W297",
+      "inventoryIndex": 296,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W298",
+      "inventoryIndex": 297,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W299",
+      "inventoryIndex": 298,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W300",
+      "inventoryIndex": 299,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W301",
+      "inventoryIndex": 300,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W302",
+      "inventoryIndex": 301,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W303",
+      "inventoryIndex": 302,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W304",
+      "inventoryIndex": 303,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W305",
+      "inventoryIndex": 304,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W306",
+      "inventoryIndex": 305,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W307",
+      "inventoryIndex": 306,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W308",
+      "inventoryIndex": 307,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W309",
+      "inventoryIndex": 308,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W310",
+      "inventoryIndex": 309,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W311",
+      "inventoryIndex": 310,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W312",
+      "inventoryIndex": 311,
+      "job": "U-CONTEXT",
+      "owner": "interface"
+    },
+    {
+      "site": "W313",
+      "inventoryIndex": 312,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W314",
+      "inventoryIndex": 313,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W315",
+      "inventoryIndex": 314,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W316",
+      "inventoryIndex": 315,
+      "job": "U-SETTINGS",
+      "owner": "interface"
+    },
+    {
+      "site": "W317",
+      "inventoryIndex": 316,
+      "job": "U-SETTINGS",
+      "owner": "interface"
+    },
+    {
+      "site": "W318",
+      "inventoryIndex": 317,
+      "job": "U-SETTINGS",
+      "owner": "interface"
+    },
+    {
+      "site": "W319",
+      "inventoryIndex": 318,
+      "job": "U-SETTINGS",
+      "owner": "interface"
+    },
+    {
+      "site": "W320",
+      "inventoryIndex": 319,
+      "job": "U-SETTINGS",
+      "owner": "interface"
+    },
+    {
+      "site": "W321",
+      "inventoryIndex": 320,
+      "job": "D-VALID",
+      "owner": "data"
+    },
+    {
+      "site": "W322",
+      "inventoryIndex": 321,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W323",
+      "inventoryIndex": 322,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W324",
+      "inventoryIndex": 323,
+      "job": "U-DOM",
+      "owner": "interface"
+    },
+    {
+      "site": "W325",
+      "inventoryIndex": 324,
+      "job": "P-CONTEXT",
+      "owner": "platform"
+    },
+    {
+      "site": "W326",
+      "inventoryIndex": 325,
+      "job": "P-RENDER-DATA",
+      "owner": "platform"
+    },
+    {
+      "site": "W327",
+      "inventoryIndex": 326,
+      "job": "P-RENDER-DATA",
+      "owner": "platform"
+    },
+    {
+      "site": "W328",
+      "inventoryIndex": 327,
+      "job": "P-RENDER-DATA",
+      "owner": "platform"
+    },
+    {
+      "site": "W329",
+      "inventoryIndex": 328,
+      "job": "P-RENDER-DATA",
+      "owner": "platform"
+    },
+    {
+      "site": "W330",
+      "inventoryIndex": 329,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W331",
+      "inventoryIndex": 330,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W332",
+      "inventoryIndex": 331,
+      "job": "A-RECORDS",
+      "owner": "authoring"
+    },
+    {
+      "site": "W333",
+      "inventoryIndex": 332,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W334",
+      "inventoryIndex": 333,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W335",
+      "inventoryIndex": 334,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W336",
+      "inventoryIndex": 335,
+      "job": "U-C2",
+      "owner": "interface"
+    },
+    {
+      "site": "W337",
+      "inventoryIndex": 336,
+      "job": "U-C1",
+      "owner": "interface"
+    },
+    {
+      "site": "W338",
+      "inventoryIndex": 337,
+      "job": "U-C1",
+      "owner": "interface"
+    },
+    {
+      "site": "W339",
+      "inventoryIndex": 338,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W340",
+      "inventoryIndex": 339,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W341",
+      "inventoryIndex": 340,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W342",
+      "inventoryIndex": 341,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W343",
+      "inventoryIndex": 342,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W344",
+      "inventoryIndex": 343,
+      "job": "U-C3",
+      "owner": "interface"
+    },
+    {
+      "site": "W345",
+      "inventoryIndex": 344,
+      "job": "U-C3",
+      "owner": "interface"
+    },
+    {
+      "site": "W346",
+      "inventoryIndex": 345,
+      "job": "U-C3",
+      "owner": "interface"
+    },
+    {
+      "site": "W347",
+      "inventoryIndex": 346,
+      "job": "U-C2",
+      "owner": "interface"
+    },
+    {
+      "site": "W348",
+      "inventoryIndex": 347,
+      "job": "U-C1",
+      "owner": "interface"
+    },
+    {
+      "site": "W349",
+      "inventoryIndex": 348,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W350",
+      "inventoryIndex": 349,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W351",
+      "inventoryIndex": 350,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W352",
+      "inventoryIndex": 351,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W353",
+      "inventoryIndex": 352,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W354",
+      "inventoryIndex": 353,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W355",
+      "inventoryIndex": 354,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W356",
+      "inventoryIndex": 355,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W357",
+      "inventoryIndex": 356,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W358",
+      "inventoryIndex": 357,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W359",
+      "inventoryIndex": 358,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W360",
+      "inventoryIndex": 359,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W361",
+      "inventoryIndex": 360,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W362",
+      "inventoryIndex": 361,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W363",
+      "inventoryIndex": 362,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W364",
+      "inventoryIndex": 363,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W365",
+      "inventoryIndex": 364,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W366",
+      "inventoryIndex": 365,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W367",
+      "inventoryIndex": 366,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W368",
+      "inventoryIndex": 367,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W369",
+      "inventoryIndex": 368,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W370",
+      "inventoryIndex": 369,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W371",
+      "inventoryIndex": 370,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W372",
+      "inventoryIndex": 371,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W373",
+      "inventoryIndex": 372,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W374",
+      "inventoryIndex": 373,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W375",
+      "inventoryIndex": 374,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W376",
+      "inventoryIndex": 375,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W377",
+      "inventoryIndex": 376,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W378",
+      "inventoryIndex": 377,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W379",
+      "inventoryIndex": 378,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W380",
+      "inventoryIndex": 379,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W381",
+      "inventoryIndex": 380,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W382",
+      "inventoryIndex": 381,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W383",
+      "inventoryIndex": 382,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W384",
+      "inventoryIndex": 383,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W385",
+      "inventoryIndex": 384,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W386",
+      "inventoryIndex": 385,
+      "job": "U-C5",
+      "owner": "interface"
+    },
+    {
+      "site": "W387",
+      "inventoryIndex": 386,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W388",
+      "inventoryIndex": 387,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W389",
+      "inventoryIndex": 388,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W390",
+      "inventoryIndex": 389,
+      "job": "U-C6",
+      "owner": "interface"
+    },
+    {
+      "site": "W391",
+      "inventoryIndex": 390,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W392",
+      "inventoryIndex": 391,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W393",
+      "inventoryIndex": 392,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W394",
+      "inventoryIndex": 393,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W395",
+      "inventoryIndex": 394,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W396",
+      "inventoryIndex": 395,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W397",
+      "inventoryIndex": 396,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W398",
+      "inventoryIndex": 397,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W399",
+      "inventoryIndex": 398,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W400",
+      "inventoryIndex": 399,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W401",
+      "inventoryIndex": 400,
+      "job": "U-C7",
+      "owner": "interface"
+    },
+    {
+      "site": "W402",
+      "inventoryIndex": 401,
+      "job": "U-C7",
+      "owner": "interface"
+    },
+    {
+      "site": "W403",
+      "inventoryIndex": 402,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W404",
+      "inventoryIndex": 403,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W405",
+      "inventoryIndex": 404,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W406",
+      "inventoryIndex": 405,
+      "job": "C8-SIZE",
+      "owner": "interface"
+    },
+    {
+      "site": "W407",
+      "inventoryIndex": 406,
+      "job": "C8-SIZE",
+      "owner": "interface"
+    },
+    {
+      "site": "W408",
+      "inventoryIndex": 407,
+      "job": "C8-TRANSFORM",
+      "owner": "interface"
+    },
+    {
+      "site": "W409",
+      "inventoryIndex": 408,
+      "job": "U-C9",
+      "owner": "interface"
+    },
+    {
+      "site": "W410",
+      "inventoryIndex": 409,
+      "job": "U-C9",
+      "owner": "interface"
+    },
+    {
+      "site": "W411",
+      "inventoryIndex": 410,
+      "job": "U-C9",
+      "owner": "interface"
+    },
+    {
+      "site": "W412",
+      "inventoryIndex": 411,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W413",
+      "inventoryIndex": 412,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W414",
+      "inventoryIndex": 413,
+      "job": "U-C4",
+      "owner": "interface"
+    },
+    {
+      "site": "W415",
+      "inventoryIndex": 414,
+      "job": "U-C10",
+      "owner": "interface"
+    },
+    {
+      "site": "W416",
+      "inventoryIndex": 415,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W417",
+      "inventoryIndex": 416,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W418",
+      "inventoryIndex": 417,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W419",
+      "inventoryIndex": 418,
+      "job": "M-M4",
+      "owner": "mcp"
+    },
+    {
+      "site": "W420",
+      "inventoryIndex": 419,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W421",
+      "inventoryIndex": 420,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W422",
+      "inventoryIndex": 421,
+      "job": "M-M5",
+      "owner": "mcp"
+    },
+    {
+      "site": "W423",
+      "inventoryIndex": 422,
+      "job": "M-M2",
+      "owner": "mcp"
+    },
+    {
+      "site": "W424",
+      "inventoryIndex": 423,
+      "job": "M-M2",
+      "owner": "mcp"
+    },
+    {
+      "site": "W425",
+      "inventoryIndex": 424,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W426",
+      "inventoryIndex": 425,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W427",
+      "inventoryIndex": 426,
+      "job": "M-M3",
+      "owner": "mcp"
+    },
+    {
+      "site": "W428",
+      "inventoryIndex": 427,
+      "job": "M-M4",
+      "owner": "mcp"
+    },
+    {
+      "site": "W429",
+      "inventoryIndex": 428,
+      "job": "M-M4",
+      "owner": "mcp"
+    },
+    {
+      "site": "W430",
+      "inventoryIndex": 429,
+      "job": "M-M4",
+      "owner": "mcp"
+    },
+    {
+      "site": "W431",
+      "inventoryIndex": 430,
+      "job": "M-M4",
+      "owner": "mcp"
+    },
+    {
+      "site": "W432",
+      "inventoryIndex": 431,
+      "job": "M-M4",
+      "owner": "mcp"
+    },
+    {
+      "site": "W433",
+      "inventoryIndex": 432,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W434",
+      "inventoryIndex": 433,
+      "job": "M-M1",
+      "owner": "mcp"
+    },
+    {
+      "site": "W435",
+      "inventoryIndex": 434,
+      "job": "M-M3",
+      "owner": "mcp"
+    },
+    {
+      "site": "W436",
+      "inventoryIndex": 435,
+      "job": "M-M3",
+      "owner": "mcp"
+    },
+    {
+      "site": "W437",
+      "inventoryIndex": 436,
+      "job": "M-M6",
+      "owner": "mcp"
+    },
+    {
+      "site": "W438",
+      "inventoryIndex": 437,
+      "job": "M-M3",
+      "owner": "mcp"
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "U-DOM",
+      "to": "P-DOM",
+      "kind": "contract",
+      "reason": "approved DOM factory contract for main/font/editor calls",
+      "conditional": "Only if a shared DOM helper is introduced or its public contract changes and this consumer adopts it; no dependency on completing unrelated component warnings."
+    },
+    {
+      "from": "U-DOM",
+      "to": "K-DOM",
+      "kind": "contract",
+      "reason": "approved DOM factory contract in M1",
+      "conditional": "Only if a shared DOM helper is introduced or its public contract changes and this consumer adopts it; no dependency on completing unrelated component warnings."
+    },
+    {
+      "from": "D-RECORDS",
+      "to": "K-RECORDS",
+      "kind": "contract",
+      "reason": "reviewed checked-JSON boundaries, if shared readers are introduced",
+      "conditional": "Only if this patch introduces/changes a shared helper or relevant public contract. Existing contract-preserving private types and local factories do not wait for this aggregate job."
+    },
+    {
+      "from": "A-RECORDS",
+      "to": "K-RECORDS",
+      "kind": "contract",
+      "reason": "writer/runtime boundary contract",
+      "conditional": "Only if this patch introduces/changes a shared helper or relevant public contract. Existing contract-preserving private types and local factories do not wait for this aggregate job."
+    },
+    {
+      "from": "K-CONTEXT",
+      "to": "K-SEARCH",
+      "kind": "contract",
+      "reason": "search marker lookup uses owning document",
+      "conditional": "Only if this patch introduces/changes a shared helper or relevant public contract. Existing contract-preserving private types and local factories do not wait for this aggregate job."
+    },
+    {
+      "from": "K-RECORDS",
+      "to": "K-TEXT",
+      "kind": "contract",
+      "reason": "define valid node.text before altering conversion",
+      "conditional": "Only if this patch introduces/changes a shared helper or relevant public contract. Existing contract-preserving private types and local factories do not wait for this aggregate job."
+    },
+    {
+      "from": "K-RECORDS",
+      "to": "K-GUARDS",
+      "kind": "contract",
+      "reason": "native method guards use checked host data",
+      "conditional": "Only if this patch introduces/changes a shared helper or relevant public contract. Existing contract-preserving private types and local factories do not wait for this aggregate job."
+    },
+    {
+      "from": "P-TIMERS",
+      "to": "P-LEAF",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/main.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "P-LEAF",
+      "to": "P-DOM",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/main.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "P-DOM",
+      "to": "P-VALID",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/main.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "P-VALID",
+      "to": "P-ID-TEXT",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/main.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "F-TYPES",
+      "to": "F-RECORDS",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/appearance.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "F-RECORDS",
+      "to": "F-VALID",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/appearance.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "D-RECORDS",
+      "to": "D-VALID",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/anchors.ts",
+        "src/attachment-labels.ts",
+        "src/local-comments.ts",
+        "src/metadata.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "P-CONTEXT",
+      "to": "P-RENDER-DATA",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/source-renderer.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "P-DOM-PROBE",
+      "to": "P-DOM",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/editor-appearance.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "P-CONTEXT",
+      "to": "P-DOM",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/font-packs.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-CONTEXT",
+      "to": "U-DOM",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/board-search-bar.ts",
+        "src/quick-tools.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-DOM",
+      "to": "U-RECORDS",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/import-guide.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-DOM",
+      "to": "U-TEXT",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/comments-panel.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "K-CONTEXT",
+      "to": "K-RECORDS",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/m1-session.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "K-RECORDS",
+      "to": "K-DOM",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/m1-session.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "K-DOM",
+      "to": "K-SEARCH",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/m1-session.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "K-SEARCH",
+      "to": "K-TEXT",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/m1-session.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "K-TEXT",
+      "to": "K-CLIPBOARD",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/m1-session.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "K-CLIPBOARD",
+      "to": "K-GUARDS",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "src/m1-session.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "M-M4",
+      "to": "M-M1",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "mcp/src/board-file.ts",
+        "mcp/src/tools-edit.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "M-M1",
+      "to": "M-M3",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "mcp/src/tools-edit.ts",
+        "mcp/src/vault.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "M-M3",
+      "to": "M-M6",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "mcp/src/vault.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "M-M1",
+      "to": "M-M5",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "mcp/src/json-rpc.ts"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C1",
+      "to": "C8-SIZE",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "C8-SIZE",
+      "to": "U-C3",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C3",
+      "to": "U-C2",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C2",
+      "to": "U-C6",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C6",
+      "to": "U-C4",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C4",
+      "to": "U-C5",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C5",
+      "to": "U-C9",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "U-C9",
+      "to": "U-C7",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files.",
+      "additionalRequirements": [
+        {
+          "kind": "validation",
+          "reason": "Validate presentation/capture after content paint, text layout and rotated preview changes.",
+          "validationOnly": true
+        }
+      ]
+    },
+    {
+      "from": "U-C7",
+      "to": "C8-TRANSFORM",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "C8-TRANSFORM",
+      "to": "U-C10",
+      "kind": "file-lease",
+      "reason": "One writer per actual shared file/component. Scheduling order, not a semantic dependency on all sites of an aggregate job.",
+      "sharedFiles": [
+        "styles.css"
+      ],
+      "conditional": "Applies when both slices write the shared file; read-only scope review can run independently. Release the relevant component lease rather than waiting for unrelated files."
+    },
+    {
+      "from": "D-SEL",
+      "to": "D-EXTENSIONS",
+      "kind": "behavior-prerequisite",
+      "reason": "Complete the type-only selection patch before the separate unknown-extension runtime repair.",
+      "sharedFiles": [
+        "src/board-selection.ts"
+      ]
+    },
+    {
+      "from": "D-EXTENSIONS",
+      "to": "K-DOM",
+      "kind": "behavior-prerequisite",
+      "reason": "Preserve extension fields before subsequent movement/preview runtime changes in M1.",
+      "conditional": "Only when the M1 patch changes movement/preview behavior or translated data. Exact S2 factory replacements with unchanged behavior are independent.",
+      "affectedRuntime": "rectangle/lasso captured ends, mixed selection move and native/connector-chain preview"
+    },
+    {
+      "from": "U-DOM",
+      "to": "C8-TRANSFORM",
+      "kind": "state-writer",
+      "reason": "Coordinate the actual CommentMarkers.update inline transform writer with the pin CSS.",
+      "conditional": "Only if the accepted transform patch changes src/comment-markers.ts and overlaps that component's U-DOM file lease; no prerequisite to finish all U-DOM sites or generic permission barrier.",
+      "sharedFilesWhenConditionApplies": [
+        "src/comment-markers.ts"
+      ]
+    },
+    {
+      "from": "U-C4",
+      "to": "U-C7",
+      "kind": "validation",
+      "reason": "Validate presentation/capture after content paint, text layout and rotated preview changes.",
+      "validationOnly": true
+    },
+    {
+      "from": "U-C5",
+      "to": "U-C7",
+      "kind": "validation",
+      "reason": "Validate presentation/capture after content paint, text layout and rotated preview changes.",
+      "validationOnly": true
+    },
+    {
+      "from": "P-TIMERS",
+      "to": "P-PDFCOMPAT",
+      "kind": "file-lease",
+      "reason": "Same src/obsidian-document-host.ts; timer patch completed before a separately scoped compatibility repair.",
+      "sharedFiles": [
+        "src/obsidian-document-host.ts"
+      ],
+      "conditional": "Any implementation is a later separately scoped follow-up after freeze release; this plan makes no code change."
+    }
+  ],
+  "validationRules": [
+    "Coordinator alone writes central register, main.js, MCP dist, inventory and shared guides.",
+    "Only immutable integrated builds may be deployed.",
+    "One input owner per Obsidian instance/device; distinct Windows/tablet/phone may run concurrently.",
+    "No OS input/foreground takeover on Windows; hidden CDP renderer only.",
+    "Physical ADB input, CDP instrumentation and hardware stylus evidence are distinct.",
+    "Do not treat a module-only proof as full bundle equivalence or real-app verification.",
+    "Conditional contract edges activate only for the stated shared helper/runtime/writer change; no artificial data-to-all-UI blocker.",
+    "Preserve all 438 baseline assignments once. Extra D-EXTENSIONS count 0 is outside warning arithmetic.",
+    "C7 capture validation follows C4/C5/C9; native results remain pending until parent evidence.",
+    "Current main build is frozen: no code changes after bf411cff362b65d021dc2779e8f72e0411a0ea1d32602e316bf5c71fa6fc7cc0.",
+    "Scoped native main checks passed does not imply automatic PDF fit, popout or OS-window/native-failure input coverage.",
+    "Existing human authorization covers scoped lint runtime repairs. Use bounded scopes, pre-edit records, file leases and relevant regression/native gates; do not invent new permission or approval barriers. Preserve the current build freeze."
+  ],
+  "impactScale": {
+    "changeImpact": {
+      "0": "annotation/scope review; require emitted JS identity",
+      "1": "local type or DOM boundary with public contracts preserved",
+      "2": "UI geometry/lifecycle/validation/API migration",
+      "3": "persistence, paths, clipboard or compatibility behavior"
+    },
+    "failureImpact": {
+      "1": "isolated presentation/diagnostic",
+      "2": "component/window/interaction",
+      "3": "data/history/locks/platform/protocol"
+    }
+  },
+  "wave1": {
+    "patchJobs": [
+      "A-AUTH",
+      "D-SEL",
+      "F-TYPES",
+      "M-M4",
+      "P-TIMERS"
+    ],
+    "readOnlyJob": {
+      "owner": "interface",
+      "path": "lint-workers/interface-dependencies.md",
+      "status": "worker-complete",
+      "result": "lint-workers/interface-dependencies.md; all C1-C10 sites and UI/DOM/settings dependency audit complete."
+    },
+    "nextGate": "Scoped main-window native checks passed on the immutable build. Popout and unsupported automatic PDF fit/native failure compatibility remain explicit follow-ups. Preserve freeze; no source/code changes after current main SHA.",
+    "status": "worker-complete",
+    "integrationStatus": "integrated-scoped-native-main-checks-passed",
+    "completedBaselineDiagnostics": 140,
+    "completedChecks": {
+      "evidence": "Reported by coordinator/user; this plan-refinement worker did not rerun gates.",
+      "types": "passed",
+      "units": {
+        "status": "passed",
+        "reported": "1800+1skip"
+      },
+      "schema": "passed",
+      "pluginBuild": "passed",
+      "mcpBuild": "passed",
+      "smokes": {
+        "standard": "passed",
+        "interactions": "passed",
+        "controls": "passed"
+      },
+      "oraclePytest": "passed"
+    },
+    "nativeChecks": {
+      "status": "integrated-scoped-native-main-checks-passed",
+      "build": {
+        "mainSha256": "bf411cff362b65d021dc2779e8f72e0411a0ea1d32602e316bf5c71fa6fc7cc0",
+        "cssSha256": "572acf04c0fc163ebeba19847f34d29441b901756bec23e722164424bb3eff28",
+        "immutable": true,
+        "codeChangesAfterFreeze": false
+      },
+      "evidence": "Parent supplied results; this documentation worker did not run input.",
+      "existingMatrices": {
+        "status": "passed",
+        "matrixCount": 3,
+        "hosts": [
+          "Windows / hidden CDP renderer (not OS window input)",
+          "Samsung SM-X736B / Android ADB",
+          "Samsung SM-A336E / Android ADB"
+        ],
+        "note": "All three existing matrices passed on all three hosts; CDP and Android input remain separately labeled."
+      },
+      "timerOwners": {
+        "runner": "check-timer-owners.mjs",
+        "status": "passed",
+        "lifecycle": "Forced-mount probe via actual plugin private callback plus real native leaf switch/unload/reload; same owner host, no saves of original bytes.",
+        "timeoutsAndForcedReject": "Actual owner-window synthetic facade, 2000ms timeout and cleanup verified; not evidence of a real native viewer failure."
+      },
+      "pdfCompatibility": {
+        "realViewOpenReuse": "passed",
+        "automaticFit": "unsupported-not-successful",
+        "baseline": "85cb6cd applyNativePdfFit returned false",
+        "current": "applyNativePdfFit returned false",
+        "hosts": "all three hosts",
+        "diagnostics": 2,
+        "result": "Private fit fields unsupported; same native fallback on baseline/current. Do not claim automatic PDF fit succeeded."
+      },
+      "pending": [
+        "popout owner-window tests",
+        "OS window input (not performed under current scope)",
+        "automatic PDF fit compatibility",
+        "real native viewer failure path (synthetic facade only)"
+      ]
+    },
+    "equivalence": {
+      "evidence": "Parent supplied full-bundle proof.",
+      "pluginPlain": {
+        "status": "byte-identical",
+        "sha256ReportedPrefix": "378f...",
+        "note": "Only prefix supplied; do not infer full SHA."
+      },
+      "pluginMinified": {
+        "status": "AST-equivalent-except-consistent-identifier-renaming",
+        "astNodes": 394946,
+        "renamedIdentifierOccurrences": 216,
+        "mapping": "consistent bijection",
+        "otherChanges": false
+      },
+      "mcpWholeBundle": {
+        "status": "byte-identical",
+        "sha256ReportedPrefix": "ed94...",
+        "note": "Only prefix supplied in this update; no inferred new full SHA."
+      }
+    }
+  },
+  "contracts": {
+    "ownerDocument": {
+      "status": "required-invariant",
+      "scope": "Every affected DOM factory, event listener, observer and timer",
+      "requirements": [
+        "Use the document/window that owns the actual board, modal, iframe or Settings container.",
+        "Capture a stable timer owner for scheduling and cancellation; preserve no-owner and non-Obsidian test-host fallbacks.",
+        "Keep HTML/SVG namespaces, existing classes/attributes/order, focus and native history behavior.",
+        "Portable IDs and MCP Node code are separate from DOM ownership."
+      ],
+      "prerequisitePolicy": "No universal P-CONTEXT edge. Already-injected owner documents allow independent local migrations."
+    },
+    "sharedDomHelper": {
+      "status": "conditional",
+      "prerequisitePolicy": "If a common helper is introduced/changed, agree and test its owner-document, namespace, fallback and public contract before adopting consumers. A local factory-preserving patch has no global helper prerequisite."
+    },
+    "movementRuntime": {
+      "status": "conditional",
+      "prerequisitePolicy": "D-EXTENSIONS follows D-SEL and precedes subsequent movement runtime changes; type-only consumers and exact DOM factory migrations remain independent."
+    },
+    "fileLeases": {
+      "status": "exclusive-per-file",
+      "prerequisitePolicy": "styles.css and m1-session.ts are hubs. Edges serialize writes to listed actual shared files; aggregate job names do not force waiting for unrelated modules. Conditional JS pin writer needs a component lease only when touched."
+    }
+  },
+  "liveCounts": {
+    "evidence": "Updated parent/coordinator checkpoint; this worker did not rerun lint or diagnostic gates.",
+    "plugin": {
+      "baselineDiagnostics": 332,
+      "warnings": 198,
+      "errors": 0
+    },
+    "css": {
+      "baselineDeclarations": 83,
+      "importantDeclarations": 83,
+      "hasSelectors": 0
+    },
+    "mcp": {
+      "baselineDiagnostics": 23,
+      "remainingDiagnostics": 17,
+      "separateDiagnosticCheck": "passed-node-scoped-diagnostic-run",
+      "errors": 2,
+      "note": "Parent supplied fresh whole-MCP Node-scoped diagnostics: 15 warnings + 2 intentional errors = 17. Whole MCP bundle byte-identical; plugin src has 0 errors.",
+      "warnings": 15,
+      "errorDisposition": "Two intentional Node/stdout scope diagnostic errors; not src lint errors."
+    },
+    "arithmetic": {
+      "baseline": 438,
+      "removed": 140,
+      "remaining": 298,
+      "remainingScopesSum": 298
+    },
+    "note": "Keep all original baseline assignments in the ledger once, including worker-complete jobs. D-EXTENSIONS has zero inventory diagnostics."
+  },
+  "followUps": [
+    {
+      "id": "WELCOME-MAIN-WINDOW-ORDER",
+      "owner": "platform/core coordinator",
+      "status": "queued-for-trace",
+      "count": 0,
+      "inventoryScope": "Outside the 438 baseline; possible lifecycle follow-up, not a confirmed repaired issue.",
+      "scope": "Generated welcome-board node/group array ordering during main-window startup/reopen. Distinguish native settlement from persistence/data loss; trace original/current build before any runtime patch. Native QA remains parent-owned."
+    }
+  ],
+  "audit": "lint-workers/interface-dependencies.md",
+  "graphValidation": {
+    "jobs": 47,
+    "edges": 46,
+    "uniqueDirectedEdges": 46,
+    "baselineAssignments": 438,
+    "assignedBaselineSites": 438,
+    "extraJobs": 2,
+    "acyclic": true,
+    "conditionalEdgesIncluded": true,
+    "topologicalOrder": [
+      "A-RECORDS",
+      "D-RECORDS",
+      "F-TYPES",
+      "U-CONTEXT",
+      "D-SEL",
+      "A-AUTH",
+      "P-CONTEXT",
+      "P-DOM-PROBE",
+      "K-CONTEXT",
+      "P-TIMERS",
+      "U-SETTINGS",
+      "U-C1",
+      "M-M4",
+      "M-M2",
+      "D-VALID",
+      "F-RECORDS",
+      "U-DOM",
+      "D-EXTENSIONS",
+      "P-RENDER-DATA",
+      "K-RECORDS",
+      "P-LEAF",
+      "P-PDFCOMPAT",
+      "C8-SIZE",
+      "M-M1",
+      "F-VALID",
+      "U-RECORDS",
+      "U-TEXT",
+      "K-DOM",
+      "P-DOM",
+      "U-C3",
+      "M-M3",
+      "M-M5",
+      "K-SEARCH",
+      "P-VALID",
+      "U-C2",
+      "M-M6",
+      "K-TEXT",
+      "P-ID-TEXT",
+      "U-C6",
+      "K-CLIPBOARD",
+      "U-C4",
+      "K-GUARDS",
+      "U-C5",
+      "U-C9",
+      "U-C7",
+      "C8-TRANSFORM",
+      "U-C10"
+    ],
+    "validationKind": "Static plan/inventory graph check only; no gate rerun or new app-input evidence."
+  }
+}

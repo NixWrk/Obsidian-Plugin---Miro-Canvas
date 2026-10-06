@@ -578,6 +578,10 @@ For interface work, follow the existing host-based [design rules](DESIGN.md).
 Before a lint fix, trace its affected user actions and add their mandatory
 checks to [the regression register](docs/lint-remediation-checks.md). Keep
 unit, synthetic, real-app and physical-device evidence separate.
+The [execution plan](docs/lint-execution-plan.md) assigns remaining lint sites
+by dependencies, impact and file ownership. Initialization retries retain one
+timer owner through cancellation; PDF readiness keeps a two-second deadline
+and the native controls fallback when automatic fitting is unavailable.
 Board reading and editing use the optional [MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
 The server is started separately by its owner's configuration; the plugin

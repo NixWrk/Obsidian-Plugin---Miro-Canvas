@@ -1616,6 +1616,59 @@ describe("changeItems", () => {
 		expect(runtime.history).toHaveLength(2);
 	});
 
+
+	it("updates an item's rounded box without dropping source or nested unknown fields, and replays one history step", () => {
+		const initial = drawings();
+		const nodes = initial.nodes as CanvasDocument[];
+		nodes[0]!.future = { nested: [{ kept: "node" }] };
+		initial.future = { nested: ["root"] };
+		initial.miroSource = { evidence: { nested: ["source"] } };
+		const metadata = initial.miroCanvas as CanvasDocument;
+		metadata.future = { nested: ["metadata"] };
+		const overrides = metadata.localOverrides as CanvasDocument;
+		(overrides.d1 as CanvasDocument).future = { nested: ["override"] };
+		const item = { type: "drawing" as const, stroke: STROKE, future: { nested: ["item"] } };
+		const input = { updates: [{ id: "d1", item, rect: { x: 12.6, y: -8.4, width: 44.6, height: 0.2 } }] };
+		const originalInput = clone(input);
+		const runtime = new NativeGraph(initial);
+
+		const result = createCanvasAuthoring(runtime).changeItems(input, initial);
+
+		expect(result.ok).toBe(true);
+		const applied = runtime.getData();
+		expect((applied.nodes as CanvasDocument[])[0]).toEqual({ ...nodes[0], x: 13, y: -8, width: 45, height: 1 });
+		expect((applied.nodes as CanvasDocument[])[1]).toEqual(nodes[1]);
+		expect(applied.miroSource).toEqual(initial.miroSource);
+		expect(applied.future).toEqual(initial.future);
+		expect(applied.miroCanvas).toEqual({ ...metadata, localOverrides: { ...overrides, d1: { ...(overrides.d1 as CanvasDocument), item } } });
+		expect(input).toEqual(originalInput);
+		expect(initial).toEqual(runtime.history[0]);
+		expect(runtime.importDataSpy).toHaveBeenCalledTimes(1);
+		expect(runtime.requestSaveSpy).toHaveBeenCalledWith(true);
+		expect(runtime.history).toHaveLength(2);
+		runtime.undo();
+		expect(runtime.getData()).toEqual(initial);
+		runtime.redo();
+		expect(runtime.getData()).toEqual(applied);
+	});
+
+	it.each([
+		{ x: Number.NaN, y: 0, width: 100, height: 20 },
+		{ x: 0, y: Number.POSITIVE_INFINITY, width: 100, height: 20 },
+		{ x: 0, y: 0, width: 0, height: 20 },
+		{ x: 0, y: 0, width: 100, height: -1 },
+	])("rejects an invalid item rectangle without import or history: %j", (rect) => {
+		const initial = drawings();
+		const runtime = new NativeGraph(initial);
+		const result = createCanvasAuthoring(runtime).changeItems({ updates: [{ id: "d1", item: { type: "drawing", stroke: STROKE }, rect }] });
+		expect(result.ok).toBe(false);
+		expect(result.diagnostics.map((entry) => entry.code)).toContain("item-rect-invalid");
+		expect(runtime.importDataSpy).not.toHaveBeenCalled();
+		expect(runtime.requestSaveSpy).not.toHaveBeenCalled();
+		expect(runtime.getData()).toEqual(initial);
+		expect(runtime.history).toHaveLength(1);
+	});
+
 	it("refuses the whole change when any part of it is not allowed, and changes nothing", () => {
 		const runtime = new NativeGraph(drawings(true));
 		const authoring = createCanvasAuthoring(runtime);
@@ -1681,5 +1734,43 @@ describe("moving a large selection", () => {
 		expect(result.ok).toBe(false);
 		expect(result.diagnostics.map((item) => item.code)).toContain("element-style-blocked-review");
 		expect(reviewRuntime.history).toHaveLength(1);
+	});
+});
+
+describe("authoring reflected host failures", () => {
+	it("reads a throwing host method getter once and never imports or saves", () => {
+		const getter = vi.fn(() => { throw new Error("unreadable getData"); });
+		const importData = vi.fn();
+		const requestSave = vi.fn();
+		const runtime = { importData, requestSave };
+		Object.defineProperty(runtime, "getData", { get: getter });
+		const result = createCanvasAuthoring(runtime).createShape(action());
+		expect(result.ok).toBe(false);
+		expect(result.diagnostics.map((entry) => entry.code)).toContain("native-get-data-missing");
+		expect(getter).toHaveBeenCalledTimes(1);
+		expect(importData).not.toHaveBeenCalled();
+		expect(requestSave).not.toHaveBeenCalled();
+	});
+
+	it("rejects a host result with a throwing then getter without another host call", () => {
+		const thenGetter = vi.fn(() => { throw new Error("unreadable then"); });
+		const document = initialDocument();
+		Object.defineProperty(document, "then", { get: thenGetter });
+		const runtime = { getData: vi.fn(() => document), importData: vi.fn(), requestSave: vi.fn() };
+		const result = createCanvasAuthoring(runtime).createShape(action());
+		expect(result.ok).toBe(false);
+		expect(result.diagnostics.map((entry) => entry.code)).toContain("native-get-data-failed");
+		expect(runtime.getData).toHaveBeenCalledTimes(1);
+		expect(thenGetter).toHaveBeenCalledTimes(1);
+		expect(runtime.importData).not.toHaveBeenCalled();
+		expect(runtime.requestSave).not.toHaveBeenCalled();
+	});
+
+	it("rejects a revoked host without letting its proxy exception escape", () => {
+		const revoked = Proxy.revocable({}, {});
+		revoked.revoke();
+		const result = createCanvasAuthoring(revoked.proxy).createShape(action());
+		expect(result.ok).toBe(false);
+		expect(result.diagnostics.map((entry) => entry.code)).toContain("native-runtime-read-failed");
 	});
 });

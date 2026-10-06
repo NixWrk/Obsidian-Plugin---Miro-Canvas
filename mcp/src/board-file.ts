@@ -334,7 +334,7 @@ export class FileMetadataStore implements MetadataDocumentStore {
 			this.failure = "the board changed during the call";
 			return false;
 		}
-		if (!this.edit.save(structuredClone(nextDocument) as Record<string, unknown>)) {
+		if (!this.edit.save(structuredClone(nextDocument))) {
 			this.failure = STALE_BOARD;
 			return false;
 		}

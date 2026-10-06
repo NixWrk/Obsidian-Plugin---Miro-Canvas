@@ -1,5 +1,6 @@
 import {describe,it,expect} from "vitest";
 import {commentSelectionId, pointInSelectionBox, previewBoardSelection, rectIntersectsBox, routeContainedInBox, routeEndsInBox, selectedComment, selectionMovesLineData, translateBoardSelection} from "../src/board-selection";
+import { buildCanvasAnchorGeometry } from "../src/connector-endpoints";
 describe("connector marquee hit testing",()=>{
   const a={x:10,y:10},b={x:20,y:20};
   it("does not select a long connector just because it crosses the box",()=>{
@@ -178,5 +179,109 @@ describe("the preview of a dragged selection", () => {
     expect(selectionMovesLineData(before, ["b", "c"])).toBe(false);
     expect(selectionMovesLineData(before, ["ab"])).toBe(true);
     expect(selectionMovesLineData({ nodes: [], edges: [] }, ["a"])).toBe(false);
+  });
+});
+
+describe("captured ends shared by repeated mixed selection moves", () => {
+  const board = () => ({
+    extension: { deep: ["root"] },
+    miroSource: { items: [{ id: "a", evidence: { deep: ["source"] } }] },
+    nodes: [
+      { id: "frame", type: "group", x: -10, y: -10, width: 60, height: 60, extension: { deep: ["frame"] } },
+      { id: "a", type: "text", x: 0, y: 0, width: 30, height: 30, extension: { deep: ["card"] } },
+      { id: "b", type: "text", x: 300, y: 0, width: 30, height: 30, extension: { deep: ["far card"] } },
+    ],
+    edges: [{ id: "native", fromNode: "a", toNode: "b", extension: { deep: ["native"] } }],
+    miroCanvas: {
+      schemaVersion: 1,
+      extension: { deep: ["metadata"] },
+      localOverrides: { native: { extension: { deep: ["override"] }, connectorAnchors: {
+        from: { type: "node", nodeId: "a", u: 0.5, v: 0.5, extension: { deep: ["attached"] } },
+        to: { type: "free", x: 315, y: 15, extension: { deep: ["far native end"] } },
+        extension: { deep: ["anchor record"] },
+      } } },
+      connectors: {
+        chain: { id: "chain", from: { type: "edge", edgeId: "native", t: 0, extension: { deep: ["chain attachment"] } },
+          to: { type: "free", x: 400, y: 15, extension: { deep: ["far chain end"] } }, route: "straight",
+          color: "#123456", width: 2, startCap: "none", endCap: "arrow", extension: { deep: ["chain"] } },
+        long: { id: "long", from: { type: "edge", edgeId: "chain", t: 0 },
+          to: { type: "free", x: 500, y: 15, extension: { deep: ["far independent end"] } }, route: "straight",
+          color: "#123456", width: 2, startCap: "none", endCap: "arrow", extension: { deep: ["long"] } },
+      },
+      localComments: [{ id: "pin", text: "Free", anchor: { type: "free", x: 15, y: 35 }, replies: [], extension: { deep: ["comment"] } }],
+      commentPlaces: { "local:untouched": { type: "free", x: 900, y: 900, extension: { deep: ["pin"] } } },
+    },
+  });
+  const ids = ["frame", "a", "native", "chain", "long", commentSelectionId("local", "pin")];
+  const ends = {
+    native: { from: true, to: false, wholeRoute: false },
+    chain: { from: true, to: false, wholeRoute: false },
+    long: { from: true, to: false, wholeRoute: false },
+  };
+
+  it("uses the same captured mask for preview, commit and the next drag through two chained lines", () => {
+    let before = board();
+    const source = structuredClone(before.miroSource);
+    const mask = structuredClone(ends);
+    for (const [dx, dy] of [[20, 10], [-5, 7]]) {
+      const original = structuredClone(before);
+      const preview = previewBoardSelection(before, ids, dx, dy, ends) as typeof before;
+      const committed = translateBoardSelection(before, ids, dx, dy, ends) as typeof before;
+      expect(preview).toEqual(committed);
+      expect(before).toEqual(original);
+      expect(preview.miroSource).toBe(before.miroSource);
+      expect(committed.miroSource).toEqual(source);
+      expect(committed.nodes[2]).toEqual(original.nodes[2]);
+      expect(committed.miroCanvas.localOverrides.native.connectorAnchors).toEqual(original.miroCanvas.localOverrides.native.connectorAnchors);
+      expect(committed.miroCanvas.connectors.chain.from).toEqual(original.miroCanvas.connectors.chain.from);
+      expect(committed.miroCanvas.connectors.long.from).toEqual(original.miroCanvas.connectors.long.from);
+      expect(committed.miroCanvas.connectors.chain.to).toEqual(original.miroCanvas.connectors.chain.to);
+      expect(committed.miroCanvas.connectors.long.to).toEqual(original.miroCanvas.connectors.long.to);
+      for (const value of ["native", "chain", "long"]) {
+        const originalGeometry = buildCanvasAnchorGeometry(original).edges?.[value];
+        const previewGeometry = buildCanvasAnchorGeometry(preview).edges?.[value];
+        expect(originalGeometry?.start).toBeDefined();
+        expect(previewGeometry?.start).toMatchObject({
+          x: originalGeometry!.start!.x + dx,
+          y: originalGeometry!.start!.y + dy,
+        });
+        expect(previewGeometry?.end).toEqual(originalGeometry?.end);
+        expect(previewGeometry).toEqual(buildCanvasAnchorGeometry(committed).edges?.[value]);
+      }
+      expect(committed.extension).toEqual(original.extension);
+      expect(committed.nodes[0].extension).toEqual(original.nodes[0].extension);
+      expect(committed.nodes[1].extension).toEqual(original.nodes[1].extension);
+      expect(committed.edges).toEqual(original.edges);
+      expect(committed.miroCanvas.extension).toEqual(original.miroCanvas.extension);
+      expect(committed.miroCanvas.localOverrides.native.extension).toEqual(original.miroCanvas.localOverrides.native.extension);
+      expect(committed.miroCanvas.connectors.chain.extension).toEqual(original.miroCanvas.connectors.chain.extension);
+      expect(committed.miroCanvas.connectors.long.extension).toEqual(original.miroCanvas.connectors.long.extension);
+      expect(committed.miroCanvas.localComments).toEqual(original.miroCanvas.localComments);
+      const pin = buildCanvasAnchorGeometry(original).comments?.["local:pin"];
+      expect(pin).toBeDefined();
+      expect(committed.miroCanvas.commentPlaces).toMatchObject({ "local:pin": { type: "free", x: pin!.x + dx, y: pin!.y + dy } });
+      expect(committed.miroCanvas.commentPlaces["local:untouched"]).toEqual(original.miroCanvas.commentPlaces["local:untouched"]);
+      expect(ends).toEqual(mask);
+      before = committed;
+    }
+  });
+
+  it("does not move uncaught waypoints and far ends when moving just the native from end", () => {
+    const before = {
+      nodes: board().nodes,
+      edges: board().edges,
+      miroCanvas: { schemaVersion: 1, localOverrides: { native: {
+        connector: { waypoints: [{ x: 100, y: 60, extension: { deep: ["waypoint"] } }], extension: { deep: ["route"] } },
+        connectorAnchors: { from: { type: "free", x: 15, y: 15, extension: { deep: ["caught"] } },
+          to: { type: "free", x: 315, y: 15, extension: { deep: ["far"] } } },
+      } } },
+    };
+    const original = structuredClone(before);
+    const preview = previewBoardSelection(before, ["native"], 20, 10, { native: ends.native }) as typeof before;
+    expect(preview).toEqual(translateBoardSelection(before, ["native"], 20, 10, { native: ends.native }));
+    expect(preview.miroCanvas.localOverrides.native.connector).toEqual(original.miroCanvas.localOverrides.native.connector);
+    expect(preview.miroCanvas.localOverrides.native.connectorAnchors.to).toEqual(original.miroCanvas.localOverrides.native.connectorAnchors.to);
+    expect(preview.miroCanvas.localOverrides.native.connectorAnchors.from).toMatchObject({ type: "free", x: 35, y: 25 });
+    expect(before).toEqual(original);
   });
 });

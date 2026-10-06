@@ -32,7 +32,7 @@ export type CanvasRect = MinimapRect;
 export type BoardBounds = MinimapRect;
 export type MinimapPoint = ViewportPoint;
 
-export interface MinimapViewportSize extends ViewportSize {}
+export type MinimapViewportSize = ViewportSize;
 
 export interface MinimapSceneItem {
 	readonly id?: string;

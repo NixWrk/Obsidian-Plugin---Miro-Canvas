@@ -323,7 +323,7 @@ function isPlainObject(value: unknown): value is AnyRecord {
 		if (Array.isArray(value)) {
 			return false;
 		}
-		const prototype = Object.getPrototypeOf(value);
+		const prototype: unknown = Object.getPrototypeOf(value);
 		return prototype === null || prototype === Object.prototype;
 	} catch {
 		return false;
@@ -396,7 +396,7 @@ function safeInvoke(target: AnyRecord, method: string, args: readonly unknown[])
 		return { ok: false };
 	}
 	try {
-		const value = Reflect.apply(candidate.value, target, [...args]);
+		const value: unknown = Reflect.apply(candidate.value, target, [...args]);
 		return isThenable(value) ? { ok: false } : { ok: true, value };
 	} catch {
 		return { ok: false };
@@ -894,8 +894,8 @@ function graphItemsNativeMismatch(
 	if (observed.length !== requested.length) return `${kind} count ${requested.length} -> ${observed.length}`;
 	const ordered = allowReorder ? matchOrderById(observed, requested) : observed;
 	for (let index = 0; index < requested.length; index += 1) {
-		const actual = ordered[index];
-		const wanted = requested[index];
+		const actual: unknown = ordered[index];
+		const wanted: unknown = requested[index];
 		if (!isPlainObject(actual) || !isPlainObject(wanted)) return `${kind}[${index}] unreadable`;
 		const actualKeys = ownKeys(actual);
 		const wantedKeys = ownKeys(wanted);
@@ -1800,7 +1800,7 @@ function buildShape(
 		addDiagnostic(diagnostics, "canvas-document-invalid", "error", "The target Canvas nodes array is unavailable.");
 		return undefined;
 	}
-	const nodes = [...nodesValue.value, node];
+	const nodes = [...(nodesValue.value as readonly unknown[]), node];
 	setOwn(document, "nodes", nodes);
 	const metadata = updateShapeMetadata(document, allocated.id, parsed.shape, parsed.locked, parsed.rotation, diagnostics);
 	if (metadata === undefined) {
@@ -2165,7 +2165,7 @@ export class CanvasAuthoring {
 			return reject();
 		}
 		const edgesValue = safeRead(document, "edges");
-		const edges = edgesValue.ok && Array.isArray(edgesValue.value) ? edgesValue.value : undefined;
+		const edges: readonly unknown[] | undefined = edgesValue.ok && Array.isArray(edgesValue.value) ? edgesValue.value : undefined;
 		if (edges === undefined) {
 			addDiagnostic(diagnostics, "canvas-document-invalid", "error", "The target Canvas edges array is unavailable.");
 			return reject();
@@ -2261,7 +2261,7 @@ export class CanvasAuthoring {
 			addDiagnostic(diagnostics, "canvas-document-invalid", "error", "The target Canvas nodes array is unavailable.");
 			return reject();
 		}
-		setOwn(document, "nodes", [...nodesValue.value, node]);
+		setOwn(document, "nodes", [...(nodesValue.value as readonly unknown[]), node]);
 		if (item !== undefined) {
 			const metadata = readMetadataForUpdate(document, diagnostics);
 			if (metadata === undefined) return reject();
@@ -2307,8 +2307,8 @@ export class CanvasAuthoring {
 				return reject();
 			}
 		}
-		const nodes = Array.isArray(input?.nodes) ? input.nodes : [];
-		const edges = Array.isArray(input?.edges) ? input.edges : [];
+		const nodes: InsertGraphInput["nodes"] = Array.isArray(input?.nodes) ? input.nodes : [];
+		const edges: InsertGraphInput["edges"] = Array.isArray(input?.edges) ? input.edges : [];
 		if (nodes.length === 0 && edges.length === 0 && !input.connectors?.length) {
 			addDiagnostic(diagnostics, "insert-empty", "error", "Adding to the board needs at least one node.");
 			return reject();
@@ -2354,8 +2354,8 @@ export class CanvasAuthoring {
 			addDiagnostic(diagnostics, "canvas-document-invalid", "error", "The target Canvas nodes or edges array is unavailable.");
 			return reject();
 		}
-		setOwn(document, "nodes", [...nodesValue.value, ...copies.nodes]);
-		setOwn(document, "edges", [...edgesValue.value, ...copies.edges]);
+		setOwn(document, "nodes", [...(nodesValue.value as readonly unknown[]), ...copies.nodes]);
+		setOwn(document, "edges", [...(edgesValue.value as readonly unknown[]), ...copies.edges]);
 		const overrides = Object.entries(input.overrides ?? {}).filter(([id]) => added.has(id));
 		const bindings = Object.entries(input.bindings ?? {}).filter(([id]) => added.has(id));
 		if (overrides.length > 0 || bindings.length > 0 || connectors.length > 0) {
@@ -2572,7 +2572,7 @@ export class CanvasAuthoring {
 		const document = cloneRecord(before.document);
 		const edges = safeRead(document, "edges");
 		if (!edges.ok || !Array.isArray(edges.value)) return reject();
-		const edge = edges.value.find((item) => {
+		const edge = (edges.value as readonly unknown[]).find((item) => {
 			const key = safeRead(item, "id");
 			return isPlainObject(item) && key.ok && key.value === id;
 		});
@@ -2619,7 +2619,7 @@ export class CanvasAuthoring {
 				return reject();
 			}
 			seen.add(id);
-			const node = nodes.value.find((item) => {
+			const node = (nodes.value as readonly unknown[]).find((item) => {
 				const key = safeRead(item, "id");
 				return isPlainObject(item) && key.ok && key.value === id;
 			});
@@ -2692,7 +2692,7 @@ export class CanvasAuthoring {
 				return reject();
 			}
 		}
-		const changes = Array.isArray(input?.updates) ? input.updates : [];
+		const changes: readonly UpdateItemInput[] = Array.isArray(input?.updates) ? input.updates : [];
 		const removals = new Set((Array.isArray(input?.removals) ? input.removals : [])
 			.filter((id): id is string => typeof id === "string" && id.length > 0));
 		if (changes.length === 0 && removals.size === 0) {

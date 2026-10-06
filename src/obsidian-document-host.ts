@@ -6,6 +6,20 @@ function get(value: unknown, key: string): unknown {
   catch { return undefined; }
 }
 
+interface PdfTimerHost {
+  setTimeout(callback: () => void, delay: number): number | ReturnType<typeof setTimeout>;
+  clearTimeout(timer: number | ReturnType<typeof setTimeout>): void;
+}
+
+function pdfTimerHost(view: unknown): PdfTimerHost {
+  const ownerWindow = get(get(get(view, "containerEl"), "ownerDocument"), "defaultView");
+  if (typeof get(ownerWindow, "setTimeout") === "function" && typeof get(ownerWindow, "clearTimeout") === "function") {
+    return ownerWindow as PdfTimerHost;
+  }
+  // The type-only bridge also runs in Node tests, without a DOM or Obsidian.
+  return typeof window === "undefined" ? { setTimeout, clearTimeout } : window;
+}
+
 /** Only the native PDF fit bridge uses private fields, and fails to native UI. */
 export async function applyNativePdfFit(view: unknown, document: LocalDocument): Promise<boolean> {
   if (document.kind !== "pdf") return true;
@@ -13,11 +27,12 @@ export async function applyNativePdfFit(view: unknown, document: LocalDocument):
     const ready = get(view, "viewer");
     if (typeof get(ready, "then") !== "function") return false;
     // A closed/unloaded view must not keep a plugin action waiting indefinitely.
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timerHost = pdfTimerHost(view);
+    let timer: ReturnType<PdfTimerHost["setTimeout"]> | undefined;
     const renderer = await Promise.race([
       Promise.resolve(ready),
-      new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), 2000); }),
-    ]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+      new Promise<undefined>((resolve) => { timer = timerHost.setTimeout(() => resolve(undefined), 2000); }),
+    ]).finally(() => { if (timer !== undefined) timerHost.clearTimeout(timer); });
     const pdf = get(get(renderer, "pdfViewer"), "pdfViewer");
     if (!pdf || typeof pdf !== "object" || typeof get(pdf, "currentScaleValue") !== "string") return false;
     return Reflect.set(pdf, "currentScaleValue", document.fit === "width" ? "page-width" : "page-fit");

@@ -4,8 +4,8 @@
  * pins move together, and a connector caught by one end moves only that end.
  */
 
-import { boardConnectors, translateConnector } from "./board-connectors";
-import { normalizeAnchor, type AnchorPoint } from "./anchors";
+import { boardConnectors, translateConnector, type BoardConnector } from "./board-connectors";
+import { normalizeAnchor, type AnchorPoint, type CanvasAnchor } from "./anchors";
 import { buildCanvasAnchorGeometry } from "./connector-endpoints";
 import { listCommentThreads, type CommentOrigin } from "./local-comments";
 
@@ -71,7 +71,40 @@ export function rectIntersectsBox(rect: Box, a: AnchorPoint, b: AnchorPoint, con
     : rect.left <= box.right && rect.right >= box.left && rect.top <= box.bottom && rect.bottom >= box.top;
 }
 
-type Loose = Record<string, any>;
+// The fields this move reads from a native graph and the plugin's own records.
+interface SelectionNode extends Record<string, unknown> {
+  id: string;
+  x: number;
+  y: number;
+}
+
+interface SelectionEdge extends Record<string, unknown> {
+  id: string;
+  fromNode: string;
+  toNode: string;
+}
+
+type ConnectorEnds = Partial<Record<"from" | "to", CanvasAnchor | null>>;
+
+interface SelectionOverride extends Record<string, unknown> {
+  connector?: (Record<string, unknown> & { waypoints?: readonly AnchorPoint[] }) | null;
+  connectorAnchors?: (Record<string, unknown> & ConnectorEnds) | null;
+}
+
+interface SelectionMetadata extends Record<string, unknown> {
+  schemaVersion?: number;
+  commentPlaces?: Record<string, unknown> | null;
+  connectors?: Record<string, unknown> | null;
+  localOverrides?: Record<string, SelectionOverride | null | undefined> | null;
+}
+
+interface SelectionDocument extends Record<string, unknown> {
+  nodes?: SelectionNode[] | null;
+  edges?: SelectionEdge[] | null;
+  miroCanvas?: SelectionMetadata | null;
+}
+
+type MovedConnector = { -readonly [Key in keyof BoardConnector]: BoardConnector[Key] };
 
 /**
  * The board with a selection moved by (dx, dy): the dragged preview and the
@@ -93,14 +126,14 @@ export function selectionMovesLineData(document: Record<string, unknown>, ids: r
   const selected = new Set(ids);
   const edges = document.edges;
   if (!Array.isArray(edges)) return false;
-  const overrides = (document.miroCanvas as Loose | undefined)?.localOverrides as Loose | undefined;
+  const overrides = (document.miroCanvas as SelectionMetadata | null | undefined)?.localOverrides;
   if (overrides === undefined || overrides === null) return false;
-  for (const edge of edges as Loose[]) {
+  for (const edge of edges as SelectionEdge[]) {
     if (!selected.has(edge.id) && !(selected.has(edge.fromNode) && selected.has(edge.toNode))) continue;
     const override = overrides[edge.id];
     if (override === undefined || override === null) continue;
     if (override.connector?.waypoints !== undefined) return true;
-    if (["from", "to"].some((end) => override.connectorAnchors?.[end]?.type === "free")) return true;
+    if ((["from", "to"] as const).some((end) => override.connectorAnchors?.[end]?.type === "free")) return true;
   }
   return false;
 }
@@ -119,14 +152,14 @@ export function previewBoardSelection(document: Record<string, unknown>, ids: re
 
 function translateSelection(document: Record<string, unknown>, ids: readonly string[], dx: number, dy: number,
   routeEnds: Readonly<Record<string, SelectedRouteEnds>>, share: boolean): Record<string, unknown> {
-  const next = (share ? { ...document } : JSON.parse(JSON.stringify(document))) as Loose;
+  const next = (share ? { ...document } : JSON.parse(JSON.stringify(document))) as SelectionDocument;
   // The plugin's own data, copied whole before the first thing in it changes when it is shared.
   let canvasCopied = !share;
-  const canvas = (fallback: Loose = {}): Loose => {
+  const canvas = (fallback: SelectionMetadata = {}): SelectionMetadata => {
     if (!canvasCopied) {
       canvasCopied = true;
       const own = document.miroCanvas;
-      next.miroCanvas = own === undefined || own === null ? fallback : JSON.parse(JSON.stringify(own));
+      next.miroCanvas = own === undefined || own === null ? fallback : JSON.parse(JSON.stringify(own)) as SelectionMetadata;
     } else {
       next.miroCanvas ??= fallback;
     }
@@ -152,18 +185,18 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     for (const comment of comments) {
       const point = pins[comment.key], thread = threads.get(comment.key);
       if (point === undefined || thread === undefined) continue;
-      const anchor = normalizeAnchor(canvas().commentPlaces[comment.key] ?? thread.anchor).anchor;
+      const anchor = normalizeAnchor(canvas().commentPlaces![comment.key] ?? thread.anchor).anchor;
       // A selected parent carries its child comment already. Keep that link.
       const carried = ((anchor?.type === "node" || anchor?.type === "image") && selected.has(anchor.nodeId))
         || (anchor?.type === "comment" && selected.has(commentSelectionId(anchor.origin, anchor.commentId)));
-      if (!carried) canvas().commentPlaces[comment.key] = { type: "free", ...shift(point) };
+      if (!carried) canvas().commentPlaces![comment.key] = { type: "free", ...shift(point) };
     }
   }
 
   if (share) {
     // Only the cards that move are copied; the others are the board's own.
     if (Array.isArray(next.nodes)) {
-      next.nodes = next.nodes.map((node: Loose) => selected.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node);
+      next.nodes = next.nodes.map((node: SelectionNode) => selected.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node);
     }
   } else {
     for (const node of next.nodes ?? []) {
@@ -177,11 +210,11 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     if (!selected.has(connector.id)) continue;
     const mask = routeEnds[connector.id];
     if (mask === undefined) {
-      canvas().connectors[connector.id] = translateConnector(connector, dx, dy);
+      canvas().connectors![connector.id] = translateConnector(connector, dx, dy);
       continue;
     }
     const route = geometry?.edges?.[connector.id];
-    const shifted: Loose = { ...connector };
+    const shifted: MovedConnector = { ...connector };
     for (const end of ["from", "to"] as const) {
       if (!mask[end]) continue;
       const anchor = connector[end], point = end === "from" ? route?.start : route?.end;
@@ -189,7 +222,7 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
       else if (!follows(anchor) && point !== undefined) shifted[end] = { type: "free", ...shift(point) };
     }
     if (mask.wholeRoute && connector.waypoints !== undefined) shifted.waypoints = connector.waypoints.map(shift);
-    canvas().connectors[connector.id] = shifted;
+    canvas().connectors![connector.id] = shifted;
   }
 
   // Native route control points are absolute board coordinates as well.
@@ -201,16 +234,16 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
       const free = (["from", "to"] as const).some((end) => override?.connectorAnchors?.[end]?.type === "free");
       if (override?.connector?.waypoints === undefined && !free) continue;
       // Written into, so it is the copy's own.
-      const own = canvas().localOverrides[edge.id];
+      const own = canvas().localOverrides![edge.id]!;
       if (own.connector?.waypoints !== undefined) own.connector.waypoints = own.connector.waypoints.map(shift);
-      for (const end of ["from", "to"]) {
+      for (const end of ["from", "to"] as const) {
         const anchor = own.connectorAnchors?.[end];
         if (anchor?.type === "free") Object.assign(anchor, shift(anchor));
       }
       continue;
     }
     const route = geometry?.edges?.[edge.id];
-    const replacements: Loose = {};
+    const replacements: ConnectorEnds = {};
     for (const end of ["from", "to"] as const) {
       const point = end === "from" ? route?.start : route?.end;
       if (mask[end] && !follows(override?.connectorAnchors?.[end], edge[`${end}Node`]) && point !== undefined) {
@@ -219,12 +252,12 @@ function translateSelection(document: Record<string, unknown>, ids: readonly str
     }
     if (Object.keys(replacements).length > 0) {
       canvas({ schemaVersion: 1 }).localOverrides ??= {};
-      const target = canvas().localOverrides[edge.id] ??= {};
+      const target = canvas().localOverrides![edge.id] ??= {};
       target.connectorAnchors = { ...target.connectorAnchors, ...replacements };
     }
     if (mask.wholeRoute && override?.connector?.waypoints !== undefined) {
-      const own = canvas().localOverrides[edge.id];
-      own.connector.waypoints = own.connector.waypoints.map(shift);
+      const own = canvas().localOverrides![edge.id]!;
+      own.connector!.waypoints = own.connector!.waypoints!.map(shift);
     }
   }
   return next;

@@ -1228,7 +1228,7 @@ function validateOverrides(value: unknown, diagnostics: AppearanceDiagnostic[]):
   }
   for (const key of ownKeys(value)) {
     if (!isSafeObjectKey(key)) {
-      addDiagnostic(diagnostics, "override-key-invalid", `localOverrides.${key}`, "Override key is unsafe.");
+      addDiagnostic(diagnostics, "override-key-invalid", `localOverrides.${key as string}`, "Override key is unsafe.");
       continue;
     }
     const override = readOwn(value, key);

@@ -217,6 +217,64 @@ describe("appearance core", () => {
     expect(() => normalizePalette(ownProto)).not.toThrow();
   });
 
+  it.each([
+    "__proto__",
+    "prototype",
+    "constructor",
+    "  CoNsTrUcToR  ",
+    "",
+    " \t\n ",
+    "a".repeat(257),
+    "node\u0000id",
+    "node\u001fid",
+    "node\u007fid",
+  ])("reports an unsafe override key without reading its value: %j", (key) => {
+    let reads = 0;
+    const localOverrides = {};
+    Object.defineProperty(localOverrides, key, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error("An unsafe override must not be read.");
+      },
+    });
+    Object.freeze(localOverrides);
+    const input = Object.freeze({ settings: Object.freeze({}), localOverrides });
+
+    const validation = validateAppearanceState(input);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.diagnostics).toEqual([{
+      code: "override-key-invalid",
+      path: `localOverrides.${key}`,
+      message: "Override key is unsafe.",
+    }]);
+    expect(reads).toBe(0);
+    expect(Object.getOwnPropertyNames(localOverrides)).toEqual([key]);
+    expect(input.localOverrides).toBe(localOverrides);
+  });
+
+  it.each([
+    "node-1",
+    "узел-🌿",
+    "a".repeat(256),
+    "  node-1  ",
+    "\tnode-1\n",
+    "node\u0080id",
+  ])("accepts a safe override key without changing its input: %j", (key) => {
+    const override = Object.freeze({ colors: Object.freeze({ fill: "#123456" }) });
+    const localOverrides = Object.freeze({ [key]: override });
+    const input = Object.freeze({ settings: Object.freeze({}), localOverrides });
+
+    const validation = validateAppearanceState(input);
+
+    expect(validation.valid).toBe(true);
+    expect(validation.diagnostics).toEqual([]);
+    expect(Object.keys(localOverrides)).toEqual([key]);
+    expect(localOverrides[key]).toBe(override);
+    expect(input.localOverrides).toBe(localOverrides);
+  });
+
   it("validates the payload boundary and emits an owned metadata subset", () => {
     const invalid = validateAppearanceState({
       settings: {

@@ -1103,3 +1103,204 @@ main/CSS/MCP hashes are unchanged by this documentation audit. MCP SHA remains
 ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
 SDK/tool versions are recorded in the inventory. No new Windows/tablet input
 run was needed for these byte-identical artifacts; L17 evidence still applies.
+
+
+## L19: parallel wave 1 participation and mandatory gates (before edits)
+
+Baseline 85cb6cd; remaining-site inventory describes unchanged code from
+96420fa. Coordinator owns this register, production outputs, shared guides,
+styles budget, device/Obsidian input and integration. Workers have disjoint
+implementation/test scopes and an exclusive detailed pre-edit trace note
+linked below. Each worker must write that note with its exact sites/callers
+and checks BEFORE implementation. If a new runtime/public-contract change is
+needed, stop at the reviewed patch boundary; do not silently widen the batch.
+No worker edits miroSource/schema, lint rules, releases, or another worker's
+files. No worker deploys or runs device input. No worker commits incomplete
+integration; coordinator runs all gates, real-app checks, then commits/pushes.
+
+### L19-SEL: data executor — selection types (69 diagnostics)
+
+Owned source src/board-selection.ts; optional focused changes only in
+ tests/board-selection.test.ts. Detailed before-edit record:
+[selection worker](lint-workers/selection.md).
+Trace: Loose alias; selectionMovesLineData; translateSelection's copy-on-write
+metadata, commentPlaces, native edge overrides/waypoints, connector endpoint
+masks. CanvasAuthoring.moveSelection calls translateBoardSelection; M1 uses
+previewBoardSelection/selectionMovesLineData for drag preview. Both paths share
+captured route ends. Require type-only private shapes/narrow annotations with
+unchanged public contracts, property reads/clones/order and emitted module JS.
+Mandatory: mixed native/independent/comment selection; one caught end and a
+far end outside bounds; repeated preview/commit parity, unchanged input and
+source/unknown fields; native/connector chains; group/non-default zoom, paths
+before release, cancel/Undo/Redo and no preview persistence. Existing focused
+selection tests plus coordinator's full scene/history/real-app gates apply.
+
+### L19-AUTH: authoring executor — authoring types (58 diagnostics)
+
+Owned source src/canvas-authoring.ts; optional focused changes in
+ tests/canvas-authoring.test.ts and tests/canvas-authoring-update-nodes.test.ts.
+Detailed before-edit record: [authoring worker](lint-workers/authoring.md).
+Trace: isPlainObject/safeInvoke/native mismatch/buildShape, createConnector,
+createItem, insertGraph, updateEdgeLabel, updateNodes and changeItems. M1 tools
+and standalone MCP tools call the same CanvasAuthoring writer; edits carry
+locks/review/source and unknown fields through native persistence/history.
+Require annotation/assertion changes only; no new checks, getter reads, clones,
+reordering, public signatures or validation weakening. Prove module JS identity.
+Mandatory: creation/style/resize/rotation/labels/paste graphs and ID remapping;
+locked/review/malformed host failures; one native history step; stale document
+refusal and metadata/source/unknown preservation. Focused authoring tests;
+coordinator runs whole-module consumers, builds and integrated app matrices.
+
+### L19-MCP: server executor — six redundant assertions
+
+Owned sources mcp/src/board-file.ts and mcp/src/tools-edit.ts; optional focused
+assertions in existing MCP tests only. Detailed before-edit record:
+[MCP worker](lint-workers/mcp.md).
+Trace: FileMetadataStore.commitDocument structuredClone; createEditTools style
+and lock clones; connectorPatch narrowed color; updateLine style casting.
+Remove exactly the six inventoried M4 assertions after verifying each caller.
+Do not change Node imports, console redirects, config paths, dispatch or regex.
+Mandatory: writer expected-document/stale check, native locks/review, unknown
+fields/miroSource, graph/connector writes, read-only tools and clean stdout.
+Prove emitted module identity; coordinator confirms full MCP build identity.
+
+### L19-WIN: platform executor — five timer diagnostics
+
+Owned src/main.ts (only initializationRetry declaration/set/clear lifecycle),
+src/obsidian-document-host.ts and tests/obsidian-document-host.test.ts.
+Detailed before-edit record: [platform worker](lint-workers/platform.md).
+Trace: handleActiveLeafChange cancels a pending retry, probes mounting and
+persistence, schedules 250ms only for the still-active leaf (at most 20);
+disposeShell cancels the remaining timer. applyNativePdfFit races the native
+viewer promise against 2s and clears its timeout after resolve/reject/timeout.
+Preserve the retry/limit/history/save semantics; capture one stable timer owner
+for both set and clear. Avoid activeWindow changing between those operations.
+Do not migrate activeLeaf/IDs/DOM or m1-session in this first batch. PDF timers
+must use the view's owner window where available and preserve the bounded
+fallback. Tests must verify owning receiver, same-host cleanup, ready/reject/
+never-ready and non-PDF behavior. Coordinator checks supported desktop/tablet
+plus the legacy phone, delayed mounting/leaf switch/unload and actual PDF view.
+
+### L19-CSS: interface executor — dependency/impact review only
+
+Exclusive output docs/lint-workers/interface-dependencies.md. Review all C1-C10
+against their state writers, owner documents, inline native styles, rotation,
+source rendering and tablet button rules. Identify actual prerequisites for
+DOM helpers/settings/owner-window work and file conflicts separately. Produce
+ordered patch slices with exact selectors/properties and mandatory real-app
+checks. Do NOT edit CSS, implementation, shared docs, outputs or devices yet.
+The coordinator keeps one CSS writer/one owner for m1-session.ts; this prevents
+independent-looking rule groups from colliding in shared state or the cascade.
+
+
+### L19-BASE: foundation executor — two annotation diagnostics
+
+Owned src/appearance.ts (only isSafeObjectKey typing / validateOverrides
+unsafe-key diagnostic) and src/minimap-model.ts (MinimapViewportSize alias).
+Detailed before-edit record: [foundation worker](lint-workers/foundation.md).
+The key comes from ownKeys as string; a negative value-is-string predicate
+narrows it to never even though unsafe strings reach the diagnostic in runtime.
+Preserve rejection/diagnostic and every reserved key/length/trim constraint;
+change annotations/overloads only, no String() conversion or deleted branch.
+MinimapViewportSize is an empty interface over ViewportSize, used in viewport
+size parsing and minimap geometry. Require accurate type alias and emitted JS
+identity. Existing appearance/metadata and minimap/viewport tests must pass;
+no declaration-merging/public signature break. No regex/shared helper change
+in this first patch. This worker may separately propose a portable control-
+character contract for later validator batches, without implementing it yet.
+
+### L19 integrated evidence and remaining checks (2026-10-06)
+
+All six workers returned their bounded patches/audit. The dependency and owner
+ledger is [the execution plan](lint-execution-plan.md), with every baseline
+site assigned once in [JSON](lint-execution-plan.json). Worker notes describe
+before-edit trace and module evidence; this section records coordinator checks.
+Local worker artifacts were archived from the newly created root `.out/` into
+`tools/obsidian_cdp/.out/l19-worker-artifacts/`; their original scripts/patches
+retain original artifact paths. No unrelated root files were moved or staged.
+
+Source warnings: **332 -> 198, zero errors**, exactly 134 removed: selection
+69, authoring 58, timers 5, foundation 2. No additional source diagnostics.
+CSS remains **83 !important / 0 :has**; this wave edits no CSS. Separate
+Node-scoped MCP diagnostic pass: **21 warnings + 2 errors -> 15 warnings + 2
+errors**. Six assertions removed; remaining Node imports (9), stdout redirects
+(2 intentional diagnostic errors), config directory (4), dispatch async (1)
+and filename regex (1) remain queued/reviewed independently of plugin lint.
+The configured plugin lint succeeds; MCP rules were not disabled or changed.
+
+Type-only whole-plugin proof, with baseline timer sources held fixed:
+unminified output byte-identical, SHA256
+`378f269349b5e44272c7330e25c858bc4651bdba981ec8979b562ab8f200f601`.
+Direct minified output differs, but all **394946 AST nodes** agree in structure
+and literals: only **216 identifier occurrences** have consistent bijective
+renames. The actual integrated plugin intentionally changes timer ownership;
+its production SHA256 is
+`bf411cff362b65d021dc2779e8f72e0411a0ea1d32602e316bf5c71fa6fc7cc0`.
+Full MCP bundle is byte-identical to baseline:
+`ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150`.
+CSS SHA256 is unchanged:
+`572acf04c0fc163ebeba19847f34d29441b901756bec23e722164424bb3eff28`.
+Installed readback on all three apps matches main/CSS hashes after testing.
+
+Integrated repository checks: TypeScript, Vitest **1800 pass + 1 existing
+skip / 113 files**, plugin lint, CSS budget, schema pin, production plugin
+and MCP builds, all three synthetic smoke suites, Python oracle **25 pass**.
+The added native harness also passes `node --check`; final diff/encoding
+checks apply to all owned files. No release/version/tag operation is included.
+
+Optional M0 setup was also attempted: its installer still expects manifest
+0.1.0 and refused current 0.2.7. `check_environment` only inspected its empty
+scaffold, with missing runtime warnings; neither is a passing runtime check.
+The newly created unregistered scaffold was archived in ignored
+`tools/obsidian_cdp/.out/l19-m0-attempt/`. This existing helper-version mismatch
+needs a separate tooling fix; actual native results below use CDP's correctly
+installed current build and are independent of M0 setup.
+
+| Real app | Input and scope | Result |
+| --- | --- | --- |
+| Windows, Obsidian 1.14.4 | Hidden isolated `l19-windows/vault`, background CDP mouse/key events; no OS input or bringToFront | All three existing matrices and timer/native-PDF probe pass; original L19 baseline bytes restored |
+| SM-X736B / R52Y808PDJB, Obsidian 1.13.8 | MiroCanvasTest, actual ADB menu/pin/close/resize/Undo/Redo taps; CDP preparations/probes separate | All three matrices and timer/native-PDF probe pass; Export touch test.canvas bytes restored |
+| SM-A336E / RZCW101PJVN, Obsidian 1.12.7 | Same MiroCanvasTest boundaries and ADB/CDP distinction | All three matrices and timer/native-PDF probe pass; original board restored; legacy evidence below minAppVersion 1.13.7 |
+
+Existing matrices: `check-owned-hidden` (37 states; exhaustive hidden display,
+rect/focus, popovers, local/imported/locked comments/draft/outside close/reload),
+`check-owned-visibility` (both themes, search and actual PDF export/capture
+hide/restore), `check-css-state --expect-marks` (native/turned selection,
+attached-edge preview before release at 50/125%, no preview writes, commit,
+Undo/Redo/cancel, late code/attachment marks and reload). Android controls and
+gestures use ADB; query/selection/late-mark preparation uses CDP. Windows uses
+background renderer synthesis. This is no new physical stylus evidence.
+
+New `check-timer-owners` calls the actual installed plugin lifecycle methods,
+opens/switches native Canvas leaves and disables/re-enables the plugin. A
+temporary mount wrapper **forces** retry eligibility; it does not claim a
+naturally delayed native failure. A 250ms retry settles on readiness; leaf
+switch/unload clear the captured host's pending handle; reload mounts and
+original board bytes stay unchanged. Exact 20-attempt bound, inactive-leaf,
+handle-zero and alternate-owner cases additionally have unit/synthetic proof.
+
+The native PDF is actually exported, opened and reused through the current
+pure bridge in the real app. **Automatic fit is unsupported on these three
+installed versions:** private nested fit fields are absent and the existing
+diagnostic/native controls fallback is retained. Direct baseline 85cb6cd and
+current bridge both return false on the same native view. Do not describe this
+as successful automatic fit. On its real owner window, instrumented never-ready
+and rejected viewer facades use/clear the same 2000ms timer; elapsed about
+2000-2013ms. A controlled late renderer receives no fit write. These failure
+facades are CDP instrumentation, not actual viewer failures/physical input.
+
+Excluded setup attempts: Windows onboarding modal obscured a control; tablet
+had no active file after reconnect. Close the modal with background CDP and
+open the existing tablet test board, then rerun complete matrices. A first
+late-PDF assertion compared the live viewer's independently changing scale;
+replace that contaminated assertion with an instrumented late renderer and
+record the real fallback separately. No product code changed in response.
+
+**Still pending:** real desktop popout/closed-window ownership and naturally
+closed/failed PDF viewer cases. No visible OS window was created for those
+checks. Existing automatic-fit compatibility is a separate follow-up, as are
+generated welcome-board ordering and the baseline extension-field loss found
+in moved waypoints/replaced free anchors. Type-only changes preserve existing
+behavior and do not certify those branches as repaired. Queue D-EXTENSIONS
+before subsequent semantic movement work; before-edit checks are required
+again when these separate runtime fixes begin.

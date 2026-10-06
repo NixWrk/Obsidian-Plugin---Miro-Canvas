@@ -855,7 +855,7 @@ export function createEditTools(context: EditToolContext): ToolDefinition[] {
 				if (typeof args.shape === "string") input.shape = args.shape as UpdateElementStyleInput["shape"];
 				if (typeof args.borderStyle === "string") input.borderStyle = args.borderStyle as UpdateElementStyleInput["borderStyle"];
 				if (typeof args.borderWidth === "number") input.borderWidth = args.borderWidth;
-				if (isRecord(args.connector)) input.connector = args.connector as UpdateElementStyleInput["connector"];
+				if (isRecord(args.connector)) input.connector = args.connector;
 				return input;
 			});
 			return fromAuthoring(session.authoring().updateElementStyles(inputs));
@@ -975,7 +975,7 @@ export function createEditTools(context: EditToolContext): ToolDefinition[] {
 			return fromWriter(session.writer().write("set-locks", (draft) => {
 				const next = reduceInteractionMetadata(draft, { type: "set-locks", elementIds: ids, locked: args.locked === true });
 				if (next === undefined) throw new Error("The lock change was not one the board's record takes.");
-				return next as UnknownRecord;
+				return next;
 			}));
 		}),
 	);
@@ -1039,9 +1039,9 @@ function readWebAddress(value: unknown): string {
 function connectorPatch(args: UnknownRecord): Partial<BoardConnector> {
 	const patch: Record<string, unknown> = {};
 	for (const key of Object.keys(connectorStyleProperties)) {
-		if (args[key] !== undefined) patch[key] = key === "color" && typeof args[key] === "string" ? (args[key] as string).toLowerCase() : args[key];
+		if (args[key] !== undefined) patch[key] = key === "color" && typeof args[key] === "string" ? (args[key]).toLowerCase() : args[key];
 	}
-	return patch as Partial<BoardConnector>;
+	return patch;
 }
 
 /** update_connector: a native edge through CanvasAuthoring, the board's own connector through its record. */
@@ -1089,7 +1089,7 @@ function updateLine(session: EditSession, args: UnknownRecord): StepResult {
 	if (typeof args.label === "string") {
 		if (args.label === "") {
 			const { label: _label, ...rest } = next;
-			next = rest as BoardConnector;
+			next = rest;
 		} else {
 			next = { ...next, label: args.label };
 		}
