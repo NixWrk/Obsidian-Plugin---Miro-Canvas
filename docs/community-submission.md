@@ -1,6 +1,6 @@
 # Community directory submission package
 
-Updated on 2026-10-05 for Miro Canvas 0.2.7. The owner has created a directory
+Updated on 2026-10-07 for Miro Canvas 0.2.8. The owner has created a directory
 draft; review of 0.2.3 reported blocking errors addressed by this release.
 Acceptance and publication of the directory listing remain pending.
 
@@ -23,7 +23,7 @@ were checked on 2026-10-04, before preparation continued after midnight.
 | Name | Miro Canvas |
 | Plugin ID | `miro-canvas` |
 | Author | NixWrk |
-| Version | 0.2.7 |
+| Version | 0.2.8 |
 | Minimum app version | 1.13.7 |
 | Platforms | Desktop and mobile editing and export |
 | License | MIT; third-party notices in repository |
@@ -95,11 +95,16 @@ to undo expanded panel spacing. The CSS regression check reports the remaining
 This is a regression budget, not the directory's CSS linter or a warning-free
 certification. Remaining selectors bridge native Canvas/Markdown markup;
 further cascade cleanup requires visual and interaction checks.
-The current unreleased batch reduces :has to four by mirroring adopted native
-menu state; the !important count remains 90. Each further lint change must
-first enter its affected actions in [the regression register](lint-remediation-checks.md). The full
-repository scan also reports Node imports in `mcp/`, the optional standalone
-Node server. The submission packaging check rejects those imports in `main.js`.
+Version 0.2.8 removes the remaining CSS advisories: the enforced budget is
+zero `!important` declarations and zero `:has()` selectors. Source lint has no
+errors and retains one documented command-ID warning to preserve saved hotkeys.
+The full repository scan also reports 11 plugin-context advisories in `mcp/`:
+these belong to the optional standalone Node server, whose own enforced lint
+check passes with no errors or warnings. The submission packaging check rejects
+Node/Electron runtime loaders in `main.js`.
+Each lint change first records affected actions in [the regression register](lint-remediation-checks.md).
+All 47 assigned groups are fixed or have an explicit compatibility disposition;
+this does not certify directory acceptance or every manual platform scenario.
 
 ## Reproducible verification
 
@@ -111,12 +116,22 @@ The phone check covers these controls only; the manifest minimum stays 1.13.7.
 The search announcement remains exposed as an `aria-live="polite"` region in
 the real desktop accessibility tree after its `clip-path` is removed.
 
+The final 0.2.8 implementation passes 2,036 unit tests (one existing optional
+skip), three browser smoke modes and 33 oracle tests. Scoped installed-app
+checks use hidden/background Windows Obsidian 1.14.4, SM-X736B tablet 1.13.8
+and SM-A336E phone 1.12.7, with real ADB input separated from CDP synthesis.
+The phone is below the manifest minimum and is extra legacy evidence only.
+Successful Android system clipboard roundtrips, physical pressure/palm/hover
+and the broader manual checks remain unverified; the regression register records
+each boundary and distinguishes historical checks from final-build checks.
+
 Run from the repository root:
 
 ```sh
 npm run check
 npm run lint
 npm run lint:css
+npm run lint:mcp
 npm test
 npm run build
 npm run mcp:build
@@ -148,7 +163,7 @@ validation; absence from the legacy catalog alone is not proof.
 
 ## Owner's final steps
 
-1. Refresh the existing draft’s automated review for version 0.2.7.
+1. Refresh the existing draft’s automated review for version 0.2.8 after its public release is verified.
 2. Sign in to Community Directory with your Obsidian account.
 3. Connect GitHub `NixWrk` so the directory can verify repository ownership.
 4. Open **Plugins → New plugin** and paste the repository URL above.

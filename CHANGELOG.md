@@ -2,38 +2,19 @@
 
 ## Unreleased
 
-- Wait for native PDF loading and initial layout before applying page/width fit; cancel pending waits when their window closes.
-- Restore native menu visibility, card alignment, paint and selected layer styles when their temporary plugin ownership ends. Replace the remaining CSS priorities with scoped rules and reversible native style ownership.
-- Use declarative native settings on supported Obsidian versions and create HTML/SVG in the owning window, including detached previews and popouts.
-- Preserve unknown connector endpoint and waypoint fields during selection transformations. Validate filenames and invisible characters with shared equivalent checks.
-- Support custom vault configuration folders in the optional MCP server; enforce separate Node runtime lint in CI. Resolve the oracle test plugin version from the current manifest.
+## 0.2.8 - 2026-10-07
 
-- Retain one timer owner for board initialization retries and PDF readiness deadlines, including cancellation on leaf switch or plugin unload. Keep the existing native PDF controls fallback when automatic fitting is unavailable.
-- Replace unsafe private Canvas type boundaries without changing executable behavior; remove six more redundant MCP assertions. Assign remaining lint sites to dependency-ordered work packages with mandatory regression checks.
-
-- Close comment threads and unsaved drafts before Select or another board gesture consumes the outside press. Keep thread and pin controls interactive. Replace three CSS priorities for owned hidden toolbar, handle and thread states with scoped selectors.
-
-- Keep the search close button above folded panel controls on phones. Remove four redundant CSS priorities for hidden search/export roots and screenshot search outlines; verify search and actual PDF capture in installed Windows/Android Obsidian.
-
-- Remove the four remaining CSS `:has()` selectors. Keep one selection outline on native cards and one code title with Obsidian's wrapped Markdown preview. Track late attachment labels and code markup with reversible local state.
-- Cancel a resize without adding an empty Undo step; preserve the live attached-line preview and one history step on release.
-- Remove 367 redundant TypeScript assertions; verify byte-identical plugin and MCP builds for that cleanup.
-
-- Keep pressure width steady during hold-to-straighten: ignore stationary pressure pulses and retain the last width through the zero-pressure move before pen lift. Preview and saved outlines agree; moving the pen still samples pressure.
-
-- Recognize tilted and uneven smart-drawn rectangles by their sides and corners. Preserve the orientation and local dimensions of rectangles, ellipses and triangles, rounding rotation to 45-degree steps in one native Undo/Redo action. Add pressure-enabled hold-to-straighten regressions in installed Android Obsidian.
-
-- Keep open selection menus inside the board when the toolbar moves or native menu contents change after opening. Verify repeated More opening on connected Android tablet/phone in both themes.
-- Add mandatory Android regression checks with real ADB touch/pen-source input, gesture previews, cancellation, Undo/Redo, minimap and viewport rotation; distinguish pen-source injection from hardware pressure/hover.
-
-- Use the board window for delayed touch/pen dots, panel hold gestures, refresh polling, resize observers and minimap pointer checks; cancel waits in their owning window.
-- Replace six native-selection-menu `:has()` selectors with explicit menu state. Preserve the inert snapshot while panning and the independent-connector Delete fallback; restore native buttons on plugin unload.
-- Keep native font fallback after a local font read fails; isolate failures and allow a later request to retry.
-- Require every lint fix to trace affected user actions and record mandatory regressions before implementation in docs/lint-remediation-checks.md.
-
-- Add a keyboard-accessible section selector to settings and move welcome/import actions to the top. Keep all parameters visible and separate developer diagnostics.
-- Document the existing Obsidian design foundation in DESIGN.md. Give README and the welcome introduction a short numbered route while preserving all twelve tutorial sections and real examples.
-- Explain moving and resizing export pages directly in the export panel, including on touch devices.
+- Keep pen width steady while holding a stroke to straighten it and through pen lift. Recognize uneven smart-drawn rectangles by their sides and corners; preserve the orientation of rectangles, ellipses and triangles, rounded to 45-degree steps.
+- Cancel a resize without adding an empty Undo step. Keep attached native edges and connector chains aligned with mixed selections during movement, commit and cancellation; preserve unknown endpoint, waypoint and comment fields.
+- Keep selection menus inside the board and the search close button above folded controls on phones. Close comment threads and unsaved drafts when an outside press starts another board action, while keeping thread and pin controls interactive.
+- Add a keyboard-accessible section selector to settings, put welcome/import actions first and use Obsidian's declarative settings API on supported versions. Clarify moving and resizing export pages and the numbered welcome route in English and Russian.
+- Remove all remaining CSS `!important` and `:has()` selectors. Preserve native menu visibility, card alignment, paint and selected layer styles through scoped rules and reversible style ownership, restoring native values when the plugin unloads.
+- Create HTML/SVG in the owning window, including detached previews and popouts. Keep delayed gestures, refresh polling and observers in that window and cancel pending work on unload or view changes.
+- Wait for native PDF loading and initial page layout before fitting a document, with a two-second deadline and the existing native controls fallback. Closing its window cancels pending waits; export, Stop and save failures restore the board view.
+- Keep native font fallback after a local font read fails and allow a later request to retry.
+- Support custom Obsidian configuration folders through `--config-dir` in the optional standalone MCP server, with a separate Node runtime lint check in CI. The plugin does not start the server.
+- Remove redundant TypeScript assertions and tighten private Canvas boundaries. Retain the existing command ID to preserve saved hotkeys; its one advisory lint warning remains documented.
+- Record affected user actions and mandatory checks before lint changes. The final implementation passes 2,036 unit tests, browser smoke checks and scoped checks in installed Windows, Android tablet and phone Obsidian. The phone runs below the supported minimum; successful Android system clipboard roundtrips and physical pen pressure/palm/hover remain unverified. See [the regression register](docs/lint-remediation-checks.md) for evidence and limits.
 
 ## 0.2.7 - 2026-10-05
 
