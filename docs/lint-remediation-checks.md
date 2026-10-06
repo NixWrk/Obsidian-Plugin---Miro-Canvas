@@ -1787,3 +1787,32 @@ physical stylus/palm/hover, OS pickers/compositor and full six-module popout UI.
 These were not run and are not represented by synthetic evidence. Existing
 source command ID warning remains visible; standalone MCP uses enforced Node
 lint rather than applying plugin-only Node/stdout rules to its stdio server.
+
+### Release 0.2.8 — CI-only typed lint fixture failure (2026-10-07)
+
+Before editing: GitHub CI run 37538153078 passed browser smoke, types and
+plugin/CSS lint, but two mcp/tests/lint-runtime.test.ts assertions failed.
+The same 25-case test passes locally without CI and reproduces the exact two
+failures on Windows with CI=true. This is independent of the Linux host.
+
+Participation: the test calls ESLint.lintText repeatedly with different fixture
+text under real mcp/src/server.ts, vault.ts and tools-edit.ts filenames. The
+installed typescript-eslint inferSingleRun uses CI=true to choose its immutable
+project program. The first tools-edit parse reads the disk source instead of the
+injected redirect; later server parses fall back to an isolated program without
+resolved Promise types. Normal lint:mcp lints actual disk files once and is not
+affected. User actions, standalone server runtime and Android do not change.
+
+Planned test-only repair: disable automatic single-run inference in the test's
+ESLint parser options so every lintText call retains its supplied source and
+project types. Keep every original assertion and the production lint config.
+Mandatory checks: all 25 cases with CI=true and without CI; enforced lint:mcp;
+GitHub full plugin and browser jobs; unchanged main.js/styles.css hashes and
+clean diff. These checks are pending at this pre-edit record.
+
+Post-edit local evidence: all 25 original cases pass with CI=true and with
+ordinary local inference. npm run lint:mcp and npm run check pass. The fixture
+repair does not touch plugin/MCP runtime sources or CSS. GitHub full rerun and
+published-asset verification remain the release gate; no tag was created on
+the failed CI commit. Earlier 2,036-test local acceptance remains historical;
+CI failure and its distinct test-only correction are not erased.

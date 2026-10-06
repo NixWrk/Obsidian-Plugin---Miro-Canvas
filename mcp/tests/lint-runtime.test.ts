@@ -7,6 +7,11 @@ import { REPOSITORY_ROOT } from "./helpers";
 const eslint = new ESLint({
 	cwd: REPOSITORY_ROOT,
 	overrideConfigFile: path.join(REPOSITORY_ROOT, "mcp/eslint.config.mjs"),
+	// Repeated lintText fixtures need the updated project, including under CI=true.
+	overrideConfig: {
+		files: ["mcp/src/**/*.ts"],
+		languageOptions: { parserOptions: { disallowAutomaticSingleRunInference: true } },
+	},
 	cache: false,
 });
 
