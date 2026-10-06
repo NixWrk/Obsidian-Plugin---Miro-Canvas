@@ -816,3 +816,86 @@ Types, 113 unit files (1,758 passed / one existing skip), plugin/MCP builds,
 ESLint, CSS budget (86 priorities / zero :has), three synthetic browser modes,
 pinned schema, 25 oracle tests and diff check pass. No user-facing behavior
 or file format changed; no README/release behavior amendment is needed.
+
+
+## L16: explicit collection constructor and native method types (before edits)
+
+Baseline 666e474 has three no-unsafe-function-type diagnostics. The private
+safeInstanceOf parameter in advanced-canvas-adapter (234) is called only with
+Map/Set by hasCollectionMember, isEnabledPlugin and hasControl: these locate
+optional Advanced Canvas and detect its controls. Canvas-adapter (565) uses
+the same check only for Map/Set in readCollection, which supplies nodes,
+edges and selection to the scene and interaction policy. Constrain these
+parameters to MapConstructor | SetConstructor; keep both guarded instanceof
+checks, diagnostic messages and fallback behavior exactly as they are.
+
+M1 guardNativeMethod (8953) wraps native undo/redo, getData, selection drag,
+importData, node/edge/selection deletion, move/resize/text/color/data editing
+and edge editLabel. The callbacks invoke the original through Reflect.apply
+with the original receiver/arguments. Specify a callable signature accepting
+unknown arguments and returning unknown, with an assertion only after the
+existing typeof-function guard; retain descriptors, disposal/restoration,
+no-method/frozen-runtime handling and the history/rebuild depth guards.
+This hook carries source/unknown root keys across native saves and refuses
+locked edits, so its callers must be verified even for annotation cleanup.
+
+Mandatory focused checks: canvas/advanced adapters for Map/Set/array/plain
+collections, absent/unavailable optional APIs, throwing getters, revoked or
+prototype-trapping Proxies, bounded iterators, method failures/diagnostics;
+M1 locking/persistence/native editing for blocked versus allowed edits,
+argument/receiver/result forwarding, undo/redo restoring locked items, one
+resize history step and cancelled preview, source/unknown field preservation,
+restoring only our own hooks on dispose. Existing focused cases cover these
+behaviors; add a forwarding regression if it is not explicitly covered.
+
+Run types/full units/lint/CSS/builds/schema/three synthetic smokes/oracle/diff.
+Compare full unminified and production plugin output against 666e474, and
+MCP bytes against the baseline hash below. If bytes match, retain L15 real-app
+matrices for the identical executable and confirm installed tablet readback;
+if they differ, inspect differences and rerun background isolated Windows
+and connected physical SM-X736B input checks before claiming completion.
+SM-A336E remains disconnected; its installed-build checks stay pending.
+No OS input/foreground takeover on Windows; CDP renderer input is synthetic,
+ADB input on the tablet is separately recorded from CDP instrumentation.
+Baseline main SHA b69a0b881218828bcf6ee5c1f95a94f9d335927e3b81b39c16d8a829803c4b7e;
+MCP SHA ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
+
+
+### L16 results (2026-10-06)
+
+All three Function annotations now describe their actual private callers.
+ESLint is 0 errors / 332 warnings (337 before): the three unsafe-function-type
+warnings and two unsafe-assignment warnings at M1 native getData/drag return
+values disappear because Reflect.apply now returns unknown rather than any.
+A baseline/current ESLint comparison of the three files confirms this exact
+five-warning delta; no rule was disabled and no runtime statement changed.
+
+Full plugin plain output is byte-identical to 666e474, SHA
+3fbdd738e76445406cfc973c8626208c8f320bb89d7d1ac8789073947b3828e5.
+Production main stays byte-identical, SHA
+b69a0b881218828bcf6ee5c1f95a94f9d335927e3b81b39c16d8a829803c4b7e;
+MCP stays byte-identical, SHA
+ed94d0a1279dd456b18516b548fb8a4a59f7d362b2f739ea7b58b5faacbce150.
+Equivalence and lint-delta JSON are in .out/l16-*-equivalence.json and
+.out/l16-lint-delta.json. The callable assertion follows the original
+runtime typeof-function check; it adds neither a runtime call nor a wrapper.
+
+Existing focused adapter tests exercise normal Map/Set collections, missing
+APIs, throwing getters, revoked/prototype-trapping Proxies, bounded iterators
+and operation failures. M1 locking's native mutation case explicitly passes
+a move point and checks both the returned "moved" value and the receiver's
+data; all fixture methods use their native this. Existing history, preview
+cancel, persistence and later-hook restoration cases pass. No behavior was
+changed, so no new test that merely mirrors an annotation was added.
+Types, all 113 unit files (1,758 passed / one existing skip), ESLint, CSS
+(86 priorities / zero :has), plugin/MCP builds, schema, all three synthetic
+smokes, 25 oracle tests and diff check pass.
+
+Real-app evidence is reused explicitly for the identical executable, not
+reported as a newly repeated input matrix: L15 Windows 10.0.19045.6456 /
+Obsidian 1.14.4 background CDP and Samsung SM-X736B / Obsidian 1.13.8
+MiroCanvasTest ADB matrices exercised these exact main.js bytes. Current
+SM-X736B readback on port 9340 matches the production SHA above. Only that
+tablet is currently listed by ADB; SM-A336E phone installed/input verification
+remains pending. No additional OS input or physical stylus claim is made.
+No user-facing behavior or format changed; release behavior docs stay as-is.

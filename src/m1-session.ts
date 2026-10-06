@@ -8950,7 +8950,7 @@ export class M1CanvasSession {
 	/** Instance-only hooks also protect edits from native menus outside the root.
 	 * Never patch prototypes or persistence/history snapshots. Restore only our
 	 * own wrappers so another plugin's later hook is not overwritten. */
-	private guardNativeMethod(target: unknown, key: string, run: (original: Function, receiver: unknown, args: unknown[]) => unknown): void {
+	private guardNativeMethod(target: unknown, key: string, run: (original: (this: unknown, ...args: unknown[]) => unknown, receiver: unknown, args: unknown[]) => unknown): void {
 		if (!isObject(target) || this.guardedMethods.get(target)?.has(key)) return;
 		const original = readRuntime(target, key);
 		if (typeof original !== "function") return;
@@ -8958,7 +8958,7 @@ export class M1CanvasSession {
 			const descriptor = Object.getOwnPropertyDescriptor(target, key);
 			const session = this;
 			const wrapper = function(this: unknown, ...args: unknown[]): unknown {
-				return session.disposed ? Reflect.apply(original, this, args) : run(original, this, args);
+				return session.disposed ? Reflect.apply(original, this, args) : run(original as (this: unknown, ...args: unknown[]) => unknown, this, args);
 			};
 			Object.defineProperty(target, key, { configurable: true, writable: true, enumerable: descriptor?.enumerable ?? false, value: wrapper });
 			const keys = this.guardedMethods.get(target) ?? new Set<string>();

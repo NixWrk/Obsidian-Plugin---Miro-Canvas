@@ -562,7 +562,7 @@ function safeIsArray(
 
 function safeInstanceOf(
 	value: unknown,
-	constructor: Function,
+	constructor: MapConstructor | SetConstructor,
 	constructorName: string,
 	probe: MutableProbe,
 	capability?: string,
