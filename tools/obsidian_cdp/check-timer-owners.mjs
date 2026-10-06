@@ -80,12 +80,16 @@ try {
             const view=pdfLeaf.view,owner=view.containerEl.ownerDocument.defaultView;
             const renderer=await view.viewer,pdf=renderer?.pdfViewer?.pdfViewer;
             const width=pdf?.currentScaleValue;
-            const baselineFit=await window.__timerOwnerBaseline.applyNativePdfFit(view,probe.describeLocalDocument(file.path,{fit:'width'}));
+            let baselineFit=null,baselineError=null;
+            try { baselineFit=await window.__timerOwnerBaseline.applyNativePdfFit(view,probe.describeLocalDocument(file.path,{fit:'width'})); }
+            catch(error) { baselineError=String(error); }
             const currentFit=await probe.applyNativePdfFit(view,probe.describeLocalDocument(file.path,{fit:'width'}));
-            if(currentFit!==baselineFit)throw Error('baseline fit compatibility differs');
             await host.openFile(probe.describeLocalDocument(file.path,{fit:'page',page:1}));
             const page=pdf?.currentScaleValue;
-            if(diagnostics.length===0&&(width!=='page-width'||page!=='page-fit'))throw Error('native fit mismatch');
+            if(width!=='page-width')throw Error('native width fit mismatch');
+            if(page!=='page-fit')throw Error('native page fit mismatch');
+            if(currentFit!==true)throw Error('current native fit failed');
+            if(diagnostics.length!==0)throw Error('native PDF diagnostics must be empty');
             const events=[],handles=new Set(),set=owner.setTimeout,clear=owner.clearTimeout;
             owner.setTimeout=function(callback,delay,...rest){const h=Reflect.apply(set,this,[callback,delay,...rest]);if(delay===2000){events.push({kind:'set',sameOwner:this===owner,delay});handles.add(h);}return h;};
             owner.clearTimeout=function(h){if(handles.has(h)){events.push({kind:'clear',sameOwner:this===owner});handles.delete(h);}return Reflect.apply(clear,this,[h]);};
@@ -99,11 +103,14 @@ try {
                 const task=probe.applyNativePdfFit({containerEl:view.containerEl,viewer:rejected},probe.describeLocalDocument(file.path));reject(Error('forced PDF failure'));
                 if(await task!==false)throw Error('rejected result');
                 if(handles.size||!events.every(e=>e.sameOwner))throw Error('native owner cleanup');
-                let lateWrites=0;
-                const latePdf={get currentScaleValue(){return 'auto';},set currentScaleValue(value){lateWrites++;}};
-                resolve({pdfViewer:{pdfViewer:latePdf}});await new Promise(r=>Reflect.apply(set,owner,[r,50]));
+                let lateWrites=0,lateScale='auto';
+                const latePdf={pdfDocument:{},firstPagePromise:Promise.resolve(),pagesPromise:Promise.resolve(),get currentScaleValue(){return lateScale;},set currentScaleValue(value){lateWrites++;lateScale=value;}};
+                const lateRenderer={pdfViewer:{pdfViewer:latePdf,initializedPromise:Promise.resolve(),isInitialViewSet:true}};
+                resolve(lateRenderer);await new Promise(r=>Reflect.apply(set,owner,[r,50]));
                 if(lateWrites!==0)throw Error('late ready wrote fit');
-                return {path:file.path,actualNativeView:true,ownerIsMain:owner===window,width,page,diagnostics,baselineFit,currentFit,forcedNeverReady:true,forcedRejection:true,elapsed,lateReadyIgnored:true,lateRendererInstrumented:true,events};
+                if(await probe.applyNativePdfFit({containerEl:view.containerEl,viewer:Promise.resolve(lateRenderer)},probe.describeLocalDocument(file.path))!==true||lateWrites!==1||lateScale!=='page-fit')throw Error('loaded facade active fit control failed');
+                if(handles.size||!events.every(e=>e.sameOwner))throw Error('loaded facade owner cleanup');
+                return {path:file.path,actualNativeView:true,ownerIsMain:owner===window,width,page,diagnostics,baselineFit,baselineError,baselineInformationalOnly:true,baselineNote:'85cb6cd early readiness reads can race native initialization; no compatibility or absent-capability verdict',currentFit,forcedNeverReady:true,forcedRejection:true,elapsed,lateReadyIgnored:true,lateRendererInstrumented:true,loadedFacadeActiveFit:true,events};
             } finally { owner.setTimeout=set;owner.clearTimeout=clear; }
         } finally {
             if(pdfLeaf&&!existing.includes(pdfLeaf))pdfLeaf.detach();
@@ -113,7 +120,7 @@ try {
     assert.equal(await checked(`const f=app.vault.getAbstractFileByPath(${JSON.stringify(saved.path)});return await app.vault.read(f)===${JSON.stringify(saved.text)};`), true);
     if (!serial) assert.equal(await checked("return !require('@electron/remote').getCurrentWindow().isVisible();"), true);
     result.originalByteUnchanged = true;
-    result.popout = 'pending; no separate OS window created';
+    result.popout = 'pending; hidden native popout and owner-closure verification belong to the separate parent probe';
     result.passed = true;
 } finally {
     await checked('delete window.__timerOwnerProbe;delete window.__timerOwnerBaseline;return true;').catch(() => {});

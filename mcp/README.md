@@ -35,10 +35,19 @@ schema; running it needs no `npm install`. Copy it anywhere you like.
 ```bash
 node mcp/dist/miro-canvas-mcp.mjs --vault /absolute/path/to/vault
 node mcp/dist/miro-canvas-mcp.mjs --vault /absolute/path/to/vault --read-only
+node mcp/dist/miro-canvas-mcp.mjs --vault /absolute/path/to/vault --config-dir Config
 ```
 
-`--vault` must be an absolute path to a folder that holds `.obsidian`, reached
-through no symbolic link or junction. `--read-only` offers only the reading and
+`--vault` must be an absolute path to a folder that holds its Obsidian
+configuration, reached through no symbolic link or junction. By default the
+configuration directory is `.obsidian`. If the vault uses a different directory,
+pass the same relative path with `--config-dir Config` or `--config-dir=Config`.
+Nested paths, such as `private/settings`, are supported. The directory must
+already exist inside the vault and every component must pass the same filename,
+traversal and link checks as board paths; `.trash` cannot be the configuration.
+The server does not infer the directory or create it.
+
+`--read-only` offers only the reading and
 checking tools; the others do not exist. The server writes one line to stderr
 when it starts; stdout carries the protocol and nothing else.
 
@@ -121,7 +130,11 @@ Examples of `tools/call` arguments:
 
 - **The vault only.** Paths are relative and end in `.canvas`; `..`, drive
   letters, `:` (alternate data streams), device names, names ending in a dot
-  or a space and anything under `.obsidian` or `.trash` are refused. Every
+  or a space and anything under the selected configuration directory,
+  `.obsidian` or `.trash` are refused, including file-card references. The
+  selected configuration subtree is also skipped by listings when its name
+  is visible or nested. Sibling names that merely share its prefix remain
+  accessible. Every
   folder on the way is checked not to be a link or junction, and the real path
   must be the path as written, inside the vault. Boards over 64 MB are refused.
 - **No lost saves.** A board's revision is the SHA-256 of its bytes. A change
@@ -132,7 +145,9 @@ Examples of `tools/call` arguments:
   renamed over the board; the temporary file is removed on any failure. A save
   landing in the milliseconds between the last check and the rename cannot be
   seen.
-- **Obsidian open.** When Obsidian's workspace shows the board open in a tab,
+- **Obsidian open.** Workspace files are read from the selected configuration
+  directory, with all path components checked again for links and containment.
+  When Obsidian's workspace shows the board open in a tab,
   an answer warns `open-in-obsidian`. Obsidian reloads a board that changed on
   disk, but edits made there and not yet saved can still be saved over the
   change: check the board there, or close it first.
@@ -200,6 +215,9 @@ args = [
 Add `"--read-only"` to the arguments to let the agent read and check boards
 but never change them.
 
+For a non-default configuration directory, also add `"--config-dir", "Config"`
+(using the vault's actual relative path) to the client's arguments.
+
 ## Working on the server
 
 The sources are `mcp/src`, the tests `mcp/tests` (run with `npm test`). `mcp/`
@@ -208,3 +226,24 @@ the build fails if anything it bundles imports `obsidian` or `electron`. The
 MCP protocol is written by hand in `json-rpc.ts` (JSON-RPC 2.0, one message
 per line). See "Agents: the MCP server" in
 [docs/miro-canvas.md](../docs/miro-canvas.md) for the design.
+
+Run the standalone server's enforced lint separately:
+
+```bash
+node node_modules/eslint/bin/eslint.js --config mcp/eslint.config.mjs mcp/src
+```
+
+This scope uses Node globals and the JavaScript and TypeScript type-checked
+recommended rules, including Promise, unsafe-value and control-character
+checks. Obsidian's plugin/mobile rules describe a different runtime: this
+server requires Node's filesystem, crypto, path, readline and stream APIs and
+does not have an Obsidian `App` or `Platform`. The plugin lint configuration
+remains separate.
+
+The server scope forbids network modules, Obsidian/Electron imports, subprocess
+imports, eval and network globals. It reserves stdout for the protocol and
+allows only the existing startup redirects from `console.log`, `console.info`
+and `console.debug` to stderr. Direct stdout access is limited to passing it
+to `serveLines` at startup. Configuration paths use the active standalone
+`Vault.configDir`; only its explicit default initializer may name `.obsidian`.
+Focused lint fixtures and bounded stdio-process tests enforce these rules.

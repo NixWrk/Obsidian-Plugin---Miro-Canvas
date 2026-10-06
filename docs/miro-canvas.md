@@ -2130,6 +2130,29 @@ PanelVisibility marks the main row with data-miro-panel-toggle-host and clears e
 
 ## Lint remediation (2026-10-06)
 
+L20 completes the source cleanup and removes every CSS `!important` and `:has`.
+Scoped paint rules and reversible ownership of native inline properties preserve
+the same board appearance. Existing observers reconcile deferred Markdown sizer
+and paint updates without queries or writes on echo records. Content replacement
+forgets detached targets; reset/unload restores the latest native value and
+priority. Background, border and table padding use non-overlapping declarations
+so teardown does not overwrite later native colors or lose padding.
+
+HTML/SVG factories create detached elements through the document's own window.
+Supported Obsidian settings use the declarative native API. PDF fit waits for
+the native document and first layout, then confirms `page-width` or `page-fit`;
+closing the owning window cancels every pending stage. Unknown endpoint and
+waypoint fields survive selection transforms. The optional stdio MCP has its
+own enforced Node lint scope and accepts the vault's custom configuration folder.
+The oracle runtime requirement follows the repository manifest version.
+
+The existing command ID `miro-canvas:m1-commands` is deliberately retained for
+hotkey compatibility. Clipboard menu actions retain the guarded native event
+fallback because async web custom formats do not expose `obsidian/canvas` to
+native Canvas. These are recorded compatibility dispositions. Current app results
+and pending device checks are recorded in the regression register and execution
+plan below; older paragraphs describe the earlier batches.
+
 Every lint change first records its traced user actions and mandatory checks
 in [the regression register](lint-remediation-checks.md). The first batch uses
 the board window for dot/panel timers, refresh polling, resize observers and

@@ -13,18 +13,20 @@
 import packageJson from "../../package.json";
 import { McpServer, serveLines } from "./json-rpc";
 import { createServerTools } from "./tools-edit";
-import { ToolError, Vault } from "./vault";
+import { DEFAULT_CONFIG_DIR, ToolError, Vault } from "./vault";
 
-const USAGE = "usage: node miro-canvas-mcp.mjs --vault <absolute path to an Obsidian vault> [--read-only]";
+const USAGE = "usage: node miro-canvas-mcp.mjs --vault <absolute path to an Obsidian vault> [--config-dir <relative folder>] [--read-only]";
 
 interface ServerArguments {
 	readonly vault: string;
 	readonly readOnly: boolean;
+	readonly configDir: string;
 }
 
 function parseArguments(argv: readonly string[]): ServerArguments {
 	let vault: string | undefined;
 	let readOnly = false;
+	let configDir = DEFAULT_CONFIG_DIR;
 	for (let index = 0; index < argv.length; index += 1) {
 		const argument = argv[index];
 		if (argument === "--vault") {
@@ -32,6 +34,13 @@ function parseArguments(argv: readonly string[]): ServerArguments {
 			index += 1;
 		} else if (argument.startsWith("--vault=")) {
 			vault = argument.slice("--vault=".length);
+		} else if (argument === "--config-dir") {
+			const value = argv[index + 1];
+			if (value === undefined || value.startsWith("--")) throw new ToolError("usage", USAGE);
+			configDir = value;
+			index += 1;
+		} else if (argument.startsWith("--config-dir=")) {
+			configDir = argument.slice("--config-dir=".length);
 		} else if (argument === "--read-only") {
 			readOnly = true;
 		} else {
@@ -39,7 +48,7 @@ function parseArguments(argv: readonly string[]): ServerArguments {
 		}
 	}
 	if (vault === undefined || vault === "") throw new ToolError("usage", USAGE);
-	return { vault, readOnly };
+	return { vault, readOnly, configDir };
 }
 
 async function main(): Promise<void> {
@@ -51,7 +60,7 @@ async function main(): Promise<void> {
 	let vault: Vault;
 	try {
 		settings = parseArguments(process.argv.slice(2));
-		vault = Vault.open(settings.vault);
+		vault = Vault.open(settings.vault, settings.configDir);
 	} catch (error) {
 		process.stderr.write(`miro-canvas-mcp: ${error instanceof Error ? error.message : String(error)}\n`);
 		process.exitCode = 2;

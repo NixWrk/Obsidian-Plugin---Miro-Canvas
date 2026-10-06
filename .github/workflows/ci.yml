@@ -33,6 +33,8 @@ jobs:
           npm run submission:check
       # The MCP server agents run beside a vault: one self-contained file.
       - run: npm run mcp:build
+      - name: MCP Node runtime lint rules
+        run: npm run lint:mcp
       - name: Release files exist
         run: test -f main.js && test -f manifest.json && test -f styles.css
       # Obsidian decides what to update by the manifest's version; the release

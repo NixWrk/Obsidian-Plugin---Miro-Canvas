@@ -1,4 +1,243 @@
-# План исполнения: зависимости, влияние и исполнители
+# План исполнения L20: финальные свидетельства и границы приёмки
+
+**На frozen assets приняты или dispositioned все 47 jobs.** Финальная проверка
+D-EXTENSIONS прошла на Windows, планшете и телефоне: смешанное/групповое
+выделение, захваченные концы и прикреплённая цепочка линий, до отпускания,
+при 50%/125%, с повторным перемещением, отменой и Undo/Redo. Общие gates
+закрыты в записанных границах свидетельств; более широкие непроверенные
+ручные сценарии перечислены отдельно ниже.
+
+База назначения — **85cb6cd**, implementation L20 — **2f3687c**. Неизменный
+[снимок](lint-remaining-sites.json) и [JSON ledger](lint-execution-plan.json)
+сохраняют **47 jobs, 46 уникальных направленных рёбер и 438 уникальных indices**.
+D-EXTENSIONS и P-PDFCOMPAT — два semantic jobs с count 0. История L19, её hashes,
+wave1 и исходное распределение сохранены; текущий результат supersedes прежние
+pending-заметки, но не переписывает их как состоявшийся тогда PASS.
+
+## Документационный scope и trace до правки
+
+Эксклюзивная запись — только этот Markdown и JSON плана в shared PRIMARY checkout.
+До правки прочитаны AGENTS/workflow, contributing/design notes, новые записи
+[центрального реестра](lint-remediation-checks.md#l20--integrated-evidence-on-the-frozen-build-2026-10-06), final worker receipts и ignored JSON evidence.
+Действие — перенести точные финальные результаты в текущие статусы и отделить
+ожидаемый selection receipt от практических непроверенных сценариев. Проверки
+этой правки: граф/assignments/арифметика, сохранность истории и frozen hashes,
+существование evidence references, UTF-8 без BOM, CRLF и scoped diff check.
+Sidecar не запускал приложения, source checks, tests, lint, сборки или devices;
+ниже приведены результаты parent/worker запусков, а не новые собственные запуски.
+
+## Frozen assets и общие gates
+
+Freeze parent: **2026-10-06T19:58:00Z**. Integrated commit — **содержащий
+commit**: его собственный hash не вписывается в документ во избежание циклического
+self-hash. Sidecar не создаёт commit. Четыре ранее заполненных hashes сохранены:
+
+| Asset | SHA-256 |
+| --- | --- |
+| main.js | aff2ee3a34a3045a30075c5736091c5cde937e3e06d2c1d327659ae5705aa200 |
+| styles.css | 7c5ce8c141b048ae4382abb83f6c3a309a0bfef5c21290bc527184202a76208c |
+| manifest.json | 68169dd642f5654f4a1c3fdf0f64510dd5dba5a72c9d9a3abf39f1a6d4f1c174 |
+| MCP bundle | 4c69150dc6398649a43fae27a2fdbf1d53e2e6a08e096022ed4adef74ccb9618 |
+
+[Полные integrated gates](lint-remediation-checks.md#l20--integrated-evidence-on-the-frozen-build-2026-10-06) — **PASS**: types; 126 Vitest files,
+**2036 passed + 1 существующий optional skip**; 33 oracle pytest;
+три synthetic smoke suites; schema pin; plugin/MCP builds; submission packaging;
+plugin lint 0 errors/1 warning, standalone MCP lint 0/0, CSS 0 priorities/0 :has.
+Typed-ESLint cold-start test получил 30s вместо прежних 5s; product deadlines
+не менялись. Module/type-only equality receipts не являются whole-bundle identity:
+L20 включает отдельно проверенные intentional runtime repairs.
+
+## Неизменная арифметика diagnostics
+
+| Область | Baseline | Финальный результат | Disposition |
+| --- | ---: | --- | --- |
+| src | 332 | 1 warning, 0 errors | W259, literal m1-commands для прежних hotkeys; actual trusted hotkey PASS |
+| CSS | 83 | 0 priorities, 0 :has | Normal cascade и reversible inline ownership; final native PASS |
+| Standalone MCP | 23 | 0 warnings / 0 errors | Enforced Node server runtime |
+| MCP в raw plugin-context | те же 23 | 11 = 9 warnings + 2 errors | 8 Node imports, 2 stderr redirects, 1 explicit config default |
+
+**438 = 426 отсутствующих raw diagnostics + 11 необходимых Node-runtime
+scope dispositions + 1 legacy command warning.** Effective enforced scopes дают
+1 warning; raw contexts суммарно дают 12. Это не заявление об удалении каждой
+legacy source-операции. Все W001–W438 / indices 0–437 и owner totals
+**90/65/5/32/35/188/23 = 438** сохранены. Settings James и часть U-DOM Helmholtz
+имеют отдельную implementation attribution без переназначения baseline sites.
+
+## Текущая приёмка всех 47 jobs
+
+Колонка diagnostics: effective / retained raw MCP plugin-context. «Принято» означает
+bounded lint-remediation acceptance по worker proofs, integrated gates и применимым
+installed receipts; непроверенные более широкие сценарии перечислены ниже.
+
+| Job | Исходный owner | Baseline sites | Diagnostics effective / raw MCP | Текущая приёмка |
+| --- | --- | ---: | ---: | --- |
+| A-RECORDS | authoring | 7 | 0 / 0 | Принято |
+| D-RECORDS | data | 10 | 0 / 0 | Принято |
+| D-VALID | data | 11 | 0 / 0 | Принято |
+| F-VALID | foundation | 2 | 0 / 0 | Принято |
+| F-RECORDS | foundation | 1 | 0 / 0 | Принято |
+| F-TYPES | foundation | 2 | 0 / 0 | Принято |
+| U-DOM | interface | 96 | 0 / 0 | Принято |
+| U-CONTEXT | interface | 2 | 0 / 0 | Принято |
+| D-SEL | data | 69 | 0 / 0 | Принято |
+| D-EXTENSIONS | data | 0 | 0 / 0 | Принято по трём native hosts |
+| A-AUTH | authoring | 58 | 0 / 0 | Принято |
+| P-CONTEXT | platform | 3 | 0 / 0 | Принято |
+| U-TEXT | interface | 1 | 0 / 0 | Принято |
+| P-DOM-PROBE | platform | 1 | 0 / 0 | Принято |
+| P-DOM | platform | 4 | 0 / 0 | Принято |
+| U-RECORDS | interface | 1 | 0 / 0 | Принято |
+| K-CONTEXT | core | 2 | 0 / 0 | Принято |
+| K-RECORDS | core | 16 | 0 / 0 | Принято |
+| K-DOM | core | 13 | 0 / 0 | Принято |
+| K-SEARCH | core | 1 | 0 / 0 | Принято |
+| K-TEXT | core | 1 | 0 / 0 | Принято |
+| K-CLIPBOARD | core | 1 | 0 / 0 | Принято с disposition |
+| K-GUARDS | core | 1 | 0 / 0 | Принято |
+| P-VALID | platform | 1 | 0 / 0 | Принято |
+| P-ID-TEXT | platform | 3 | 1 / 0 | Принято с disposition |
+| P-LEAF | platform | 11 | 0 / 0 | Принято |
+| P-TIMERS | platform | 5 | 0 / 0 | Принято |
+| P-PDFCOMPAT | platform | 0 | 0 / 0 | Принято |
+| U-SETTINGS | interface | 5 | 0 / 0 | Принято |
+| P-RENDER-DATA | platform | 4 | 0 / 0 | Принято |
+| U-C5 | interface | 26 | 0 / 0 | Принято |
+| U-C2 | interface | 2 | 0 / 0 | Принято |
+| U-C1 | interface | 3 | 0 / 0 | Принято |
+| U-C4 | interface | 39 | 0 / 0 | Принято |
+| U-C3 | interface | 3 | 0 / 0 | Принято |
+| U-C6 | interface | 1 | 0 / 0 | Принято |
+| U-C7 | interface | 2 | 0 / 0 | Принято |
+| C8-SIZE | interface | 2 | 0 / 0 | Принято |
+| C8-TRANSFORM | interface | 1 | 0 / 0 | Принято |
+| U-C9 | interface | 3 | 0 / 0 | Принято |
+| U-C10 | interface | 1 | 0 / 0 | Принято |
+| M-M1 | mcp | 9 | 0 / 8 | Принято с disposition |
+| M-M4 | mcp | 6 | 0 / 0 | Принято |
+| M-M5 | mcp | 1 | 0 / 0 | Принято |
+| M-M2 | mcp | 2 | 0 / 2 | Принято с disposition |
+| M-M3 | mcp | 4 | 0 / 1 | Принято с disposition |
+| M-M6 | mcp | 1 | 0 / 0 | Принято |
+
+[DATA](lint-workers/l20-data.md), [AUTHORING/DOM](lint-workers/l20-authoring-dom.md),
+[FOUNDATION/settings](lint-workers/l20-foundation-settings.md),
+[PLATFORM](lint-workers/l20-platform.md), [INTERFACE/CSS](lint-workers/l20-interface.md)
+и [MCP](lint-workers/l20-mcp.md) сохраняют scoped patches, module/plain-JS proofs,
+focused tests и подробные dispositions. MCP receipt: 183 focused tests, 10 real
+bounded stdio subprocesses. Финальные full gates подтверждены отдельно parent.
+
+## Installed native evidence на текущих assets
+
+**Windows 1.14.4:** [все восемь матриц](../tools/obsidian_cdp/.out/l20-windows-final/summary.json) PASS: native style owners,
+hidden roots, visibility/capture, CSS/resize/labels, timer/PDF, card fill, font failures,
+arrow colors. [Restoration](../tools/obsidian_cdp/.out/l20-windows-final/restoration.json) сохраняет exact original board,
+один hidden/unfocused main window и отсутствие дочерних окон. [Style proof](../tools/obsidian_cdp/.out/l20-native/styles-Windows.json)
+положительно подтверждает ordinary M1 **1→1** и Source **5→5** после 100 замен
+каждого preview; прежний count0 gap этим superseded, не переименован в старый PASS.
+Обе темы, late Markdown 18px writer, paint/menu competition, group class-only state,
+latest external values/priorities и неизменные source/extensions/history проверены.
+Pure-helper actual-host CSSOM и [132 variants / 48,816 synthetic comparisons](../tools/obsidian_cdp/.out/l20-interface/css-transfer/final-proof.json)
+остаются отдельными типами evidence: matched 83 sites, 0 mismatches; helpers-off 162.
+
+[Windows settings](../tools/obsidian_cdp/.out/l20-authoring-dom/settings-navigation-desktop-background.json) PASS: 12 sections, trusted renderer navigation,
+строгий fresh welcome witness, export help и exact post-action bytes.
+[Trusted hotkey](../tools/obsidian_cdp/.out/l20-hotkey-proof.json) Ctrl+Alt+F10 открыл commands modal через сохранённый
+miro-canvas:m1-commands; временная in-memory mapping, прежний hotkeys file и board
+восстановлены. Это подтверждает compatibility disposition одного raw warning.
+
+[Actual Windows clipboard](../tools/obsidian_cdp/.out/l20-native/clipboard-Windows.json) PASS: trusted native copy/paste/cut,
+Canvas MIME, source/unknown/per-card overrides, one-step history и Undo/Redo.
+Исходные formats/payloads восстановлены и проверены, не записывались в logs.
+Parent дополнительно сообщает **39 focused clipboard units PASS**. Guarded synchronous
+legacy execCommand сохранён: это проверенная compatibility, не async API migration.
+
+[Native export](../tools/obsidian_cdp/.out/l20-export-followup-Windows.json) PASS: настоящий two-page PDF, trusted Stop и
+forced save-callback failure после actual capture. Exact camera/document,
+screenshotting flag, capture classes, progress и оба export roots восстановлены;
+cancel/failure не создали дополнительного PDF. Callback failure был инъекцией,
+не наблюдением настоящей disk error.
+[Native PDF/popout](../tools/obsidian_cdp/.out/l20-pdf-popout.json) PASS: actual two-page main и hidden native popout,
+page-width/page-fit, правильный ownerWindow; already-closed view возвращает false.
+Шесть принудительных readiness stages завершились false при **реальном закрытии
+native окна**, без late fit writes. Report измеряет примерно 166–185ms; facades
+явно instrumented. Timer matrices подтверждают currentFit=true и diagnostics=[];
+owner receiver, общий 2000ms deadline, rejection/late-ready и native lifecycle
+guards сохранены. Старый baseline early-read boolean — только информация;
+прежний вывод «private capabilities отсутствуют» более не описывает текущий результат.
+
+**Tablet SM-X736B / Obsidian 1.13.8:** [все десять матриц](../tools/obsidian_cdp/.out/l20-tablet-final/completed-summary.json) и
+[positive M1 proof](../tools/obsidian_cdp/.out/l20-tablet-final/native-style-owners.positive-M1.pass.json) PASS; settings 12 sections с реальным ADB
+navigation и отдельно отмеченным CDP Tab. [Worker receipt](lint-workers/l20-tablet-final.md)
+сохраняет model/serial/input и exact board/theme/data.json/installed hashes restoration.
+Fresh Picture.png единожды принимает **height160→133 при width200**, natural480×320,
+ratio1.5, только **до action baseline**: [L19/L20/disabled-native diagnosis](../tools/obsidian_cdp/.out/l20-tablet-final/height-profiles-report.json)
+доказывает одинаковую native image aspect normalization. Все прочие saved/native
+fields, source/unknown/nested arrays остаются strict; пять stable full snapshots
+предшествуют действиям, post-export/close bytes и original board strict.
+Это не production data repair и не широкое исключение height.
+
+**Phone SM-A336E / Obsidian 1.12.7:** [все девять матриц](../tools/obsidian_cdp/.out/l20-phone-final/receipt.json) и
+[positive M1 proof](../tools/obsidian_cdp/.out/l20-phone-final/native-style-owners/l20-native/styles-RZCW101PJVN.json) PASS, включая drawing/hold/shape и точную
+restoration. [Worker receipt](lint-workers/l20-phone-final.md) отделяет real ADB
+от CDP setup/pressure. Версия ниже minimum1.13.7: supported declarative settings
+**исключены**, новая settings compatibility для 1.12.7 не заявляется.
+
+## Непроверенные более широкие сценарии
+
+[Финальная приёмка D-EXTENSIONS](lint-workers/l20-data-native.md) PASS на всех
+трёх hosts: четыре cases, восемь commits и четыре held cancels на каждом.
+Native/independent/chain paths и pins следуют до release; source/unknown fields,
+невыделенные дальние концы, history и точные сохранённые bytes проверены.
+Captured masks подготовлены API; это не сертификация физического marquee.
+Parent завершил input после закрытия исполнителя; прежние неудачные попытки
+не переименованы в PASS. Reports: selection-native-{windows,tablet,phone}-chain-final.json
+в ignored tools/obsidian_cdp/.out/l20-data/.
+
+- **Android happy clipboard roundtrip НЕ СЕРТИФИЦИРОВАН.** Chromium/WebView read
+  denied до создания fixture и любых clipboard writes; [attempt](../tools/obsidian_cdp/.out/l20-native/clipboard-R52Y808PDJB.json)
+  не даёт успешной clipboard restoration/roundtrip сертификации. Без безопасного
+  arbitrary-format backup destructive alternative не запускалась.
+  [Отдельные реальные tablet ADB Cut missing/false/throw checks](../tools/obsidian_cdp/.out/l20-native/clipboard-R52Y808PDJB-failures.json)
+  PASS: graph/history неизменны, clipboard event отсутствует, correct receiver,
+  existing notice и descriptors/callback/original board restored. Failure guards
+  остаются прежними; успешный Android system roundtrip этим не доказывается.
+- Real hardware pressure, физический stylus/palm/hover не проверены. ADB
+  stylus-source и synthetic CDP pressure — разные, ограниченные свидетельства.
+- Windows OS input/foreground/compositor и system pickers/native dropdown popup
+  не сертифицированы. Trusted background renderer events не становятся OS input.
+- Полный mounted UI/action provenance всех шести модулей в popout не доказан.
+  [DOM receipt](lint-workers/l20-dom-native.md) + pure factory main/iframe/hidden-popout probes
+  и actual PDF popout fit/close не заменяют эту более широкую проверку.
+- Forced readiness/rejection/late-ready и forced export save callback не являются
+  естественными native viewer/disk failures. Публичная совместимость всех будущих
+  private viewer shapes не заявляется; existing fail-closed fallback остаётся.
+
+## Follow-ups и исторические записи
+
+WELCOME-MAIN-WINDOW-ORDER **closed без product patch**: actual native getData
+сортирует top-level nodes по zIndex одинаково на L19/L20/disabled-native; каждый
+card field, source/extensions, nested array order и exact file bytes сохранены.
+Отдельная fresh tablet image normalization теперь доказана и принята только до
+strict action baseline. Deferred native style-owner follow-up **accepted** по
+финальным трём hosts с положительным M1 retention. Это два count-zero follow-ups
+вне 438-site/47-job arithmetic, не новые assigned jobs.
+
+MCP-LINT-GUARD-HARDENING имеет disposition **not-required-for-current-runtime**: syntax guards имеют
+alias/callee/config-template/inline-disable escape possibilities и console-property
+false positive. Runtime-scope disposition не заявляет security confinement;
+новый hardening patch этим документационным scope не создаётся.
+
+Статическая проверка сохраняет 47 jobs, 46 unique directed edges (включая conditional),
+DAG и 438 indices; **46 accepted/dispositioned + 1 pending**. Ниже — неизменный
+архив L19: queued/pending, старые hashes и прежняя PDF-интерпретация описывают тот
+момент. Актуальные статусы выше и в JSON supersede эти записи, не исправляя историю.
+
+## Архив планирования и evidence L19
+
+Следующий исходный текст сохранён для истории L19. Его «текущий», queued, freeze
+и PDF-unsupported формулировки относятся к тому checkpoint, а не к L20.
+Историческая PDF inference ограничена пояснением выше; финальная L20 приёмка
+находится в pending таблице, а не в старых passed/hash строках.
 
 База назначения — `85cb6cd`, снимок [438 мест](lint-remaining-sites.json).
 [Машинный план](lint-execution-plan.json) сохраняет каждое исходное место
@@ -17,7 +256,7 @@ Popout и PDF compatibility имеют отдельные pending результ
 обязательные проверки и единственный владелец затронутых файлов. Во время
 проверок приложений используется одна неизменная сборка.
 
-## Текущий результат и счётчики
+### Текущий результат и счётчики
 
 | Область | База | Текущий checkpoint | Статус свидетельства |
 | --- | ---: | ---: | --- |
@@ -56,7 +295,7 @@ JS (SHA prefix `378f...`); minified AST: 394946 nodes, только 216 identifi
 occurrences с consistent bijective renames, без других изменений. Whole MCP
 byte-identical (SHA prefix `ed94...`). Полные SHA и область сравнения приведены в реестре L19.
 
-## Степень влияния
+### Степень влияния
 
 Оценка изменения и последствий ошибки различается. У type-only правки может
 быть нулевое изменение runtime, но её участок — история и данные доски.
@@ -72,7 +311,7 @@ byte-identical (SHA prefix `ed94...`). Полные SHA и область сра
 3 — данные, история, блокировки, платформа или протокол. D-EXTENSIONS имеет
 changeImpact 3 и failureImpact 3 независимо от нулевого количества warnings.
 
-## Владельцы и завершённая волна 1
+### Владельцы и завершённая волна 1
 
 Назначенное количество — весь участок исходного снимка, а не оставшийся
 счётчик или объём первого патча. Владельцы и все исходные inventory indices
@@ -95,7 +334,7 @@ read-only работа, а не шестой патч со снятыми warnin
 в очередь, а не объявлены выполняющимися. Координатор выдаёт узкий scope и
 снимает соответствующую file lease перед следующим writer.
 
-## Граф направлений
+### Граф направлений
 
 Диаграмма показывает основные отношения; точные 47 jobs и 46 рёбер находятся
 в JSON. Пунктир означает условие, а не универсальную блокировку потребителей.
@@ -127,7 +366,7 @@ flowchart TD
 идти независимо от type-only data work. Введение нового общего helper/public
 contract активирует только соответствующие условные рёбра.
 
-## Реальные зависимости и ограничения параллельности
+### Реальные зависимости и ограничения параллельности
 
 | Связь | Вид | Правило исполнения |
 | --- | --- | --- |
@@ -159,7 +398,7 @@ barrier и не необходимость закрыть все 96 U-DOM warnin
 делить управление одним Obsidian/device, пересобирать общий output поверх
 native matrix или объявлять synthetic input настоящим OS/hardware input.
 
-## Порядок очередей
+### Порядок очередей
 
 1. **Волна 1 / worker-complete.** D-SEL 69, A-AUTH 58, M-M4 6,
    P-TIMERS 5, F-TYPES 2. Read-only interface audit завершён. Центральный L19
@@ -195,7 +434,7 @@ native matrix или объявлять synthetic input настоящим OS/ha
    Инвентарь обновляет координатор; baseline assignment ID не исчезает из ledger.
    Новые findings учитываются отдельно от исходных 438.
 
-## Выдача scope и свидетельства
+### Выдача scope и свидетельства
 
 Поручение содержит baseline/rule/sites, owner files, допустимый вид изменения,
 callers/actions, before-edit note, focused checks, pending native evidence,
@@ -219,7 +458,7 @@ PDF capture с success/Stop/failure restoration. Системный clipboard и
 focus-dependent compositor/popout checks имеют отдельные соответствующие
 свидетельства; synthetic ClipboardEvent их не заменяет.
 
-## Findings вне исходных warnings
+### Findings вне исходных warnings
 
 D-EXTENSIONS присутствует среди 47 jobs как zero-diagnostic semantic job.
 Базовые shift(point) и replaced native anchor теряют extension fields;
@@ -241,7 +480,7 @@ platform/core coordinator и статусом queued-for-trace. Это возм�
 и сопоставить базовую/текущую сборки. Это не новый assigned warning, не
 подтверждённый завершённый repair и не дополнительный job в счётчике 47.
 
-## Статическая проверка плана
+### Статическая проверка плана
 
 Все W001–W438 и inventoryIndex 0–437 назначены один раз; каждый индекс совпадает
 с diagnosticIndices/count своего job и владельцем. Owner totals остаются
@@ -253,3 +492,8 @@ inventory indices. Сумма completed wave-1 assignments — 140; оставш
 соответствие file-lease реальным общим файлам и topological sort всего графа,
 включая условные рёбра. Получено 47/46; циклов нет. Эти результаты подтверждают
 структуру плана и арифметику, а не исполнение новых source/app gates.
+
+Финальное решение по MCP guard review: текущий source и реальные stdio checks
+соблюдают контракт. Syntax lint предупреждает случайные регрессии; security
+confinement и анализ всех гипотетических будущих alias-синтаксисов не являются
+незакрытым assigned warning. Review сохранён, hardening patch не заявляется.

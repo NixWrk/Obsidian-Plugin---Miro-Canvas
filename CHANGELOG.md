@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Wait for native PDF loading and initial layout before applying page/width fit; cancel pending waits when their window closes.
+- Restore native menu visibility, card alignment, paint and selected layer styles when their temporary plugin ownership ends. Replace the remaining CSS priorities with scoped rules and reversible native style ownership.
+- Use declarative native settings on supported Obsidian versions and create HTML/SVG in the owning window, including detached previews and popouts.
+- Preserve unknown connector endpoint and waypoint fields during selection transformations. Validate filenames and invisible characters with shared equivalent checks.
+- Support custom vault configuration folders in the optional MCP server; enforce separate Node runtime lint in CI. Resolve the oracle test plugin version from the current manifest.
+
 - Retain one timer owner for board initialization retries and PDF readiness deadlines, including cancellation on leaf switch or plugin unload. Keep the existing native PDF controls fallback when automatic fitting is unavailable.
 - Replace unsafe private Canvas type boundaries without changing executable behavior; remove six more redundant MCP assertions. Assign remaining lint sites to dependency-ordered work packages with mandatory regression checks.
 

@@ -34,6 +34,22 @@ function request(id: number, method: string, params?: unknown): Record<string, u
 }
 
 describe("MCP over newline-delimited JSON-RPC", () => {
+	it("always returns a Promise and settles responses after the caller resumes", async () => {
+		const server = makeServer();
+		const order: string[] = [];
+		const ping = server.handleMessage(request(1, "ping"));
+		expect(ping).toBeInstanceOf(Promise);
+		const settled = ping.then(() => order.push("response"));
+		order.push("caller");
+		await settled;
+		expect(order).toEqual(["caller", "response"]);
+		const missing = server.handleMessage(request(2, "unknown"));
+		expect(missing).toBeInstanceOf(Promise);
+		expect(await missing).toMatchObject({ id: 2, error: { code: -32601 } });
+		expect(await server.handleMessage({ jsonrpc: "2.0", method: "unknown" })).toBeUndefined();
+		expect(await server.handleMessage(request(3, "tools/call", { name: "read_board", arguments: { path: 4 } }))).toMatchObject({ id: 3, error: { code: -32602 } });
+	});
+
 	it("speaks the client's protocol version when it knows it, else the newest", async () => {
 		const answers = await exchange(makeServer(), [
 			request(1, "initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "test", version: "1" } }),

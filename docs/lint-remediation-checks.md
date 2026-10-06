@@ -1304,3 +1304,486 @@ in moved waypoints/replaced free anchors. Type-only changes preserve existing
 behavior and do not certify those branches as repaired. Queue D-EXTENSIONS
 before subsequent semantic movement work; before-edit checks are required
 again when these separate runtime fixes begin.
+
+## L20 — complete the assigned remaining work (2026-10-06)
+
+### Welcome ordering follow-up — native behavior verified
+
+Windows 1.14.4 hidden native reopen: L19 `2f3687c`, current source build and
+plugin-disabled cases each retain all 79 node records, every root field and
+original disk bytes. Runtime order differs from file order in all three cases.
+Local native `getData` implementation sorts by `Cee(e,t) = e.zIndex-t.zIndex`;
+it spreads the native saved data first and preserves root extensions. Runtime
+zIndex initialization can produce different orders across reopen attempts.
+This is native serialization, not a new field/source loss. No product patch.
+Artifact `l20-welcome-order.json` records the three classified native API probes.
+The settings harness now waits for stable bytes/runtime order and compares all
+fields canonically by root node ID, while retaining strict original byte checks
+after subsequent actions. It no longer assumes that native z-order matches the
+original disk array. All nested/unknown/source arrays stay ordered in the witness.
+
+### L20 source native styles — coordinator lease, before edit
+
+Native follow-up, before repair: the installed CSS-zero Windows fixture found
+Markdown layout rewriting the ordinary card's owned sizer padding from 0 to
+18px after its child-list notification. Reuse the existing single appearance
+observer on fixed owned sizer `style` attributes; reuse SourceRenderer's single
+live observer for fixed projected style targets. Style callbacks compare cached
+properties only, without DOM queries, measurement, card traversal or timers.
+One mutable snapshot per property retains the latest native value/priority,
+avoiding an accumulating restore patch per resize. Child-list callbacks alone
+discover late targets. Mandatory late layout/foreign-write reconciliation,
+group fallback changes, repeated no-op style records, bounded snapshots,
+restoration and native three-platform rerun.
+
+Parfit's PDF lease is closed; the coordinator owns `source-renderer.ts` for
+the remaining 36 C4/C5 sites in the exact CSS request inventory. Participation:
+`refresh` -> memoized card signature -> `applyNode` -> current native shell,
+face, content, preview and sizers. `followLiveGeometry` already has one shared
+child-list observer for markup; reuse it for late content projection. Existing
+reverse-order patches restore value AND priority. No new card observer or
+per-frame card traversal. Clear only inline declarations competing with exact
+paint selectors, preserving dynamic CSS selection/theme states. Project the
+three sizer modes and fitted text with normal inline values. Group selection
+uses CSS variables for live border width/style/color, retaining native values
+while unselected. Mandatory: native ordinary/text/shape/sticky/drawing/table/
+code/document/embed/deck/slide/group/mindmap faces, fitted original markup,
+late replacement, group focus/unfocus, themes, undo/reset/unload, source/unknown
+preservation, fixed identity memoization and physical Android input. Unit and
+real-app checks remain pending until recorded below.
+
+User explicitly requests completion of every pending item. Baseline 2f3687c:
+198 source warnings, 83 CSS priorities, 17 standalone MCP diagnostics. Parent
+alone owns m1-session.ts, shared DOM factory, central register/plans/locales,
+builds/deployments and app input. Four unrelated root files remain untouched.
+Workers write detailed linked before-edit sections before EACH implementation
+slice, not a retroactive summary. Artifacts live under tools/obsidian_cdp/.out.
+New shared contracts are reviewed before their consumers adopt them.
+
+### L20-DATA
+
+Sagan owns board-selection.ts and the previous data-direction files, plus
+focused tests. [Before-edit notes](lint-workers/l20-data.md). Trace D-EXTENSIONS:
+translateSelection/shift, replaced native free anchors and comment places feed
+M1 previews and committed history; preserve unknown fields and miroSource,
+remove only obsolete known attachment fields on type conversion. Mandatory:
+native/independent captured-end masks, waypoint extensions, repeated drag,
+connector chains, mixed/group and nondefault zoom, no preview save, commit/
+cancel/Undo/Redo, metadata locks/review. D-RECORDS traces hostile records and
+private host calls; preserve guards/reads/public contracts and prove emitted
+JS identity where annotation-only. D-VALID follows the separately reviewed
+exact character profiles; every allow/reject/replace/trim/length edge requires
+equivalence evidence before callers change. Parent owns native device checks.
+
+### L20-AUTH-DOM
+
+Helmholtz owns advanced-canvas-adapter/importers/viewport remaining records,
+then explicit delegated UI files: m2-tools, panel-arrange, panel-visibility,
+document-controls, slide-show, board-export. [Notes](lint-workers/l20-authoring-dom.md).
+This is a temporary U-DOM file lease transfer, not concurrent interface writes.
+Trace pure import/native receiver and DOM creation from injected owner documents
+to append/focus/icon/events. Adopt only the parent-reviewed owner-document
+factory. Preserve attributes/child order/detached creation/SVG namespace and
+tablet button variables. Mandatory import unknown/source/locked failures;
+all creation tools, M2 dialogs, arrange/fold/cancel, PDF page controls,
+presentation/export success/stop/failure, both themes and mobile real input.
+
+### L20-PLATFORM
+
+Parfit owns main.ts, document-host, IDs, fonts, editor-appearance and
+source-renderer, with focused tests. [Notes](lint-workers/l20-platform.md).
+Trace main active-leaf switches/settings callbacks/command IDs, private native
+PDF view fields, portable crypto IDs and reversible renderer styles. Read real
+host code before changing private APIs; parent supplies native snapshots. Keep
+hotkey compatibility, UTF-8 filename restrictions, Node/shared-module support,
+same-window cleanup and font failure retry. Mandatory rapid leaf switch/unload,
+ready/reject/close/timeout/fit/page/reused native PDF, main and hidden popout;
+renderer before/after style restoration, offscreen nodes, themes/rotation/
+selection, actual capture, original bytes/source preserved. CSS owns styles.css;
+any requested renderer ownership change must be coordinated before editing.
+
+### L20-FOUNDATION-SETTINGS
+
+James owns appearance.ts, new pure exact character profiles/tests, and
+settings-tab.ts. [Notes](lint-workers/l20-foundation-settings.md).
+Trace validators to names/paths/font keys and replacement semantics; preserve
+all exact C0/DEL/C1/format sets, codepoint versus code-unit limits. Export pure
+profiles for reviewed adopting src/MCP callers; no Obsidian runtime import.
+Settings definitions can replace display; trace native search indexing,
+custom host/scroll/focus/toggles, save/rebuild behavior before migration.
+Mandatory exhaustive profile equivalence, appearance rejection/prototype
+protection, all settings available and searchable, keyboard/section positioning,
+device-local persistence and restore. Parent owns locales if new keys needed.
+
+### L20-INTERFACE-CSS
+
+Anscombe owns styles.css and comment-markers.ts, then remaining interface
+modules excluding explicit Helmholtz/James leases. [Notes](lint-workers/l20-interface.md).
+Use prior 83-site audit as trace, with each new selector/state owner recorded
+before its slice. Order owned states/size/cursors/native controls/link blocker,
+paint/text/rotation, capture/presentation, comment transform, native layer.
+Specificity cannot defeat native inline values; define reversible ownership
+with main/renderer owners rather than move !important into JavaScript. No
+per-card-per-frame observer/measurement. Mandatory both themes, hidden/disabled/
+focus/hit, one outline/marquee, comment tail/hit after zoom, text/Markdown/inline
+typography, native and chain geometry before release, capture restoration,
+tablet padding, reload/dispose and connected device input. Parent supplies
+shared factory; no concurrent m1-session/source-renderer writes.
+
+### L20-MCP
+
+Carver owns mcp/, standalone lint scope and focused server tests, excluding
+shared schema/src/central outputs. [Notes](lint-workers/l20-mcp.md).
+Trace configDir into protected paths, local filename validation and JSON-RPC
+async dispatch/stdout routing. Keep necessary standalone Node APIs and clean
+stdio. Correctly document/enforce server runtime scope instead of deleting
+required APIs or weakening plugin rules. Mandatory custom config directory
+read/write/traversal/protected/symlink/stale/locks/source/unknown cases, method
+responses/notifications/read-only/errors, real process stdout valid protocol,
+no plugin import of server and actual bundle validation. Pure character-profile
+contract is a prerequisite only when adopted for filename checks.
+
+### L20-CORE and native follow-ups
+
+Parent owns remaining 35 M1 sites: runtime records, DOM factories/owner fallback,
+search result marking, text validation, system clipboard and guarded native
+receiver. Trace each narrow block in a before-edit entry before modification.
+Keep native method receiver and synchronous history/rollback, graph and text
+clipboard semantics, unknown/source and geometry invariants. Check isolated
+system clipboard with restoration (synthetic ClipboardEvent is separate),
+hidden popout/closed-window timer ownership and actual PDF controls, baseline
+welcome-array settlement, and M0 helper's stale 0.1.0 version restriction.
+Real input uses background renderer CDP on Windows; Android uses ADB on each
+physical device separately. Only frozen integrated builds are deployed.
+
+#### L20-CORE DOM contract — before edit
+
+Observed installed Windows Obsidian 1.14.4 via background CDP: global createEl
+uses its realm's document.createElement; Node.createEl calls that global and
+appends to its receiver. Node.doc is ownerDocument || document. Therefore using
+an unrelated parent helper may adopt a wrong-realm element, unlike original
+owner-document creation. Shared createHtmlElement/createSvgElement capture
+document.defaultView and call that realm's helper when present, otherwise bind
+the native creation method to the injected document for browsers/minimal tests
+without Obsidian extensions. Return detached elements; preserve exact tag,
+namespace, empty attributes/children, helper/native receiver and no ambient
+activeWindow. No global prototype patches, temporary body insertion or writes.
+Consumers keep current append/set-attribute/style/events code. Mandatory unit
+checks: distinct main/owner helpers, helper receiver and ownerDocument, plain
+and minimal fake documents with no window, SVG namespace, detached state and
+no ambient read. Native checks include main and hidden popout plus child
+iframe fallback; tablet/phone actual component controls after deployment.
+
+#### L20-CORE records/DOM/context — before edit
+
+M1 read boundaries: boundingRect/readStyleValue/search edge-path lookup,
+readStyleProperty, hide-imported-comment list, refreshLiveDocument scene arrays,
+node Map lookup, appearance target/closest/frame queries, refresh timer handle,
+event ancestry/attribute/closest. Reflect results become unknown before their
+existing checks; Array.isArray results become readonly unknown[] before copy.
+No extra guard/getter/cloning/order/runtime branch is allowed in this type slice.
+Mandatory module JS byte identity and existing hostile host/selection/history/
+appearance/comment/geometry tests; parent integration/native follows later.
+
+DOM sites: search hit, marquee, brush, pen/shape/connector preview SVG,
+text-replacement form/input, mixed selection frame/sides and attachment label.
+Replace only creations with reviewed owner-document factories. Owner-document
+fallback renames its local variable to read ambient document without globalThis,
+with typeof guard for Node; actual owner-first behavior remains. Mandatory:
+search hits, native/turned/mixed outline, rectangle/lasso, pen/tilted shapes,
+transparent overlay, text form, late labels, iframe/hidden popout, cancel/reload.
+
+#### L20-CORE search/text/native wrapper — before edit
+
+searchHitElement checks a known connected cached label/pin, otherwise queries
+the current root only. Use root.find when Obsidian provides it; retain generic
+native query fallback for injected browser hosts with no extension. Same
+selector, cache key and missing-element handling; no global document query.
+captureTextFragment reads selected editing node's actual string text to decide
+HTML formatting. Unknown objects must not stringify/execute user getters; only
+actual strings can be HTML. Native guard wrappers need a lexical disposed
+predicate and their function receiver; replacing the whole wrapper with an
+arrow would change native this and is forbidden. Keep original descriptor,
+args, third-party later hook and restoration semantics. Mandatory label/pin
+search/rebuild/cache/disconnected, text plain/HTML/unknown and prototype-sensitive
+inputs, native receiver/disposed/throw/locked/review/Undo/Redo/stale data hooks.
+
+#### L20-CORE clipboard compatibility disposition — before edit
+
+Installed native Canvas handleCopy writes DataTransfer `obsidian/canvas`;
+handlePaste reads that exact type before file/link/plain-text fallback. Desktop
+uses owner-window Electron getCurrentWebContents copy/cut/paste first. Android
+has no electron; document.execCommand raises the trusted ClipboardEvent served
+by the plugin/native handlers. Removing that fallback breaks connector menu
+copy/cut/paste and native graph interoperability.
+
+Actual hidden Windows 1.14.4 probe: ClipboardItem.supports('obsidian/canvas') is
+false, supports('web obsidian/canvas') is true. After Async Clipboard.write with
+the web type, trusted WebContents.paste exposes only text/plain; getData of the
+native Canvas type is empty. The original system clipboard text/html/rtf/image
+and custom data were held only in renderer memory and restored in finally;
+no payload contents logged. This confirms no equivalent async replacement.
+Chrome documents web custom types as opt-in incompatible native representations:
+https://developer.chrome.com/blog/web-custom-formats-for-the-async-clipboard-api.
+SM-X736B reports the same support distinction and no electron. Full actual
+menu roundtrip/lock/failure/history tests follow on final app builds.
+
+Disposition: retain this one legacy API as a documented compatibility requirement.
+The linter disallows deprecation suppressions; no suppression/config relaxation
+is used. Probe and invoke the unchanged, explicit execCommand capability through
+the existing fail-closed host bridge, which retains its receiver and catches
+missing/throwing methods. This also fixes the old unhandled fallback exception.
+The API remains legacy; passing static lint is not evidence of replacing it. Do
+not label this accepted compatibility requirement as an API migration. Require
+receiver/arguments, desktop preference, missing/throwing fallback, denied copy
+never deleting data, native graph and plugin metadata roundtrip, cut one step,
+Undo/Redo, and system clipboard restoration. No asynchronous cut is introduced.
+
+#### L20 M0 runtime version — before edit
+
+Oracle load_config supplies required_plugins.miro-canvas to scaffold manifests,
+runtime installer expected_version, profile validation and environment checks.
+The committed 0.1.0 pin refused current 0.2.7 before deployment. Replace only
+that stale runtime requirement with a repository-version token resolved by
+load_config from the checked manifest id/version; retain explicit alternate
+pins and installer overrides. Missing/malformed/mismatched repository manifest
+must fail before vault mutation. Preserve exact vault/link guards, atomic
+installation/rollback, three release assets and unrelated Advanced Canvas pin.
+Mandatory fake-manifest versions/pinned overrides/malformed/missing tests,
+existing oracle suite, actual current build setup/environment, no vault/window
+registration, and future manifest changes without hand-editing the config.
+
+#### L20 native UI display ownership — before edit
+
+Remaining CSS control/menu/capture rules compete with inline native/plugin
+display values. Sagan's temporary lease is new native-ui-visibility.ts and
+focused tests/[note](lint-workers/l20-native-ui.md); parent alone wires M1.
+Take fixed native controls/menu elements discovered once per native identity;
+controls stay hidden during the session, menus hide only for independent-only
+selection, presentation or capture. Reversibly own normal inline display/hidden
+without !important. Snapshot original/latest external value AND priority and
+hidden attribute, restore only own value, detach exact owner-window observers.
+Observe only those few UI roots and root class state, never card styles or
+per-card/frame scans. Mandatory external show during suppression, native menu
+rebuild/restoration, capture/presentation begin/end/failure, subsequent plugin
+hook/disposal, focused/hit accessibility, both themes/mobile/owned-window tests.
+
+#### L20 selected native layer ownership — before edit
+
+updateShownLayer currently marks only a single non-group native card and stores
+its runtime zIndex in --miro-canvas-layer; CSS priority defeats selected node's
+native inline zIndex lift. Capture current z-index style value/priority once,
+set the normal inline value to that same runtime layer while selected, and
+restore only our applied value when clearing/changing/disposal. A native
+renderZIndex hook applies only to the one marked card; preserve its receiver,
+underlying runtime zIndex/file order/Undo history and third-party restoration.
+No new pass through all nodes per frame. Mandatory overlapping/select/group/
+mixed, native drag lift before release, move/cancel/Undo/Redo, native/external
+inline value and priority restoration, offscreen remount, source unchanged.
+### L20 — local native card vertical alignment ownership (before edit)
+
+The three sizer declarations at the start of `styles.css` participate in M1
+`decorateNodeAppearance` → `applyElementAppearance`, including ordinary Canvas
+text cards without source descriptors. They must be projected onto the current
+Markdown sizer, in the existing identity/content appearance pass, and restored
+with original value and priority. No new per-card observer or frame work.
+Mandatory: top/middle/bottom, overflow, late preview replacement, reset and
+unload restoration, foreign priority preservation, native Windows and both
+Android versions; no board/history/source changes. Real checks pending.
+
+### L20 — deferred native style writer followup (before edit)
+
+Actual installed Windows 1.14.4 rewrites ordinary Markdown sizer padding-bottom
+from the projected 0 to 18px after the childList callback. CSS specificity cannot
+override inline declarations. SourceRenderer already observes fixed rotation/
+markup targets; M1 already has one appearance observer. Register only the fixed
+participating properties in these existing observers, reconcile style mutations
+without DOM queries/measurement/board refresh, and retain the latest external
+value/priority for reset/unload. No extra observer per card, no frame work, and
+no accumulating restore patches. Empty paint declarations must register before
+the first late native write. CSS-normalized values and echo records must cause
+zero repeated writes. Group variables retain latest native border fallback.
+Mandatory: late 18px layout, paint + rotation in one observer, 1000 echo batches
+without writes/queries, reset/unload/latest foreign priority, actual native style
+owner harness on Windows and both Android versions, original board/source/history
+unchanged. Focused tests are unit evidence; actual app results recorded separately.
+
+Deferred-writer audit, before followup: Chromium reproduced overlapping `padding`
+vs M1 padding-bottom teardown, and background/border shorthand restoration
+overwriting later native color/priority. Own non-overlapping longhands in these
+families. Repeated Markdown replacement also retained old targets; prune detached
+ownership and observer keeper registrations on content replacement, never on a
+frame. Mandatory real CSSOM mixed shorthand/longhand teardown, late native color,
+100 preview replacements with bounded current targets and preserved rotation.
+
+### L20 — integrated evidence on the frozen build (2026-10-06)
+
+Frozen assets: main.js `aff2ee3a34a3045a30075c5736091c5cde937e3e06d2c1d327659ae5705aa200`,
+styles.css `7c5ce8c141b048ae4382abb83f6c3a309a0bfef5c21290bc527184202a76208c`,
+manifest.json `68169dd642f5654f4a1c3fdf0f64510dd5dba5a72c9d9a3abf39f1a6d4f1c174`,
+MCP bundle `4c69150dc6398649a43fae27a2fdbf1d53e2e6a08e096022ed4adef74ccb9618`.
+Runtime/CSS are frozen; subsequent test/documentation corrections do not alter
+these assets. Worker implementation receipts are linked above, never substituted
+for installed app evidence.
+
+Full integrated types, 126 Vitest files (2036 passed + 1 existing optional skip),
+src lint (0 errors, 1 retained command warning), standalone MCP lint (0/0), CSS
+lint (0 priorities, 0 :has), schema pin, production plugin/MCP builds and
+submission packaging passed. Three synthetic smoke suites and 33 oracle pytest
+cases passed separately. The first cold typed-ESLint test exceeded its old 5s
+test deadline; its startup allowance is now 30s, preserving all rule assertions;
+the complete suite passed. This is test harness startup, not a product timeout.
+
+Current M0 setup/environment passed with manifest-derived plugin version 0.2.7
+and four offline compatibility boards. The separate Advanced Canvas scaffold
+contains its pinned manifest but no runtime JS/CSS; this is not claimed as
+installed Advanced Canvas visual compatibility. No vault registration/window
+opening occurred. Generated vault archived under ignored .out/l20-m0/vault.
+
+Windows 1.14.4 native style owners passed on the final installed build: both
+themes, actual Markdown 0px padding after deferred layout, native paint/menu
+competition, capture/presentation suppression and latest external priority,
+class-only group border changes, original source/extension fields and history.
+200 actual DOM preview replacements retained five current Source targets.
+Separate pure-helper actual-host CSSOM cases prove table padding teardown and
+latest blue color/important priority restoration for embed/slide. No OS input,
+foregrounding or screenshots; original board bytes restored exactly. Artifact:
+tools/obsidian_cdp/.out/l20-native/styles-Windows.json. M1-specific current-sizer
+coverage is being checked separately; the Source replacement count is not a
+claim of that extra owner.
+
+Final pure-helper/cached-native CSS proof rerun after restoration repair:
+132 variants, 48,816 compared values, all 83 original sites matched, zero
+differences including extra paint surfaces; disabling ownership produces 162
+differences. Group class-only cycles make no extra writes. This is synthetic
+CSS evidence, separate from the installed plugin checks. Artifact:
+tools/obsidian_cdp/.out/l20-interface/css-transfer/final-proof.json.
+
+Windows main/plain-iframe/native hidden-popout owner factory checks passed
+with exact helper receivers, document, detached HTML/SVG and namespace; pending
+individual UI mounts/actions are separately tracked in l20-dom-native.md.
+Earlier pre-restoration-repair installed Windows hidden/visibility/CSS-state/
+card-fill/font-failures/arrow-color matrices passed; final reruns are recorded
+separately, without relabeling their earlier build. Final tablet evidence is in
+lint-workers/l20-tablet-final.md. After the user unlocked SM-A336E, all nine
+final-build phone matrices passed; see lint-workers/l20-phone-final.md. The
+supported-settings gate excludes this legacy Obsidian 1.12.7. Hardware
+pressure/hover is never inferred from ADB pen-source or synthetic CDP pressure.
+
+Welcome ordering followup CLOSED without a production patch: actual native
+getData sorts by zIndex; archived L19, L20 and disabled-plugin native reopens all
+reorder in-memory arrays while preserving every card field, source/extensions
+and exact file bytes. The harness now compares all fields while ignoring only
+the top-level runtime node order; nested unknown arrays retain their order.
+Artifact tools/obsidian_cdp/.out/l20-welcome-order.json. Remaining app/input
+acceptance below stays pending until its actual recorded result.
+
+Phone final receipt: native styles, hidden roots, visibility/capture, resize/CSS
+states, PDF/timers, card fill, font failure, arrow colors and held drawing/shape
+recognition passed. Real ADB control/gesture/pen-source input is separately
+recorded from CDP pressure/state preparation and actual-host CSSOM helper
+instrumentation. Original Export touch test.canvas bytes, theme/settings/config
+and frozen installed hashes restored exactly. Positive ordinary M1 ownership
+is 1→1 after 100 DOM preview replacements; imported Source ownership is 5→5.
+The earlier offscreen count0 observations remain historical limitations.
+
+Windows final native clipboard/menu check passed on the frozen asset. Trusted
+background CDP menu clicks caused actual trusted copy/paste/cut clipboard
+events, including Obsidian's Canvas MIME. Native paste duplicated two cards and
+one edge, preserved source/unknown fields and per-card overrides, and made one
+history step. Cut and both Undo/Redo roundtrips passed. All original clipboard
+formats/payloads were held only in memory and restored/verified; none logged.
+Original board bytes restored. Artifact .out/l20-native/clipboard-Windows.json.
+This is installed Electron clipboard evidence, without OS input/foregrounding.
+
+Final Windows AFF2 matrix: native-style owners, hidden, visibility/capture,
+CSS/resize/labels, timer owners/PDF, card fill, font failures and arrow colors
+all passed sequentially. Original L20 baseline.canvas bytes/path restored;
+one native main window remains hidden/unfocused, no children. Current ordinary
+M1 sizer retention is positively checked 1→1 after 100 replacements; earlier
+zero-count coverage is superseded by this new result, not relabeled. Evidence
+.out/l20-windows-final/summary.json and restoration.json; styles-Windows.json.
+
+Supported Windows 1.14.4 settings navigation passed all twelve sections,
+trusted renderer key/mouse navigation, fresh welcome full-field witness,
+export help and exact post-action bytes, source/unknown fields and asset hashes.
+The window stayed hidden; no screenshots or native dropdown popup. Existing
+miro-canvas:m1-commands registry ID and a temporary native in-memory custom
+hotkey opened the commands modal through a trusted Ctrl+Alt+F10 event. Original
+mapping, hotkeys file existence/bytes and board bytes restored; no config save
+for the temporary mapping. Evidence settings-navigation-desktop-background.json
+and .out/l20-hotkey-proof.json. This certifies keeping the literal ID; the one
+raw command lint warning is a compatibility disposition, not concealed.
+
+Additional actual Windows export passed a two-page native PDF, trusted Stop
+during capture, and an explicitly forced save-callback failure after actual
+capture. Each branch restores exact camera, document, screenshotting flag,
+capture classes, progress removal and both export roots; cancel/failure create
+no extra PDF. Evidence .out/l20-export-followup-Windows.json. The save failure
+is an injected callback, not a claim of an actual disk error. Actual PDF viewer
+opened the exported two-page file in main and hidden native popout: page-width
+and page-fit confirmed, two pages loaded, current main owner true/popout false.
+Already-closed native view returns false. Closing actual popout during each of
+six forced readiness stages returns false in 167–172ms with zero late fit writes.
+Forced never-ready stages are facades; native window teardown is real. Original
+board bytes/path restored; evidence .out/l20-pdf-popout.json on frozen sources.
+
+Tablet fresh creation height diagnosis: the same Picture.png file node changes
+height160→133 at width200 in archived L19, current L20 and unloaded native
+Obsidian. Actual native image renderer sets aspect ratio and calls native resize
+plus overrideHistory; unloaded-native stack contains only app.js. All other
+fields/source/extensions match. This is native initial image normalization,
+not an L20 data-loss repair. The before-edit settings-harness followup permits
+only this mathematically verified creation variant before the strict action
+baseline; original-board/action bytes and every other field remain strict.
+Evidence lint-workers/l20-tablet-final.md and ignored height-profiles-report.json.
+
+Final tablet settings and stronger native style-owner reruns passed on the same
+frozen assets: twelve sections, ADB navigation, separately labeled CDP Tab,
+fresh creation's sole verified image-height normalization, five stable full
+native/file samples, then exact post-export/post-close bytes. Actual ordinary
+M1 owner remains 1→1 after 100 replacements in both themes; Source remains 5→5.
+All ten tablet matrices are now accepted; original board/theme/data.json and
+three installed asset hashes restored. See lint-workers/l20-tablet-final.md.
+
+Android clipboard evidence boundary: a tablet happy-roundtrip attempt stopped
+BEFORE creating a fixture or modifying the clipboard because WebView denied
+navigator.clipboard.read permission. Native Obsidian replaces readText/writeText
+with Capacitor Clipboard read/write, but this does not establish a safe backup
+of arbitrary native formats, so no alternate destructive clipboard test was
+performed. Actual ADB Cut menu taps separately passed injected missing/false/
+throw legacy-host cases: exact graph and history unchanged, no clipboard event,
+one existing unavailable notice, correct owner-document receiver, restored
+descriptor/callback/original board. Evidence clipboard-R52Y808PDJB-failures.json.
+These certify the guarded failure behavior; successful Android system clipboard
+roundtrip remains unverified, separate from the successful Windows roundtrip.
+
+Final D-EXTENSIONS accepted on all three actual hosts; details in
+lint-workers/l20-data-native.md. Each host passed whole-group and captured-end
+movement at exact 50%/125%, two repeated commits, Undo/Redo and held cancel.
+Native edge, independent line, unselected connector-to-connector chain and both
+comment pins follow the same preview before release; unselected far ends stay
+fixed. Every source/unknown/anchor/waypoint/comment field matches, no preview
+save/history, one native history step, natural committed save and exact original
+bytes/path/viewport/hashes restored. Final reports:
+.out/l20-data/selection-native-{windows,tablet,phone}-chain-final.json.
+Prepared masks are separately labeled, not claimed as a physical marquee.
+
+Android guarded clipboard failures now pass on BOTH models, using actual ADB
+Cut menu taps and injected missing/false/throw hosts, without clipboard access.
+The phone's first callback check caught a tap during native menu animation
+selecting Copy; waiting for four equal native menu rectangles fixed test setup.
+It remains a failed attempt, not a passing Cut check. Final callbacks are exactly
+Cut with owner-document receiver; graph/history/source/original bytes unchanged.
+Windows native clipboard roundtrip also reran successfully after harness guards.
+Supported Windows settings reran in light theme with the final creation contract,
+strict witnesses/restoration PASS. Native popout guard and settings preference
+restored; probe globals removed, one hidden/unfocused main window remains.
+
+All 47 assigned jobs have final bounded acceptance or an explicit compatibility/
+runtime disposition. Remaining broader manual scenarios are listed separately
+in lint-execution-plan.md: successful Android system clipboard roundtrip,
+physical stylus/palm/hover, OS pickers/compositor and full six-module popout UI.
+These were not run and are not represented by synthetic evidence. Existing
+source command ID warning remains visible; standalone MCP uses enforced Node
+lint rather than applying plugin-only Node/stdout rules to its stdio server.

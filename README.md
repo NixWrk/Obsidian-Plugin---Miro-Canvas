@@ -582,6 +582,12 @@ The [execution plan](docs/lint-execution-plan.md) assigns remaining lint sites
 by dependencies, impact and file ownership. Initialization retries retain one
 timer owner through cancellation; PDF readiness keeps a two-second deadline
 and the native controls fallback when automatic fitting is unavailable.
+PDF fitting waits for the native document and initial page layout within that
+deadline; closing its window cancels the wait. Native controls, card alignment
+and decoration styles restore their previous values when the plugin unloads.
+Settings use Obsidian's declarative settings API on supported versions. The
+separate Node MCP server has its own enforced check, `npm run lint:mcp`, and
+accepts `--config-dir` for vaults using a custom Obsidian configuration folder.
 Board reading and editing use the optional [MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
 The server is started separately by its owner's configuration; the plugin

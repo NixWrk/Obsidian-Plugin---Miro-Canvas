@@ -15,6 +15,7 @@
     "schema:sync": "node scripts/sync-schema.mjs",
     "submission:check": "node scripts/check-submission.mjs",
     "lint": "eslint src --cache",
+    "lint:mcp": "eslint --config mcp/eslint.config.mjs mcp/src",
     "lint:css": "node scripts/check-css.mjs",
     "lint:report": "eslint src --format json --output-file tools/obsidian_cdp/.out/lint-report.json"
   },

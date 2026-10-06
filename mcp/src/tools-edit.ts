@@ -12,7 +12,6 @@
  */
 
 import { lstatSync, readFileSync } from "node:fs";
-import path from "node:path";
 
 import { normalizeAnchor, resolveAnchor, type AnchorPoint, type CanvasAnchor } from "../../src/anchors";
 import { planBoardConnectors } from "../../src/board-connector-writes";
@@ -38,7 +37,7 @@ import {
 	BoardEdit, FileCanvasRuntime, FileMetadataStore, readBoardFile, revisionOf, sameJson, STALE_BOARD, type BoardFile,
 } from "./board-file";
 import { boardPathSchema, createReadTools, readWarnings, type ToolDefinition } from "./tools";
-import { ToolError, Vault } from "./vault";
+import { ToolError, type Vault } from "./vault";
 
 type UnknownRecord = Record<string, unknown>;
 type JsonSchema = Record<string, unknown>;
@@ -169,9 +168,9 @@ function editAllowed(document: unknown, operation: string, ids: readonly string[
 /** Whether Obsidian's workspace shows the board open in a tab. */
 export function boardOpenInObsidian(vault: Vault, boardPath: string): boolean {
 	for (const name of WORKSPACE_FILES) {
-		const file = path.join(vault.realRoot, ".obsidian", name);
 		let workspace: unknown;
 		try {
+			const file = vault.resolveConfigurationFile(name);
 			const stats = lstatSync(file);
 			// lstat: a link is not a file, and is not followed.
 			if (!stats.isFile() || stats.size > WORKSPACE_MAX_BYTES) continue;
@@ -742,7 +741,7 @@ export function createEditTools(context: EditToolContext): ToolDefinition[] {
 				node.text = stringOr(args.text, "");
 			} else if (kind === "file") {
 				if (typeof args.file !== "string") return refuse("file-missing", "A file card needs file, a path inside the vault.");
-				node.file = readVaultFilePath(args.file);
+				node.file = readVaultFilePath(context.vault, args.file);
 			} else {
 				node.url = readWebAddress(args.url);
 			}
@@ -1020,8 +1019,8 @@ export function createServerTools(context: EditToolContext & { readonly readOnly
  * A file card's path, checked for shape only by the vault's own rule for
  * paths: the card names a file, the server never opens it.
  */
-function readVaultFilePath(file: string): string {
-	return Vault.splitRelativePath(file, "folder").join("/");
+function readVaultFilePath(vault: Vault, file: string): string {
+	return vault.splitRelativePath(file, "folder").join("/");
 }
 
 /** A web address for a link card: http or https only. */

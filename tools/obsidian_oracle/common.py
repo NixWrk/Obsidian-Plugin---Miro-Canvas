@@ -25,7 +25,17 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def load_config() -> dict[str, Any]:
-    return load_json(CONFIG_PATH)
+    config = load_json(CONFIG_PATH)
+    required = config.get("required_plugins", {})
+    if required.get("miro-canvas") == "${plugin_version}":
+        manifest = load_json(REPO_ROOT / "manifest.json")
+        if not isinstance(manifest, dict) or manifest.get("id") != "miro-canvas":
+            raise ValueError("Repository manifest must identify miro-canvas")
+        version = manifest.get("version")
+        if not isinstance(version, str) or not version.strip() or version != version.strip():
+            raise ValueError("Repository manifest must have a valid plugin version")
+        required["miro-canvas"] = version
+    return config
 
 
 def resolve_path(raw_path: str) -> Path:

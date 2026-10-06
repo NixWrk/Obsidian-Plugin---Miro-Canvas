@@ -123,22 +123,29 @@ export class McpServer {
 		return { jsonrpc: "2.0", id, error: { code: INTERNAL_ERROR, message: `Internal error: ${detail}` } };
 	}
 
-	private async dispatch(method: string, params: unknown): Promise<unknown> {
-		switch (method) {
-			case "initialize":
-				return this.initialize(params);
-			case "notifications/initialized":
-			case "notifications/cancelled":
-				return {};
-			case "ping":
-				return {};
-			case "tools/list":
-				return this.listTools();
-			case "tools/call":
-				return this.callTool(params);
-			default:
-				throw new RpcError(METHOD_NOT_FOUND, `Method not found: ${method}`);
-		}
+	private dispatch(method: string, params: unknown): Promise<unknown> {
+		return new Promise<unknown>((resolve) => {
+			switch (method) {
+				case "initialize":
+					resolve(this.initialize(params));
+					return;
+				case "notifications/initialized":
+				case "notifications/cancelled":
+					resolve({});
+					return;
+				case "ping":
+					resolve({});
+					return;
+				case "tools/list":
+					resolve(this.listTools());
+					return;
+				case "tools/call":
+					resolve(this.callTool(params));
+					return;
+				default:
+					throw new RpcError(METHOD_NOT_FOUND, `Method not found: ${method}`);
+			}
+		});
 	}
 
 	/** Speak the client's protocol version when this server knows it, else the newest. */
