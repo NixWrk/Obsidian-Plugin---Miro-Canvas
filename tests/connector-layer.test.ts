@@ -82,6 +82,31 @@ function layerOf(connectors: readonly BoardConnector[], pressed: string[] = []) 
 }
 
 describe("connector layer", () => {
+  it("keeps arrowheads independent in two views of the same connector", () => {
+    const first = layerOf([connector({ color: "#123456" })]);
+    const second = layerOf([connector({ color: "#ff6600" })]);
+    first.layer.render();
+    second.layer.render();
+    const markerIds = (svg: FakeElement) => all(svg).filter(element => element.tag === "marker").map(element => element.attrs.get("id")!);
+    const firstIds = markerIds(first.svg);
+    const secondIds = markerIds(second.svg);
+    expect(firstIds).toHaveLength(2);
+    expect(secondIds).toHaveLength(2);
+    expect(firstIds.some(id => secondIds.includes(id))).toBe(false);
+    const secondLine = all(second.svg).find(element => element.attrs.get("class") === "canvas-display-path")!;
+    expect(secondLine.attrs.get("marker-start")).toBe(`url(#${secondIds[0]})`);
+    expect(secondLine.attrs.get("marker-end")).toBe(`url(#${secondIds[1]})`);
+    first.replace([connector({ color: "#abcdef" })]);
+    first.layer.render();
+    expect(secondLine.styles.get("stroke")).toBe("#ff6600");
+    expect(markerIds(second.svg)).toEqual(secondIds);
+    second.replace([connector({ color: "#ff6600", from: { type: "free", x: 40, y: 80 } })]);
+    second.layer.render();
+    expect(markerIds(second.svg)).toEqual(secondIds);
+    first.layer.dispose();
+    second.layer.dispose();
+  });
+
   it("draws each connector as native Canvas draws an edge, in board units", () => {
     const { layer, svg } = layerOf([connector()]);
     layer.render();

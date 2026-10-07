@@ -18,6 +18,20 @@ const typography: TypographySettings = {
 };
 
 describe("buildEditorAppearanceRules", () => {
+  it.each(["dark", "light"] as const)("carries an opposite %s board scheme into an unstyled editor without persisting card colors", (theme) => {
+    const rules = buildEditorAppearanceRules(undefined, undefined, theme);
+    const body = rules.filter(rule => rule.selector === "body").flatMap(rule => rule.declarations);
+    expect(body).toContainEqual(["background-color", "transparent"]);
+    expect(body).toContainEqual(["color-scheme", theme]);
+    expect(body).toContainEqual(["--text-normal", theme === "dark" ? "#dedede" : "#222222"]);
+    expect(rules.find(rule => rule.selector.includes("cm-content"))?.declarations).toContainEqual(["color", theme === "dark" ? "#dedede" : "#222222"]);
+    const colors = { text: "#4262ff", fill: "#ffd02f" };
+    const explicit = buildEditorAppearanceRules(typography, colors, theme);
+    expect(explicit.find(rule => rule.selector.includes("cm-content"))?.declarations).toContainEqual(["color", "#4262ff"]);
+    expect(colors).toEqual({ text: "#4262ff", fill: "#ffd02f" });
+    expect(buildEditorAppearanceRules(undefined, undefined)).toEqual([]);
+  });
+
   it("returns no rules for a card with no override, so its editor stays exactly native", () => {
     expect(buildEditorAppearanceRules(undefined, undefined)).toEqual([]);
   });

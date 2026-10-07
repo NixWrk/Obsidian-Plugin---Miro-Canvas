@@ -172,8 +172,9 @@ import {
 	DEFAULT_EXPORT_STATE, MAX_EXPORT_PAGES, exportRecord, pageAround, paperRatio, paperSize, readExportState, reshapePage,
 	type ExportPageRecord, type ExportRect, type ExportState,
 } from "./export-pages";
-import { ExportOverlay, ExportPanel, capturePages, type ExportKind } from "./board-export";
-import { makePdf, makePptx } from "./export-files";
+import { ExportOverlay, ExportPanel, renderExportPages, type ExportKind } from "./board-export";
+import { packExport } from "./export-worker-client";
+import { createExportCanvas } from "./export-canvas";
 import { words } from "./i18n";
 
 export interface M1SessionOptions {
@@ -189,7 +190,8 @@ export interface M1SessionOptions {
 	readonly setIcon?: (element: HTMLElement, icon: string) => void;
 	/** Opens this plugin's page in Obsidian's settings, from the board menu. */
 	readonly onOpenSettings?: () => void;
-	readonly onSaveExport?: (name: string, bytes: Uint8Array) => Promise<string>;
+	readonly onSaveExport?: (name: string, bytes: Uint8Array, sourcePath?: string) => Promise<string>;
+	readonly onExportJob?: (controller: AbortController) => () => void;
 	readonly onAddFile?: (button: HTMLElement, fromVault: () => void) => void;
 	readonly onOpenCommentThread?: (threadId: string, origin: CommentOrigin) => void;
 	/**
@@ -1471,6 +1473,7 @@ export class M1CanvasSession {
 	}>();
 	private readonly domIdentity = new WeakMap<object, number>();
 	private themeRootSnapshot: ThemeRootSnapshot | undefined;
+	private lastEditorTheme: string | undefined;
 	private root: HTMLElement | undefined;
 	private mounted = false;
 	private disposed = false;
@@ -1595,6 +1598,7 @@ export class M1CanvasSession {
 		readonly mode: "board" | "slides";
 		readonly title: string;
 		state: ExportState;
+		abort?: AbortController;
 		readonly panel: ExportPanel;
 		readonly overlay: ExportOverlay;
 		busy?: string;
@@ -6308,6 +6312,11 @@ export class M1CanvasSession {
 			},
 			onExport: (kind) => void this.runExport(kind),
 			onClose: () => this.closeExport(),
+			onStop: () => {
+				if (this.exporting === undefined) return;
+				this.exporting.stop = true;
+				this.exporting.abort?.abort();
+			},
 		});
 		const overlay = new ExportOverlay(document, (id, rect, commit) => this.movePageOnScreen(id, rect, commit), () => {
 			const current = this.exporting?.state;
@@ -6315,14 +6324,19 @@ export class M1CanvasSession {
 		});
 		root.appendChild(overlay.element);
 		document.body.appendChild(panel.element);
+		panel.element.classList.add("miro-canvas-theme-surface");
+		panel.element.setAttribute("data-miro-canvas-resolved-theme", root.getAttribute("data-miro-canvas-resolved-theme") ?? "light");
 		this.exporting = { mode: deckId === undefined ? "board" : "slides", title, state, panel, overlay, stop: false };
 		this.renderExport();
 	}
 
-	private closeExport(): void {
+	private closeExport(cancel = true): void {
 		const exporting = this.exporting;
 		if (exporting === undefined) return;
-		exporting.stop = true;
+		if (cancel) {
+			exporting.stop = true;
+			exporting.abort?.abort();
+		}
 		exporting.panel.dispose();
 		exporting.overlay.dispose();
 		this.exporting = undefined;
@@ -6420,54 +6434,74 @@ export class M1CanvasSession {
 		exporting.overlay.update(pages, exporting.mode === "board" && exporting.busy === undefined);
 	}
 
-	/** Photograph the pages, pack them into the file asked for, and offer to save it. */
+	/** Render a board snapshot independently and save the chosen document. */
 	private async runExport(kind: ExportKind): Promise<void> {
 		const exporting = this.exporting;
 		const canvas = this.nativeCanvas();
 		if (exporting === undefined || canvas === undefined || exporting.busy !== undefined) return;
-		const pages = exporting.state.pages;
+		const state = { ...exporting.state, pages: exporting.state.pages.map(page => ({ ...page })) };
+		const pages = state.pages;
 		if (pages.length === 0) return;
 		const file = readRuntime(this.view, "file");
 		const base = typeof readRuntime(file, "basename") === "string" ? readRuntime(file, "basename") as string : "Board";
+		const sourcePath = readRuntime(file, "path");
 		exporting.stop = false;
+		exporting.abort = new AbortController();
+		let releaseJob: (() => void) | undefined;
 		exporting.busy = words().export.capturing;
-		this.renderExport();
-		// Nothing of the plugin belongs in the pictures: its own panel and page
-		// overlay step aside, and so do the plugin's own selections.
-		exporting.panel.element.hidden = true;
-		exporting.overlay.element.hidden = true;
-		this.callNative("deselectAll");
-		this.selectedCommentKeys.clear();
-		this.connectorLayer?.select([]);
+		let background: ReturnType<typeof createExportCanvas> | undefined;
+		let renderer: M1CanvasSession | undefined;
 		try {
-			const pictures = await capturePages(canvas as never, pages, exporting.state.quality, (done, total) => {
-				if (this.exporting !== exporting || exporting.stop) return false;
+			releaseJob = this.options.onExportJob?.(exporting.abort);
+			this.renderExport();
+			const document = ownerDocument(this.root);
+			if (document === undefined) throw new Error(words().export.unavailable);
+			const snapshot = JSON.parse(JSON.stringify(this.savedDocument())) as Record<string, unknown>;
+			const resolvedTheme = this.root?.getAttribute("data-miro-canvas-resolved-theme");
+			if (resolvedTheme === "light" || resolvedTheme === "dark") {
+				const metadata = isObject(snapshot.miroCanvas) ? snapshot.miroCanvas : {};
+				const settings = isObject(metadata.settings) ? metadata.settings : {};
+				snapshot.miroCanvas = { ...metadata, schemaVersion: metadata.schemaVersion ?? 1, settings: { ...settings, displayTheme: resolvedTheme } };
+			}
+			background = createExportCanvas(this.view, snapshot, document);
+			const writer = new MetadataWriter({ readDocument: () => snapshot, commitDocument: () => false });
+			renderer = new M1CanvasSession(background.view, writer, { document, settings: this.settings, onFontUsed: this.options.onFontUsed });
+			renderer.refresh();
+			const pictures = await renderExportPages(background.canvas as never, pages, state.quality, (done, total) => {
+				if (exporting.stop || exporting.abort?.signal.aborted) return false;
+				renderer?.refresh();
 				exporting.busy = words().export.capturingProgress(done, total);
-				this.renderExport();
+				if (!this.disposed && this.exporting === exporting) this.renderExport();
 				return true;
-			});
+			}, exporting.abort.signal, () => renderer?.refresh());
 			exporting.busy = kind === "pdf" ? words().export.writingPdf : words().export.writingPptx;
 			this.renderExport();
 			const sheets = pages.map((page, index) => {
-				const size = paperSize(exporting.state.format, exporting.state.orientation, page);
+				const size = paperSize(state.format, state.orientation, page);
 				const picture = pictures[index];
 				return {
 					width: size.width, height: size.height, image: picture.jpeg, pixelWidth: picture.width, pixelHeight: picture.height,
 					...(page.name === undefined ? {} : { title: page.name }),
 				};
 			});
-			const bytes = kind === "pdf" ? makePdf(sheets, { title: base }) : makePptx(sheets, { title: base });
+			const bytes = await packExport(kind, sheets, { title: base }, document, exporting.abort.signal);
 			if (this.options.onSaveExport === undefined) throw new Error(words().export.unavailable);
-			const saved = await this.options.onSaveExport(`${base}.${kind}`, bytes);
+			if (exporting.abort.signal.aborted) throw new Error(words().export.exportStopped);
+			const saved = await this.options.onSaveExport(`${base}.${kind}`, bytes, typeof sourcePath === "string" ? sourcePath : undefined);
 			if (saved !== undefined) this.options.onNotice?.(words().export.exportedTo(saved));
 		} catch (error) {
 			this.options.onNotice?.(error instanceof Error ? error.message : words().export.exportFailed);
 		} finally {
-			exporting.busy = undefined;
-			exporting.panel.element.hidden = false;
-			exporting.overlay.element.hidden = false;
-			if (this.exporting === exporting) this.renderExport();
-			this.refresh();
+			try {
+				renderer?.dispose();
+			} finally {
+				background?.dispose();
+				releaseJob?.();
+				exporting.abort = undefined;
+				exporting.busy = undefined;
+				if (this.exporting === exporting) this.renderExport();
+				if (!this.disposed) this.refresh();
+			}
 		}
 	}
 
@@ -8333,8 +8367,8 @@ export class M1CanvasSession {
 	/**
 	 * Decorate exactly the shells a mutation batch added: nodes with a
 	 * persisted override, and nodes this session already tracks for editor
-	 * cleanup.  A plain card with no override is never touched, so it stays
-	 * exactly native.  "Everything" instead runs the full, exact refresh path.
+	 * cleanup, plus an unstyled card entering its editor. "Everything" instead
+	 * runs the full, exact refresh path.
 	 */
 	private runAppearanceMutationPass(): void {
 		const everything = this.pendingAppearanceEverything;
@@ -8367,7 +8401,7 @@ export class M1CanvasSession {
 			}
 			const id = readCanvasElementId(node);
 			const hasOverride = id !== undefined && this.appearance.localOverrides[id] !== undefined;
-			if (hasOverride || this.editorAppearanceDom.has(shell)) {
+			if (hasOverride || this.editorAppearanceDom.has(shell) || readRuntime(node, "isEditing") === true) {
 				this.decorateNodeAppearance(node, sourceScene);
 			}
 		}
@@ -8395,7 +8429,12 @@ export class M1CanvasSession {
 			this.editorAppearanceDom.delete(dom);
 			return;
 		}
-		const rules = buildEditorAppearanceRules(typography, colors);
+		const boardTheme = this.root?.getAttribute("data-miro-canvas-resolved-theme");
+		const bodyClasses = ownerDocument(this.root)?.body?.classList;
+		const oppositeTheme = boardTheme === "dark" && bodyClasses?.contains("theme-light")
+			? "dark"
+			: boardTheme === "light" && bodyClasses?.contains("theme-dark") ? "light" : undefined;
+		const rules = buildEditorAppearanceRules(typography, colors, oppositeTheme);
 		if (rules.length === 0 && !this.editorAppearanceFrames.has(frame)) {
 			// Never decorated: a card with no override stays exactly native.
 			return;
@@ -8967,9 +9006,25 @@ export class M1CanvasSession {
 		writeAttribute(this.root, "data-miro-canvas-resolved-theme", resolved);
 		writeAttribute(this.controls.element, "data-miro-canvas-theme", normalized);
 		writeAttribute(this.controls.element, "data-miro-canvas-resolved-theme", resolved);
+		if (this.exporting !== undefined) {
+			writeAttribute(this.exporting.panel.element, "data-miro-canvas-resolved-theme", resolved);
+		}
 		this.setTrackedStyle(this.root, "color-scheme", resolved, this.themeRootSnapshot.styles);
 		this.setTrackedStyle(this.root, "background-color", resolved === "dark" ? "#1e1e1e" : "#ffffff", this.themeRootSnapshot.styles);
 		this.setTrackedStyle(this.root, "color", resolved === "dark" ? "#dedede" : "#1e1e1e", this.themeRootSnapshot.styles);
+		const bodyTheme = ownerDocument(this.root)?.body?.classList?.contains?.("theme-dark") === true ? "dark" : "light";
+		const editorTheme = `${resolved}|${bodyTheme}`;
+		if (this.lastEditorTheme !== editorTheme) {
+			this.lastEditorTheme = editorTheme;
+			for (const node of this.scene.nodes) {
+				if (readRuntime(node, "isEditing") !== true) continue;
+				const dom = readCanvasElementDom(node);
+				const id = readCanvasElementId(node);
+				if (dom === undefined || id === undefined) continue;
+				const override = this.appearance.localOverrides[id];
+				this.refreshEditorAppearance(node, dom, override?.typography, override?.colors);
+			}
+		}
 	}
 
 	private restoreThemeRoot(): void {
@@ -9547,7 +9602,7 @@ export class M1CanvasSession {
 		this.cancelPendingPenDot();
 		this.selectionMoveEnd?.();
 		this.slideShow?.stop();
-		this.closeExport();
+		this.closeExport(false);
 		this.arrangeMode?.dispose();
 		this.panelVisibility?.dispose();
 		this.controls.dispose();

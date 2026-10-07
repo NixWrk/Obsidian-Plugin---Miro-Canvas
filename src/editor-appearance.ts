@@ -35,26 +35,41 @@ const HIGHLIGHT_SELECTOR = ".markdown-source-view.mod-cm6 .cm-highlight";
 /**
  * The rules a card's editor needs to look like the card does while it is
  * shown.  Vertical alignment is not part of this: the editor never gets it.
- * A card with neither typography nor colours set returns no rules at all, so
- * a plain card's editor stays exactly native.
+ * Without overrides or an opposite board scheme, a plain editor stays native.
  */
 export function buildEditorAppearanceRules(
 	typography: TypographySettings | undefined,
 	colors: ColorSettings | undefined,
+	boardTheme?: "light" | "dark",
 ): readonly EditorAppearanceRule[] {
-	if (typography === undefined && colors === undefined) {
+	if (typography === undefined && colors === undefined && boardTheme === undefined) {
 		return [];
 	}
 	const rules: EditorAppearanceRule[] = [];
-	if (colors?.fill !== undefined) {
+	if (colors?.fill !== undefined || boardTheme !== undefined) {
 		// The fill is painted on the node shell, behind the frame.  Without
 		// this the frame's own dark background hides it the moment the card
 		// is opened for editing.
 		rules.push({ selector: BODY_SELECTOR, declarations: [["background-color", "transparent"]] });
 	}
+	if (boardTheme !== undefined) {
+		const dark = boardTheme === "dark";
+		rules.push({ selector: BODY_SELECTOR, declarations: [
+			["color-scheme", boardTheme],
+			["--background-primary", dark ? "#1e1e1e" : "#ffffff"],
+			["--background-primary-alt", dark ? "#232323" : "#fafafa"],
+			["--text-normal", dark ? "#dedede" : "#222222"],
+			["--text-muted", dark ? "#b3b3b3" : "#5c5c5c"],
+			["--text-faint", dark ? "#999999" : "#707070"],
+			["--code-background", dark ? "#232323" : "#fafafa"],
+			["color", dark ? "#dedede" : "#222222"],
+		] });
+	}
 	const content: (readonly [string, string])[] = typography === undefined ? [] : [...typographyDeclarations(typography)];
 	if (colors?.text !== undefined) {
 		content.push(["color", colorToCss(colors.text)]);
+	} else if (boardTheme !== undefined) {
+		content.push(["color", boardTheme === "dark" ? "#dedede" : "#222222"]);
 	}
 	if (content.length > 0) {
 		rules.push({ selector: CONTENT_SELECTOR, declarations: Object.freeze(content) });

@@ -41,7 +41,10 @@ interface DrawnConnector {
   readonly course: string;
 }
 
+let layerSequence = 0;
+
 export class ConnectorLayer {
+  private readonly markerNamespace = ++layerSequence;
   public readonly element: SVGSVGElement;
   private readonly selected = new Set<string>();
   private previewed: BoardConnector | undefined;
@@ -197,7 +200,7 @@ export class ConnectorLayer {
     for (const [end, cap] of [["start", connector.startCap], ["end", connectorEndCap(connector)]] as const) {
       const path = CAP_PATHS[cap];
       if (path === undefined) continue;
-      const id = `miro-board-cap-${connector.id}-${end}`;
+      const id = `miro-board-cap-${this.markerNamespace}-${connector.id}-${end}`;
       const marker = defs.appendChild(this.document.createElementNS(SVG, "marker"));
       for (const [name, value] of Object.entries({
         id, viewBox: "-16 -8 18 16", refX: "0", refY: "0",

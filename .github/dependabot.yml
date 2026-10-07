@@ -5,15 +5,40 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      build-and-test:
+        applies-to: version-updates
+        patterns: ["esbuild", "vitest", "@vitest/*", "vite", "vite-node", "tinypool"]
+      compatible-updates:
+        applies-to: version-updates
+        patterns: ["*"]
+        exclude-patterns: ["esbuild", "vitest", "@vitest/*", "vite", "vite-node", "tinypool", "typescript", "@types/node"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript 7 is outside the current lint toolchain's supported peer range.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Keep declarations aligned with the Node 22 development/CI runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      workflow-actions:
+        applies-to: version-updates
+        patterns: ["*"]
 
   - package-ecosystem: pip
     directory: /
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      python-checks:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

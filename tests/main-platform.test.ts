@@ -11,7 +11,7 @@ import { replaceInvalidFilenameCharacters } from "../src/control-characters";
 const source = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("main.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const plugin = ast.statements.find(ts.isClassDeclaration)!;
-const names = ["initializationTimerHost", "initializationRetry", "shellDisposed", "focusedLeaf", "handleActiveLeafChange", "disposeShell", "activeM1Session", "updateStatus", "pickFontFile", "openFileSourceMenu"];
+const names = ["initializationTimerHost", "initializationRetry", "shellDisposed", "exportJobs", "focusedLeaf", "handleActiveLeafChange", "disposeShell", "activeM1Session", "updateStatus", "pickFontFile", "openFileSourceMenu"];
 const methods = names.map(name => plugin.members.find(member => member.name?.getText(ast) === name)!.getText(ast)).join("\n");
 const sanitizer = ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "sanitizeFontFileName")!;
 const code = transformSync(`class PlatformProbe { ${methods}\nsettingsOfThisDevice() {}\ncurrentCanvasStillOpen() { return false; } }\nthis.PlatformProbe = PlatformProbe;\nthis.sanitize = ${sanitizer.getText(ast)};`, { loader: "ts", target: "es2020" }).code;
@@ -87,6 +87,18 @@ function leaf(kind: string) {
 }
 
 describe("main platform methods (synthetic native contract)", () => {
+  it("aborts independent jobs from every board only when the plugin unloads", () => {
+    const f = shell();
+    const first = new AbortController();
+    const second = new AbortController();
+    f.instance.exportJobs.add(first);
+    f.instance.exportJobs.add(second);
+    f.instance.disposeShell();
+    expect(first.signal.aborted).toBe(true);
+    expect(second.signal.aborted).toBe(true);
+    expect(f.instance.exportJobs.size).toBe(0);
+  });
+
   it("retains focused Canvas/sidebar/file/null identity rather than choosing a recent board", () => {
     const f = shell();
     expect(f.instance.focusedLeaf()).toBeNull();

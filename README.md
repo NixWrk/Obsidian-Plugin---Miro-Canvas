@@ -342,6 +342,11 @@ Settings also cover board theme, zoom limits and steps, wheel behaviour,
 snapping, the minimap and attachment names. The interface follows Obsidian's
 language, with English and Russian available.
 
+The board theme covers its controls, default cards and their editors, search
+and export panels. Obsidian outside the board keeps its own theme. When both
+schemes match, the board keeps the installed Obsidian theme's colors; an
+opposite board scheme uses a local neutral palette. Explicit card colors stay.
+
 In **Arrange panels**, drag the minimap’s corner to resize it. The size is
 saved separately for each device.
 
@@ -472,7 +477,14 @@ Each PDF page and PowerPoint slide contains an **image of the board**.
 Card text and shapes are not separate editable slide objects. Files are saved
 in the vault using Obsidian’s attachment location with unique filenames.
 Live web embeds and video are omitted. Standard quality uses 2000 pixels on
-the long side, high quality 3000. Stop cancels export and restores the view.
+the long side, high quality 3000.
+
+Export renders a separate board snapshot in the background and packs the file
+in a Web Worker. Your camera, selection and working board stay available; you
+can move cards, pan or open another board while it runs. **Stop** in the export
+panel cancels the job and removes its background resources. Disabling the
+plugin stops its jobs. The output uses the attachment location of the source
+board at export start. The plugin opens no extra window and captures no screen.
 
 ## Bring boards from Miro and other plugins
 
@@ -565,7 +577,10 @@ user's journey from installation to importing a board (`FUT-004`). Large
 selections and line-to-line connections also need improvement. A GIF for one
 feature does not complete the entire task.
 
-Build with `npm ci`, `npm run check`, `npm test` and `npm run build`.
+Build with a supported Node version (22.12+ on the 22/24/26 lines), `npm ci`,
+`npm run check`, `npm test` and `npm run build`. Downloaded CLI/MCP still run
+on Node 20+. Dependency updates and deferred majors are recorded in the
+[maintenance report](docs/dependency-maintenance.md).
 See the [contributor guide](docs/contributing.md) for validation and releases.
 The [community submission package](docs/community-submission.md) contains the
 listing text, release checks, policy disclosures and remaining review question.

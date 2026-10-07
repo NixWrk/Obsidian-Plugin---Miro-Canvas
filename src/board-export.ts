@@ -1,15 +1,14 @@
 /**
  * Exporting a board: the panel that sets it up, the pages drawn over the
- * board while it is open, and the capture that turns each page into a
- * picture.
+ * board while it is open, and the independent page renderer.
  *
  * Pages are marked on the board, not made of it: they are rectangles over
  * it, stored with the board, so what is exported is chosen without moving,
  * copying or resizing a single item.  A presentation's slides are pages
  * already.
  *
- * The browser renders each visible tile into a picture on desktop and mobile.
- * The camera is restored after success, failure or cancellation.
+ * The browser renders tiles of an isolated Canvas on desktop and mobile.
+ * The working board's camera and selection are never changed by export.
  */
 
 import { createHtmlElement } from "./dom-elements";
@@ -44,6 +43,7 @@ export interface ExportPanelActions {
   readonly onShowPage: (id: string) => void;
   readonly onExport: (kind: ExportKind) => void;
   readonly onClose: () => void;
+  readonly onStop?: () => void;
 }
 
 /** The export panel: paper, pages, quality and the two ways out. */
@@ -67,6 +67,10 @@ export class ExportPanel {
     const close = this.button(header, "×", words().export.close, "miro-canvas-export__close clickable-icon");
     this.on(close, "click", () => this.actions.onClose());
     const busy = view.busy !== undefined;
+    if (busy && this.actions.onStop !== undefined) {
+      const stop = this.button(header, words().export.stop, words().export.stop, "miro-canvas-export__stop");
+      this.on(stop, "click", () => this.actions.onStop?.());
+    }
 
     if (view.mode === "board") {
       const paper = this.row(root, words().export.paperLabel);
@@ -331,10 +335,8 @@ export interface CapturePagePlan {
 }
 
 /**
- * How each page is captured, worked out purely from the pages, the quality,
- * the window rectangle being photographed, and the window's own pixel and
- * zoom scaling - no DOM, no Electron.  `capturePages` drives the camera
- * with this; tests check the arithmetic without either.
+ * Tiles of each output page, from its geometry, quality and the independently
+ * owned surface size. No DOM or Electron; the working board is not measured.
  */
 export function planCapture(
   pages: readonly ExportRect[],
@@ -362,7 +364,7 @@ export function planCapture(
   });
 }
 
-/** The part of native Canvas the capture drives. */
+/** Camera and pixels belonging exclusively to the background renderer. */
 interface CaptureCanvas {
   x: number; y: number; tx: number; ty: number; zoom: number; tZoom: number;
   screenshotting?: boolean;
@@ -374,33 +376,43 @@ interface CaptureCanvas {
   setViewport?(x: number, y: number, zoom: number): void;
 }
 
-/** Render pages in the browser; no desktop capture or filesystem is needed. */
-export async function capturePages(
+function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = (): void => reject(new Error(words().export.exportStopped));
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener("abort", abort, { once: true });
+    operation.then(value => {
+      signal.removeEventListener("abort", abort);
+      resolve(value);
+    }, error => {
+      signal.removeEventListener("abort", abort);
+      reject(error instanceof Error ? error : new Error(words().export.exportFailed));
+    });
+  });
+}
+
+/** Render only an independently owned Canvas surface; never the working board. */
+export async function renderExportPages(
   canvas: CaptureCanvas,
   pages: readonly ExportRect[],
   quality: ExportQuality,
   progress: (done: number, total: number) => boolean,
+  signal?: AbortSignal,
+  prepare?: () => void,
 ): Promise<CapturedPage[]> {
   const wrapper = canvas.wrapperEl;
   const document = wrapper.ownerDocument;
   const view = document.defaultView;
   if (view === null) throw new Error(words().export.unavailable);
+  if (wrapper.getAttribute("data-miro-canvas-export-renderer") !== "true") throw new Error(words().export.unavailable);
   const saved = { x: canvas.x, y: canvas.y, zoom: canvas.zoom, screenshotting: canvas.screenshotting };
-  const status = createHtmlElement(document, "div");
-  status.className = "miro-canvas-export-progress";
-  status.setAttribute("role", "status");
-  const label = createHtmlElement(document, "span");
-  const stop = createHtmlElement(document, "button");
-  stop.type = "button";
-  stop.textContent = words().export.stop;
-  status.append(label, stop);
-  document.body.appendChild(status);
-  let stopped = false;
   const controller = new AbortController();
-  stop.addEventListener("click", () => {
-    stopped = true;
-    controller.abort();
-  });
+  const abort = (): void => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
   const pause = (ms: number): Promise<void> => new Promise(resolve => view.setTimeout(resolve, ms));
   const results: CapturedPage[] = [];
   let activeSheet: HTMLCanvasElement | undefined;
@@ -409,7 +421,7 @@ export async function capturePages(
     canvas.deselectAll();
     wrapper.classList.add("is-screenshotting", "miro-canvas-exporting");
     canvas.screenshotting = true;
-    await document.fonts.ready;
+    await abortable(document.fonts.ready, controller.signal);
     const bounds = wrapper.getBoundingClientRect();
     const capture = { width: Math.floor(bounds.width), height: Math.floor(bounds.height) };
     if (capture.width < 1 || capture.height < 1) throw new Error(words().export.pageNotDrawn);
@@ -424,25 +436,25 @@ export async function capturePages(
       const context = sheet.getContext("2d");
       if (context === null) throw new Error(words().export.pageNotDrawn);
       for (const { center, zoom, draw } of tiles) {
-        label.textContent = words().export.capturingProgress(done, total);
-        if (stopped || !progress(done, total)) throw new Error(words().export.exportStopped);
+        if (controller.signal.aborted || !progress(done, total)) throw new Error(words().export.exportStopped);
         canvas.x = canvas.tx = center.x;
         canvas.y = canvas.ty = center.y;
         canvas.zoom = canvas.tZoom = zoom;
         canvas.viewportChanged = true;
         canvas.requestFrame();
-        await pause(120);
-        await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()));
+        await abortable(pause(120), controller.signal);
+        await abortable(new Promise<void>(resolve => view.requestAnimationFrame(() => resolve())), controller.signal);
+        prepare?.();
         const picture = await html2canvas(wrapper, {
           signal: controller.signal,
           scale: 1, logging: false, backgroundColor: view.getComputedStyle(wrapper).backgroundColor,
           width: capture.width, height: capture.height,
           allowTaint: false, useCORS: false, imageTimeout: 10000,
-          ignoreElements: element => element.matches("iframe, video, .miro-canvas-export-progress"),
+          ignoreElements: element => element.matches("iframe, video"),
           onclone: (_document, cloned) => prepareExportSvgs(wrapper, cloned),
         });
         activePicture = picture;
-        if (stopped || !progress(done, total)) throw new Error(words().export.exportStopped);
+        if (controller.signal.aborted || !progress(done, total)) throw new Error(words().export.exportStopped);
         context.drawImage(picture, 0, 0, Math.min(picture.width, draw.width), Math.min(picture.height, draw.height),
           draw.x, draw.y, Math.min(picture.width, draw.width), Math.min(picture.height, draw.height));
         picture.width = picture.height = 0;
@@ -455,12 +467,12 @@ export async function capturePages(
     }
     progress(total, total);
   } catch (error) {
-    if (stopped) throw new Error(words().export.exportStopped);
+    if (controller.signal.aborted) throw new Error(words().export.exportStopped);
     throw error;
   } finally {
     if (activePicture !== undefined) activePicture.width = activePicture.height = 0;
     if (activeSheet !== undefined) activeSheet.width = activeSheet.height = 0;
-    status.remove();
+    signal?.removeEventListener("abort", abort);
     wrapper.classList.remove("is-screenshotting", "miro-canvas-exporting");
     canvas.screenshotting = saved.screenshotting;
     canvas.x = canvas.tx = saved.x;
