@@ -1,4 +1,4 @@
-# miro-canvas MCP server
+# miro-canvas MCP server and CLI
 
 An [MCP](https://modelcontextprotocol.io) server that lets an AI agent - Claude
 Code, Codex or any other MCP client - read, check and change the miro-canvas
@@ -25,10 +25,15 @@ Node 20 or later.
 ```bash
 npm ci
 npm run mcp:build     # -> mcp/dist/miro-canvas-mcp.mjs
+npm run cli:build     # -> mcp/dist/miro-canvas-cli.mjs
 ```
 
-The result is one file with everything inside it, including the pinned board
-schema; running it needs no `npm install`. Copy it anywhere you like.
+Each build produces one standalone file with everything inside it, including
+the pinned board schema; running it needs no `npm install`. Copy it anywhere
+you like. The CLI uses the same tool operations and board writers as MCP;
+the MCP server and the skill remain available. Use CLI for local board work,
+or MCP tools when already connected. The plugin starts neither program and
+includes neither in `main.js`.
 
 ## Run
 
@@ -50,6 +55,70 @@ The server does not infer the directory or create it.
 `--read-only` offers only the reading and
 checking tools; the others do not exist. The server writes one line to stderr
 when it starts; stdout carries the protocol and nothing else.
+
+## CLI
+
+With Node 20 or later, use the file produced by `npm run cli:build`:
+
+```text
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] list
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] call <tool> --args <JSON>
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] call <tool> --input <path>
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] call <tool> --stdin
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] batch --input <path>
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] batch --stdin
+```
+
+`list` lists the available tools; use `call list_boards` to list board files.
+For `call`, choose one input source: `--args` holds a JSON arguments object,
+`--input` reads that object from a file, or `--stdin` reads it from stdin.
+JSON input is limited to 8 MiB and batches to 1,000 calls.
+The same vault and configuration-directory guards apply as for MCP; the
+explicit default is `.obsidian`. `--read-only` exposes only reading and
+checking tools.
+
+Every invocation writes one JSON result to stdout. Exit status is 0 on
+success, 1 on a failed tool call or board validation (`valid: false`), and 2
+on bad command usage or input. Tool diagnostics stay in the JSON result;
+input/startup errors are also written to stderr.
+`node mcp/dist/miro-canvas-cli.mjs --help` and `--version` also return JSON
+and do not require `--vault`.
+
+For example, save this arguments object as `read.json`:
+
+```json
+{ "path": "boards/plan.canvas", "level": "summary" }
+```
+
+```bash
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault call read_board --input read.json
+```
+
+A batch input is a JSON array of `{ "name": "<tool>", "arguments": { ... } }`
+entries. Calls run sequentially and stop on the first refusal or failure.
+Earlier writes remain; a batch is not a transaction. Save this as `batch.json`:
+
+```json
+[
+  { "name": "read_board", "arguments": { "path": "boards/plan.canvas" } },
+  { "name": "add_item", "arguments": { "path": "boards/plan.canvas", "expectedRevision": "previous", "type": "sticky_note", "x": 0, "y": 0, "text": "Next step" } }
+]
+```
+
+```bash
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault batch --input batch.json
+```
+
+Within one batch, `expectedRevision: "previous"` means the most recent
+successful revision returned for the **same board** in that batch.
+`read_board` can seed it. A call for another board does not replace it;
+a previous process supplies no revision to a new batch. Dry runs retain the
+actual file revision for handoff, not the hypothetical edited revision.
+
+`undo_last` can restore only the last change remembered for that board in
+the same process, subject to its revision check. For CLI use, put the change
+and undo in one batch. A later CLI invocation has no undo record. This does
+not create persistent native Obsidian Undo history.
 
 ## Tools
 
@@ -105,7 +174,7 @@ stable `code`. Hand `revision` to the next change.
 | `layer` | `ids`, `direction` (`front`, `back`, `forward`, `backward`) |
 | `lock` | `ids`, `locked` |
 | `comment` | `op` (`add`, `reply`, `edit`, `resolve`, `reopen`, `delete`), `commentId`, `text`, `anchor`, `author` |
-| `undo_last` | nothing: gives back the board as it was before this server's last change to it, while nothing has saved it since |
+| `undo_last` | nothing besides `path`: restores the last change remembered for that board in this process, while nothing has saved it since; in CLI use, keep it in the same batch |
 
 The end of a line (`from`, `to`) or a comment's `anchor` is a card
 (`{ "nodeId": "card-1" }`, optionally with `"side": "top" | "right" | "bottom" | "left"`;
@@ -224,10 +293,10 @@ The sources are `mcp/src`, the tests `mcp/tests` (run with `npm test`). `mcp/`
 may import the plugin's pure modules from `src/`, never the other way round;
 the build fails if anything it bundles imports `obsidian` or `electron`. The
 MCP protocol is written by hand in `json-rpc.ts` (JSON-RPC 2.0, one message
-per line). See "Agents: the MCP server" in
+per line). See "Agents: the MCP server and CLI" in
 [docs/miro-canvas.md](../docs/miro-canvas.md) for the design.
 
-Run the standalone server's enforced lint separately:
+Run the standalone MCP and CLI enforced lint separately:
 
 ```bash
 node node_modules/eslint/bin/eslint.js --config mcp/eslint.config.mjs mcp/src
@@ -236,14 +305,20 @@ node node_modules/eslint/bin/eslint.js --config mcp/eslint.config.mjs mcp/src
 This scope uses Node globals and the JavaScript and TypeScript type-checked
 recommended rules, including Promise, unsafe-value and control-character
 checks. Obsidian's plugin/mobile rules describe a different runtime: this
-server requires Node's filesystem, crypto, path, readline and stream APIs and
-does not have an Obsidian `App` or `Platform`. The plugin lint configuration
+server requires Node's filesystem, crypto, path and readline APIs and the
+existing `ReadLineOptions["input"]` and `write(string)` contract; it does not have
+an Obsidian `App` or `Platform`. The plugin lint configuration
 remains separate.
 
-The server scope forbids network modules, Obsidian/Electron imports, subprocess
-imports, eval and network globals. It reserves stdout for the protocol and
-allows only the existing startup redirects from `console.log`, `console.info`
-and `console.debug` to stderr. Direct stdout access is limited to passing it
-to `serveLines` at startup. Configuration paths use the active standalone
-`Vault.configDir`; only its explicit default initializer may name `.obsidian`.
-Focused lint fixtures and bounded stdio-process tests enforce these rules.
+The standalone scope forbids network modules, Obsidian/Electron imports,
+subprocess imports, eval, network globals and own `console` use. Ajv uses
+`logger: false`; structured schema errors remain in tool results. Startup
+does not redirect the global console. Stdout carries only MCP protocol messages
+or the CLI's one JSON result; CLI file input and stdin use Node APIs.
+Configuration paths use the active standalone `Vault.configDir`; only its
+explicit default initializer may name `.obsidian`. Focused lint fixtures and
+bounded stdio-process tests enforce these rules. Seven existing genuine Node
+builtin imports remain; the type-only `node:stream` import has been removed.
+The CLI adds one `node:fs` import for file/stdin input. Those imports, the explicit
+configuration default and legacy plugin command ID remain visible in the raw
+plugin context; the current local official-rules scan reports 10 warnings and no errors.

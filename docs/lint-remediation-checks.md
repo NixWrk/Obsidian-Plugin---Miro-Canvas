@@ -1816,3 +1816,84 @@ repair does not touch plugin/MCP runtime sources or CSS. GitHub full rerun and
 published-asset verification remain the release gate; no tag was created on
 the failed CI commit. Earlier 2,036-test local acceptance remains historical;
 CI failure and its distinct test-only correction are not erased.
+
+### CLI and remaining source advisories — trace before implementation (2026-10-07)
+
+User requests preserving the skill, MCP and the shared tested board operations,
+adding a command-line frontend and explaining retained warnings in both READMEs.
+The new frontend must use createServerTools / CanvasAuthoring / MetadataWriter,
+including vault containment, source/unknown fields, locks/review, revision
+checks, validation and write-once behavior. MCP protocol responses and callers
+remain compatible. CLI list/call/batch use the same schema-checked operation
+runner; batch retains only this process's undo and stops on first failure,
+with completed writes retained rather than an implied transaction.
+
+Console sites server.ts:56-58 run at MCP startup before Vault.open. They redirect
+log/info/debug globally to stderr. No own board tool calls console; the two Ajv
+constructors in json-rpc.ts and validate.ts are the logging dependency. Planned
+repair: shared runner with Ajv logger:false, also board Ajv logger:false; remove
+startup redirects and enforce no console in standalone sources. Preserve JSON
+schema errors and structured ToolError responses, diagnostics on stderr, and
+stdout containing only the protocol/CLI JSON.
+
+Eight reported Node imports provide hashes/atomic file writes, containment,
+workspace reads and stdio; retain genuine standalone Node dependencies rather
+than hiding imports or importing Obsidian.Platform. DEFAULT_CONFIG_DIR is the
+explicit compatibility default and active Vault.configDir remains configurable.
+Legacy command ID m1-commands retains saved hotkeys; no ID or UI change planned.
+Android plugin behavior is unaffected: no src/ or CSS edits, neither frontend
+bundled/started by the plugin. Recheck plugin bundle graph and frozen hashes.
+
+Mandatory checks pending: shared input schema and failed result/error parity;
+real CLI processes list/read/validate/edit/lock/review/source+unknown fields,
+stale revision/dry run, custom config/path protection, read-only and bad input,
+batch previous-revision scope/stop/undo; existing MCP stdio tests and all unit
+tests; standalone no-console lint, raw remaining advisories; types/build/schema/
+submission and three smoke modes. Native check uses only a project-local scratch
+board and hidden/background Windows Obsidian; never user's vault or foreground
+OS input. Existing real Android coverage is not recast as a new CLI test.
+
+Additional trace before changing stream types: json-rpc.ts imports Readable and
+Writable only with import type. serveLines only supplies input to readline and
+calls output.write; callers pass Node stdin/stdout or stream test instances.
+No runtime stream import is emitted. NodeJS.ReadableStream / WritableStream
+already express this required contract in the existing Node types. Remove the
+unused runtime-module dependency notation while retaining readline's actual
+Node API. Required checks: tsc, existing readline/JSON-RPC tests including
+notifications and ordering, real MCP stdin/stdout process tests, and raw source
+advisory counts. This affects neither the plugin nor Android runtime.
+
+Raw Obsidian-context follow-up caught two no-undef warnings for the NodeJS type
+namespace, despite successful Node lint/tsc. Before correcting: preserve the
+same stream contract using ReadLineOptions['input'] from the already imported
+node:readline module and a structural write(string) output, exactly the methods
+serveLines calls. No new Node import site or globals suppression; repeat raw
+lint, JSON-RPC/stdio tests and tsc. The failed raw scan remains evidence.
+
+
+CLI final evidence (2026-10-07): 128 files / 2,111 unit tests PASS, one existing
+optional skip. Includes 69 focused CLI cases using real bounded processes, existing MCP processes,
+shared result/schema parity, no console output for unknown Ajv formats, input
+limits at exactly 8 MiB and one extra byte through file/stdin, and both bundle
+graphs excluding Obsidian/network and plugin graph excluding standalone sources.
+Types, plugin and both standalone builds, Node lint 0/0, plugin lint 0 errors/1
+legacy ID warning, CSS 0/0, pinned schema, submission, 3 smoke modes and 33 oracle
+tests PASS. Raw recommended Obsidian rules over src+mcp report exactly 10
+warnings/0 errors: 8 required Node import sites, explicit .obsidian default,
+legacy command ID. The earlier NodeJS namespace scan failures remain recorded;
+readline input type and structural writer corrected them without suppression.
+
+Actual native evidence: .out/cli-native-acceptance.json uses the built CLI as a
+real stdin process on a fresh project-local scratch board, then installed hidden
+Windows Obsidian 1.14.4 displays its edited card and handles trusted background
+CDP mouse selection. Source and unknown fields preserved; scratch removed and
+original board path/bytes restored; test window stays hidden/unfocused. Installed
+plugin manifest 0.2.7 is explicitly recorded, with the same main/CSS runtime
+hashes as release 0.2.8; no version-install claim. Root main.js and styles.css
+remain aff2ee3a34a3045a30075c5736091c5cde937e3e06d2c1d327659ae5705aa200 and
+7c5ce8c141b048ae4382abb83f6c3a309a0bfef5c21290bc527184202a76208c.
+No plugin source/CSS change affects Android, so no new physical Android gesture
+claim is made. Interactive terminal TTY rejection remains unexercised; piped
+stdin is checked in real processes. Batch stops on first failure with committed
+prefix retained, and undo exists only in the current process; neither is native
+persistent history. Both READMEs explain remaining warning reasons clearly.

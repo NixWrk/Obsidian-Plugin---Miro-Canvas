@@ -9,16 +9,12 @@ const forbiddenModules = new Set([
 	"cross-fetch", "undici", "ws",
 ]);
 
-const consoleMember = (node, name) => node?.type === "MemberExpression" && !node.computed
-	&& node.object.type === "Identifier" && node.object.name === "console"
-	&& node.property.type === "Identifier" && (name === undefined || node.property.name === name);
-
 const runtime = {
 	rules: {
 		"stdio": {
 			meta: { type: "problem", schema: [], messages: {
-				console: "Console is reserved for the three server startup redirects to stderr.",
-				stdout: "Only serveLines may receive process.stdout at server startup.",
+				console: "Standalone board tools cannot use console; return diagnostics or write startup errors to stderr.",
+				stdout: "Stdout is reserved for MCP serveLines and the CLI final JSON response.",
 			} },
 			create(context) {
 				return {
@@ -30,17 +26,15 @@ const runtime = {
 						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/server.ts")
 							&& call.type === "CallExpression" && call.callee.type === "Identifier"
 							&& call.callee.name === "serveLines" && call.arguments[2] === node) return;
+						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/cli.ts")
+							&& call.type === "MemberExpression" && !call.computed && call.property.name === "write"
+							&& call.parent.type === "CallExpression" && call.parent.callee === call
+							&& call.parent.parent.type === "ExpressionStatement" && call.parent.parent.parent.type === "Program") return;
 						context.report({ node, messageId: "stdout" });
 					},
 					Identifier(node) {
 						if (node.name !== "console") return;
-						const member = node.parent;
-						const assignment = member.parent;
-						const redirect = context.filename.replaceAll("\\", "/").endsWith("/mcp/src/server.ts")
-							&& assignment.type === "AssignmentExpression" && assignment.operator === "="
-							&& consoleMember(assignment.left) && ["log", "info", "debug"].includes(assignment.left.property.name)
-							&& consoleMember(assignment.right, "error") && assignment.parent.type === "ExpressionStatement";
-						if (!redirect) context.report({ node, messageId: "console" });
+						context.report({ node, messageId: "console" });
 					},
 				};
 			},

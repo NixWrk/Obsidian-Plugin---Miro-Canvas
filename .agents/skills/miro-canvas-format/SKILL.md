@@ -1,6 +1,6 @@
 ---
 name: miro-canvas-format
-description: Read, check and safely edit Obsidian Canvas boards made by miro2obsidian or the miro-canvas plugin - .canvas files with miroSource (the imported Miro snapshot) and miroCanvas (the plugin's metadata) - preferably through the plugin's MCP server (miro-canvas-mcp), whose tools enforce locks, keep miroSource and refuse to write over a newer save. Use when a person asks what is on such a board, wants cards, lines, comments, layers, locks or export pages changed without Obsidian open, wants a board validated, or asks how the format works.
+description: Read, check and safely edit Obsidian Canvas boards made by miro2obsidian or the miro-canvas plugin - .canvas files with miroSource (the imported Miro snapshot) and miroCanvas (the plugin's metadata) - through the shared checked command-line tools or an available MCP server; both enforce locks, preserve miroSource and refuse stale writes. Use when a person asks what is on such a board, wants cards, lines, comments, layers, locks or export pages changed without Obsidian open, wants a board validated, or asks how the format works.
 ---
 
 # Miro Canvas boards
@@ -19,6 +19,51 @@ Everything the plugin draws falls back to plain Canvas without it, so edit the
 native `nodes`/`edges` whenever they can express the change, and `miroCanvas`
 only for what they cannot. Read [references/format.md](references/format.md)
 before editing; it lists every field with the rules the plugin relies on.
+
+## With the command-line utility
+
+When the agent has a terminal, use the repository's CLI instead of inventing
+JSON-edit scripts. It uses the same schema-checked operations and plugin writers
+as MCP. If MCP is already connected, its tools are also appropriate; neither
+frontend is required for ordinary editing inside Obsidian.
+
+Build once with `npm run cli:build` in the plugin repository. Node 20+ runs the
+self-contained `mcp/dist/miro-canvas-cli.mjs`; copying that bundle requires no
+dependency install. Use absolute paths to the executable and vault.
+
+```powershell
+node mcp/dist/miro-canvas-cli.mjs --vault C:/path/to/vault list
+node mcp/dist/miro-canvas-cli.mjs --vault C:/path/to/vault call read_board --input read-args.json
+node mcp/dist/miro-canvas-cli.mjs --vault C:/path/to/vault batch --input changes.json
+```
+
+The input for `call` is an arguments object, such as
+`{"path":"Projects/Plan.canvas","level":"summary"}`. Use `--input` for JSON
+files or `--stdin` for piped JSON to avoid shell quoting; `--args <JSON>` is
+available for short objects. Add `--config-dir Config` for the vault's actual
+configuration folder, or `--read-only` to expose only reading/validation tools.
+Output is one JSON object; exit status 0 means success, 1 means a tool refused
+the operation or validation found an invalid board, and 2 means invalid usage
+or input. Inspect diagnostics even when the process exits successfully.
+
+Read and validate before editing. Pass the revision returned by `read_board`
+as `expectedRevision`, use `dryRun: true` to preview, then validate after the
+actual change. For several calls, batch input is an array:
+
+```json
+[
+  {"name":"read_board","arguments":{"path":"Projects/Plan.canvas"}},
+  {"name":"update_node","arguments":{"path":"Projects/Plan.canvas","id":"card-1","text":"Renamed","expectedRevision":"previous"}},
+  {"name":"validate_board","arguments":{"path":"Projects/Plan.canvas"}}
+]
+```
+
+`previous` uses the last successful revision of the same board in that batch;
+it never borrows another board's revision or a dry run's hypothetical revision.
+Batches stop at the first failure. Earlier successful writes remain; a batch
+is not a transaction. `undo_last` remembers only the last change of this process,
+so CLI undo is usable inside the same batch, not from a later command. Close
+the board in Obsidian before writing; these tools edit files, not the open view.
 
 ## With the MCP server
 
@@ -59,7 +104,7 @@ repository, pinned from miro2obsidian's `miro2obsidian/schemas/v1/`
 with valid and invalid example boards in `fixtures/`. Check with, in order of
 preference:
 
-1. the MCP server's `validate_board` - the schema and the plugin's own reading
+1. CLI or MCP `validate_board` - the schema and the plugin's own reading
    (ids used once, whole-number geometry, anchors that land, records about
    cards the board no longer has);
 2. `python -m miro2obsidian.validate path\to\board.canvas` in the miro2obsidian
@@ -76,7 +121,7 @@ the edit kept the board valid).
    is a risk: the MCP server notices Obsidian's saves (and warns
    `open-in-obsidian` when a tab shows the board), but a board with unsaved
    edits open in Obsidian can still overwrite the change on its next save.
-   Without the server, Obsidian must not have the board open at all.
+   Direct JSON editing requires the board to be closed in Obsidian.
 2. Parse and write the whole file as JSON; keep every field you do not
    understand exactly as it is, at every level. Newer plugin versions add
    fields, and other plugins (Advanced Canvas) add their own.

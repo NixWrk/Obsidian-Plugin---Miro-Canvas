@@ -8,6 +8,7 @@
     "dev": "node esbuild.config.mjs --watch",
     "build": "node esbuild.config.mjs --production",
     "mcp:build": "node esbuild.mcp.mjs",
+    "cli:build": "node esbuild.mcp.mjs --cli",
     "test": "vitest run",
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",

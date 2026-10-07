@@ -586,12 +586,45 @@ PDF fitting waits for the native document and initial page layout within that
 deadline; closing its window cancels the wait. Native controls, card alignment
 and decoration styles restore their previous values when the plugin unloads.
 Settings use Obsidian's declarative settings API on supported versions. The
-separate Node MCP server has its own enforced check, `npm run lint:mcp`, and
-accepts `--config-dir` for vaults using a custom Obsidian configuration folder.
-Board reading and editing use the optional [MCP server](mcp/README.md) and
-[miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
-The server is started separately by its owner's configuration; the plugin
-does not start it.
+separate Node MCP server and CLI have their own enforced check, `npm run lint:mcp`,
+and accept `--config-dir Config` for a custom Obsidian configuration folder;
+the explicit default is `.obsidian`.
+Board reading and editing use the optional [MCP server and CLI](mcp/README.md)
+and [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
+Use the CLI for local board work, or MCP tools when already connected.
+The plugin starts neither program.
+
+With Node 20 or later, build the CLI with `npm run cli:build`:
+
+```bash
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault list
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault call read_board --input read.json
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault batch --input batch.json
+```
+
+The CLI uses the same tool operations as MCP and prints one JSON result.
+Exit codes are 0 for success, 1 for a tool or board-validation failure and 2
+for bad usage or input. `--read-only` permits reading and checking only.
+See the [CLI reference](mcp/README.md#cli) for `--args`, `--stdin`, sequential
+batches, revision handoff and undo limited to the current process.
+
+#### Remaining source warnings
+
+A local scan of `src/` and `mcp/src/` with the official Obsidian rules reports
+**10 warnings and no errors**. The standalone Node lint reports no warnings or
+errors; the plugin-only lint retains the one command-ID warning below.
+
+| Warning | Sites | Reason |
+| --- | --- | --- |
+| Node builtin imports | 8 | The optional CLI/MCP programs use files, paths, hashes and stdin. They run under Node 20+, are excluded from `main.js`, and are never started by the plugin. |
+| Literal `.obsidian` | 1 | The ordinary configuration folder is an explicit default. Custom folders work through `--config-dir`; operations use the selected folder. |
+| `m1-commands` command ID | 1 | Existing users' saved hotkeys refer to this ID. Retaining it preserves them. |
+
+The two console warnings and the type-only `node:stream` import from the 0.2.8
+report are removed. CLI adds one necessary `node:fs` import, included in the
+eight sites above. Standalone code forbids console calls; Ajv logging is disabled
+while validation errors remain in JSON responses. These explanations do not
+certify Community Directory acceptance; its next scan may report differently.
 
 ## License
 

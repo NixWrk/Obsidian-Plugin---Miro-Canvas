@@ -52,10 +52,6 @@ function parseArguments(argv: readonly string[]): ServerArguments {
 }
 
 async function main(): Promise<void> {
-	// stdout carries the protocol; a stray log line would break it.
-	console.log = console.error;
-	console.info = console.error;
-	console.debug = console.error;
 	let settings: ServerArguments;
 	let vault: Vault;
 	try {

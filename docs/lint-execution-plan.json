@@ -7134,5 +7134,50 @@
       "submission": "passed",
       "note": "Parent full-gate receipt; no execution by doc sidecar. Cold typed-ESLint test startup allowance changed 5s to 30s; product deadlines unchanged."
     }
+  },
+  "postReleaseCli": {
+    "date": "2026-10-07",
+    "baselineRelease": "0.2.8",
+    "status": "accepted",
+    "originalReportedWarnings": 12,
+    "removedOriginalWarnings": 3,
+    "newNecessaryCliNodeImports": 1,
+    "currentLocalOfficialRules": {
+      "totalWarnings": 10,
+      "errors": 0,
+      "nodeImports": 8,
+      "configurationDefault": 1,
+      "legacyCommandId": 1
+    },
+    "enforcedLint": {
+      "pluginErrors": 0,
+      "pluginWarnings": 1,
+      "nodeErrors": 0,
+      "nodeWarnings": 0,
+      "cssImportant": 0,
+      "cssHas": 0
+    },
+    "checks": {
+      "unitFiles": 128,
+      "unitPassed": 2111,
+      "unitSkipped": 1,
+      "smokeModes": 3,
+      "oraclePassed": 33,
+      "skillValid": true,
+      "nativeWindows": "actual CLI process + trusted background CDP; scratch board; original bytes/path restored"
+    },
+    "mainSha256": "aff2ee3a34a3045a30075c5736091c5cde937e3e06d2c1d327659ae5705aa200",
+    "stylesSha256": "7c5ce8c141b048ae4382abb83f6c3a309a0bfef5c21290bc527184202a76208c",
+    "limitations": [
+      "Interactive TTY stdin rejection not exercised.",
+      "No new Android runtime check: plugin source/CSS and hashes unchanged.",
+      "Raw local lint is not a new Community Directory review.",
+      "CLI batches retain earlier writes on failure; undo is process-local."
+    ],
+    "evidence": [
+      "tools/obsidian_cdp/.out/cli-final-tests.log",
+      "tools/obsidian_cdp/.out/cli-raw-lint.json",
+      "tools/obsidian_cdp/.out/cli-native-acceptance.json"
+    ]
   }
 }

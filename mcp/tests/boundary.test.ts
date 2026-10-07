@@ -17,10 +17,10 @@ function normalise(file: string): string {
 	return file.split(path.sep).join("/");
 }
 
-async function serverMetafile(): Promise<Metafile> {
+async function serverMetafile(frontend = "server"): Promise<Metafile> {
 	const url = pathToFileURL(path.join(REPOSITORY_ROOT, "esbuild.mcp.mjs")).href;
 	const { mcpBuildOptions } = await import(/* @vite-ignore */ url);
-	const result = await esbuild.build({ ...mcpBuildOptions(REPOSITORY_ROOT), write: false, metafile: true, logLevel: "silent" });
+	const result = await esbuild.build({ ...mcpBuildOptions(REPOSITORY_ROOT, frontend), write: false, metafile: true, logLevel: "silent" });
 	return result.metafile!;
 }
 
@@ -41,11 +41,13 @@ async function pluginMetafile(): Promise<Metafile> {
 	return result.metafile!;
 }
 
-describe("the server bundle", () => {
+describe.each(["server", "cli"])("the %s bundle", frontend => {
 	it("carries nothing of Obsidian, the plugin's session, main.ts or the settings tab", async () => {
-		const metafile = await serverMetafile();
+		const metafile = await serverMetafile(frontend);
 		const inputs = Object.keys(metafile.inputs).map(normalise);
-		expect(inputs).toContain("mcp/src/server.ts");
+		expect(inputs).toContain(`mcp/src/${frontend}.ts`);
+		expect(inputs).toContain("mcp/src/tool-runner.ts");
+		expect(inputs).toContain("mcp/src/tools-edit.ts");
 		expect(inputs.some((input) => input.includes("node_modules/ajv/"))).toBe(true);
 		for (const forbidden of ["src/m1-session.ts", "src/main.ts", "src/settings-tab.ts", "src/obsidian-document-host.ts", "src/welcome-board.ts"]) {
 			expect(inputs).not.toContain(forbidden);
@@ -54,7 +56,7 @@ describe("the server bundle", () => {
 	}, 60_000);
 
 	it("imports no network module", async () => {
-		const metafile = await serverMetafile();
+		const metafile = await serverMetafile(frontend);
 		const external = Object.values(metafile.outputs).flatMap((output) => output.imports.filter((item) => item.external).map((item) => item.path));
 		for (const name of NETWORK_MODULES) {
 			expect(external).not.toContain(name);

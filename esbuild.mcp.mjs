@@ -23,10 +23,11 @@ export const noObsidianPlugin = {
 };
 
 /** The build options, shared with mcp/tests/boundary.test.ts. */
-export function mcpBuildOptions(root = rootDir) {
+export function mcpBuildOptions(root = rootDir, frontend = "server") {
+	if (!["server", "cli"].includes(frontend)) throw new Error(`Unknown board frontend: ${frontend}`);
 	return {
-		entryPoints: [path.join(root, "mcp", "src", "server.ts")],
-		outfile: path.join(root, "mcp", "dist", "miro-canvas-mcp.mjs"),
+		entryPoints: [path.join(root, "mcp", "src", `${frontend}.ts`)],
+		outfile: path.join(root, "mcp", "dist", frontend === "server" ? "miro-canvas-mcp.mjs" : "miro-canvas-cli.mjs"),
 		bundle: true,
 		platform: "node",
 		format: "esm",
@@ -42,5 +43,5 @@ export function mcpBuildOptions(root = rootDir) {
 const spelling = (file) => (process.platform === "win32" ? file.toLowerCase() : file);
 const invokedAs = process.argv[1] === undefined ? "" : spelling(path.resolve(process.argv[1]));
 if (invokedAs === spelling(fileURLToPath(import.meta.url))) {
-	await esbuild.build(mcpBuildOptions());
+	await esbuild.build(mcpBuildOptions(rootDir, process.argv.includes("--cli") ? "cli" : "server"));
 }

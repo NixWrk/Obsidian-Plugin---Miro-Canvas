@@ -61,7 +61,7 @@ let compiledBoard: ValidateFunction | undefined;
 /** The board schema, compiled once, with the other two resolved from the bundle, never fetched. */
 function boardValidator(): ValidateFunction {
 	if (compiledBoard !== undefined) return compiledBoard;
-	const ajv = new Ajv2020({ strict: false, allErrors: true });
+	const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 	ajv.addSchema(miroSourceSchema);
 	ajv.addSchema(miroCanvasSchema);
 	compiledBoard = ajv.compile(boardSchema);

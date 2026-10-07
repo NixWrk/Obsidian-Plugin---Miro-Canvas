@@ -497,3 +497,22 @@ inventory indices. Сумма completed wave-1 assignments — 140; оставш
 соблюдают контракт. Syntax lint предупреждает случайные регрессии; security
 confinement и анализ всех гипотетических будущих alias-синтаксисов не являются
 незакрытым assigned warning. Review сохранён, hardening patch не заявляется.
+
+
+### CLI follow-up after release 0.2.8 — 2026-10-07
+
+The skill and MCP remain; the new CLI reuses the same schema-checked operations
+and plugin writers. This follows the original 47-group acceptance rather than
+rewriting its historical inventory. Of the 12 reported 0.2.8 source warnings,
+two console sites and one type-only stream import are removed. CLI adds one
+required Node filesystem import; current local official-rule scan is 10 warnings
+and 0 errors (8 Node imports, config default, legacy command ID). Enforced Node
+lint is 0/0, plugin lint 0 errors/1 retained ID warning, CSS 0/0.
+
+Acceptance: 2,111 unit tests passed with one existing optional skip, three browser
+smoke modes, 33 oracle tests, valid updated skill, type/build/schema/submission
+checks, and actual CLI file editing plus trusted background selection in hidden
+Windows Obsidian 1.14.4. Original board bytes/path restored. Main/CSS hashes
+equal the 0.2.8 runtime; Android code is unaffected. Interactive TTY rejection
+is not exercised; batch/undo limits and warning reasons are documented in both
+root READMEs. This is not a new release or directory acceptance.

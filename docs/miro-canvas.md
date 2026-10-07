@@ -481,18 +481,40 @@ and the plugin's tests both run those fixtures, and the plugin's list of known
 fields are allowed wherever the plugin keeps fields from newer versions. Check
 a board with `python -m miro2obsidian.validate <file.canvas>`.
 
-### Agents: the MCP server
+### Agents: the MCP server and CLI
 
 `mcp/` holds an MCP server (done 2026-09-28, `FUT-007`) through which an AI
 agent reads, checks and edits the boards of one vault without Obsidian open:
 `node mcp/dist/miro-canvas-mcp.mjs --vault <absolute path> [--read-only]`,
-built by `npm run mcp:build` into one file for Node 20 that carries ajv and
-the pinned schema, so running it needs no install. The agent's MCP client
+built by `npm run mcp:build` into one file for Node 20 or later that carries
+ajv and the pinned schema, so running it needs no install. The agent's MCP client
 starts it; the plugin never does, and `main.js` contains nothing of it. It
 speaks JSON-RPC 2.0 over stdio, one message per line (written by hand; the MCP
 SDK would bring a web server along), and opens no network connection. The
 skill `miro-canvas-format` in `.agents/skills/` tells an agent how to use it
 and how the format works; [mcp/README.md](../mcp/README.md) lists the tools.
+
+`npm run cli:build` produces `mcp/dist/miro-canvas-cli.mjs` for Node 20 or later.
+The CLI shares MCP's tool operations, validation and writers; MCP and the skill
+remain available. Neither standalone frontend is started or bundled by the plugin.
+
+```text
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] list
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] call <tool> --args <JSON>
+node mcp/dist/miro-canvas-cli.mjs --vault <absolute path> [--config-dir Config] [--read-only] batch --input <path>
+```
+
+`list` lists tools. `call` takes a JSON arguments object from one of
+`--args`, `--input <path>` or `--stdin`; `batch` takes an array of
+`{ "name": "<tool>", "arguments": { ... } }` from `--input <path>` or `--stdin`.
+Output is one JSON result; exit codes are 0 for success, 1 for a tool or
+board-validation failure, 2 for bad usage/input. Batch calls run sequentially,
+stop on first refusal and keep earlier writes. In that batch,
+`expectedRevision: "previous"` uses the most recent successful revision for
+the same board, including one seeded by `read_board`. `undo_last` remembers
+only the last change for that board in the same process (a CLI batch), with
+no persistent native Undo. `--help` and `--version` return JSON without a vault.
+See the [CLI reference](../mcp/README.md#cli).
 
 - **Reuse.** The server imports the plugin's pure modules from `src/` and never
   the other way round; nothing it bundles imports `obsidian` (the build fails
@@ -514,15 +536,19 @@ and how the format works; [mcp/README.md](../mcp/README.md) lists the tools.
   byte order mark is kept. A save that lands between the last check and the
   rename cannot be seen - a window of milliseconds. A board holding whole
   numbers beyond 2^53 is not edited, since writing it back would round them.
-  When `.obsidian/workspace.json` shows the board open in a tab, the answer
-  warns `open-in-obsidian`: Obsidian reloads a board changed on disk, but its
+  When the selected configuration folder's `workspace.json` shows the board
+  open in a tab, the answer warns `open-in-obsidian`: Obsidian reloads a board
+  changed on disk, but its
   own unsaved edits can still be saved over the change.
-- **Vault guard.** `--vault` must be an absolute folder holding `.obsidian`,
-  reached through no link. A board is named by a relative path ending in
+- **Vault guard.** `--vault` must be an absolute folder holding its configuration
+  directory, reached through no link. The explicit default is `.obsidian`;
+  `--config-dir Config` selects an existing relative folder in the vault.
+  A board is named by a relative path ending in
   `.canvas`; `..`, drive letters, `:` (alternate streams), device names, names
-  ending in a dot or a space and anything under `.obsidian` or `.trash` are
-  refused; every folder on the way is checked not to be a link or junction,
-  and the real path must be the path as written, inside the vault. Boards over
+  ending in a dot or a space and anything under the selected configuration
+  directory, `.obsidian` or `.trash` are refused; every folder on the way is
+  checked not to be a link or junction, and the real path must be the path as
+  written, inside the vault. Boards over
   64 MB are refused; `list_boards` never follows a link.
 
 ## Rendering requirements
@@ -2126,7 +2152,7 @@ Export-page tabs and resize corners belong to PANEL_SELECTOR so rectangle select
 
 ## Panel CSS states (0.2.6)
 
-PanelVisibility marks the main row with data-miro-panel-toggle-host and clears expanded spacing while folded. QuickTools mirrors its menu and settings state in attributes only when values change; stacking and the spare-tools tray use these states instead of :has. Horizontal panels choose the roomier side and wrap to the space between the button and board edge, matching the vertical panel height limit. Cancelled drags restore the previous width. The search live region uses opacity: 0 and remains in the accessibility tree without clip-path. CI reports advisory budgets of 90 !important declarations and 10 native-markup :has selectors; it does not certify them as required or eliminate the remaining directory warnings.
+PanelVisibility marks the main row with data-miro-panel-toggle-host and clears expanded spacing while folded. QuickTools mirrors its menu and settings state in attributes only when values change; stacking and the spare-tools tray use these states instead of :has. Horizontal panels choose the roomier side and wrap to the space between the button and board edge, matching the vertical panel height limit. Cancelled drags restore the previous width. The search live region uses opacity: 0 and remains in the accessibility tree without clip-path. At 0.2.6, CI reported advisory budgets of 90 !important declarations and 10 native-markup :has selectors; these historical budgets did not certify the overrides as required or eliminate directory warnings. The L20 section below records their later removal.
 
 ## Lint remediation (2026-10-06)
 
@@ -2145,6 +2171,18 @@ closing the owning window cancels every pending stage. Unknown endpoint and
 waypoint fields survive selection transforms. The optional stdio MCP has its
 own enforced Node lint scope and accepts the vault's custom configuration folder.
 The oracle runtime requirement follows the repository manifest version.
+
+The standalone CLI shares the MCP runner and board safeguards. Its Node lint
+scope bans own `console` use; Ajv uses `logger: false` and returns structured
+validation errors without global console redirects. Seven existing genuine Node
+builtin imports remain; the type-only stream import now uses the existing
+`ReadLineOptions["input"]` and `write(string)` contract. The CLI adds one `node:fs`
+import for file/stdin input. These imports and the explicit `.obsidian` default
+remain visible in the raw plugin context; current totals require a fresh scan.
+Both root READMEs record those reasons and the saved-hotkey command warning;
+they do not claim scanner zero or Community Directory acceptance. This change
+does not alter plugin UI or source; `main.js` and CSS runtime hashes are expected
+to stay identical, with verification recorded separately in the regression register.
 
 The existing command ID `miro-canvas:m1-commands` is deliberately retained for
 hotkey compatibility. Clipboard menu actions retain the guarded native event

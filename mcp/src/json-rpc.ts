@@ -7,13 +7,10 @@
  * work on one board at once.  Notifications get no answer.
  */
 
-import { createInterface } from "node:readline";
-import type { Readable, Writable } from "node:stream";
-
-import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
+import { createInterface, type ReadLineOptions } from "node:readline";
 
 import type { ToolDefinition } from "./tools";
-import { ToolError } from "./vault";
+import { ToolArgumentsError, ToolRunner } from "./tool-runner";
 
 /** Protocol versions this server speaks, newest first. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26"] as const;
@@ -64,16 +61,11 @@ function isRequestId(value: unknown): value is RequestId {
 
 export class McpServer {
 	private readonly options: McpServerOptions;
-	private readonly tools = new Map<string, ToolDefinition>();
-	private readonly argumentCheckers = new Map<string, ValidateFunction>();
+	private readonly runner: ToolRunner;
 
 	public constructor(options: McpServerOptions) {
 		this.options = options;
-		const ajv = new Ajv2020({ strict: false, allErrors: true, useDefaults: false });
-		for (const tool of options.tools) {
-			this.tools.set(tool.name, tool);
-			this.argumentCheckers.set(tool.name, ajv.compile(tool.inputSchema));
-		}
+		this.runner = new ToolRunner(options.tools);
 	}
 
 	/**
@@ -181,31 +173,11 @@ export class McpServer {
 		if (!isRecord(params) || typeof params.name !== "string") {
 			throw new RpcError(INVALID_PARAMS, "tools/call needs a tool name.");
 		}
-		const tool = this.tools.get(params.name);
-		const checker = this.argumentCheckers.get(params.name);
-		if (tool === undefined || checker === undefined) {
-			throw new RpcError(INVALID_PARAMS, `Unknown tool: ${params.name}`);
-		}
-		const args = params.arguments === undefined ? {} : params.arguments;
-		if (!isRecord(args) || !checker(args)) {
-			const problems = (checker.errors ?? []).map((error) => `${error.instancePath || "arguments"} ${error.message ?? "is invalid"}`);
-			throw new RpcError(INVALID_PARAMS, `Invalid arguments for ${tool.name}: ${problems.join("; ") || "arguments must be an object"}`);
-		}
 		try {
-			const structured = tool.run(args);
-			return {
-				content: [{ type: "text", text: JSON.stringify(structured) }],
-				structuredContent: structured,
-				isError: tool.failed?.(structured) === true,
-			};
+			return this.runner.run(params.name, params.arguments === undefined ? {} : params.arguments);
 		} catch (error) {
-			// A file that cannot be read and a mistake of the server's alike are the call's failure.
-			const code = error instanceof ToolError ? error.code : "internal";
-			const message = error instanceof Error ? error.message : String(error);
-			return {
-				content: [{ type: "text", text: `${code}: ${message}` }],
-				isError: true,
-			};
+			if (error instanceof ToolArgumentsError) throw new RpcError(INVALID_PARAMS, error.message);
+			throw error;
 		}
 	}
 }
@@ -214,7 +186,7 @@ export class McpServer {
  * Serve one client on a pair of streams, line by line, one request at a time.
  * Resolves when the input ends and every answer is written.
  */
-export async function serveLines(server: McpServer, input: Readable, output: Writable): Promise<void> {
+export async function serveLines(server: McpServer, input: ReadLineOptions["input"], output: { write(line: string): unknown }): Promise<void> {
 	const lines = createInterface({ input, crlfDelay: Infinity });
 	for await (const line of lines) {
 		if (line.trim() === "") continue;

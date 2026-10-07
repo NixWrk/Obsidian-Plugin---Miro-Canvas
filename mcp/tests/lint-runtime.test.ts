@@ -21,8 +21,8 @@ async function lint(source: string, module = "server"): Promise<string[]> {
 }
 
 describe("enforced standalone Node lint runtime", () => {
-	it("accepts required Node APIs and exact stderr redirects", async () => {
-		expect(await lint('import { randomBytes } from "node:crypto"; export const id = randomBytes(8); console.log = console.error; console.info = console.error; console.debug = console.error;')).toEqual([]);
+	it("accepts required Node APIs and the explicit config default", async () => {
+		expect(await lint('import { randomBytes } from "node:crypto"; export const id = randomBytes(8);')).toEqual([]);
 		expect(await lint('export const DEFAULT_CONFIG_DIR = ".obsidian";', "vault")).toEqual([]);
 	}, 30000); // Loading the typed ESLint project is slower on a cold Windows CI host.
 
@@ -38,7 +38,8 @@ describe("enforced standalone Node lint runtime", () => {
 		expect(await lint(source)).toContain("mcp-runtime/stdio");
 	});
 
-	it("rejects even exact redirects outside startup", async () => {
+	it("rejects console redirects both at startup and in shared operations", async () => {
+		expect(await lint("console.log = console.error;")).toContain("mcp-runtime/stdio");
 		expect(await lint("console.log = console.error;", "tools-edit")).toContain("mcp-runtime/stdio");
 	});
 
