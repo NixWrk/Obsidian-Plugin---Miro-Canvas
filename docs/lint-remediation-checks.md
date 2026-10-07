@@ -1897,3 +1897,26 @@ claim is made. Interactive terminal TTY rejection remains unexercised; piped
 stdin is checked in real processes. Batch stops on first failure with committed
 prefix retained, and undo exists only in the current process; neither is native
 persistent history. Both READMEs explain remaining warning reasons clearly.
+
+### Release 0.2.9 — bounded stdin portability correction, before edit
+
+GitHub CI 37581276120 passes browser smoke/types/plugin/CSS lint and 2,110 unit
+cases, but the 8 MiB piped stdin case fails with parent spawnSync EPIPE on Linux.
+The same case passes on Windows. CLI inputJson currently uses synchronous
+readSync(0) over the pipe. Node stdin is a stream; repeated synchronous descriptor
+reads do not wait for future pipe chunks. Planned repair is asynchronous stream
+iteration with the same byte bound and Buffer checks, keeping JSON/exit status,
+argument parsing, vault operations, and unchanged input-file/--args behavior.
+The CLI outer main awaits input before opening a vault or performing an edit.
+
+Mandatory checks: exact-limit and one-byte-over input on Windows and Linux CI;
+all CLI and MCP tests, typed Node lint, updated builds, unchanged plugin hashes,
+full CI before creating the tag and exact published file verification. This is
+standalone-only; no src/ or CSS/Android runtime changes. Failure is retained as
+separate CI evidence rather than treated as a passed portability check.
+
+Windows follow-up: async stdin passes all 69 existing CLI cases and 10 MCP stdio
+process tests; added delayed chunks / split UTF-8 filename regression passes.
+Types and enforced Node lint pass. Full Linux CI remains required before tag;
+no plugin runtime source/CSS changes. The fix awaits chunks while bounding total
+bytes, rather than ignoring EPIPE in the test or weakening input-limit checks.

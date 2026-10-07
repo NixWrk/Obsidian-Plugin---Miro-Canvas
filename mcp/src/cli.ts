@@ -1,5 +1,5 @@
 /** One-shot board operations; the plugin never imports or starts this program. */
-import { readFileSync, readSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import packageJson from "../../package.json";
 import { createServerTools } from "./tools-edit";
 import { ToolArgumentsError, ToolRunner, type ToolResult } from "./tool-runner";
@@ -33,7 +33,7 @@ function parseJson(text: string): unknown {
 	}
 }
 
-function inputJson(kind: string | undefined, value: string | undefined): unknown {
+async function inputJson(kind: string | undefined, value: string | undefined): Promise<unknown> {
 	if (kind === undefined) return {};
 	let text: string;
 	if (kind === "--args") {
@@ -43,13 +43,12 @@ function inputJson(kind: string | undefined, value: string | undefined): unknown
 		if (kind === "--input" && statSync(value ?? "").size > MAX_INPUT_BYTES) throw new ToolError("input", "Input exceeds 8 MiB.");
 		if (kind === "--stdin") {
 			const chunks: Buffer[] = [];
-			const buffer = Buffer.alloc(64 * 1024);
 			let bytes = 0;
-			let count: number;
-			while ((count = readSync(0, buffer, 0, buffer.length, null)) > 0) {
-				bytes += count;
+			for await (const chunk of process.stdin) {
+				if (!Buffer.isBuffer(chunk)) throw new ToolError("input", "Stdin must supply bytes.");
+				bytes += chunk.length;
 				if (bytes > MAX_INPUT_BYTES) throw new ToolError("input", "Input exceeds 8 MiB.");
-				chunks.push(Buffer.from(buffer.subarray(0, count)));
+				chunks.push(chunk);
 			}
 			text = Buffer.concat(chunks).toString("utf8");
 		} else text = readFileSync(value ?? "", "utf8");
@@ -86,7 +85,7 @@ function execute(call: Invocation, runner: ToolRunner, revisions: Map<string, st
 	return result;
 }
 
-function main(argv: readonly string[]): unknown {
+async function main(argv: readonly string[]): Promise<unknown> {
 	let vaultPath: string | undefined;
 	let configDir = DEFAULT_CONFIG_DIR;
 	let readOnly = false;
@@ -130,7 +129,7 @@ function main(argv: readonly string[]): unknown {
 		: command === "call" ? positional.length !== 2
 			: command === "batch" ? positional.length !== 1 || inputKind === undefined || inputKind === "--args"
 				: true) throw new ToolError("usage", "Use list, call <tool>, or batch. Use --help for examples.");
-	const data = inputJson(inputKind, inputValue);
+	const data = await inputJson(inputKind, inputValue);
 	const calls = command === "batch" ? (() => {
 		if (!Array.isArray(data) || data.length === 0 || data.length > MAX_BATCH_CALLS) throw new ToolError("input", "Batch must contain 1 to 1000 calls.");
 		return data.map(invocation);
@@ -166,7 +165,7 @@ try {
 	const args = process.argv.slice(2);
 	if (args.length === 1 && args[0] === "--help") output = { help: USAGE };
 	else if (args.length === 1 && args[0] === "--version") output = { version: packageJson.version };
-	else output = main(args);
+	else output = await main(args);
 } catch (error) {
 	process.exitCode = 2;
 	const code = error instanceof ToolError ? error.code : "input";

@@ -1,5 +1,5 @@
 /** Real CLI processes over disposable, project-local vaults; never a person's vault. */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -79,6 +79,36 @@ describe.each(["input", "stdin"])("CLI byte limit through %s", mode => {
 			expect(readFileSync(file)).toEqual(original);
 		}
 	});
+});
+
+it("waits for delayed stdin chunks and preserves a split UTF-8 filename", async () => {
+	const root = makeVault();
+	copyFileSync(path.join(root, "board.canvas"), path.join(root, "Ю.canvas"));
+	const original = readFileSync(path.join(root, "Ю.canvas"));
+	const payload = Buffer.from(JSON.stringify({ path: "Ю.canvas" }));
+	const split = payload.indexOf(Buffer.from("Ю")) + 1;
+	const answer = await new Promise<Answer>((resolve, reject) => {
+		const child = spawn(process.execPath, [executable, "--vault", root, "call", "read_board", "--stdin"], { windowsHide: true });
+		let stdout = "";
+		let stderr = "";
+		const timeout = setTimeout(() => { child.kill(); reject(new Error("Delayed stdin process timed out.")); }, 10000);
+		child.stdout.on("data", (data: Buffer) => { stdout += data.toString("utf8"); });
+		child.stderr.on("data", (data: Buffer) => { stderr += data.toString("utf8"); });
+		child.on("error", reject);
+		child.stdin.on("error", reject);
+		child.on("close", code => {
+			clearTimeout(timeout);
+			if (code !== 0) reject(new Error(`CLI exited ${code}: ${stderr} ${stdout}`));
+			else {
+				try { resolve(JSON.parse(stdout)); } catch (error) { reject(error); }
+			}
+		});
+		child.stdin.write(payload.subarray(0, split));
+		setTimeout(() => child.stdin.end(payload.subarray(split)), 150);
+	});
+	expect(answer.structuredContent.path).toBe("Ю.canvas");
+	expect(answer.isError).toBe(false);
+	expect(readFileSync(path.join(root, "Ю.canvas"))).toEqual(original);
 });
 
 function revision(file: string): string {
