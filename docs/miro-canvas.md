@@ -2258,4 +2258,4 @@ font failure/retry, Undo/Redo, viewport rotation and preserved test boards.
 The coordinated builder/test/browser/Actions updates, development SDK Moment
 override and TypeScript 7 / Node 26 declaration deferrals are recorded in
 [the maintenance report](dependency-maintenance.md). Development requires
-Node 22.12+; standalone CLI/MCP retain their Node 20+ target.
+Node 22.13+; standalone CLI/MCP retain their Node 20+ target.

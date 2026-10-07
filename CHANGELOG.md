@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update development ESLint to 10.12.0 and Node 22 declarations to 22.20.5; development now requires Node 22.13+ on supported lines. Keep the three plugin runtime files unchanged and CLI/MCP downloads on Node 20+; rebuilding the standalone tools changes only unused package metadata. Pin html2canvas-pro 2.5.0: the next two patches declare Node 24 and are deferred.
+
 ## 0.2.10 - 2026-10-07
 
 - Render PDF/PowerPoint pages from an independent board snapshot and pack files in a bundled Web Worker. Keep the working camera, selection and editing available; board switches retain running exports. Stop cancels the job, plugin unload aborts all jobs, and output paths remain tied to the source board. No screen capture or extra window.

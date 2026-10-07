@@ -30,7 +30,7 @@ The following examples use the same files built locally under `mcp/dist/`.
 
 ## Build
 
-Use a supported development Node version (22.12+ on the 22/24/26 lines)
+Use a supported development Node version (22.13+ on the 22/24/26 lines)
 for npm installation, builds and tests. Downloaded/built standalone programs
 continue to target Node 20+; they do not include Vitest or the development SDK.
 
