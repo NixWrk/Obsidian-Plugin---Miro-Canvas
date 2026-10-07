@@ -2155,6 +2155,34 @@ cross-platform browser export and official lint checks.
 
 PDF/PPTX use bundled html2canvas-pro on Windows and Android. Pages are tiled at a fixed output scale, independent of device pixel ratio, up to 3000 pixels on the long side. SVG styles and viewports preserve native edges and plugin connectors. Camera and progress UI are restored on success, cancellation or failure. Attachments are written using Obsidian’s file manager and Vault.createBinary with unique names. Live web embeds and video are omitted. Official Obsidian lint rules run in CI and release jobs.
 
+## Independent export (0.2.10)
+
+The historical live-camera capture above is superseded. Export freezes a board
+document, page geometry, resolved theme and source attachment path, creates an
+unregistered/inert native Canvas view outside the viewport, and renders only
+that owned surface. Its requestSave/saveLocalData are disabled; it never opens
+a workspace leaf or binds global keys. A separate M1 renderer applies the same
+shapes, native fills, source decorations and connector geometry to the copy.
+SVG marker IDs belong to each connector layer so two views cannot borrow each
+other's arrowheads. The working board is never deselected, hidden or moved.
+
+The PDF/PPTX packer runs in a browser Worker built from the reviewed pure
+export-files modules and embedded in main.js. There is no extra install, network
+module, OS process or window. Worker readiness precedes transferring dedicated
+page buffers. Stop terminates packing or aborts rendering; all owned DOM,
+listeners, object URLs and workers are released. Plugin unload aborts its job
+registry; switching a board disposes its UI while the independent job continues.
+Saving uses the source path captured at job start. Once Vault.createBinary has
+begun, its write is the commit boundary and is not deleted on a later Stop.
+
+Packing input is bounded to 200 pages and 128 MiB of JPEG bytes on desktop /
+64 MiB on mobile; the packing watchdog is 60 seconds. Android may suspend the
+app itself in the background; no screen activation is used to bypass that.
+Native checks: check-independent-export.mjs observes Windows/Android jobs without
+screenshots, activation or touch; check-export-concurrency.mjs uses trusted mouse
+input in the hidden Windows vault to move/pan during success, Stop, save failure
+and a board switch, verifying snapshot geometry and retaining later user work.
+
 ## Export page gestures (0.2.5)
 
 Export-page tabs and resize corners belong to PANEL_SELECTOR so rectangle selection, drawing and tool drops cannot claim their pointer gestures. The interior is deliberately excluded and remains native board content. Regression checks cover event ownership and real mouse input at non-default zoom, preview without persistence, unchanged native nodes/edges, free resizing, fixed paper ratio and reopening page metadata.

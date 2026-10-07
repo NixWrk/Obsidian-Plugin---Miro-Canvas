@@ -5,30 +5,77 @@ import { fileURLToPath } from "node:url";
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
+export const workerInjection = path.join(rootDir, "__miro-export-worker-source__.js");
+const workerInputs = new Set([
+  "src/export-worker.ts",
+  "src/export-worker-protocol.ts",
+  "src/export-files.ts",
+].map((file) => path.join(rootDir, file)));
 
-const context = await esbuild.context({
-  entryPoints: [path.join(rootDir, "src", "main.ts")],
-  outfile: path.join(rootDir, "main.js"),
-  bundle: true,
-  platform: "browser",
-  format: "cjs",
-  target: "es2020",
-  external: ["obsidian", "electron"],
-  sourcemap: production ? false : "inline",
-  minify: production,
-  logLevel: "info"
-});
+// Bundle a reviewed worker entry at build time, including its watch dependencies.
+export const exportWorkerPlugin = {
+  name: "miro-export-worker",
+  setup(build) {
+    build.onResolve({ filter: /__miro-export-worker-source__\.js$/ }, () => ({
+      path: workerInjection,
+      namespace: "miro-export-worker",
+    }));
+    build.onLoad({ filter: /.*/, namespace: "miro-export-worker" }, async () => {
+      const worker = await esbuild.build({
+        absWorkingDir: rootDir,
+        entryPoints: [path.join(rootDir, "src", "export-worker.ts")],
+        bundle: true,
+        platform: "browser",
+        format: "iife",
+        target: "es2020",
+        write: false,
+        metafile: true,
+        sourcemap: false,
+        minify: production,
+        logLevel: "silent",
+      });
+      const inputs = Object.keys(worker.metafile.inputs).map((file) => path.resolve(rootDir, file));
+      if (inputs.some((file) => !workerInputs.has(file))
+        || Object.values(worker.metafile.outputs).some((output) => output.imports.length > 0)) {
+        throw new Error("Export worker must contain only the reviewed local packing modules.");
+      }
+      return {
+        contents: `export const __MIRO_EXPORT_WORKER_SOURCE__ = ${JSON.stringify(worker.outputFiles[0].text)};`,
+        loader: "js",
+        watchFiles: inputs,
+      };
+    });
+  },
+};
 
-if (watch) {
-  await context.watch();
-  console.log("[miro-canvas] watching for changes");
+// Importing the build hooks for verification never writes main.js.
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  const context = await esbuild.context({
+    entryPoints: [path.join(rootDir, "src", "main.ts")],
+    outfile: path.join(rootDir, "main.js"),
+    bundle: true,
+    platform: "browser",
+    format: "cjs",
+    target: "es2020",
+    external: ["obsidian", "electron"],
+    inject: [workerInjection],
+    plugins: [exportWorkerPlugin],
+    sourcemap: production ? false : "inline",
+    minify: production,
+    logLevel: "info"
+  });
 
-  const dispose = async () => {
+  if (watch) {
+    await context.watch();
+    console.log("[miro-canvas] watching for changes");
+
+    const dispose = async () => {
+      await context.dispose();
+    };
+    process.once("SIGINT", dispose);
+    process.once("SIGTERM", dispose);
+  } else {
+    await context.rebuild();
     await context.dispose();
-  };
-  process.once("SIGINT", dispose);
-  process.once("SIGTERM", dispose);
-} else {
-  await context.rebuild();
-  await context.dispose();
+  }
 }

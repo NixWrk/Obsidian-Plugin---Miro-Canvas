@@ -152,7 +152,7 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
   readonly render: (patch?: Partial<ExportPanelState>) => void;
 } {
   const calls: Record<string, unknown[]> = {
-    format: [], quality: [], addPage: [], addFramePages: [], removePage: [], movePage: [], showPage: [], exportKind: [], close: [],
+    format: [], quality: [], addPage: [], addFramePages: [], removePage: [], movePage: [], showPage: [], exportKind: [], close: [], stop: [],
   };
   const actions: ExportPanelActions = {
     onFormat: (format, orientation) => calls.format.push([format, orientation]),
@@ -164,6 +164,7 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
     onShowPage: (id) => calls.showPage.push(id),
     onExport: (kind) => calls.exportKind.push(kind),
     onClose: () => calls.close.push(true),
+    onStop: () => calls.stop.push(true),
   };
   const panel = new ExportPanel(new FakeDocument() as unknown as Document, actions);
   const root = panel.element as unknown as FakeElement;
@@ -174,6 +175,19 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
 }
 
 describe("ExportPanel", () => {
+  it("keeps Stop and Close available in the existing panel while export runs", () => {
+    const { root, calls, render } = buildPanel({ busy: "Rendering pages" });
+    const stop = byLabel(root, words().export.stop);
+    expect(stop.disabled).toBe(false);
+    stop.dispatch("click");
+    byLabel(root, words().export.close).dispatch("click");
+    expect(calls.stop).toHaveLength(1);
+    expect(calls.close).toHaveLength(1);
+    expect(byLabel(root, words().export.exportPdf).disabled).toBe(true);
+    render({ busy: undefined });
+    expect(byLabelAll(root, words().export.stop)).toHaveLength(0);
+  });
+
   it("explains page placement only when the page bounds can be edited", () => {
     const { root, render } = buildPanel();
     expect(texts(root, "miro-canvas-export__layout-hint")).toHaveLength(1);

@@ -5,7 +5,7 @@ import { DocumentControls } from "../src/document-controls";
 import { PanelArrangeMode } from "../src/panel-arrange";
 import { PanelVisibility } from "../src/panel-visibility";
 import { SlideShow } from "../src/slide-show";
-import { ExportPanel, ExportOverlay, capturePages } from "../src/board-export";
+import { ExportPanel, ExportOverlay, renderExportPages } from "../src/board-export";
 import { DEFAULT_EXPORT_STATE } from "../src/export-pages";
 import { ALL_TOOLBAR_ITEMS } from "../src/quick-tools";
 import { words } from "../src/i18n";
@@ -371,16 +371,18 @@ describe.each([false, true])("leased controls use the injected document (owner h
     panel.dispose();
   });
 
-  it.each(["success", "stop", "failure"])("captures with owner canvas and restores progress/camera on %s", async mode => {
+  it.each(["success", "stop", "failure"])("renders the owned background canvas and cleans up on %s", async mode => {
     const { document, root } = fixture(helper);
+    root.setAttribute("data-miro-canvas-export-renderer", "true");
+    const controller = new AbortController();
     const canvas = { x: 17, y: 29, tx: 17, ty: 29, zoom: -1, tZoom: -1, screenshotting: false,
       wrapperEl: root as unknown as HTMLElement, deselectAll: vi.fn(), requestFrame: vi.fn(), setViewport: vi.fn() };
     if (mode === "stop") renderer.render.mockImplementationOnce(() => {
-      byLabel(document.body, words().export.stop).fire("click");
+      controller.abort();
       return Promise.resolve({ width: 1000, height: 800 });
     });
     if (mode === "failure") renderer.render.mockRejectedValueOnce(new Error("paint failed"));
-    const result = capturePages(canvas, [{ x: 0, y: 0, width: 500, height: 400 }], "standard", () => true);
+    const result = renderExportPages(canvas, [{ x: 0, y: 0, width: 500, height: 400 }], "standard", () => true, controller.signal);
     if (mode === "success") expect(await result).toHaveLength(1);
     else await expect(result).rejects.toThrow(mode === "stop" ? words().export.exportStopped : "paint failed");
     requireOwnerPath(document, helper);

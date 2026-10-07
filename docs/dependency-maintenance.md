@@ -147,3 +147,28 @@ is not a passed export gate. The owner's subsequent requirement supersedes this
 capture architecture: exports must run independently without screen capture,
 foreground changes or manipulating the working board. Release 0.2.10 remains
 unpublished until that behavior and its concurrency checks pass.
+
+## Independent export acceptance
+
+The export now owns an inert, unregistered native Canvas copy and a compiled
+browser Worker for PDF/PPTX packing. It never captures a screen, activates a
+window, changes the working camera/selection or restores over later user work.
+Board switches retain the job; Stop and plugin unload abort owned work. Output
+attachment lookup uses the original source path. SVG marker namespaces prevent
+two copies of a board borrowing each other's caps. Worker input bounds are
+128 MiB desktop / 64 MiB mobile, 200 pages, with a 60-second packing watchdog;
+oversize input produces a localized instruction to reduce pages/quality.
+
+Real Windows and SM-X736B produce PDF/PPTX with unchanged view samples and
+clean worker/DOM teardown. Hidden Windows also passes real drag/pan during
+success, Stop, save failure and board switch, preserving snapshot geometry.
+Generated PDF content is visually inspected by rendering the saved artifact;
+no OS screenshot is involved. The SM-A336E legacy phone disconnected before
+the new export check; its old-theme evidence is not reused as export evidence.
+Only the tablet is currently connected. The register records exact scope and
+earlier failures, including the obsolete phone live-capture timeout.
+
+130 unit files / 2,157 cases pass, with one existing optional skip. New worker
+tests verify bundle isolation and watch inputs. Current type/plugin/CSS lint
+and all three smoke modes pass. Fresh PR/main CI and five published-asset
+verification are still required before publication is complete.

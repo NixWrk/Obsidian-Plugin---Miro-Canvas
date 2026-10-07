@@ -128,6 +128,7 @@ function isNativeCanvasView(view: unknown): boolean {
 export default class MiroCanvasPlugin extends Plugin {
   private statusBarItem: HTMLElement | null = null;
   private shellDisposed = false;
+  private readonly exportJobs = new Set<AbortController>();
   private advancedInspection: AdvancedCanvasInspection | null = null;
   private canvasInspection: CanvasSessionInspection | null = null;
   private metadataStoreProbe: ObsidianMetadataStoreProbe | null = null;
@@ -515,8 +516,11 @@ export default class MiroCanvasPlugin extends Plugin {
       onStateChange: () => this.updateStatus(true),
       setIcon: (element, icon) => setIcon(element, icon),
       onOpenSettings: () => this.openOwnSettings(),
-      onSaveExport: async (name, bytes) => {
-        const sourcePath = view instanceof obsidian.FileView ? view.file?.path : undefined;
+      onExportJob: (controller) => {
+        this.exportJobs.add(controller);
+        return () => this.exportJobs.delete(controller);
+      },
+      onSaveExport: async (name, bytes, sourcePath) => {
         const path = await this.app.fileManager.getAvailablePathForAttachment(name, sourcePath);
         await this.app.vault.createBinary(path, bytes.slice().buffer);
         return path;
@@ -1202,6 +1206,8 @@ export default class MiroCanvasPlugin extends Plugin {
     }
 
     this.shellDisposed = true;
+    for (const controller of this.exportJobs) controller.abort();
+    this.exportJobs.clear();
     if (this.initializationRetry !== null) this.initializationTimerHost.clearTimeout(this.initializationRetry);
     this.initializationRetry = null;
     this.toolsModal?.close();

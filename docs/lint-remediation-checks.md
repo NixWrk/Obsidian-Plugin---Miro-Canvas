@@ -1993,6 +1993,51 @@ resources and never undo later user work. Keep progress/Stop available without
 covering the board. No Page.bringToFront, OS screenshots or native-window
 activation in export/test paths. These new gates are pending; release withheld.
 
+Independent renderer trace found ConnectorLayer's marker IDs depend only on
+the connector ID. A second view of the same board in one document can therefore
+resolve its SVG url(#...) to the live board's marker. Before changing: assign
+each layer a unique marker namespace, preserving connector records and cap
+geometry. Mandatory check: two layers with the same connector ID/different
+colors resolve distinct markers; redraw/move keeps its own reference. Include
+same-board/background-export arrowheads in the native export regression.
+
+The new abortable font/frame wait raised prefer-promise-reject-errors because
+an underlying Promise can reject with an arbitrary value. Before fixing:
+preserve Error instances and map non-Error rejection to the existing localized
+export failure. Mandatory checks: font wait rejection/abort, raster cancellation
+and lint returning to the sole retained legacy command-ID advisory.
+
+Independent export evidence: real browser Workers produce both PDF and PPTX
+in hidden Windows Obsidian 1.14.4 and physical SM-X736B / Android 16 / Obsidian
+1.13.8. Initial receipts sampled the working view 67 and 337 times throughout
+render/packing: active file, selection, x/y/zoom, screenshotting flag and classes
+remain unchanged; original file bytes and worker/DOM cleanup pass. Android
+checks use no ADB input, foreground activation, screenshots or test-board switch.
+SM-A336E is no longer connected; its new export check is pending (legacy 1.12.7,
+below the supported minimum). Its earlier theme checks remain separate evidence.
+
+Hidden Windows concurrency passes real CDP card drag and middle-button pan
+at 50% zoom during success, Stop, controlled save failure and board switch.
+The independent copy retains initial node geometry; success/Stop/error never
+restore the camera or undo later user changes. Board switch completes the job
+using its original source path. Four cases sample 70/21/71/71 frames and leave
+zero renderer surfaces/jobs. No screen capture or window activation. A generated
+PDF is rendered as a local artifact for inspection: heading/bold text, a colored
+rhombus and native arrow are present; this is not a capture of the user's screen.
+Receipts: .out/dependabot-maintenance/{windows,android}/independent-export*.json
+and .out/export-concurrency.json. Initial checker failure read native data after
+its owned view was disposed; final checks retain the geometry sampled while
+rendering instead of treating disposed model contents as the export snapshot.
+
+Unit checks cover live-surface refusal, cancellation while fonts/raster wait,
+non-Error font rejection, owned view lifecycle/factory failures, Stop availability,
+plugin-wide job abort, same-board SVG marker separation, worker/direct PDF/PPTX
+equivalence, transferred buffer offsets, limits, startup/error/timeout/abort cleanup
+and build/watch injection. 130 files / 2,157 tests pass, one existing skip.
+Types/plugin lint/CSS lint and all three synthetic smoke modes pass; the sole
+legacy command-ID advisory remains. Final asset deployment/CI gates are tracked
+in dependency-maintenance.md. Obsolete live-capture receipts are historical.
+
 ### Release 0.2.9 — bounded stdin portability correction, before edit
 
 GitHub CI 37581276120 passes browser smoke/types/plugin/CSS lint and 2,110 unit

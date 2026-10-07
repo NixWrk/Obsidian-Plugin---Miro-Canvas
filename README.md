@@ -477,7 +477,14 @@ Each PDF page and PowerPoint slide contains an **image of the board**.
 Card text and shapes are not separate editable slide objects. Files are saved
 in the vault using Obsidian’s attachment location with unique filenames.
 Live web embeds and video are omitted. Standard quality uses 2000 pixels on
-the long side, high quality 3000. Stop cancels export and restores the view.
+the long side, high quality 3000.
+
+Export renders a separate board snapshot in the background and packs the file
+in a Web Worker. Your camera, selection and working board stay available; you
+can move cards, pan or open another board while it runs. **Stop** in the export
+panel cancels the job and removes its background resources. Disabling the
+plugin stops its jobs. The output uses the attachment location of the source
+board at export start. The plugin opens no extra window and captures no screen.
 
 ## Bring boards from Miro and other plugins
 
