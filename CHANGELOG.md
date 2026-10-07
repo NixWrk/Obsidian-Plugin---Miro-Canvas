@@ -4,6 +4,7 @@
 
 ## 0.2.10 - 2026-10-07
 
+- Keep board panels, default cards and their editing frames consistent when the board and Obsidian use opposite light/dark themes. Carry the board scheme into export and progress panels. Theme checks now reject white controls on a dark board and inspect actual colors while reading and editing on Windows and physical Android devices.
 - Update the build and test toolchain together to esbuild 0.28.2 and Vitest 5.0.3, and browser checks to Playwright 1.63.0. Keep all existing behavior assertions.
 - Use patched Moment 2.31.0 for the development SDK dependency, removing the remaining known npm audit advisories. This does not replace Obsidian's own runtime libraries.
 - Update pinned GitHub Actions for Node/Python setup and release provenance. Group related Dependabot updates; defer incompatible TypeScript and Node declaration major upgrades with documented reasons.

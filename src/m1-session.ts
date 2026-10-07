@@ -1471,6 +1471,7 @@ export class M1CanvasSession {
 	}>();
 	private readonly domIdentity = new WeakMap<object, number>();
 	private themeRootSnapshot: ThemeRootSnapshot | undefined;
+	private lastEditorTheme: string | undefined;
 	private root: HTMLElement | undefined;
 	private mounted = false;
 	private disposed = false;
@@ -6315,6 +6316,8 @@ export class M1CanvasSession {
 		});
 		root.appendChild(overlay.element);
 		document.body.appendChild(panel.element);
+		panel.element.classList.add("miro-canvas-theme-surface");
+		panel.element.setAttribute("data-miro-canvas-resolved-theme", root.getAttribute("data-miro-canvas-resolved-theme") ?? "light");
 		this.exporting = { mode: deckId === undefined ? "board" : "slides", title, state, panel, overlay, stop: false };
 		this.renderExport();
 	}
@@ -8333,8 +8336,8 @@ export class M1CanvasSession {
 	/**
 	 * Decorate exactly the shells a mutation batch added: nodes with a
 	 * persisted override, and nodes this session already tracks for editor
-	 * cleanup.  A plain card with no override is never touched, so it stays
-	 * exactly native.  "Everything" instead runs the full, exact refresh path.
+	 * cleanup, plus an unstyled card entering its editor. "Everything" instead
+	 * runs the full, exact refresh path.
 	 */
 	private runAppearanceMutationPass(): void {
 		const everything = this.pendingAppearanceEverything;
@@ -8367,7 +8370,7 @@ export class M1CanvasSession {
 			}
 			const id = readCanvasElementId(node);
 			const hasOverride = id !== undefined && this.appearance.localOverrides[id] !== undefined;
-			if (hasOverride || this.editorAppearanceDom.has(shell)) {
+			if (hasOverride || this.editorAppearanceDom.has(shell) || readRuntime(node, "isEditing") === true) {
 				this.decorateNodeAppearance(node, sourceScene);
 			}
 		}
@@ -8395,7 +8398,12 @@ export class M1CanvasSession {
 			this.editorAppearanceDom.delete(dom);
 			return;
 		}
-		const rules = buildEditorAppearanceRules(typography, colors);
+		const boardTheme = this.root?.getAttribute("data-miro-canvas-resolved-theme");
+		const bodyClasses = ownerDocument(this.root)?.body?.classList;
+		const oppositeTheme = boardTheme === "dark" && bodyClasses?.contains("theme-light")
+			? "dark"
+			: boardTheme === "light" && bodyClasses?.contains("theme-dark") ? "light" : undefined;
+		const rules = buildEditorAppearanceRules(typography, colors, oppositeTheme);
 		if (rules.length === 0 && !this.editorAppearanceFrames.has(frame)) {
 			// Never decorated: a card with no override stays exactly native.
 			return;
@@ -8967,9 +8975,25 @@ export class M1CanvasSession {
 		writeAttribute(this.root, "data-miro-canvas-resolved-theme", resolved);
 		writeAttribute(this.controls.element, "data-miro-canvas-theme", normalized);
 		writeAttribute(this.controls.element, "data-miro-canvas-resolved-theme", resolved);
+		if (this.exporting !== undefined) {
+			writeAttribute(this.exporting.panel.element, "data-miro-canvas-resolved-theme", resolved);
+		}
 		this.setTrackedStyle(this.root, "color-scheme", resolved, this.themeRootSnapshot.styles);
 		this.setTrackedStyle(this.root, "background-color", resolved === "dark" ? "#1e1e1e" : "#ffffff", this.themeRootSnapshot.styles);
 		this.setTrackedStyle(this.root, "color", resolved === "dark" ? "#dedede" : "#1e1e1e", this.themeRootSnapshot.styles);
+		const bodyTheme = ownerDocument(this.root)?.body?.classList?.contains?.("theme-dark") === true ? "dark" : "light";
+		const editorTheme = `${resolved}|${bodyTheme}`;
+		if (this.lastEditorTheme !== editorTheme) {
+			this.lastEditorTheme = editorTheme;
+			for (const node of this.scene.nodes) {
+				if (readRuntime(node, "isEditing") !== true) continue;
+				const dom = readCanvasElementDom(node);
+				const id = readCanvasElementId(node);
+				if (dom === undefined || id === undefined) continue;
+				const override = this.appearance.localOverrides[id];
+				this.refreshEditorAppearance(node, dom, override?.typography, override?.colors);
+			}
+		}
 	}
 
 	private restoreThemeRoot(): void {

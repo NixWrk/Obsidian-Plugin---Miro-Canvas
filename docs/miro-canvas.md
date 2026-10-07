@@ -15,6 +15,15 @@ from the plugin.
 
 ## Current implementation status
 
+Opposite board/application color schemes use a scoped neutral palette for
+panels and default native cards. Body-hosted export/progress portals carry the
+owning board's resolved scheme. Default-card editor iframes receive reversible
+appearance rules only for a scheme mismatch; explicit card colors take priority.
+The mutation pass includes unstyled cards entering editing, and an existing
+editor updates when either scheme changes. Matching custom application themes
+keep their palette. check-theme.mjs verifies actual computed colors and rejects
+an intentionally white toolbar on a dark board in real Windows/Android apps.
+
 Owned toolbar, handle and thread hidden states use scoped rules after their
 component display rules. Comment outside-close listens in the owning window
 capture phase, before selection/drawing consumes the press, and stays scoped

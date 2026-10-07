@@ -342,6 +342,11 @@ Settings also cover board theme, zoom limits and steps, wheel behaviour,
 snapping, the minimap and attachment names. The interface follows Obsidian's
 language, with English and Russian available.
 
+The board theme covers its controls, default cards and their editors, search
+and export panels. Obsidian outside the board keeps its own theme. When both
+schemes match, the board keeps the installed Obsidian theme's colors; an
+opposite board scheme uses a local neutral palette. Explicit card colors stay.
+
 In **Arrange panels**, drag the minimap’s corner to resize it. The size is
 saved separately for each device.
 

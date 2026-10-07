@@ -10,6 +10,7 @@ class Element {
   public className = "";
   public textContent = "";
   public type = "";
+  public attributes = new Map<string, string>();
   public readonly classes = new Set<string>();
   public readonly classList = {
     add: (...names: string[]) => names.forEach(name => this.classes.add(name)),
@@ -19,7 +20,8 @@ class Element {
   append(...elements: Element[]) { elements.forEach(element => { element.parent = this; this.children.push(element); }); }
   appendChild(element: Element) { this.append(element); return element; }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); }
-  setAttribute() {}
+  setAttribute(name: string, value: string) { this.attributes.set(name, value); }
+  getAttribute(name: string) { return this.attributes.get(name) ?? null; }
   addEventListener() {}
   querySelectorAll() { return []; }
   getBoundingClientRect() { return { width: 1000, height: 800 }; }
@@ -66,6 +68,19 @@ beforeEach(() => {
 });
 
 describe("browser export", () => {
+  it.each(["light", "dark"])("keeps the %s board scheme on the body progress portal and removes it on cancellation", async (theme) => {
+    const fixture = board();
+    fixture.wrapper.setAttribute("data-miro-canvas-resolved-theme", theme);
+    fixture.document.body.setAttribute("data-miro-canvas-resolved-theme", theme === "dark" ? "light" : "dark");
+    await expect(capturePages(fixture.canvas, [{ x: 0, y: 0, width: 500, height: 400 }], "standard", () => {
+      const status = fixture.document.body.children[0]!;
+      expect(status.getAttribute("data-miro-canvas-resolved-theme")).toBe(theme);
+      expect(fixture.document.body.getAttribute("data-miro-canvas-resolved-theme")).not.toBe(theme);
+      return false;
+    })).rejects.toThrow();
+    restored(fixture);
+  });
+
   it("renders multiple pages with explicit pixel scale and restores the board", async () => {
     const fixture = board();
     const progress = vi.fn(() => true);

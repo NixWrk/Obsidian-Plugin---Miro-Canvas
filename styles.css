@@ -19,6 +19,64 @@
   color-scheme: light;
 }
 
+/* A board may use the opposite scheme to the app. Body variables have already
+   resolved there, so its panels and native cards need a local neutral palette.
+   Matching schemes keep the person's Obsidian theme and custom colors. */
+.theme-light :is(.miro-canvas-root, .miro-canvas-theme-surface)[data-miro-canvas-resolved-theme="dark"] {
+  color-scheme: dark;
+  --miro-board-surface: #1e1e1e;
+  --miro-board-surface-alt: #232323;
+  --miro-board-secondary: #282828;
+  --miro-board-border: #444444;
+  --miro-board-border-hover: #555555;
+  --miro-board-text: #dedede;
+  --miro-board-muted: #b3b3b3;
+  --miro-board-faint: #999999;
+  --miro-board-hover: rgb(255 255 255 / 7%);
+}
+
+.theme-dark :is(.miro-canvas-root, .miro-canvas-theme-surface)[data-miro-canvas-resolved-theme="light"] {
+  color-scheme: light;
+  --miro-board-surface: #ffffff;
+  --miro-board-surface-alt: #fafafa;
+  --miro-board-secondary: #f6f6f6;
+  --miro-board-border: #dadada;
+  --miro-board-border-hover: #bdbdbd;
+  --miro-board-text: #222222;
+  --miro-board-muted: #5c5c5c;
+  --miro-board-faint: #707070;
+  --miro-board-hover: rgb(0 0 0 / 7%);
+}
+
+.theme-light :is(.miro-canvas-root, .miro-canvas-theme-surface)[data-miro-canvas-resolved-theme="dark"],
+.theme-dark :is(.miro-canvas-root, .miro-canvas-theme-surface)[data-miro-canvas-resolved-theme="light"] {
+  --background-primary: var(--miro-board-surface);
+  --background-primary-alt: var(--miro-board-surface-alt);
+  --background-secondary: var(--miro-board-secondary);
+  --background-secondary-alt: var(--miro-board-surface-alt);
+  --background-modifier-border: var(--miro-board-border);
+  --background-modifier-border-hover: var(--miro-board-border-hover);
+  --background-modifier-border-focus: var(--miro-board-border-hover);
+  --background-modifier-hover: var(--miro-board-hover);
+  --background-modifier-form-field: var(--miro-board-surface);
+  --background-modifier-form-field-hover: var(--miro-board-surface-alt);
+  --text-normal: var(--miro-board-text);
+  --text-muted: var(--miro-board-muted);
+  --text-faint: var(--miro-board-faint);
+  --interactive-normal: var(--miro-board-surface);
+  --interactive-hover: var(--miro-board-surface-alt);
+  --canvas-background: var(--miro-board-surface);
+  --canvas-card-label-color: var(--miro-board-faint);
+  --canvas-dot-pattern: var(--miro-board-border);
+  --input-placeholder-color: var(--miro-board-faint);
+  --code-background: var(--miro-board-surface-alt);
+  --code-normal: var(--miro-board-text);
+  --code-comment: var(--miro-board-faint);
+  --code-punctuation: var(--miro-board-muted);
+  --table-border-color: var(--miro-board-border);
+  --table-header-color: var(--miro-board-text);
+}
+
 /* Where a card's text sits between its top and bottom edges.  Native Canvas
    stretches the preview's sizer over the whole card, which keeps the text at
    the top whatever is chosen, so a card set to the middle or the bottom lets

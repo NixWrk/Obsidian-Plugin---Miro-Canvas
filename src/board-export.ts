@@ -387,7 +387,11 @@ export async function capturePages(
   if (view === null) throw new Error(words().export.unavailable);
   const saved = { x: canvas.x, y: canvas.y, zoom: canvas.zoom, screenshotting: canvas.screenshotting };
   const status = createHtmlElement(document, "div");
-  status.className = "miro-canvas-export-progress";
+  status.className = "miro-canvas-export-progress miro-canvas-theme-surface";
+  const boardTheme = wrapper.getAttribute("data-miro-canvas-resolved-theme");
+  if (boardTheme === "dark" || boardTheme === "light") {
+    status.setAttribute("data-miro-canvas-resolved-theme", boardTheme);
+  }
   status.setAttribute("role", "status");
   const label = createHtmlElement(document, "span");
   const stop = createHtmlElement(document, "button");

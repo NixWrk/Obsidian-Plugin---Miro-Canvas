@@ -106,3 +106,44 @@ runs will be checked in fresh CI. Provenance v4.2.2 will execute in the genuine
 Monthly related version updates are grouped. TypeScript/Node declaration major
 proposals are deferred explicitly, while compatible updates remain enabled;
 security alert settings are independent and were not changed by this patch.
+
+## Theme follow-up before release
+
+The owner's Android observation revealed that previous dark/light checks did
+not assert the whole board palette. Fix the board/app scheme mismatch for
+panels/default cards, body-hosted export/progress portals and unstyled editor
+iframes. Matching custom Obsidian themes retain their own palette; explicit
+card colors remain dominant. This changes plugin source/CSS and supersedes the
+toolchain-only artifact hashes above. Trace and mandatory checks were recorded
+before each repair in lint-remediation-checks.md.
+
+The final Windows-built main is
+d53c9c86b9e493ea239f48d33ebecf6f9cfbd29298f23300d1681fbfa94120b4;
+CRLF CSS is a0b7fcfa81f2f872296309cbb9e580777ef1340737c98f28455a69686330c163.
+check-theme passes eight combinations on hidden Windows SDK 1.14.4, physical
+SM-X736B / Android 16 / Obsidian 1.13.8 and physical SM-A336E / Android 14 /
+Obsidian 1.12.7 (legacy-only). Includes actual card entry/exit, negative white
+toolbar detection, live editor switching, explicit editor colors, unload/reload
+and exact original board/config/settings restoration. Touch evidence is real
+ADB; media preferences and live editor color setup are separately labeled CDP
+instrumentation. The initial genuine white editor failure is retained.
+
+All 128 unit files / 2,116 tests pass, with one existing optional skip. Types,
+plugin/CSS lint, three synthetic smoke modes and 33 oracle tests pass. The
+remaining legacy command-ID warning is unchanged. See
+[the full Advanced Canvas comparison](advanced-canvas-comparison.md): preserving
+imported fields is distinguished from implementing their runtime behavior.
+PR #7 (TypeScript 7) and #8 (Node 26 declarations) were closed with the concrete
+compatibility reasons and a link to coordinated PR #11. Compatible proposals
+#1/#2/#3/#6/#9/#10 remain covered by #11 until its successful merge.
+
+Final capture/native matrix receipts, fresh CI and publication are required
+before calling release 0.2.10 complete.
+
+Final Windows native matrices and selection chains pass on the new assets.
+Tablet PDF/Stop/forced-save-failure and dark progress palette pass. The phone
+follow-up fails its bounded wait for a saved PDF; that receipt is retained and
+is not a passed export gate. The owner's subsequent requirement supersedes this
+capture architecture: exports must run independently without screen capture,
+foreground changes or manipulating the working board. Release 0.2.10 remains
+unpublished until that behavior and its concurrency checks pass.

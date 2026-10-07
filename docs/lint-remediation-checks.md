@@ -1898,6 +1898,101 @@ stdin is checked in real processes. Batch stops on first failure with committed
 prefix retained, and undo exists only in the current process; neither is native
 persistent history. Both READMEs explain remaining warning reasons clearly.
 
+### Board theme consistency — 2026-10-07, traced before edit
+
+User reported Android checks passing with white controls around a dark board.
+M1CanvasSession.applyTheme sets the board background, text and color-scheme;
+styles.css resolves dock, toolbar, search, export, thread and default native
+card surfaces from inherited Obsidian semantic variables. Those variables are
+already resolved on body: changing the board background does not change them.
+The design explicitly allows the board theme to differ from the application.
+The existing card-fill check asserts explicit colored cards, and most runners
+request application themes without asserting a complete board palette.
+
+Affected actions: choose light/dark/system in the board menu, change the
+application theme, open another board, select/edit a default card, open board
+menus/search/export, reload or disable the plugin. Mandatory regression:
+all application/board light-dark combinations, OS preference for system,
+computed surface/text colors for board, default card, toolbar and dock,
+selection/edit controls and open panels; explicit user colors stay unchanged;
+application chrome/theme and original board bytes/settings restore exactly.
+An intentionally white toolbar on a dark board must fail the new oracle.
+Run in hidden Windows Obsidian 1.14.4 and physical MiroCanvasTest devices
+SM-X736B / Obsidian 1.13.8 and SM-A336E / 1.12.7 (legacy-only).
+Record ADB taps separately from CDP setup/computed-style observations.
+All new checks remain pending until evidence is recorded below.
+
+The first complete palette run additionally caught the export panel: openExport
+appends it to the owning document body to escape the board clipping rectangle.
+Keep that placement; propagate the resolved board scheme to this owned portal
+on creation and later theme changes. Capture progress is also checked for its
+owner/placement. Mandatory checks include export open/close and capture/Stop
+under opposite schemes, avoiding any global body theme mutation.
+
+Real SM-X736B editor follow-up exposed another boundary: a default card's
+same-origin iframe remains white with rgb(34,34,34) text on a dark board.
+applyEditorAppearance currently skips unstyled cards, while iframe CSS comes
+from the application theme. Before changing: extend the existing reversible
+editor stylesheet only for a board/app scheme mismatch; keep explicit card
+text colors/typography dominant and leave matching custom themes native.
+Mandatory checks: actual entry/exit of default-card editing for all theme
+combinations on Windows/tablet/phone, frame background/text contrast, theme
+switch while editing, explicit color overrides and removal of the owned
+stylesheet on unload. Retain the failing tablet receipt separately.
+
+Final theme evidence: check-theme.mjs passes eight app/board combinations in
+Windows Obsidian SDK 1.14.4 (hidden/unfocused), SM-X736B / Android 16 / Obsidian
+1.13.8 and SM-A336E / Android 14 / Obsidian 1.12.7 (legacy-only). ADB touch
+selects themes/cards and enters/leaves editing; Windows uses trusted background
+CDP mouse input. Computed styles are observed in the actual app documents.
+System preference dark/light is CDP media emulation, not a physical OS-setting
+change. Every combination checks board, toolbar, dock, default card, selected
+card toolbar, editor iframe, board menu, search and body-hosted export panel.
+The oracle deliberately paints a real toolbar white and must reject that state.
+The OS keyboard may intentionally hide the tool/dock bars; their computed
+colors still must pass, and visible card/menu/search/export roots are required.
+The runner confirms the OS input method before sending Back, so a stale keyboard
+layout marker does not navigate away from the fixture.
+
+Live-editor scheme switching, explicit text/fill priority and active-frame
+stylesheet removal on plugin disable also pass on all three hosts. Scheme
+switches/explicit color setup use native session/writer calls over CDP, recorded
+separately from ADB taps. Original board bytes/path, application config bytes,
+plugin settings bytes and viewport restore; Windows remains hidden/unfocused.
+No physical stylus pressure/hover/palm test is claimed. Receipts are under
+.out/dependabot-maintenance/{windows/theme-complete.json,
+android/theme-complete-tablet.json,android/theme-complete-phone.json}.
+Frozen Windows-built main SHA256:
+d53c9c86b9e493ea239f48d33ebecf6f9cfbd29298f23300d1681fbfa94120b4;
+CRLF CSS: a0b7fcfa81f2f872296309cbb9e580777ef1340737c98f28455a69686330c163.
+Earlier missing-control/keyboard fixture failures and the genuine white iframe
+failure remain separate receipts. They are not recorded as passed theme checks.
+
+### Independent export — 2026-10-07, before implementation
+
+Owner requires export to leave their screen and working board available.
+capturePages currently deselects native items, sets screenshotting classes,
+moves x/y/zoom per tile, requests frames and renders the live wrapper with
+html2canvas. runExport additionally hides the panel and page overlay until
+completion. Restoration after success/Stop is insufficient: the live view
+must never be changed by the export. Test automation must also avoid taking
+the owner's display; no foreground/OS screenshot operations are authorized.
+
+Plan: freeze an immutable document/style snapshot at export start, render it
+in an independently owned background surface/task, produce PDF/PPTX from that
+surface, and dispose only export-owned resources. No external process/install
+from the plugin. Trace native runtime construction/lifecycle before choosing
+an isolated renderer; preserve all known content and report unsupported
+content explicitly rather than silently omit it.
+
+Mandatory Windows/physical Android checks: user selection, camera and active
+file stay unchanged throughout export, including before each tile; real input
+can select/move/pan the working board while export runs; exported geometry uses
+the start snapshot; success/Stop/save/render failures remove background
+resources and never undo later user work. Keep progress/Stop available without
+covering the board. No Page.bringToFront, OS screenshots or native-window
+activation in export/test paths. These new gates are pending; release withheld.
+
 ### Release 0.2.9 — bounded stdin portability correction, before edit
 
 GitHub CI 37581276120 passes browser smoke/types/plugin/CSS lint and 2,110 unit
