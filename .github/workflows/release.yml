@@ -29,6 +29,9 @@ jobs:
       - run: npm run lint:css
       - run: npm test
       - run: npm run build
+      - run: npm run mcp:build
+      - run: npm run cli:build
+      - run: npm run lint:mcp
       # Obsidian looks for the manifest's version and downloads the files of
       # the release with that tag.
       - name: Tag matches the manifest
@@ -40,7 +43,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: "main.js, styles.css"
+          subject-path: "main.js, styles.css, mcp/dist/miro-canvas-mcp.mjs, mcp/dist/miro-canvas-cli.mjs"
       # The release notes are this version's section of the changelog: from
       # its "## " heading to the next one.
       - name: Release notes for this version
@@ -52,4 +55,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --notes-file NOTES.md \
-            main.js manifest.json styles.css
+            main.js manifest.json styles.css \
+            mcp/dist/miro-canvas-mcp.mjs mcp/dist/miro-canvas-cli.mjs

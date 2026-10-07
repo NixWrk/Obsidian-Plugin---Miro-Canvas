@@ -65,7 +65,8 @@ unit/synthetic and physical-device evidence.
      becomes the release notes, and the plugin shows it in its update window.
   3. Push and wait for CI to pass.
   4. Push the tag `x.y.z`, without a "v". `.github/workflows/release.yml`
-     checks, builds and publishes `main.js`, `manifest.json` and `styles.css`.
+     checks, builds and publishes `main.js`, `manifest.json` and `styles.css`,
+     plus the optional standalone MCP and CLI bundles.
 - **Font packs.**
   1. When a font changes, rebuild with
      `python tools/build_font_packs.py --write-catalogue src/font-pack-catalogue.ts`.

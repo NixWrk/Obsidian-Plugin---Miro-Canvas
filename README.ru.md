@@ -617,7 +617,10 @@ Obsidian. Отдельные MCP-сервер и CLI для Node проверя�
 Для локальной работы используйте CLI, а при уже подключённом MCP — его инструменты.
 Плагин не запускает ни одну программу.
 
-Для CLI нужен Node 20 или новее; сборка — `npm run cli:build`:
+Для CLI и MCP нужен Node 20 или новее. Готовые `miro-canvas-cli.mjs` и
+`miro-canvas-mcp.mjs` доступны в [релизе](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/latest).
+Это необязательные инструменты для агентов; разместите их вне папки плагина.
+Для локальной сборки CLI используйте `npm run cli:build`:
 
 ```bash
 node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault list

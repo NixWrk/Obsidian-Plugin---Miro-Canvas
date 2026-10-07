@@ -1,6 +1,6 @@
 # Community directory submission package
 
-Updated on 2026-10-07 for Miro Canvas 0.2.8. The owner has created a directory
+Updated on 2026-10-07 for Miro Canvas 0.2.9. The owner has created a directory
 draft; review of 0.2.3 reported blocking errors addressed by this release.
 Acceptance and publication of the directory listing remain pending.
 
@@ -23,7 +23,7 @@ were checked on 2026-10-04, before preparation continued after midnight.
 | Name | Miro Canvas |
 | Plugin ID | `miro-canvas` |
 | Author | NixWrk |
-| Version | 0.2.8 |
+| Version | 0.2.9 |
 | Minimum app version | 1.13.7 |
 | Platforms | Desktop and mobile editing and export |
 | License | MIT; third-party notices in repository |
@@ -102,6 +102,19 @@ The full repository scan also reports 11 plugin-context advisories in `mcp/`:
 these belong to the optional standalone Node server, whose own enforced lint
 check passes with no errors or warnings. The submission packaging check rejects
 Node/Electron runtime loaders in `main.js`.
+Version 0.2.9 removes two console warnings and the type-only stream import from
+that report, and adds one required Node filesystem import for CLI JSON input.
+Current local official-rule scan over plugin and standalone sources is 10
+warnings / 0 errors: eight Node import sites, the explicit configuration default
+and the legacy command ID. Both READMEs explain their runtime/compatibility
+reasons; the enforced standalone Node check remains 0 errors / 0 warnings.
+The updated skill and CLI share the checked board operations with MCP. Optional
+prebuilt CLI/MCP downloads are separate from the three files Obsidian installs.
+All 2,111 unit tests and 33 oracle tests pass, with three browser smoke modes
+and an actual CLI edit opened and selected through trusted background input in
+hidden Windows Obsidian. Plugin main.js and CSS match the checked 0.2.8 runtime.
+No new Android runtime behavior or physical-device certification is claimed.
+
 Each lint change first records affected actions in [the regression register](lint-remediation-checks.md).
 All 47 assigned groups are fixed or have an explicit compatibility disposition;
 this does not certify directory acceptance or every manual platform scenario.
@@ -163,7 +176,7 @@ validation; absence from the legacy catalog alone is not proof.
 
 ## Owner's final steps
 
-1. Refresh the existing draft’s automated review for version 0.2.8 after its public release is verified.
+1. Refresh the existing draft’s automated review for version 0.2.9 after its public release is verified.
 2. Sign in to Community Directory with your Obsidian account.
 3. Connect GitHub `NixWrk` so the directory can verify repository ownership.
 4. Open **Plugins → New plugin** and paste the repository URL above.

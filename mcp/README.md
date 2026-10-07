@@ -18,6 +18,16 @@ plugin.
 The skill [`miro-canvas-format`](../.agents/skills/miro-canvas-format/SKILL.md)
 tells an agent how to use it and how the format works.
 
+## Download
+
+From [release 0.2.9](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/0.2.9)
+or a later release, download `miro-canvas-cli.mjs` or `miro-canvas-mcp.mjs`.
+Node 20+ is required; no dependency install is needed. Run the downloaded file
+with `node /absolute/path/to/miro-canvas-cli.mjs --help`, or register the MCP
+file with your client. These optional files go outside the plugin's installation
+folder. Obsidian installs only `main.js`, `manifest.json` and `styles.css`.
+The following examples use the same files built locally under `mcp/dist/`.
+
 ## Build
 
 Node 20 or later.

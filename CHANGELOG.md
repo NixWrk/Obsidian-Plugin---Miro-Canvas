@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.2.9 - 2026-10-07
+
+- Publish ready-to-run `miro-canvas-cli.mjs` and `miro-canvas-mcp.mjs` as optional release downloads. Both require Node 20+; Obsidian only needs the usual three plugin files.
+
 - Add an optional Node 20+ CLI built with `npm run cli:build` to list, call and batch the same board tools as MCP. Accept JSON arguments, file input or stdin, return one JSON result and explicit exit codes, and support custom configuration folders and read-only use.
 - Run batch calls sequentially and stop at the first refusal, retaining earlier writes. Hand off revisions per board with `expectedRevision: "previous"`; undo remembers only the last change in the same process. MCP and the format skill remain available.
 - Return JSON for CLI `--help` and `--version`. Remove standalone startup console redirects, forbid own console use and configure Ajv with `logger: false`, preserving structured validation errors. Replace the type-only `node:stream` import with the readline input type and a structural output writer. Explain retained Node imports, the explicit `.obsidian` default and the legacy hotkey command ID in both root READMEs; raw CLI I/O advisories remain visible.

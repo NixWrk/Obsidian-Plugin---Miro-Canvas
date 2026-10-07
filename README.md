@@ -594,7 +594,10 @@ and [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md).
 Use the CLI for local board work, or MCP tools when already connected.
 The plugin starts neither program.
 
-With Node 20 or later, build the CLI with `npm run cli:build`:
+With Node 20 or later, download `miro-canvas-cli.mjs` or `miro-canvas-mcp.mjs`
+from the [release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/latest).
+These optional agent tools run separately; put them outside the plugin folder.
+To build the CLI locally, use `npm run cli:build`:
 
 ```bash
 node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault list
