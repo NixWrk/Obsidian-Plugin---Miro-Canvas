@@ -11,7 +11,7 @@ This section is written so that a task can be handed to an AI coding agent
    both languages, minimal HTML, no network and no installs, large boards,
    code style) and [docs/miro-canvas.md](../docs/miro-canvas.md) (design notes,
    the Obsidian behaviour the code relies on, the task list).
-3. Use a supported development Node version (22.12+ on the 22/24/26 lines),
+3. Use a supported development Node version (22.13+ on the 22/24/26 lines),
    then run `npm ci` once. Standalone CLI/MCP downloads still target Node 20+.
 4. Never change `miroSource` - the Miro data a board was imported with. Never
    work in the person's own vault or Obsidian profile: every check in a real

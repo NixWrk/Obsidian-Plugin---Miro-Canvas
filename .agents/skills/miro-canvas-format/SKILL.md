@@ -28,7 +28,7 @@ as MCP. If MCP is already connected, its tools are also appropriate; neither
 frontend is required for ordinary editing inside Obsidian.
 
 Building/testing the repository requires a supported development Node version
-(22.12+ on the 22/24/26 lines). Build once with `npm run cli:build`. Node 20+ runs the
+(22.13+ on the 22/24/26 lines). Build once with `npm run cli:build`. Node 20+ runs the
 self-contained `mcp/dist/miro-canvas-cli.mjs`; copying that bundle requires no
 dependency install. Use absolute paths to the executable and vault.
 

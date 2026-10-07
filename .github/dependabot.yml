@@ -15,6 +15,9 @@ updates:
         exclude-patterns: ["esbuild", "vitest", "@vitest/*", "vite", "vite-node", "tinypool", "typescript", "@types/node"]
         update-types: ["minor", "patch"]
     ignore:
+      # These patches require Node 24; development/CI retain supported Node 22.
+      - dependency-name: "html2canvas-pro"
+        versions: ["2.5.1", "2.5.2"]
       # TypeScript 7 is outside the current lint toolchain's supported peer range.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]

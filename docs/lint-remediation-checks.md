@@ -2060,3 +2060,24 @@ process tests; added delayed chunks / split UTF-8 filename regression passes.
 Types and enforced Node lint pass. Full Linux CI remains required before tag;
 no plugin runtime source/CSS changes. The fix awaits chunks while bounding total
 bytes, rather than ignoring EPIPE in the test or weakening input-limit checks.
+
+### Development-only dependency follow-up after 0.2.10
+
+The pre-update trace and engine gates for proposals #12/#13/#14 are recorded
+in dependency-maintenance.md. No source lint fix or rule suppression is added:
+ESLint 10.12.0 runs the existing plugin/Node configurations, Node declarations
+stay on 22.20.5, and html2canvas-pro remains the reviewed 2.5.0 because 2.5.1/2.5.2
+require Node 24. Development requires Node 22.13+ on the 22 line; optional tool
+downloads retain Node 20+. The transitive development ESLint 9 deprecation is
+visible and is not hidden by a peer override.
+
+Mandatory checks passed: clean install without engine warnings, npm audit zero,
+type check, unchanged lint scopes (one retained legacy-ID advisory; Node/CSS
+zero), 2,157 unit cases plus the existing skip, all three synthetic smoke modes,
+schema and submission packaging. Three plugin assets match published 0.2.10
+after JSON/CSS line-ending normalization. Rebuilt standalone tools change only
+unused package metadata; all code outside that literal matches, their version
+and initialization remain unchanged. No Android behavior change is introduced;
+existing real Windows/tablet evidence above applies. The disconnected legacy
+phone's independent-export check remains pending. Fresh Linux CI is required
+before merging the development-only follow-up; no new plugin tag is planned.

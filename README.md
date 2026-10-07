@@ -577,7 +577,7 @@ user's journey from installation to importing a board (`FUT-004`). Large
 selections and line-to-line connections also need improvement. A GIF for one
 feature does not complete the entire task.
 
-Build with a supported Node version (22.12+ on the 22/24/26 lines), `npm ci`,
+Build with a supported Node version (22.13+ on the 22/24/26 lines), `npm ci`,
 `npm run check`, `npm test` and `npm run build`. Downloaded CLI/MCP still run
 on Node 20+. Dependency updates and deferred majors are recorded in the
 [maintenance report](docs/dependency-maintenance.md).

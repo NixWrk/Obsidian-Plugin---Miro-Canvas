@@ -172,3 +172,59 @@ earlier failures, including the obsolete phone live-capture timeout.
 tests verify bundle isolation and watch inputs. Current type/plugin/CSS lint
 and all three smoke modes pass. Fresh PR/main CI and five published-asset
 verification are still required before publication is complete.
+
+## Fresh proposals after 0.2.10 publication — traced before update
+
+0.2.10 release run 37600194847 succeeds; all five downloaded assets match the
+local build (CRLF normalized for JSON/CSS), and downloaded CLI/MCP report 0.2.10.
+The original six compatible proposals were closed as superseded by merged #11;
+TypeScript 7 / Node 26 declarations remain deferred. New monthly grouped checks
+then created #12 html2canvas-pro 2.5.1, #13 ESLint 10.12.0 and #14 Node 22.20.5
+declarations. Each fresh PR CI passes, but combined validation is still required.
+
+html2canvas changes the runtime rasterizer used only on the independently owned
+export surface. Upstream 2.5.1 changes zoom/blend coordinates, pseudo-content,
+image-cache preload retention and text clipping; mandatory checks are actual
+Windows/connected-Android PDF/PPTX, snapshot/working-view independence, Stop,
+save failure and board switch, plus visual inspection of generated artifacts.
+ESLint 10 changes development config lookup/context contracts and requires
+Node 22.13+ on the 22 line; current TS-eslint explicitly supports ESLint 10,
+and the Obsidian rules plugin declares ESLint >=9.19. Keep all rule scopes and
+the sole documented legacy-ID advisory; run plugin/Node/CSS lint from their
+existing commands without suppressions. Node declarations remain on 22.
+
+Plan a separate 0.2.11 for the changed rasterizer bundle if the combined checks
+pass, with consistent development Node 22.13+ docs/engines and unchanged CLI/MCP
+Node 20+ target/minimum Obsidian. No published tag is rewritten. Phone remains
+disconnected; the supported tablet is available for background-only validation.
+
+Follow-up engine check: html2canvas-pro 2.5.1 and 2.5.2 both declare Node >=24,
+unlike the installed 2.5.0. Their PR CI on Node 22 is green but npm emits an
+unsupported-engine warning. The first caret install also selected 2.5.2 rather
+than the proposed 2.5.1; both attempts are discarded. Keep reviewed 2.5.0 pinned
+exactly and ignore these two version proposals until a deliberate Node baseline
+migration. Do not silence engines or switch the supported runtime implicitly.
+Accept the supported ESLint 10 and Node 22 declaration patch; development minimum
+becomes 22.13, while runtime/bundle versions remain 0.2.10. A new plugin release
+is unnecessary: the three rebuilt plugin assets match the published 0.2.10
+files (line endings normalized for JSON/CSS). Rebuilt CLI/MCP differ only in
+their embedded package.json engines/devDependencies/dependencies metadata;
+the code outside that literal is identical and consumes only its unchanged
+version. Both current bundles still report 0.2.10 and initialize successfully.
+
+Final follow-up acceptance: clean npm ci emits no engine warnings; npm audit
+reports zero advisories. Plugin lint retains only the documented legacy
+command-ID warning, Node lint and CSS checks are clean, all 130 unit files /
+2,157 cases pass with the existing optional skip, and the three synthetic
+smoke modes, schema and submission packaging pass. Source, styles and user
+behavior are unchanged, so the real Windows/tablet evidence for release
+0.2.10 remains applicable; the disconnected legacy phone's new export check
+remains unverified. npm still reports a development-only deprecation for
+ESLint 9 pulled transitively by eslint-plugin-obsidianmd 0.4.2 and its plugins;
+do not force an incompatible peer override to hide it.
+
+Publication is complete: merged #11 is main commit
+413e23add992c0f341c91f7668c718de9effc750, both PR/main CI pass, and release
+run 37600194847 succeeds including provenance. All five published assets were
+verified against the tagged source before the development-only follow-up.
+The earlier pending-publication entries above describe intermediate states.
