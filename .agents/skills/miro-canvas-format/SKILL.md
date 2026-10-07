@@ -27,7 +27,8 @@ JSON-edit scripts. It uses the same schema-checked operations and plugin writers
 as MCP. If MCP is already connected, its tools are also appropriate; neither
 frontend is required for ordinary editing inside Obsidian.
 
-Build once with `npm run cli:build` in the plugin repository. Node 20+ runs the
+Building/testing the repository requires a supported development Node version
+(22.12+ on the 22/24/26 lines). Build once with `npm run cli:build`. Node 20+ runs the
 self-contained `mcp/dist/miro-canvas-cli.mjs`; copying that bundle requires no
 dependency install. Use absolute paths to the executable and vault.
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 import { arrangeTrayPlacement, dropIndexFromPointer, PanelArrangeMode, pressIsOutside, rectContainsPoint, type PanelArrangeHost } from "../src/panel-arrange";
 import type { PanelId, PanelPosition } from "../src/panel-layout";
@@ -221,8 +221,8 @@ interface Rig {
   positions: Partial<Record<PanelId, PanelPosition>>;
   readonly savedPositions: Array<{ readonly id: PanelId; readonly position: PanelPosition }>;
   readonly savedToolbarItems: (readonly ToolbarItem[])[];
-  readonly resetLayout: ReturnType<typeof vi.fn>;
-  readonly onExit: ReturnType<typeof vi.fn>;
+  readonly resetLayout: Mock<() => void>;
+  readonly onExit: Mock<() => void>;
 }
 
 function buildRig(initialItems: readonly ToolbarItem[] = ["select", "text", "sticky"]): Rig {

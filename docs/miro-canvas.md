@@ -2214,3 +2214,11 @@ additional check). Open selection popovers are re-clamped when the toolbar's
 placement or native contents change. Closed popovers do not cause measurements.
 The regression register records real ADB gestures, previews and cancellation,
 font failure/retry, Undo/Redo, viewport rotation and preserved test boards.
+
+
+### Dependency maintenance — 2026-10-07
+
+The coordinated builder/test/browser/Actions updates, development SDK Moment
+override and TypeScript 7 / Node 26 declaration deferrals are recorded in
+[the maintenance report](dependency-maintenance.md). Development requires
+Node 22.12+; standalone CLI/MCP retain their Node 20+ target.
