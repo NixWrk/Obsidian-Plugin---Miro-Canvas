@@ -27,6 +27,8 @@ import {
 } from "./settings";
 
 export interface SettingsTabHost {
+  readonly openCustomStyles?: () => void;
+  readonly openPalette?: () => void;
   readonly settings: MiroCanvasSettings;
   readonly saveSettings: (patch: Partial<MiroCanvasSettings>) => Promise<void>;
   /** Everyone who has written on the open board, for their colours. */
@@ -210,6 +212,35 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
       "minZoom", (value) => `${Math.round(value * 100)}%`);
     this.slider(rows, labels.maxZoomName, labels.maxZoomDesc,
       "maxZoom", (value) => `${Math.round(value * 100)}%`);
+    const enhancementLabels = words().enhancements;
+    for (const [key, title] of [
+      ["contentTextThreshold", enhancementLabels.contentText],
+      ["contentFileThreshold", enhancementLabels.contentFile],
+      ["contentLinkThreshold", enhancementLabels.contentLink],
+      ["contentPluginThreshold", enhancementLabels.contentPlugin],
+    ] as const) this.slider(rows, title, enhancementLabels.contentHint, key, (value) => `${Math.round(value * 100)}%`);
+    for (const [key, title, description] of [
+      ["highlightConnectedLines", enhancementLabels.highlightLines, enhancementLabels.highlightLinesHint],
+      ["boardKnowledge", enhancementLabels.knowledge, enhancementLabels.knowledgeHint],
+      ["automaticPropertyEdges", enhancementLabels.propertyEdges, enhancementLabels.propertyEdgesHint],
+    ] as const) {
+      new SettingsRow(rows).setName(title).setDesc(description)
+        .addToggle((toggle) => toggle.setValue(this.host.settings[key])
+          .onChange((value) => void this.host.saveSettings({ [key]: value })));
+    }
+    new SettingsRow(rows).setName(enhancementLabels.relationProperties).setDesc(enhancementLabels.relationPropertiesHint)
+      .configure((setting) => {
+        setting.addText((text) => text.setValue(this.host.settings.relationProperties.join(", "))
+          .onChange((value) => void this.host.saveSettings({ relationProperties: value.split(",").map((name) => name.trim()).filter(Boolean) })));
+      });
+    if (this.host.openCustomStyles !== undefined) {
+      new SettingsRow(rows).setName(enhancementLabels.customStyles).setDesc(enhancementLabels.stylesHint)
+        .addButton((button) => button.setButtonText(enhancementLabels.editStyles).onClick(() => { void this.host.openCustomStyles?.(); }));
+    }
+    if (this.host.openPalette !== undefined) {
+      new SettingsRow(rows).setName(enhancementLabels.paletteTitle)
+        .addButton((button) => button.setButtonText(enhancementLabels.paletteTitle).onClick(() => { void this.host.openPalette?.(); }));
+    }
 
     this.sectionHeading(rows, "panning", labels.panningHeading);
 

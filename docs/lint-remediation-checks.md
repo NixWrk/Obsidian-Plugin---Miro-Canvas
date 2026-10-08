@@ -2081,3 +2081,34 @@ and initialization remain unchanged. No Android behavior change is introduced;
 existing real Windows/tablet evidence above applies. The disconnected legacy
 phone's independent-export check remains pending. Fresh Linux CI is required
 before merging the development-only follow-up; no new plugin tag is planned.
+# Canvas feature expansion: new lint findings (2026-10-07)
+
+Before remediation the scan found new typing/DOM/deletion advisories in
+board-encapsulation, canvas-authoring, m1-session, main, native-history-fence and
+settings-tab; board-link-lifecycle has its own integration trace. These paths
+participate in transferring cards/comments/lines, locked dependent validation,
+one-step undo/redo and failed-save compensation, scoped decoration and selected
+line highlighting, deleting only an unchanged new test/transfer target, and
+saving relation property settings. Fix typing without changing these actions;
+use FileManager.trashFile for conditional target cleanup and declarative setting
+callbacks. The m1-commands hotkey compatibility warning remains intentional.
+
+Mandatory checks: focused transfer/authoring/fence/source/search/settings tests,
+full unit suite, lint/build/CSS gates, stale/deleted/edited target retention,
+native save failure then redo, theme/unload restoration, real Windows and Android
+touch palette/group/line/search/transfer actions at non-default zoom. Unit and
+synthetic results alone do not close real-app checks; those remain pending.
+## Property-result placement and Android keyboard — 2026-10-08
+
+Trace before UI repair: CanvasPropertyResults.section appends its owned section
+after Obsidian's flex-filling native result root. On SM-X736B / Obsidian 1.13.8,
+actual ADB input focuses native search at y152; its result is y950 while the
+keyboard occupies y803..1204 (--keyboard-height 400.94116px). The second tap
+never reaches Obsidian. This is a layout defect, not a navigation pass.
+Place the owned section before the native result root and give only that section
+a bounded scroll area; preserve native query controls, rows, pane descriptors
+and all native styles. Required checks: DOM order and native-root identity,
+typed property query/result navigation with the keyboard still open on tablet,
+outgoing link navigation, desktop native results remaining accessible, CSS gate,
+focused sidecar tests and full types. Phone acceptance remains pending while
+the device is disconnected; no synthetic result substitutes for ADB input.

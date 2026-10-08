@@ -690,6 +690,25 @@ describe("presentations, groups and ink", () => {
     expect(f.el("t").nodeEl.style.getPropertyValue("--miro-ink")).toBe("");
     expect(f.el("dark").contentEl.style.getPropertyValue("text-align")).toBe("");
   });
+  it("removes expanded frame paint for a collapsed native header and restores it on expand", () => {
+    const node = { id: "frame", type: "group", x: 0, y: 0, width: 900, height: 500, label: "Frame" };
+    let data: any = { nodes: [node], edges: [], miroCanvas: { schemaVersion: 1 },
+      miroSource: { items: [{ id: "frame", type: "frame", style: { fillColor: "#ffffff" } }] }, future: { keep: true } };
+    const nodeEl = new Element("div"), containerEl = new Element("div"), contentEl = new Element("div");
+    nodeEl.appendChild(containerEl);
+    containerEl.appendChild(contentEl);
+    const renderer = new SourceRenderer({ getDocument: () => data, getNodes: () => [{ id: "frame", nodeEl, containerEl, contentEl }], getEdges: () => [] }, dom);
+    renderer.refresh();
+    expect(nodeEl.getAttribute("data-miro-source-kind")).toBe("frame");
+    data = { ...data, miroCanvas: { schemaVersion: 1, localOverrides: { frame: { groupCollapse: { width: 900, height: 500, children: [] } } } } };
+    renderer.refresh();
+    expect(nodeEl.getAttribute("data-miro-source-kind")).toBeNull();
+    expect(data.nodes).toEqual([node]);
+    data = { ...data, miroCanvas: { schemaVersion: 1 } };
+    renderer.refresh();
+    expect(nodeEl.getAttribute("data-miro-source-kind")).toBe("frame");
+    renderer.dispose();
+  });
 });
 
 describe("source-backed app-card rendering", () => {

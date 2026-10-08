@@ -1,4 +1,5 @@
 import { CodeHeadingMarks } from "./native-markup-state";
+import { groupCollapse } from "./board-groups";
 import { projectNativeCardStyles } from "./native-card-styles";
 import { NativeStyleProperties } from "./native-style-properties";
 import {
@@ -23,6 +24,7 @@ import { pressureStrokePath } from "./pressure-stroke";
 type UnknownRecord = Record<PropertyKey, unknown>;
 
 export interface SourceRendererHost {
+  getCollapsedNodeOwners?(): ReadonlyMap<string, string>;
   getDocument(): unknown;
   getNodes(): readonly unknown[] | undefined;
   getEdges(): readonly unknown[] | undefined;
@@ -98,6 +100,171 @@ interface LinesDrawnFor {
   readonly document: unknown;
   readonly measured: string | undefined;
   readonly geometry: AnchorGeometry;
+  readonly visibility?: number;
+}
+
+interface RouteBounds {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+}
+
+interface VisibleEdge extends RouteBounds {
+  readonly runtime: unknown;
+}
+
+interface RouteBoundsTree extends RouteBounds {
+  readonly entries?: readonly VisibleEdge[];
+  readonly left?: RouteBoundsTree;
+  readonly right?: RouteBoundsTree;
+}
+
+function intersectsRoute(left: RouteBounds, right: RouteBounds): boolean {
+  return left.minX <= right.maxX && left.maxX >= right.minX && left.minY <= right.maxY && left.maxY >= right.minY;
+}
+
+function readRouteBounds(value: unknown): RouteBounds | undefined {
+  const minX = safeGet(value, "minX"), minY = safeGet(value, "minY");
+  const maxX = safeGet(value, "maxX"), maxY = safeGet(value, "maxY");
+  return finiteNumber(minX) && finiteNumber(minY) && finiteNumber(maxX) && finiteNumber(maxY) && minX <= maxX && minY <= maxY
+    ? { minX, minY, maxX, maxY } : undefined;
+}
+
+/** Built only when projected geometry changes; viewport queries visit intersecting branches. */
+function routeBoundsTree(entries: VisibleEdge[]): RouteBoundsTree | undefined {
+  if (entries.length === 0) return undefined;
+  const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (const entry of entries) {
+    bounds.minX = Math.min(bounds.minX, entry.minX);
+    bounds.minY = Math.min(bounds.minY, entry.minY);
+    bounds.maxX = Math.max(bounds.maxX, entry.maxX);
+    bounds.maxY = Math.max(bounds.maxY, entry.maxY);
+  }
+  if (entries.length <= 8) return { ...bounds, entries };
+  const axis = bounds.maxX - bounds.minX >= bounds.maxY - bounds.minY ? "minX" : "minY";
+  entries.sort((left, right) => left[axis] - right[axis]);
+  const middle = Math.floor(entries.length / 2);
+  return { ...bounds, left: routeBoundsTree(entries.slice(0, middle)), right: routeBoundsTree(entries.slice(middle)) };
+}
+
+function queryRouteBounds(tree: RouteBoundsTree | undefined, bounds: RouteBounds, result: unknown[]): void {
+  if (tree === undefined || !intersectsRoute(tree, bounds)) return;
+  if (tree.entries !== undefined) {
+    for (const entry of tree.entries) if (intersectsRoute(entry, bounds)) result.push(entry.runtime);
+    return;
+  }
+  queryRouteBounds(tree.left, bounds, result);
+  queryRouteBounds(tree.right, bounds, result);
+}
+
+function projectedRouteBounds(geometry: AnchorEdgeGeometry | undefined, nativeCurve: boolean): RouteBounds | undefined {
+  if (geometry === undefined) return undefined;
+  const points: unknown[] = [...(geometry.points ?? []), geometry.start, geometry.end];
+  const segments = geometry.segments;
+  if (Array.isArray(segments)) for (const segment of segments) points.push(safeGet(segment, "c1"), safeGet(segment, "c2"), safeGet(segment, "to"));
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const point of points) {
+    if (point === undefined) continue;
+    const x = safeGet(point, "x"), y = safeGet(point, "y");
+    if (!finiteNumber(x) || !finiteNumber(y)) return undefined;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  if (!Number.isFinite(minX)) return undefined;
+  // Native bends reach at most 150 units beyond their 7-unit exits; include the hit stroke.
+  const padding = nativeCurve ? 169 : 12;
+  return { minX: minX - padding, minY: minY - padding, maxX: maxX + padding, maxY: maxY + padding };
+}
+
+/** A scoped supplement to native virtualization, leaving the raw spatial index intact. */
+class CollapsedRouteVisibility {
+  public revision = 0;
+  private active = true;
+  private syncing = false;
+  private tree: RouteBoundsTree | undefined;
+  private projected = new Set<unknown>();
+  private visible = new Set<unknown>();
+  private readonly restores: RestorePatch[] = [];
+
+  private constructor(public readonly canvas: unknown, private readonly repaint: () => void) {}
+
+  public static install(canvas: unknown, repaint: () => void): CollapsedRouteVisibility | undefined {
+    if (!isObject(canvas) || !(safeGet(canvas, "edges") instanceof Map) || !(safeGet(canvas, "lastEdgesInViewport") instanceof Set)
+      || !isElement(safeGet(canvas, "edgeContainerEl")) || !isElement(safeGet(canvas, "edgeEndContainerEl"))
+      || typeof safeGet(canvas, "getViewportBBox") !== "function" || readRouteBounds(safeCall(canvas, "getViewportBBox")) === undefined) return undefined;
+    const visibility = new CollapsedRouteVisibility(canvas, repaint);
+    if (!visibility.wrap("getIntersectingEdges", (original, receiver, args) => {
+      const native: unknown = Reflect.apply(original, receiver, args);
+      const bounds = readRouteBounds(args[0]);
+      if (!visibility.active || receiver !== canvas || !Array.isArray(native) || bounds === undefined) return native;
+      const projected: unknown[] = [];
+      queryRouteBounds(visibility.tree, bounds, projected);
+      const nativeEdges: readonly unknown[] = native;
+      return [...nativeEdges.filter((edge) => !visibility.projected.has(edge)), ...projected];
+    }) || !visibility.wrap("virtualize", (original, receiver, args) => {
+      const result: unknown = Reflect.apply(original, receiver, args);
+      if (visibility.active && receiver === canvas) visibility.afterVirtualize();
+      return result;
+    })) {
+      visibility.dispose();
+      return undefined;
+    }
+    return visibility;
+  }
+
+  private wrap(key: string, invoke: (original: (...args: unknown[]) => unknown, receiver: unknown, args: unknown[]) => unknown): boolean {
+    const original = safeGet(this.canvas, key);
+    if (!isObject(this.canvas) || typeof original !== "function") return false;
+    const descriptor = Object.getOwnPropertyDescriptor(this.canvas, key);
+    if (descriptor !== undefined && (!descriptor.configurable || !("value" in descriptor))) return false;
+    const wrapper = function(this: unknown, ...args: unknown[]): unknown { return invoke(original as (...args: unknown[]) => unknown, this, args); };
+    try {
+      Object.defineProperty(this.canvas, key, { configurable: true, writable: true, value: wrapper, enumerable: descriptor?.enumerable ?? false });
+      this.restores.push(() => {
+        if (!isObject(this.canvas) || safeGet(this.canvas, key) !== wrapper) return;
+        if (descriptor === undefined) Reflect.deleteProperty(this.canvas, key);
+        else Object.defineProperty(this.canvas, key, descriptor);
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public update(projected: Set<unknown>, entries: VisibleEdge[]): void {
+    this.projected = projected;
+    this.tree = routeBoundsTree(entries);
+    this.syncing = true;
+    try { safeCall(this.canvas, "virtualize"); } finally { this.syncing = false; }
+  }
+
+  private afterVirtualize(): void {
+    const last = safeGet(this.canvas, "lastEdgesInViewport");
+    if (!(last instanceof Set)) return;
+    const visible = new Set([...last].filter((edge) => this.projected.has(edge)));
+    const changed = visible.size !== this.visible.size || [...visible].some((edge) => !this.visible.has(edge));
+    this.visible = visible;
+    if (!changed) return;
+    this.revision += 1;
+    // Native render initializes the two paths; only newly visible routes need it here.
+    for (const edge of visible) if (safeGet(edge, "initialized") === false) safeCall(edge, "render");
+    if (!this.syncing) {
+      try { this.repaint(); } catch { /* Native virtualization keeps its result if decoration fails. */ }
+    }
+  }
+
+  public dispose(): void {
+    if (!this.active) return;
+    this.active = false;
+    rollBack(this.restores);
+    this.projected.clear();
+    this.visible.clear();
+    this.tree = undefined;
+    if (this.restores.length === 2) safeCall(this.canvas, "virtualize");
+  }
 }
 
 /**
@@ -1963,6 +2130,10 @@ export class SourceRenderer {
   private readonly document: Document | undefined;
   /** Observer keeping rotations and redrawn edges in place between refreshes. */
   private liveWatch: unknown;
+  private collapsedVisibility: CollapsedRouteVisibility | undefined;
+  private visibilityDocument: unknown;
+  private visibilityGeometry: AnchorGeometry | undefined;
+  private visibilityRuntimes = new Map<string, unknown>();
 
   public constructor(private readonly host: SourceRendererHost, document?: Document) {
     this.document = document ?? defaultDocument();
@@ -2001,6 +2172,12 @@ export class SourceRenderer {
     const movingIds = new Set(Array.isArray(movingValue)
       ? movingValue.filter((id): id is string => typeof id === "string") : []);
     const moving = movingIds.size > 0;
+    const collapsedOwners = this.host.getCollapsedNodeOwners?.() ?? new Map<string, string>();
+    const collapsedGroups = new Set(Array.isArray(safeGet(sourceDocument, "nodes"))
+      ? (safeGet(sourceDocument, "nodes") as unknown[]).flatMap((node) => {
+        const id = safeGet(node, "id");
+        return typeof id === "string" && groupCollapse(sourceDocument, id) !== undefined ? [id] : [];
+      }) : []);
     for (const id of nativeEdges.keys()) {
       if (!descriptors.has(id) && isObject(safeGet(safeGet(overrides, id), "connectorAnchors"))) {
         descriptors.set(id, { kind: "connector", rotation: 0, css: {} });
@@ -2015,7 +2192,7 @@ export class SourceRenderer {
     if (preview !== undefined && !descriptors.has(preview.id)) {
       descriptors.set(preview.id, { kind: "text", rotation: preview.rotation, css: {} });
     }
-    if (descriptors.size === 0 && !moving) {
+    if (descriptors.size === 0 && !moving && collapsedGroups.size === 0) {
       this.resetRenderedState();
       this.diagnosticList = Object.freeze(diagnostics);
       return this.diagnosticList;
@@ -2062,7 +2239,7 @@ export class SourceRenderer {
       : undefined;
     const geometry = known ?? buildCanvasAnchorGeometry(sourceDocument, preview === undefined ? measured : {
       ...measured, [preview.id]: { ...measured[preview.id], rotation: preview.rotation },
-    }, scene);
+    }, scene, undefined, collapsedOwners);
     // Native edges on a turned or shaped node, which the host draws to the
     // middle of a side of the upright box.
     const rectangle = shapeOutline("rectangle");
@@ -2070,7 +2247,7 @@ export class SourceRenderer {
       if (typeof nodeId !== "string") return undefined;
       const rect = geometry.nodes?.[nodeId];
       if (rect === undefined) return undefined;
-      const outline = shapeOutline(scene.items.get(nodeId)?.shape);
+      const outline = collapsedOwners.has(nodeId) ? rectangle : shapeOutline(scene.items.get(nodeId)?.shape);
       return { rect, outline: outline === rectangle ? undefined : outline };
     };
     const reshaped = (nodeId: unknown): boolean => {
@@ -2085,7 +2262,9 @@ export class SourceRenderer {
     for (const [id, edge] of nativeEdges) {
       const descriptor = descriptors.get(id);
       if (descriptor === undefined) {
-        if (reshaped(safeGet(edge, "fromNode")) || reshaped(safeGet(edge, "toNode"))
+        if (collapsedOwners.has(safeGet(edge, "fromNode") as string) || collapsedOwners.has(safeGet(edge, "toNode") as string)
+          || collapsedGroups.has(safeGet(edge, "fromNode") as string) || collapsedGroups.has(safeGet(edge, "toNode") as string)
+          || reshaped(safeGet(edge, "fromNode")) || reshaped(safeGet(edge, "toNode"))
           || movingIds.has(safeGet(edge, "fromNode") as string) || movingIds.has(safeGet(edge, "toNode") as string))
           nativeRoutes.set(id, { edge, anchors: {} });
         continue;
@@ -2110,16 +2289,18 @@ export class SourceRenderer {
       return runtime === undefined ? [] : [`${id}:${safeGet(runtime, "initialized") === false ? "new" : "ready"}`];
     });
     const runtimeOfItem = (item: RenderedItem): unknown => runtimeOf(item.kind, item.id);
-    const lines: LineDrawing = { sourceDocument, scene, descriptors, nativeEdges, nativeRoutes, edges, geometry, routeNode, moving };
+    const lines: LineDrawing = { sourceDocument, scene, descriptors, nativeEdges, nativeRoutes, edges, geometry, routeNode, moving: moving || collapsedGroups.size > 0 };
+    this.updateCollapsedVisibility(lines, collapsedGroups.size > 0, collapsedOwners, diagnostics);
     // A card that only moves - dragged by a selection or by native Canvas - keeps
     // what is drawn on it: only the lines that follow it are drawn again.  The
     // cards are drawn again when anything else about them changes.
     const cardSignature = safeSignature({
-      descriptors: [...descriptors], routes: [...nativeRoutes.keys()], ready, order: scene.order, preview, diagnostics, fittedTexts,
+      descriptors: [...descriptors], routes: [...nativeRoutes.keys()], collapsedGroups: [...collapsedGroups], ready, order: scene.order, preview, diagnostics, fittedTexts,
       sizes: [...descriptors.keys()].map((id) => [id, documentSizes.get(id) ?? null]),
     });
     const linesDrawnFor: LinesDrawnFor = {
       moving, document: sourceDocument, measured: moving ? safeSignature(measured) : undefined, geometry,
+      visibility: this.collapsedVisibility?.revision,
     };
     if (cardSignature !== undefined && cardSignature === this.drawnCards && this.decorationsIntact(runtimeOfItem, "node")) {
       if (this.linesDrawnAre(linesDrawnFor) && this.decorationsIntact(runtimeOfItem, "edge")) return this.diagnosticList;
@@ -2137,7 +2318,7 @@ export class SourceRenderer {
     const lineDiagnostics: string[] = [];
     try {
       for (const [id, descriptor] of descriptors) {
-        if (nativeRoutes.has(id) || descriptor.kind === "connector") continue;
+        if (nativeRoutes.has(id) || descriptor.kind === "connector" || collapsedGroups.has(id)) continue;
         const runtime = nodes.get(id);
         if (runtime === undefined) {
           cardDiagnostics.push(`node-runtime-missing: ${id}.`);
@@ -2182,10 +2363,64 @@ export class SourceRenderer {
   /** Whether the lines on the page already follow the cards as they stand. */
   private linesDrawnAre(next: LinesDrawnFor): boolean {
     const drawn = this.linesDrawnFor;
-    if (drawn === undefined || drawn.moving !== next.moving) return false;
+    if (drawn === undefined || drawn.moving !== next.moving || drawn.visibility !== next.visibility) return false;
     // A dragged selection projects a new board on every move: its identity is the change.
     if (next.moving) return drawn.document === next.document && drawn.measured === next.measured;
     return sameRoundedData(drawn.geometry, next.geometry);
+  }
+
+  private updateCollapsedVisibility(lines: LineDrawing, collapsed: boolean, owners: ReadonlyMap<string, string>, diagnostics: string[]): void {
+    if (!collapsed) {
+      this.clearCollapsedVisibility();
+      return;
+    }
+    const runtimes = new Map<string, unknown>();
+    for (const id of lines.nativeEdges.keys()) {
+      if (!lines.nativeRoutes.has(id) && lines.descriptors.get(id)?.kind !== "connector" && !owners.has(id)) continue;
+      const runtime = lines.edges.get(id);
+      if (runtime !== undefined) runtimes.set(id, runtime);
+    }
+    if (this.collapsedVisibility !== undefined && this.visibilityDocument === lines.sourceDocument
+      && sameRoundedData(this.visibilityGeometry, lines.geometry) && runtimes.size === this.visibilityRuntimes.size
+      && [...runtimes].every(([id, runtime]) => this.visibilityRuntimes.get(id) === runtime)) return;
+    const canvas = [...runtimes.values()].map((runtime) => safeGet(runtime, "canvas")).find(isObject);
+    if (this.collapsedVisibility?.canvas !== canvas) this.clearCollapsedVisibility();
+    if (this.collapsedVisibility === undefined) {
+      this.collapsedVisibility = CollapsedRouteVisibility.install(canvas, () => { this.refresh(); });
+    }
+    if (this.collapsedVisibility === undefined) {
+      if (canvas !== undefined) diagnostics.push("collapsed-route-virtualization-unsupported: native Canvas shape unavailable.");
+      return;
+    }
+    const projected = new Set<unknown>();
+    const entries: VisibleEdge[] = [];
+    const nativeMap = safeGet(canvas, "edges");
+    for (const [id, runtime] of runtimes) {
+      if (!(nativeMap instanceof Map) || nativeMap.get(id) !== runtime || safeGet(runtime, "canvas") !== canvas
+        || !isElement(safeGet(runtime, "lineGroupEl")) || !isElement(safeGet(runtime, "lineEndGroupEl"))
+        || typeof safeGet(runtime, "attach") !== "function" || typeof safeGet(runtime, "detach") !== "function"
+        || typeof safeGet(runtime, "render") !== "function") continue;
+      if (owners.has(id)) {
+        projected.add(runtime);
+        continue;
+      }
+      const bounds = projectedRouteBounds(lines.geometry.edges?.[id], lines.nativeRoutes.has(id));
+      if (bounds === undefined) continue;
+      projected.add(runtime);
+      entries.push({ ...bounds, runtime });
+    }
+    this.visibilityDocument = lines.sourceDocument;
+    this.visibilityGeometry = lines.geometry;
+    this.visibilityRuntimes = runtimes;
+    this.collapsedVisibility.update(projected, entries);
+  }
+
+  private clearCollapsedVisibility(): void {
+    this.collapsedVisibility?.dispose();
+    this.collapsedVisibility = undefined;
+    this.visibilityDocument = undefined;
+    this.visibilityGeometry = undefined;
+    this.visibilityRuntimes.clear();
   }
 
   /**
@@ -2391,6 +2626,7 @@ export class SourceRenderer {
 
   private resetRenderedState(): void {
     this.restoreOwnedPatches();
+    this.clearCollapsedVisibility();
     this.forgetRendering();
   }
 

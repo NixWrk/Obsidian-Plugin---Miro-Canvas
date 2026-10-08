@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { M1CanvasSession } from "../src/m1-session";
+import { M1CanvasSession, type M1SessionOptions } from "../src/m1-session";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
 import type { M1ControlsActions } from "../src/m1-controls";
@@ -58,7 +58,7 @@ const sessions: M1CanvasSession[] = [];
 afterEach(() => { sessions.splice(0).forEach((session) => session.dispose()); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 /** A board with a locked card, a free one and, for a large selection, as many more free cards as asked. */
-function fixture(moreCards = 0) {
+function fixture(moreCards = 0, options: M1SessionOptions = {}) {
 	const root = new HostElement("canvas-wrapper");
 	const nodeData = (id: string) => ({ id, type: "text", text: id, x: 0, y: 0, width: 100, height: 80, futureNode: { keep: id } });
 	const more = Array.from({ length: moreCards }, (_, index) => nodeData(`card-${index}`));
@@ -112,7 +112,7 @@ function fixture(moreCards = 0) {
 	const view = { canvas };
 	const store = createObsidianMetadataStore(view).store;
 	expect(store).toBeDefined();
-	const session = new M1CanvasSession(view, new MetadataWriter(store!));
+	const session = new M1CanvasSession(view, new MetadataWriter(store!), options);
 	sessions.push(session);
 	expect(session.mount()).toBe(true);
 	const locked = nodes.get("locked")!;
@@ -120,6 +120,43 @@ function fixture(moreCards = 0) {
 	const actions = (session.controls as unknown as { actions: M1ControlsActions }).actions;
 	return { root, canvas, session, locked, free, selection, initial, history, actions };
 }
+
+describe("committed knowledge publication", () => {
+	it("coalesces action saves and never publishes from render refreshes", async () => {
+		const publish = vi.fn();
+		const { canvas, session, free } = fixture(0, { onCommittedBoardDocument: publish });
+		free.setText("[[New link]]");canvas.data = canvas.getData();canvas.requestSave(true);canvas.requestSave(false);
+		session.notifyCommittedBoardDocument();session.notifyCommittedBoardDocument();
+		session.refresh();session.refresh();expect(publish).not.toHaveBeenCalled();await Promise.resolve();
+		expect(publish).toHaveBeenCalledTimes(1);
+		expect((publish.mock.calls[0]![0] as Data).nodes.find((node: Data) => node.id === "free").text).toBe("[[New link]]");
+		expect(publish.mock.calls[0]![0]).toBe(publish.mock.calls[0]![1]);
+		session.refresh();await Promise.resolve();expect(publish).toHaveBeenCalledTimes(1);
+	});
+	it("publishes native Undo and Redo only at the outer history boundary", async () => {
+		const publish = vi.fn();
+		const { canvas, free, session } = fixture(0, { onCommittedBoardDocument: publish });
+		free.setText("Changed link");canvas.data = canvas.getData();canvas.requestSave(true);session.notifyCommittedBoardDocument();await Promise.resolve();publish.mockClear();
+		canvas.undo();await Promise.resolve();
+		expect((publish.mock.calls[0]![0] as Data).nodes.find((node: Data) => node.id === "free").text).toBe("free");
+		canvas.redo();await Promise.resolve();expect(publish).toHaveBeenCalledTimes(2);
+		expect((publish.mock.calls[1]![0] as Data).nodes.find((node: Data) => node.id === "free").text).toBe("Changed link");
+	});
+	it("suppresses a held preview until a subsequent settled commit", async () => {
+		const publish = vi.fn();
+		const { canvas, session } = fixture(0, { onCommittedBoardDocument: publish });
+		const internal = session as unknown as { pointerHeld: boolean };
+		internal.pointerHeld = true;canvas.requestSave(false);session.notifyCommittedBoardDocument();await Promise.resolve();expect(publish).not.toHaveBeenCalled();
+		internal.pointerHeld = false;session.refresh();await Promise.resolve();expect(publish).not.toHaveBeenCalled();
+		canvas.requestSave(true);session.notifyCommittedBoardDocument();await Promise.resolve();expect(publish).toHaveBeenCalledTimes(1);
+	});
+	it("drops queued publication and releases its owner once on unload", async () => {
+		const publish = vi.fn(), release = vi.fn();
+		const { canvas, session } = fixture(0, { onCommittedBoardDocument: publish, onReleaseBoardDocument: release });
+		canvas.requestSave(true);session.notifyCommittedBoardDocument();session.dispose();session.dispose();await Promise.resolve();
+		expect(publish).not.toHaveBeenCalled();expect(release).toHaveBeenCalledTimes(1);
+	});
+});
 
 describe("selection frame follows the displayed card", () => {
 	it("uses live size and displayed zoom while native resize and camera animation have not committed", () => {
@@ -136,6 +173,19 @@ describe("selection frame follows the displayed card", () => {
 });
 
 describe("resize history", () => {
+  it("repaints metadata after native Undo and Redo without another board input", () => {
+    const { canvas, session, initial } = fixture();
+    canvas.data.miroCanvas = { ...canvas.data.miroCanvas, settings: { reviewMode: true } };
+    canvas.requestSave(true);
+    session.refresh();
+    expect(session.snapshot.reviewMode).toBe(true);
+    canvas.undo();
+    expect(session.snapshot.reviewMode).toBe(false);
+    expect((canvas.getData() as Data).miroSource).toEqual(initial.miroSource);
+    canvas.redo();
+    expect(session.snapshot.reviewMode).toBe(true);
+    expect((canvas.getData() as Data).miroSource).toEqual(initial.miroSource);
+  });
 	it("restores a cancelled preview without saving, then commits a later resize once", () => {
 		const { canvas, free, session } = fixture();
 		canvas.selectOnly(free);

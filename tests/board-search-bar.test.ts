@@ -249,3 +249,128 @@ describe("the board's search bar", () => {
     expect(input.listeners.get("input")).toEqual([]);
   });
 });
+
+const enhancementLabels = {
+  regex: "Use regular expressions",
+  caseSensitive: "Match case",
+  errors: {
+    "invalid-pattern": "Invalid regular expression",
+    "unsupported-pattern": "This regular expression needs unsupported syntax",
+    "pattern-too-long": "Regular expression is too long",
+    "input-too-large": "Board is too large for regular expression search",
+    "work-limit": "Regular expression reached the search work limit",
+  },
+};
+
+describe("optional search bar enhancements", () => {
+  function enhanced(delay = 0) {
+    const queries: Array<{ query: string; options: import("../src/board-search").SearchOptions | undefined }> = [];
+    const steps: number[] = [];
+    const document = new FakeDocument();
+    const bar = new BoardSearchBar(document as unknown as Document, {
+      onQuery: (query, options) => { queries.push({ query, options }); },
+      onStep: (direction) => { steps.push(direction); },
+      onClose: () => bar.close(),
+      queryDelay: () => delay,
+    }, { labels: enhancementLabels });
+    const root = bar.element as unknown as FakeElement;
+    const input = bar.input as unknown as FakeElement;
+    return { bar, root, input, document, queries, steps };
+  }
+
+  it("keeps the default bar/callback shape and adds no mode controls without injected labels", () => {
+    const { root } = build();
+    expect(descendants(root).filter((element) => element.getAttribute("data-search-option") !== null)).toEqual([]);
+  });
+
+  it("toggles modes with pressed state and immutable option snapshots", () => {
+    const { bar, root, input, queries } = enhanced();
+    bar.open();
+    type(input, "Pattern");
+    const caseButton = byLabel(root, enhancementLabels.caseSensitive);
+    const regexButton = byLabel(root, enhancementLabels.regex);
+    expect(caseButton.getAttribute("aria-pressed")).toBe("false");
+    click(caseButton);
+    click(regexButton);
+    expect(caseButton.getAttribute("aria-pressed")).toBe("true");
+    expect(regexButton.getAttribute("aria-pressed")).toBe("true");
+    expect(queries).toEqual([
+      { query: "Pattern", options: { regex: false, caseSensitive: false } },
+      { query: "Pattern", options: { regex: false, caseSensitive: true } },
+      { query: "Pattern", options: { regex: true, caseSensitive: true } },
+    ]);
+    const options = bar.options as { regex: boolean };
+    options.regex = false;
+    expect(bar.options.regex).toBe(true);
+    expect(press(root, regexButton, " ").stopped).toBe(true);
+  });
+
+  it("searches mode changes immediately and cancels a pending query using the previous mode", () => {
+    const { bar, root, input, queries, document } = enhanced(120);
+    bar.open();
+    type(input, "a+");
+    expect(queries).toEqual([]);
+    click(byLabel(root, enhancementLabels.regex));
+    document.runTimers();
+    expect(queries).toEqual([{ query: "a+", options: { regex: true, caseSensitive: false } }]);
+    type(input, "a+b");
+    press(root, input, "Enter");
+    expect(queries[1]).toEqual({ query: "a+b", options: { regex: true, caseSensitive: false } });
+  });
+
+  it("shows and announces localized errors, marks the field invalid and blocks navigation until recovery", () => {
+    const { bar, root, input, steps } = enhanced();
+    type(input, "[");
+    bar.showResult({ current: 0, total: 3, error: { code: "invalid-pattern" } });
+    expect(byClass(root, "miro-canvas-search__count").textContent).toBe(enhancementLabels.errors["invalid-pattern"]);
+    expect(byClass(root, "miro-canvas-search__live").textContent).toBe(enhancementLabels.errors["invalid-pattern"]);
+    expect(root.getAttribute("data-search-state")).toBe("error");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(byLabel(root, "Next (Enter)").disabled).toBe(true);
+    press(root, input, "Enter");
+    press(root, input, "ArrowDown");
+    click(byLabel(root, "Next (Enter)"));
+    expect(steps).toEqual([]);
+    bar.showResult({ current: 0, total: 1, kind: "file" });
+    expect(root.getAttribute("data-search-state")).toBe("found");
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    expect(root.getAttribute("data-search-error")).toBe("");
+    press(root, input, "Enter");
+    expect(steps).toEqual([1]);
+  });
+
+  it("keeps structured errors visible even if a legacy host passes one without enhancement labels", () => {
+    const { bar, root } = build();
+    bar.showResult({ current: -1, total: 0, error: { code: "invalid-pattern" } });
+    expect(byClass(root, "miro-canvas-search__count").textContent).toBe("invalid-pattern");
+    expect(root.getAttribute("data-search-state")).toBe("error");
+  });
+
+  it("uses the injected locale for modes/errors and the existing locale for result kinds", () => {
+    setLocale("ru");
+    const document = new FakeDocument();
+    const labels = { ...enhancementLabels, regex: "Регулярные выражения", caseSensitive: "Учитывать регистр",
+      errors: { ...enhancementLabels.errors, "invalid-pattern": "Ошибка выражения" } };
+    const bar = new BoardSearchBar(document as unknown as Document, { onQuery: () => {}, onStep: () => {}, onClose: () => {} },
+      { labels, initialOptions: { regex: true } });
+    const root = bar.element as unknown as FakeElement;
+    expect(byLabel(root, labels.regex).getAttribute("aria-pressed")).toBe("true");
+    bar.showResult({ current: -1, total: 0, error: { code: "invalid-pattern" } });
+    expect(byClass(root, "miro-canvas-search__count").textContent).toBe("Ошибка выражения");
+    bar.showResult({ current: 0, total: 1, kind: "file" });
+    expect(byClass(root, "miro-canvas-search__live").textContent).toContain("1");
+  });
+
+  it("cancels enhanced searches on close/dispose and does not emit after disposal", () => {
+    const { bar, input, document, queries } = enhanced(120);
+    type(input, "cancelled");
+    bar.close();
+    document.runTimers();
+    expect(queries).toEqual([]);
+    type(input, "also cancelled");
+    bar.dispose();
+    document.runTimers();
+    bar.setOptions({ regex: true });
+    expect(queries).toEqual([]);
+  });
+});

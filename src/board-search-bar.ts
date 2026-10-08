@@ -9,12 +9,12 @@ import { createHtmlElement } from "./dom-elements";
  * letter is not taken for a tool and Delete does not remove a card.
  */
 import { words } from "./i18n";
-import type { SearchKind } from "./board-search";
+import type { SearchError, SearchErrorCode, SearchKind, SearchOptions } from "./board-search";
 import { TOOLTIP_DELAY } from "./tooltips";
 
 export interface BoardSearchBarHost {
   /** The field's text changed; search again and show the first match. */
-  readonly onQuery: (query: string) => void;
+  readonly onQuery: (query: string, options?: SearchOptions) => void;
   /** Show the next (1) or previous (-1) match. */
   readonly onStep: (direction: 1 | -1) => void;
   /** Escape or the close button: put the bar away and give the board its keys back. */
@@ -24,12 +24,25 @@ export interface BoardSearchBarHost {
   readonly setIcon?: (element: HTMLElement, icon: string) => void;
 }
 
+/** Labels come from the parent's locale table, never from this component. */
+export interface BoardSearchEnhancementLabels {
+  readonly regex: string;
+  readonly caseSensitive: string;
+  readonly errors: Readonly<Record<SearchErrorCode, string>>;
+}
+
+export interface BoardSearchBarOptions {
+  readonly labels: BoardSearchEnhancementLabels;
+  readonly initialOptions?: SearchOptions;
+}
+
 export interface BoardSearchResult {
   /** The match shown, counted from 0; -1 when there is none. */
   readonly current: number;
   readonly total: number;
   /** What the match shown is, read out to a screen reader. */
   readonly kind?: SearchKind;
+  readonly error?: SearchError;
 }
 
 type TimerHost = {
@@ -45,10 +58,18 @@ export class BoardSearchBar {
   private readonly previousButton: HTMLButtonElement;
   private readonly nextButton: HTMLButtonElement;
   private readonly timers: TimerHost;
+  private readonly optionButtons = new Map<keyof SearchOptions, HTMLButtonElement>();
+  private searchOptions: SearchOptions = { regex: false, caseSensitive: false };
+  private hasError = false;
+  private disposed = false;
   private pendingQuery: ReturnType<TimerHost["setTimeout"]> | undefined;
   private readonly cleanups: (() => void)[] = [];
 
-  public constructor(private readonly document: Document, private readonly host: BoardSearchBarHost) {
+  public constructor(
+    private readonly document: Document,
+    private readonly host: BoardSearchBarHost,
+    private readonly enhancements?: BoardSearchBarOptions,
+  ) {
     const labels = words().search;
     const view = document.defaultView as unknown as TimerHost | null;
     this.timers = view !== null && typeof view?.setTimeout === "function" && typeof view?.clearTimeout === "function"
@@ -68,6 +89,21 @@ export class BoardSearchBar {
     this.input.setAttribute("spellcheck", "false");
     this.input.setAttribute("autocomplete", "off");
 
+    if (enhancements !== undefined) {
+      for (const [option, label, glyph, icon] of [
+        ["caseSensitive", enhancements.labels.caseSensitive, "Aa", "case-sensitive"],
+        ["regex", enhancements.labels.regex, ".*", "regex"],
+      ] as const) {
+        const button = bar.appendChild(this.button(label, icon, glyph));
+        button.setAttribute("data-search-option", option);
+        this.optionButtons.set(option, button);
+        this.listen(button, "click", () => {
+          this.setOptions({ ...this.searchOptions, [option]: this.searchOptions[option] !== true });
+        });
+      }
+      this.setOptions(enhancements.initialOptions ?? {}, false);
+    }
+
     this.counter = bar.appendChild(this.make("span", "miro-canvas-search__count"));
     this.previousButton = bar.appendChild(this.button(labels.previous, "chevron-up", "↑"));
     this.nextButton = bar.appendChild(this.button(labels.next, "chevron-down", "↓"));
@@ -79,8 +115,12 @@ export class BoardSearchBar {
 
     this.listen(this.input, "input", () => this.scheduleQuery());
     this.listen(bar, "keydown", (event) => this.onKey(event as KeyboardEvent));
-    this.listen(this.previousButton, "click", () => this.host.onStep(-1));
-    this.listen(this.nextButton, "click", () => this.host.onStep(1));
+    this.listen(this.previousButton, "click", () => {
+      if (!this.hasError) this.host.onStep(-1);
+    });
+    this.listen(this.nextButton, "click", () => {
+      if (!this.hasError) this.host.onStep(1);
+    });
     this.listen(closeButton, "click", () => this.host.onClose());
 
     this.element = bar;
@@ -93,6 +133,23 @@ export class BoardSearchBar {
 
   public get query(): string {
     return this.input.value;
+  }
+
+  public get options(): SearchOptions {
+    return { ...this.searchOptions };
+  }
+
+  /** Updating a mode searches immediately, cancelling any pending literal query. */
+  public setOptions(options: SearchOptions, search = true): void {
+    if (this.disposed) return;
+    this.searchOptions = { regex: options.regex === true, caseSensitive: options.caseSensitive === true };
+    for (const [option, button] of this.optionButtons) {
+      button.setAttribute("aria-pressed", String(this.searchOptions[option] === true));
+    }
+    if (search) {
+      this.cancelPendingQuery();
+      this.emitQuery();
+    }
   }
 
   /** Show the bar with the field focused and its text selected, ready to type over. */
@@ -116,6 +173,20 @@ export class BoardSearchBar {
   public showResult(result: BoardSearchResult): void {
     const labels = words().search;
     const searching = this.input.value.trim() !== "";
+    this.hasError = result.error !== undefined;
+    this.input.setAttribute("aria-invalid", String(this.hasError));
+    this.element.setAttribute("data-search-error", result.error?.code ?? "");
+    if (result.error !== undefined) {
+      // The fallback remains visible for legacy hosts; integrated hosts inject
+      // precise, localized error labels for every structured error code.
+      const message = this.enhancements?.labels.errors[result.error.code] ?? result.error.code;
+      this.counter.textContent = message;
+      this.live.textContent = message;
+      this.element.setAttribute("data-search-state", "error");
+      this.previousButton.disabled = true;
+      this.nextButton.disabled = true;
+      return;
+    }
     const found = result.total > 0 && result.current >= 0;
     let count = "";
     if (found) count = labels.count(result.current + 1, result.total);
@@ -131,6 +202,7 @@ export class BoardSearchBar {
   }
 
   public dispose(): void {
+    this.disposed = true;
     this.cancelPendingQuery();
     for (const cleanup of this.cleanups.splice(0)) cleanup();
     this.element.remove();
@@ -150,26 +222,27 @@ export class BoardSearchBar {
       event.preventDefault();
       // Enter right after typing searches at once rather than skipping the first match.
       if (this.flushPendingQuery()) return;
-      this.host.onStep(event.shiftKey ? -1 : 1);
+      if (!this.hasError) this.host.onStep(event.shiftKey ? -1 : 1);
       return;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       this.flushPendingQuery();
-      this.host.onStep(event.key === "ArrowDown" ? 1 : -1);
+      if (!this.hasError) this.host.onStep(event.key === "ArrowDown" ? 1 : -1);
     }
   }
 
   private scheduleQuery(): void {
+    if (this.disposed) return;
     this.cancelPendingQuery();
     const delay = this.host.queryDelay?.() ?? 0;
     if (delay <= 0) {
-      this.host.onQuery(this.input.value);
+      this.emitQuery();
       return;
     }
     this.pendingQuery = this.timers.setTimeout(() => {
       this.pendingQuery = undefined;
-      this.host.onQuery(this.input.value);
+      this.emitQuery();
     }, delay);
   }
 
@@ -177,8 +250,14 @@ export class BoardSearchBar {
   private flushPendingQuery(): boolean {
     if (this.pendingQuery === undefined) return false;
     this.cancelPendingQuery();
-    this.host.onQuery(this.input.value);
+    this.emitQuery();
     return true;
+  }
+
+  private emitQuery(): void {
+    if (this.disposed) return;
+    if (this.enhancements === undefined) this.host.onQuery(this.input.value);
+    else this.host.onQuery(this.input.value, this.options);
   }
 
   private cancelPendingQuery(): void {

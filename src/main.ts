@@ -1,9 +1,9 @@
 import { replaceInvalidFilenameCharacters } from "./control-characters";
 import { createHtmlElement } from "./dom-elements";
 import * as obsidian from "obsidian";
-import { Component, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, TFile, getLanguage, normalizePath, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { Component, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, Setting, TFile, getLanguage, normalizePath, parseYaml, stringifyYaml, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
-import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily } from "./appearance";
+import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily, defaultPalette } from "./appearance";
 import {
   inspectAdvancedCanvas,
   inspectCanvasView,
@@ -17,6 +17,22 @@ import {
 } from "./obsidian-metadata-store";
 import { storeDeviceFiles } from "./device-files";
 import { M1CanvasSession } from "./m1-session";
+import { PaletteEditor } from "./palette-editor";
+import { CustomStyleEditor } from "./custom-style-editor";
+import { cloneCanvasJson } from "./canvas-json";
+import { newCanvasId } from "./canvas-ids";
+import { graphDrift } from "./native-graph";
+import { CanvasAuthoring } from "./canvas-authoring";
+import { planEncapsulateSelection } from "./board-encapsulation";
+import { BoardTransferPublisher, type BoardTransferPublishResult, type TransferFileStat } from "./board-transfer-publisher";
+import { createObsidianBoardIndex, type ObsidianBoardIndex } from "./obsidian-board-index";
+import { CanvasOutgoingLinks } from "./canvas-outgoing-links";
+import { CanvasBacklinks } from "./canvas-backlinks";
+import { CanvasPropertyResults } from "./canvas-property-results";
+import { BoardCardResolver, BoardCardEmbeds, canvasCardLink, installCanvasCardLinkOpener, installCanvasCardEmbedCreator } from "./board-card-links";
+import { planBoardLinkRename, planReconcileNotePropertyEdges } from "./board-link-lifecycle";
+import type { BoardKnowledge } from "./board-knowledge";
+import { prepareBoardMetadataRename } from "./board-metadata-maintenance";
 import { DEFAULT_TOOLBAR_ITEMS } from "./quick-tools";
 import { M2CanvasTools, type InitialCommentTarget } from "./m2-tools";
 import { createObsidianDocumentHost } from "./obsidian-document-host";
@@ -137,6 +153,46 @@ export default class MiroCanvasPlugin extends Plugin {
   /** What the session now standing was built for, to tell a board still on screen from another; see `board-binding.ts`. */
   private currentCanvasBinding: BoardBinding | null = null;
   private m1Session: M1CanvasSession | null = null;
+  private boardIndex: ObsidianBoardIndex | undefined;
+  private outgoingLinks: CanvasOutgoingLinks | undefined;
+  private backlinks: CanvasBacklinks | undefined;
+  private propertyResults: CanvasPropertyResults | undefined;
+  private cardResolver: BoardCardResolver | undefined;
+  private cardEmbeds: BoardCardEmbeds | undefined;
+  private cardLinkCleanup: (() => void) | undefined;
+  private cardCreatorCleanup: (() => void) | undefined;
+  private readonly enhancementModals = new Set<Modal>();
+  /** Bounded maintainer receipt for the last transfer; no source or target document bodies. */
+  private transferReceipt: {
+    sourcePath: string;
+    targetPath: string;
+    result?: BoardTransferPublishResult;
+    refused?: string;
+    applyChecks: Array<{
+      reason: string;
+      identitySame: boolean;
+      expected: Pick<TransferFileStat, "mtime" | "size" | "revision">;
+      observed?: Pick<TransferFileStat, "mtime" | "size" | "revision">;
+      authoring?: { ok: boolean; status: string; diagnostics: string[] };
+    }>;
+    saveChecks: Array<{ status: "saved" | "failed"; reason: string; graphDrift?: string }>;
+  } | undefined;
+  private relationTimer: number | undefined;
+  private renameWork = Promise.resolve();
+  private renameReceipt: {
+    oldPath: string;
+    newPath: string;
+    folder: boolean;
+    processed: number;
+    error?: string;
+    boards: Array<{
+      path: string;
+      status: string;
+      save?: string;
+      diagnostics: readonly string[];
+      references: Array<{ nodeId?: string; link: string; original: string; resolvedPath?: string; start?: number; end?: number }>;
+    }>;
+  } | undefined;
   private toolsModal: Modal | null = null;
   private importGuideModal: Modal | null = null;
   /** The status bar's mark while a newer release is known; absent otherwise. */
@@ -183,6 +239,8 @@ export default class MiroCanvasPlugin extends Plugin {
       accountName: () => obsidianAccountName(window.localStorage),
       openImportGuide: () => this.openImportGuide(),
       createWelcomeBoard: () => void this.openWelcomeBoard(true),
+      openPalette: () => this.openPermanentPalette(),
+      openCustomStyles: () => this.openCustomStyles(),
       pluginVersion: this.manifest.version,
       checkForUpdate: () => this.checkForUpdates(),
       fontPackCatalogue: FONT_PACK_CATALOGUE,
@@ -213,6 +271,9 @@ export default class MiroCanvasPlugin extends Plugin {
     // Register cleanup as soon as the shell owns a DOM element. This also
     // covers a partially loaded plugin if a later registration throws.
     this.register(() => this.disposeShell());
+    this.registerEvent(this.app.vault.on("modify", (file) => {
+      if ((this.currentCanvasView as { file?: unknown } | null)?.file === file) this.m1Session?.notifyCommittedBoardDocument();
+    }));
 
     this.addCommand({
       id: "show-status",
@@ -324,7 +385,24 @@ export default class MiroCanvasPlugin extends Plugin {
     }));
     this.registerEvent(workspaceEvents.on("canvas:selection-menu", (menu: unknown) => {
       this.addLayerItems(menu);
+      if (menu instanceof Menu) for (const action of this.activeM1Session()?.enhancementActions() ?? []) {
+        menu.addItem((item) => item.setTitle(action.title).setDisabled(action.disabled === true).setSection("miro-canvas-actions").onClick(action.run));
+      }
     }));
+    const enhanced = words().enhancements;
+    for (const [id, name, action] of [
+      ["flip-edges", enhanced.flipEdges, (session: M1CanvasSession) => session.flipSelectionEdges()],
+      ["select-connected-lines", enhanced.selectConnected, (session: M1CanvasSession) => session.selectRelatedLines()],
+      ["select-incoming-lines", enhanced.selectIncoming, (session: M1CanvasSession) => session.selectRelatedLines("incoming")],
+      ["select-outgoing-lines", enhanced.selectOutgoing, (session: M1CanvasSession) => session.selectRelatedLines("outgoing")],
+      ["toggle-group-collapse", enhanced.collapseGroup, (session: M1CanvasSession) => session.toggleSelectedGroup()],
+      ["board-properties", enhanced.boardProperties, () => this.openBoardProperties()],
+      ["encapsulate-selection", enhanced.encapsulate, () => this.openSelectionTransfer()],
+    ] as const) this.addCommand({ id, name, checkCallback: (checking) => this.runM1Command(checking, action) });
+    this.addCommand({ id: "permanent-palette", name: enhanced.paletteTitle, callback: () => this.openPermanentPalette() });
+    this.addCommand({ id: "custom-styles", name: enhanced.editStyles, callback: () => this.openCustomStyles() });
+    this.addCommand({ id: "update-property-edges", name: enhanced.updatePropertyEdges,
+      checkCallback: (checking) => this.runM1Command(checking, () => this.reconcilePropertyEdges()) });
     // Registered without default hotkeys so Obsidian's own editor can bind
     // them and nothing is taken from the user or another plugin.
     for (const command of navigationCommands()) {
@@ -462,6 +540,7 @@ export default class MiroCanvasPlugin extends Plugin {
     // person can decline it without ever seeing Miro mentioned again outside
     // the settings tab's own button.
     this.app.workspace.onLayoutReady(() => {
+      this.startBoardIntegration();
       this.maybeAskImportQuestion();
       void this.checkForUpdatesAtStart();
     });
@@ -499,6 +578,7 @@ export default class MiroCanvasPlugin extends Plugin {
     // A settings save from inside "arrange panels" rebuilds this same board's
     // session; the mode must stay open through that.  Switching to a
     // different board is a real departure, so it closes the mode instead.
+    if (view === undefined) return;
     const sameBoard = this.currentCanvasView === view;
     const wasArranging = sameBoard && this.m1Session?.arrangeModeActive === true;
     this.toolsModal?.close();
@@ -511,7 +591,44 @@ export default class MiroCanvasPlugin extends Plugin {
     this.metadataWriter = this.metadataStoreProbe.store
       ? new MetadataWriter(this.metadataStoreProbe.store)
       : null;
+    const indexedFile = (view as { file?: unknown }).file;
     this.m1Session = new M1CanvasSession(view, this.metadataWriter, {
+      onCommittedBoardDocument: (document, identity) => {
+        if (this.currentCanvasView !== view || !(indexedFile instanceof TFile) || (view as { file?: unknown }).file !== indexedFile) return;
+        this.boardIndex?.ingestLiveDocument(indexedFile, document, { owner: view, identity });
+      },
+      onReleaseBoardDocument: () => {
+        if (indexedFile instanceof TFile) this.boardIndex?.releaseLiveDocument(indexedFile, view);
+      },
+      noteSearchAdapter: {
+        stat: (path) => {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          return file instanceof TFile ? { mtime: file.stat.mtime, size: file.stat.size } : undefined;
+        },
+        read: async (path, signal) => {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          if (signal.aborted || !(file instanceof TFile)) throw new Error("Linked note unavailable");
+          return this.app.vault.cachedRead(file);
+        },
+      },
+      subscribeNoteChanges: (changed) => {
+        const events = [
+          this.app.vault.on("modify", (file) => changed(file.path)),
+          this.app.vault.on("delete", (file) => changed(file.path)),
+          this.app.vault.on("rename", (file, oldPath) => { changed(oldPath); changed(file.path); }),
+        ];
+        return () => events.forEach((event) => this.app.vault.offref(event));
+      },
+      onSelectionActions: (button, actions) => {
+        const menu = new Menu();
+        for (const action of actions) menu.addItem((item) => item.setTitle(action.title).setDisabled(action.disabled === true).onClick(action.run));
+        const rect = button.getBoundingClientRect();
+        menu.showAtPosition({ x: rect.left, y: rect.bottom });
+      },
+      onOpenPalette: () => this.openPermanentPalette(),
+      onOpenBoardProperties: () => this.openBoardProperties(),
+      onEncapsulateSelection: () => this.openSelectionTransfer(),
+      onCopyNodeReference: (id, embed) => void this.copyCardReference(id, embed),
       onNotice: (message) => new Notice(message),
       onStateChange: () => this.updateStatus(true),
       setIcon: (element, icon) => setIcon(element, icon),
@@ -558,6 +675,7 @@ export default class MiroCanvasPlugin extends Plugin {
       }),
     });
     const mounted = this.m1Session.mount();
+    if (mounted && this.canvasSettings.automaticPropertyEdges) this.queuePropertyEdges();
     this.updateStatus(true);
     // A Canvas leaf can mount before its runtime exposes the data and save
     // members the metadata store needs.  Mounting alone is therefore not
@@ -578,9 +696,18 @@ export default class MiroCanvasPlugin extends Plugin {
 
   /** Persist a settings change and rebuild the session so it takes effect. */
   public async saveCanvasSettings(patch: Partial<MiroCanvasSettings>): Promise<void> {
+    const previous = this.canvasSettings;
     this.canvasSettings = mergeSettings(this.settingsOfThisDevice(), patch);
     setAuthorColors(this.canvasSettings.commentAuthorColors);
-    await this.persistSettings();
+    const pending = this.canvasSettings;
+    try {
+      await this.persistSettings();
+    } catch (error) {
+      if (this.canvasSettings === pending) this.canvasSettings = previous;
+      setAuthorColors(this.canvasSettings.commentAuthorColors);
+      throw error;
+    }
+    if ("boardKnowledge" in patch) this.configureBoardIndex();
     const leaf = this.focusedLeaf();
     if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
       this.handleActiveLeafChange(leaf);
@@ -605,8 +732,10 @@ export default class MiroCanvasPlugin extends Plugin {
     } catch {
       onDisk = undefined;
     }
-    this.canvasSettings = withOtherKindsFromDisk(this.canvasSettings, onDisk);
-    await this.saveData(settingsForStorage(this.canvasSettings));
+    const current = this.canvasSettings;
+    const merged = withOtherKindsFromDisk(current, onDisk);
+    await this.saveData(settingsForStorage(merged));
+    if (this.canvasSettings === current) this.canvasSettings = merged;
   }
 
   /**
@@ -619,6 +748,7 @@ export default class MiroCanvasPlugin extends Plugin {
     if (this.shellDisposed) return;
     const before = this.settingsOfThisDevice();
     this.canvasSettings = settingsFromExternalChange(before, await this.loadData());
+    if (before.boardKnowledge !== this.canvasSettings.boardKnowledge) this.configureBoardIndex();
     setAuthorColors(this.canvasSettings.commentAuthorColors);
     if (sameOnThisDevice(before, this.canvasSettings)) return;
     const leaf = this.focusedLeaf();
@@ -1200,12 +1330,592 @@ export default class MiroCanvasPlugin extends Plugin {
     this.syncFontCatalog();
   }
 
+  private enhancementModal(title: string, cleanup: () => void = () => {}): Modal {
+    const modal = new Modal(this.app);
+    modal.setTitle(title);
+    modal.containerEl.classList.add("miro-canvas-enhancement-container");
+    modal.modalEl.classList.add("miro-canvas-enhancement-dialog");
+    modal.contentEl.addClass("miro-canvas-enhancement-modal");
+    modal.onClose = () => {
+      cleanup();
+      this.enhancementModals.delete(modal);
+      modal.contentEl.empty();
+    };
+    this.enhancementModals.add(modal);
+    return modal;
+  }
+
+  private openPermanentPalette(): void {
+    let editor: PaletteEditor | undefined;
+    const modal = this.enhancementModal(words().enhancements.paletteTitle, () => editor?.dispose());
+    editor = new PaletteEditor(modal.contentEl.ownerDocument, this.canvasSettings.permanentPalette ?? defaultPalette(), defaultPalette(), words().enhancements.palette, {
+      onChange: async (palette) => this.saveCanvasSettings({ permanentPalette: [...palette] }),
+    });
+    modal.contentEl.append(editor.element);
+    modal.open();
+  }
+
+  private openCustomStyles(): void {
+    let editor: CustomStyleEditor | undefined;
+    const modal = this.enhancementModal(words().enhancements.customStyles, () => editor?.dispose());
+    editor = new CustomStyleEditor(modal.contentEl.ownerDocument, this.canvasSettings.customStyles, words().enhancements.styles, {
+      onChange: async (styles) => this.saveCanvasSettings({ customStyles: [...styles] }),
+    });
+    modal.contentEl.append(editor.element);
+    modal.open();
+  }
+
+  private openBoardProperties(): void {
+    const session = this.activeM1Session();
+    const before = session?.actionSnapshot();
+    if (session === null || session === undefined || before === undefined) return;
+    const metadata = before.miroCanvas as Record<string, unknown> | undefined;
+    let yaml = stringifyYaml(metadata?.properties ?? {});
+    const labels = words().enhancements;
+    const modal = this.enhancementModal(labels.boardProperties);
+    new Setting(modal.contentEl).setClass("miro-canvas-properties-setting").setDesc(labels.propertiesHint).addTextArea((input) => {
+      input.setValue(yaml).onChange((value) => { yaml = value; });
+      input.inputEl.classList.add("miro-canvas-properties-input");
+      input.inputEl.setAttribute("aria-label", labels.boardProperties);
+      input.inputEl.spellcheck = false;
+    });
+    const error = modal.contentEl.createEl("p", { cls: "miro-canvas-enhancement-status" });
+    error.setAttribute("role", "status");
+    new Setting(modal.contentEl).addButton((button) => button.setButtonText(labels.cancel).onClick(() => modal.close()))
+      .addButton((button) => button.setButtonText(labels.save).setCta().onClick(() => {
+        try {
+          const properties: unknown = parseYaml(yaml);
+          if (properties === null || typeof properties !== "object" || Array.isArray(properties) || Object.keys(properties).length > 256) throw new Error("Invalid board properties");
+          const plain = cloneCanvasJson(properties);
+          const next = cloneCanvasJson(before) as Record<string, unknown>;
+          next.miroCanvas = { ...(metadata ?? { schemaVersion: 1 }), properties: plain };
+          if (this.activeM1Session() !== session || !session.applyFeatureDocument(next, before)) {
+            error.textContent = labels.propertiesFailed;
+            return;
+          }
+          modal.close();
+        } catch { error.textContent = labels.propertiesInvalid; }
+      }));
+    modal.open();
+  }
+
+  private openSelectionTransfer(): void {
+    const session = this.activeM1Session();
+    const view = this.currentCanvasView as { file?: TFile; save?: () => Promise<void>; saving?: boolean } | null;
+    const file = view?.file;
+    const before = session?.actionSnapshot();
+    if (session === null || session === undefined || before === undefined || file === undefined || typeof view?.save !== "function" || session.featureBusy()) return;
+    const labels = words().enhancements;
+    const selection = session.selectionForTransfer();
+    let name = "";
+    const lifetime = new AbortController();
+    const modal = this.enhancementModal(labels.encapsulate, () => lifetime.abort());
+    modal.contentEl.createEl("p", { text: labels.transferHint });
+    new Setting(modal.contentEl).setName(labels.destinationName).addText((input) => input.onChange((value) => { name = value.trim(); }));
+    const status = modal.contentEl.createEl("p");
+    status.setAttribute("role", "status");
+    let running = false;
+    new Setting(modal.contentEl).addButton((button) => button.setButtonText(labels.cancel).onClick(() => modal.close()))
+      .addButton((button) => button.setButtonText(labels.transfer).setCta().onClick(() => {
+        if (running) return;
+        if (!name || replaceInvalidFilenameCharacters(name) !== name || name === "." || name === "..") { status.textContent = labels.invalidName; return; }
+        const folder = file.parent?.path === "/" ? "" : file.parent?.path ?? "";
+        const filename = name.endsWith(".canvas") ? name : `${name}.canvas`;
+        const targetPath = normalizePath(`${folder ? `${folder}/` : ""}${filename}`);
+        if (this.app.vault.getAbstractFileByPath(targetPath) !== null) { status.textContent = labels.invalidName; return; }
+        const plan = planEncapsulateSelection(before, selection.ids, { targetPath, proxyId: newCanvasId(), routeEnds: selection.routeEnds });
+        if (!plan.ok) { status.textContent = labels.actionFailed; return; }
+        running = true;
+        button.setDisabled(true);
+        status.textContent = labels.transferBusy;
+        void this.publishSelectionTransfer(session, view, file, before, plan.source, targetPath, plan.target, lifetime.signal).then((result) => {
+          if (lifetime.signal.aborted) return;
+          if (result === "applied") modal.close();
+          else status.textContent = result === "partial" ? labels.transferPartial : labels.transferFailed;
+        }).catch(() => { if (!lifetime.signal.aborted) status.textContent = labels.transferPartial; }).finally(() => {
+          running = false;
+          if (!lifetime.signal.aborted) button.setDisabled(false);
+        });
+      }));
+    modal.open();
+  }
+
+  private async publishSelectionTransfer(session: M1CanvasSession, view: { file?: TFile; save?: () => Promise<void>; saving?: boolean }, file: TFile,
+    before: Readonly<Record<string, unknown>>, after: Record<string, unknown>, targetPath: string, target: Record<string, unknown>, signal: AbortSignal): Promise<string> {
+    const sourcePath = file.path;
+    const receipt: NonNullable<typeof this.transferReceipt> = { sourcePath, targetPath, applyChecks: [], saveChecks: [] };
+    this.transferReceipt = receipt;
+    const revisions = new WeakMap<TFile, number>();
+    const createdFiles = new WeakMap<TFile, { readonly path: string; readonly stat: TransferFileStat }>();
+    const events: obsidian.EventRef[] = [];
+    const changed = (item: unknown): void => {
+      if (item instanceof TFile) revisions.set(item, (revisions.get(item) ?? 0) + 1);
+    };
+    try {
+      events.push(this.app.vault.on("create", (item) => {
+        changed(item);
+        if (item instanceof TFile) createdFiles.set(item, {
+          path: item.path,
+          stat: { identity: item, mtime: item.stat.mtime, size: item.stat.size, revision: revisions.get(item) ?? 0 },
+        });
+      }));
+      events.push(this.app.vault.on("modify", changed));
+      events.push(this.app.vault.on("delete", changed));
+      events.push(this.app.vault.on("rename", changed));
+      const stat = (path: string): TransferFileStat | undefined => {
+        const item = this.app.vault.getAbstractFileByPath(path);
+        return item instanceof TFile && item.path === path
+          ? { identity: item, mtime: item.stat.mtime, size: item.stat.size, revision: revisions.get(item) ?? 0 } : undefined;
+      };
+      const sameStat = (path: string, expected: TransferFileStat): boolean => {
+        const current = stat(path);
+        return current?.identity === expected.identity && current.mtime === expected.mtime
+          && current.size === expected.size && current.revision === expected.revision;
+      };
+      const cancelled = (cancellation: AbortSignal): boolean => cancellation.aborted || this.shellDisposed;
+      const read = async (path: string): Promise<string> => {
+        const item = this.app.vault.getAbstractFileByPath(path);
+        if (!(item instanceof TFile)) throw new Error("Transfer file unavailable");
+        return this.app.vault.read(item);
+      };
+      const json = (value: unknown): string => JSON.stringify(value, (_key, item: unknown) => {
+        if (item === null || typeof item !== "object" || Array.isArray(item)) return item;
+        return Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right)));
+      });
+      const same = (left: Readonly<Record<string, unknown>>, right: Readonly<Record<string, unknown>>): boolean => {
+        if (left === after || right === after) {
+          const stored = left === after ? right : left;
+          return graphDrift(stored, after) === undefined && json({ ...stored, nodes: [], edges: [] }) === json({ ...after, nodes: [], edges: [] });
+        }
+        return json(left) === json(right);
+      };
+      const snapshot = (): Readonly<Record<string, unknown>> => {
+        const current = session.actionSnapshot();
+        if (this.shellDisposed || this.activeM1Session() !== session || view.file !== file || file.path !== sourcePath
+          || current === undefined || session.featureBusy()) throw new Error("Transfer source changed");
+        return current;
+      };
+      const checkDisk = async (path: string, expected: { stat: TransferFileStat; text: string }): Promise<boolean> => {
+        return sameStat(path, expected.stat) && await read(path) === expected.text && sameStat(path, expected.stat);
+      };
+      const initial = stat(sourcePath);
+      if (initial === undefined || cancelled(signal)) { receipt.refused = "source-unavailable-or-cancelled"; return "refused"; }
+      let text: string;
+      try { text = await read(sourcePath); } catch { receipt.refused = "initial-read-failed"; return "refused"; }
+      if (cancelled(signal) || !sameStat(sourcePath, initial)) { receipt.refused = "initial-source-changed-or-cancelled"; return "refused"; }
+      const publisher = new BoardTransferPublisher<Readonly<Record<string, unknown>>>({
+        stat: (path) => stat(path), read: (path) => read(path), snapshotSource: () => snapshot(), sameSnapshot: same,
+        createTarget: async (path, contents, cancellation) => {
+          if (cancelled(cancellation) || this.app.vault.getAbstractFileByPath(path)) return { status: "exists" };
+          const item = await this.app.vault.create(path, contents);
+          const created = createdFiles.get(item);
+          return created?.path !== path ? { status: "failed" } : { status: "created", stat: created.stat };
+        },
+        applySource: async (_path, next, expected, cancellation) => {
+          type AuthoringResult = NonNullable<(typeof receipt.applyChecks)[number]["authoring"]>;
+          let authoringResult: AuthoringResult | undefined;
+          const checked = (reason: string): void => {
+            if (receipt.applyChecks.length >= 4) return;
+            const wanted = expected.fingerprint.stat;
+            const observed = stat(expected.path);
+            receipt.applyChecks.push({
+              reason, identitySame: observed?.identity === wanted.identity,
+              expected: { mtime: wanted.mtime, size: wanted.size, revision: wanted.revision },
+              ...(observed === undefined ? {} : { observed: { mtime: observed.mtime, size: observed.size, revision: observed.revision } }),
+              ...(authoringResult === undefined ? {} : { authoring: authoringResult }),
+            });
+          };
+          const refused = (reason: string): { status: "refused" } => { checked(reason); return { status: "refused" }; };
+          if (cancelled(cancellation)) return refused("cancelled-before-read");
+          let diskMatches: boolean;
+          try { diskMatches = await checkDisk(expected.path, expected.fingerprint); }
+          catch (error) { checked("source-disk-read-failed"); throw error; }
+          if (!diskMatches) return refused("source-disk-fingerprint-changed");
+          if (cancelled(cancellation)) return refused("cancelled-after-read");
+          if (!sameStat(expected.path, expected.fingerprint.stat)) return refused("source-revision-after-read");
+          if (this.activeM1Session() !== session) return refused("inactive-session");
+          const authoring = (session as unknown as { authoring?: CanvasAuthoring }).authoring;
+          let restore: (() => void) | undefined;
+          // actionSnapshot initializes this local authoring instance before publication.
+          // Capture only diagnostic codes; preserve parent instrumentation and the exact result.
+          if (authoring instanceof CanvasAuthoring) {
+            const descriptor = Object.getOwnPropertyDescriptor(authoring, "applyDocument");
+            if (descriptor === undefined && Object.isExtensible(authoring) || descriptor?.writable === true && "value" in descriptor) {
+              const original = Reflect.get(authoring, "applyDocument");
+              const wrapper = function (this: CanvasAuthoring, ...args: Parameters<CanvasAuthoring["applyDocument"]>): ReturnType<CanvasAuthoring["applyDocument"]> {
+                const result = Reflect.apply(original, this, args);
+                authoringResult = { ok: result.ok, status: result.status, diagnostics: result.diagnostics.slice(0, 16).map((diagnostic) => diagnostic.code) };
+                return result;
+              };
+              try {
+                Object.defineProperty(authoring, "applyDocument", { ...(descriptor ?? { configurable: true, enumerable: false, writable: true }), value: wrapper });
+                restore = () => {
+                  if (authoring.applyDocument !== wrapper) return;
+                  if (descriptor === undefined) Reflect.deleteProperty(authoring, "applyDocument");
+                  else Object.defineProperty(authoring, "applyDocument", descriptor);
+                };
+              } catch { /* Diagnostics never change whether native authoring can run. */ }
+            }
+          }
+          try {
+            if (!session.applyFeatureDocument(next, expected.snapshot)) return refused("native-feature-refused");
+          } catch (error) { checked("native-feature-threw"); throw error; }
+          finally { restore?.(); }
+          checked("applied");
+          return { status: "applied", snapshot: snapshot(), rollbackSafe: true };
+        },
+        awaitSourceSave: async (path, expected, cancellation) => {
+          const failed = (reason: string, drift?: string): { status: "failed" } => {
+            if (receipt.saveChecks.length < 4) receipt.saveChecks.push({ status: "failed", reason, ...(drift === undefined ? {} : { graphDrift: drift }) });
+            return { status: "failed" };
+          };
+          try {
+            const deadline = Date.now() + 5000;
+            const saving = (): boolean => view.saving === true;
+            const settleSave = async (): Promise<void> => {
+              while (saving() && Date.now() < deadline && !cancelled(cancellation)) await new Promise((resolve) => window.setTimeout(resolve, 20));
+            };
+            await settleSave();
+            if (cancelled(cancellation)) return failed("cancelled");
+            if (saving()) return failed("save-busy-before");
+            if (!same(snapshot(), expected)) return failed("source-snapshot-before-save");
+            await view.save!();
+            await settleSave();
+            if (cancelled(cancellation)) return failed("cancelled");
+            if (saving()) return failed("save-busy-after");
+            if (!same(snapshot(), expected)) return failed("source-snapshot-after-save");
+            const saved = stat(path);
+            const contents = await read(path);
+            if (cancelled(cancellation)) return failed("cancelled");
+            if (saved === undefined || !sameStat(path, saved)) return failed("source-revision-during-save-read");
+            if (!same(snapshot(), expected)) return failed("source-snapshot-during-save-read");
+            const stored = JSON.parse(contents) as Record<string, unknown>;
+            const drift = graphDrift(stored, expected);
+            if (drift !== undefined) return failed("disk-graph-drift", drift);
+            if (json({ ...stored, nodes: [], edges: [] }) !== json({ ...expected, nodes: [], edges: [] })) return failed("disk-root-drift");
+            if (receipt.saveChecks.length < 4) receipt.saveChecks.push({ status: "saved", reason: "verified" });
+            return { status: "saved", fingerprint: { stat: saved, text: contents } };
+          } catch { return failed("native-save-or-read-failed"); }
+        },
+        rollbackSource: async (_prior, expected, cancellation) => !cancelled(cancellation) && await checkDisk(expected.path, expected.fingerprint)
+          && !cancelled(cancellation) && sameStat(expected.path, expected.fingerprint.stat)
+          && same(snapshot(), expected.snapshot) && session.rollbackFeatureDocument(),
+        deleteTarget: async (path, expected, source, cancellation) => {
+          if (cancelled(cancellation) || !await checkDisk(path, expected) || cancelled(cancellation)
+            || !await checkDisk(source.path, source.fingerprint) || cancelled(cancellation)) return false;
+          const item = this.app.vault.getAbstractFileByPath(path);
+          if (item !== expected.stat.identity || !(item instanceof TFile) || !same(snapshot(), source.snapshot)
+            || cancelled(cancellation) || !sameStat(path, expected.stat) || !sameStat(source.path, source.fingerprint.stat)) return false;
+          await this.app.fileManager.trashFile(item);
+          return this.app.vault.getAbstractFileByPath(path) === null;
+        },
+      });
+      try {
+        const result = await publisher.publish({ sourcePath, targetPath, sourceBefore: before, sourceAfter: after, sourceFingerprint: { stat: initial, text }, targetText: JSON.stringify(target, null, "\t") }, signal);
+        receipt.result = result;
+        return result.status;
+      } finally { publisher.dispose(); }
+    } finally {
+      for (const event of events) this.app.vault.offref(event);
+    }
+  }
+
+  private async copyCardReference(id: string, embed: boolean): Promise<void> {
+    const file = (this.currentCanvasView as { file?: TFile } | null)?.file;
+    const link = file === undefined ? undefined : canvasCardLink(file.path, id);
+    if (link === undefined) { new Notice(words().enhancements.copyFailed); return; }
+    try {
+      await navigator.clipboard.writeText(`${embed ? "!" : ""}[[${link}]]`);
+      new Notice(words().enhancements.copied);
+    } catch { new Notice(words().enhancements.copyFailed); }
+  }
+
+  private configureBoardIndex(): void {
+    this.backlinks?.dispose();
+    this.propertyResults?.dispose();
+    this.outgoingLinks?.dispose();
+    this.boardIndex?.dispose();
+    this.outgoingLinks = undefined;
+    this.boardIndex = undefined;
+    this.propertyResults = undefined;
+    this.backlinks = undefined;
+    if (this.shellDisposed || !this.canvasSettings.boardKnowledge) return;
+    this.boardIndex = createObsidianBoardIndex(this.app, {
+      onIndexed: () => { this.outgoingLinks?.refresh(); this.propertyResults?.refresh(); this.backlinks?.refresh(); if (this.canvasSettings.automaticPropertyEdges) this.queuePropertyEdges(); },
+      onNotePropertiesChanged: () => { if (this.canvasSettings.automaticPropertyEdges) this.queuePropertyEdges(); },
+      onRename: (file, oldPath, boards) => {
+        this.maintainRenamedBoards(file, oldPath, boards);
+      },
+    });
+    this.boardIndex.start();
+    this.outgoingLinks = new CanvasOutgoingLinks(this.app, this.boardIndex);
+    this.outgoingLinks.start();
+    this.propertyResults = new CanvasPropertyResults(this.app, this.boardIndex, { labels: () => words().enhancements.propertyResults });
+    this.propertyResults.start();
+    this.backlinks = new CanvasBacklinks(this.app, this.boardIndex);
+    this.backlinks.start();
+  }
+
+  /** The index supplies historical targets; never resolve a bare link after rename. */
+  private maintainRenamedBoards(file: obsidian.TAbstractFile, oldPath: string, boards: ReadonlyMap<string, BoardKnowledge>): void {
+    const newPath = file.path;
+    const folder = !(file instanceof TFile);
+    const receipt: NonNullable<typeof this.renameReceipt> = { oldPath, newPath, folder, processed: 0, boards: [] };
+    this.renameReceipt = receipt;
+    const snapshots = new Map<string, { knowledge: BoardKnowledge; board: TFile }>();
+    for (const [previousPath, knowledge] of boards) {
+      const path = previousPath === oldPath || previousPath.startsWith(`${oldPath}/`) ? newPath + previousPath.slice(oldPath.length) : previousPath;
+      const board = this.app.vault.getAbstractFileByPath(path);
+      if (!(board instanceof TFile) || board.extension !== "canvas") continue;
+      try {
+        // Newer native parsing/resolution cannot mutate queued historical evidence.
+        const snapshot = typeof structuredClone === "function" ? structuredClone(knowledge) : cloneCanvasJson(knowledge);
+        snapshots.set(path, { knowledge: snapshot, board });
+      } catch { receipt.error = "historical-snapshot-unavailable"; }
+    }
+    this.renameWork = this.renameWork.catch(() => {}).then(async () => {
+      for (const [path, { knowledge, board }] of snapshots) {
+        if (this.shellDisposed) return;
+        const row: (typeof receipt.boards)[number] = {
+          path, status: "queued", diagnostics: [],
+          references: [...knowledge.links, ...knowledge.embeds].slice(0, 8).map((reference) => ({
+            nodeId: reference.position?.nodeId, link: reference.link.slice(0, 4096), original: reference.original.slice(0, 4096),
+            resolvedPath: reference.resolvedPath, start: reference.position?.start.offset, end: reference.position?.end.offset,
+          })),
+        };
+        if (receipt.boards.length < 64) receipt.boards.push(row);
+        receipt.processed += 1;
+        if (file.path !== newPath || this.app.vault.getAbstractFileByPath(newPath) !== file
+          || this.app.vault.getAbstractFileByPath(path) !== board || board.path !== path) { row.status = "file-identity-changed"; continue; }
+        const open = this.app.workspace.getLeavesOfType("canvas").find((leaf) => (leaf.view as unknown as { file?: TFile }).file === board);
+        if (open !== undefined) {
+          const deadline = Date.now() + 5000;
+          while (!this.shellDisposed && this.renameViewBusy(open.view) && Date.now() < deadline) {
+            await new Promise((resolve) => window.setTimeout(resolve, 50));
+          }
+          if (this.shellDisposed) return;
+          const stillOpen = this.app.workspace.getLeavesOfType("canvas").some((leaf) => leaf.view === open.view);
+          if (!stillOpen || (open.view as unknown as { file?: TFile }).file !== board || file.path !== newPath
+            || this.app.vault.getAbstractFileByPath(path) !== board || this.app.vault.getAbstractFileByPath(newPath) !== file) {
+            row.status = "view-or-file-changed";
+            continue;
+          }
+          const result = this.renameBoardReferences(oldPath, newPath, folder, knowledge, open.view);
+          row.status = result.status;
+          row.diagnostics = result.diagnostics.slice(0, 16);
+          if (result.status === "applied") row.save = await this.persistRenamedBoard(open.view, board);
+          continue;
+        }
+        if (board.stat.size > 16 * 1024 * 1024) { row.status = "board-too-large"; continue; }
+        try {
+          const source = await this.app.vault.read(board);
+          if (this.shellDisposed) return;
+          const plan = prepareBoardMetadataRename(source, { sourcePath: path, oldPath, newPath, folder, preRename: knowledge });
+          row.diagnostics = plan.diagnostics.slice(0, 16).map((diagnostic) => diagnostic.code);
+          if (plan.status !== "prepared") { row.status = plan.status; continue; }
+          let committed = false;
+          await this.app.vault.process(board, (current) => {
+            const opened = this.app.workspace.getLeavesOfType("canvas").some((leaf) => (leaf.view as unknown as { file?: TFile }).file === board);
+            if (this.shellDisposed || opened || current !== plan.expectedSource || file.path !== newPath
+              || this.app.vault.getAbstractFileByPath(newPath) !== file || this.app.vault.getAbstractFileByPath(path) !== board || board.path !== path) return current;
+            committed = true;
+            return JSON.stringify(plan.document, null, "\t");
+          });
+          row.status = committed ? "metadata-applied" : "source-changed-or-opened";
+          if (committed) this.boardIndex?.reindex(path);
+        } catch { row.status = "maintenance-failed"; }
+      }
+      // Let a successful M1 commit publish its coalesced live document before draining indexing.
+      await Promise.resolve();
+      if (!this.shellDisposed) await this.boardIndex?.flush();
+    }).catch(() => { receipt.error = "rename-work-failed"; });
+  }
+
+  private renameViewBusy(view: unknown): boolean {
+    const bound = this.m1Session;
+    const session = this.currentCanvasView === view && bound !== null && bound.view === view ? bound : undefined;
+    return session?.featureBusy() === true || (view as { canvas?: { isDragging?: boolean } } | null)?.canvas?.isDragging === true;
+  }
+
+  /** Drain the native view save, without hooking requestSave or adding another history step. */
+  private async persistRenamedBoard(view: unknown, file: TFile): Promise<string> {
+    const native = view as { file?: TFile; save?: () => Promise<void>; saving?: boolean };
+    if (typeof native.save !== "function") return "save-unavailable";
+    const path = file.path;
+    const present = (): boolean => !this.shellDisposed && native.file === file && file.path === path
+      && this.app.vault.getAbstractFileByPath(path) === file
+      && this.app.workspace.getLeavesOfType("canvas").some((leaf) => leaf.view === view);
+    const json = (value: unknown): string => JSON.stringify(value, (_key, item: unknown) => item === null || typeof item !== "object" || Array.isArray(item)
+      ? item : Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right))));
+    const same = (left: Record<string, unknown>, right: Record<string, unknown>): boolean => graphDrift(left, right) === undefined
+      && json({ ...left, nodes: [], edges: [] }) === json({ ...right, nodes: [], edges: [] });
+    const authoring = new CanvasAuthoring(view);
+    try {
+      if (!present() || this.renameViewBusy(view)) return "view-or-file-changed";
+      const expected = authoring.readSnapshot().document;
+      if (expected === undefined) return "snapshot-unavailable";
+      const deadline = Date.now() + 5000;
+      const saving = (): boolean => native.saving === true;
+      const settle = async (): Promise<void> => {
+        while (present() && saving() && Date.now() < deadline) await new Promise((resolve) => window.setTimeout(resolve, 20));
+      };
+      const current = (): boolean => {
+        const document = authoring.readSnapshot().document;
+        return document !== undefined && same(document, expected);
+      };
+      await settle();
+      if (!present() || saving() || this.renameViewBusy(view) || !current()) return "source-changed-or-busy";
+      await native.save();
+      await settle();
+      if (!present() || saving() || this.renameViewBusy(view) || !current()) return "source-changed-or-busy";
+      const mtime = file.stat.mtime;
+      const size = file.stat.size;
+      const contents = await this.app.vault.read(file);
+      if (!present() || file.stat.mtime !== mtime || file.stat.size !== size || this.renameViewBusy(view) || !current()) return "source-changed-during-read";
+      const stored = JSON.parse(contents) as Record<string, unknown>;
+      return same(stored, expected) ? "saved" : "disk-unverified";
+    } catch { return "save-failed"; }
+    finally { authoring.dispose(); }
+  }
+
+  private queuePropertyEdges(): void {
+    if (this.shellDisposed || this.relationTimer !== undefined) return;
+    this.relationTimer = window.setTimeout(() => {
+      this.relationTimer = undefined;
+      if (this.shellDisposed || !this.canvasSettings.automaticPropertyEdges) return;
+      if (this.activeM1Session()?.featureBusy()) { this.queuePropertyEdges(); return; }
+      this.reconcilePropertyEdges();
+    }, 200);
+  }
+
+  private reconcilePropertyEdges(): void {
+    const session = this.activeM1Session();
+    const before = session?.actionSnapshot();
+    const file = (this.currentCanvasView as { file?: TFile } | null)?.file;
+    if (session === null || session === undefined || before === undefined || file === undefined || session.featureBusy()) return;
+    const plan = planReconcileNotePropertyEdges(before, {
+      sourcePath: file.path,
+      properties: this.canvasSettings.relationProperties.length ? this.canvasSettings.relationProperties : undefined,
+      resolveLink: (link, source) => this.app.metadataCache.getFirstLinkpathDest(link, source)?.path,
+      getNoteCache: (path) => {
+        const note = this.app.vault.getAbstractFileByPath(path);
+        return note instanceof TFile ? this.app.metadataCache.getFileCache(note) : undefined;
+      },
+      createEdgeId: () => newCanvasId(),
+    });
+    if (plan.ok && plan.changed) session.applyFeatureDocument(plan.document, before, true);
+  }
+
+  private renameBoardReferences(oldPath: string, newPath: string, folder: boolean, knowledge: BoardKnowledge, view: unknown = this.currentCanvasView): { status: string; diagnostics: readonly string[] } {
+    const file = (view as { file?: TFile } | null)?.file;
+    if (!(file instanceof TFile) || this.shellDisposed) return { status: "view-unavailable", diagnostics: [] };
+    if (this.renameViewBusy(view)) return { status: "view-busy", diagnostics: [] };
+    const bound = this.m1Session;
+    const session = this.currentCanvasView === view && bound !== null && bound.view === view ? bound : undefined;
+    const authoring = session === undefined ? new CanvasAuthoring(view) : undefined;
+    try {
+      const before = session?.actionSnapshot() ?? authoring?.readSnapshot().document;
+      if (before === undefined) return { status: "snapshot-unavailable", diagnostics: [] };
+      const plan = planBoardLinkRename(before, { sourcePath: file.path, oldPath, newPath, folder, preRename: knowledge });
+      if (!plan.ok) return { status: plan.reason, diagnostics: [] };
+      const diagnostics = plan.diagnostics.map((diagnostic) => diagnostic.code);
+      if (!plan.changed) return { status: "noop", diagnostics };
+      if (session !== undefined) return { status: session.applyFeatureDocument(plan.document, before, true) ? "applied" : "native-feature-refused", diagnostics };
+      const result = authoring!.applyDocument(plan.document, before);
+      return { status: result.ok ? "applied" : "native-feature-refused", diagnostics: [...diagnostics, ...result.diagnostics.map((diagnostic) => diagnostic.code)] };
+    } catch { return { status: "native-feature-failed", diagnostics: [] }; }
+    finally { authoring?.dispose(); }
+  }
+
+  private startBoardIntegration(): void {
+    if (this.shellDisposed || this.cardResolver !== undefined) return;
+    this.configureBoardIndex();
+    const resolver = new BoardCardResolver({
+      resolvePath: (link, source) => this.app.metadataCache.getFirstLinkpathDest(link, source)?.path,
+      stat: (path) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof TFile ? { mtime: file.stat.mtime, size: file.stat.size } : undefined;
+      },
+      read: async (path, signal) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (signal.aborted || !(file instanceof TFile)) throw new Error("Card board unavailable");
+        return this.app.vault.cachedRead(file);
+      },
+    });
+    this.cardResolver = resolver;
+    const render = async (text: string, context: import("./board-card-links").CardRenderContext): Promise<void> => {
+      const component = new Component();
+      component.load();
+      context.registerCleanup(() => component.unload());
+      if (!context.signal.aborted) await MarkdownRenderer.render(this.app, text, context.container, context.sourcePath, component);
+    };
+    const labels = words().enhancements.cardEmbed;
+    const embeds = new BoardCardEmbeds(resolver, {
+      labels: { ...labels, error: () => labels.error },
+      renderMarkdown: render,
+      renderFile: async (path, subpath, context) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile) || context.signal.aborted) return false;
+        await render(`![[${path}${subpath}]]`, context);
+        return true;
+      },
+    });
+    this.cardEmbeds = embeds;
+    const creator = installCanvasCardEmbedCreator(this.app, {
+      Component,
+      create: (request) => new class extends Component {
+        public async loadFile(): Promise<void> {
+          if (request.signal.aborted) return;
+          const context = request.context;
+          const handle = embeds.mountNative(context.containerEl, context.linktext, context.sourcePath, context.depth, request.registerCleanup);
+          if (handle === undefined) {
+            context.containerEl.textContent = words().enhancements.cardEmbed.error;
+            return;
+          }
+          this.register(() => handle.dispose());
+          request.registerCleanup(() => handle.dispose());
+          await handle.ready;
+        }
+      }(),
+      onError: (request) => { request.context.containerEl.textContent = words().enhancements.cardEmbed.error; },
+    });
+    this.cardCreatorCleanup = creator.dispose;
+    const opener = installCanvasCardLinkOpener(this.app.workspace, resolver, () => new Notice(words().enhancements.cardEmbed.error));
+    this.cardLinkCleanup = opener.dispose;
+    this.registerMarkdownPostProcessor((element, context) => {
+      for (const handle of embeds.postprocess(element, context.sourcePath)) {
+        const child = new class extends MarkdownRenderChild {
+          override onunload(): void { handle.dispose(); }
+        }(handle.element);
+        context.addChild(child);
+      }
+    });
+    const changed = (path: string): void => {
+      resolver.invalidate(path);
+      void embeds.refresh();
+    };
+    this.registerEvent(this.app.vault.on("modify", (file) => changed(file.path)));
+    this.registerEvent(this.app.vault.on("delete", (file) => changed(file.path)));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { changed(oldPath); changed(file.path); }));
+  }
+
   private disposeShell(): void {
     if (this.shellDisposed) {
       return;
     }
 
     this.shellDisposed = true;
+    if (this.relationTimer !== undefined) window.clearTimeout(this.relationTimer);
+    this.relationTimer = undefined;
+    for (const modal of [...this.enhancementModals]) modal.close();
+    this.cardLinkCleanup?.();
+    this.cardCreatorCleanup?.();
+    this.cardEmbeds?.dispose();
+    this.cardResolver?.dispose();
+    this.outgoingLinks?.dispose();
+    this.backlinks?.dispose();
+    this.propertyResults?.dispose();
+    this.boardIndex?.dispose();
     for (const controller of this.exportJobs) controller.abort();
     this.exportJobs.clear();
     if (this.initializationRetry !== null) this.initializationTimerHost.clearTimeout(this.initializationRetry);

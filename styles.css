@@ -5096,3 +5096,110 @@
 .miro-canvas-root.canvas-wrapper[data-miro-canvas-tool="lasso"] :is(.canvas-node.is-focused, .canvas-node.is-selected, .canvas-edge.is-focused, .miro-board-connector.is-focused) * {
   cursor: move;
 }
+
+/* Obsidian Android reports the keyboard height without shrinking the viewport. */
+.is-mobile .miro-canvas-enhancement-container {
+  box-sizing: border-box;
+  padding-bottom: var(--keyboard-height, 0px);
+}
+
+.is-mobile .miro-canvas-enhancement-container .miro-canvas-enhancement-dialog {
+  max-height: calc(100dvh - var(--keyboard-height, 0px) - 32px);
+}
+
+.miro-canvas-enhancement-modal :is(.miro-canvas-palette-editor, .miro-canvas-custom-style-editor) {
+  display: grid;
+  gap: 12px;
+}
+
+.miro-canvas-enhancement-modal :is(.miro-canvas-palette-editor__row, .miro-canvas-custom-style-editor__row) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.miro-canvas-enhancement-modal :is(.miro-canvas-palette-editor__label, .miro-canvas-custom-style-editor__label) {
+  flex: 1;
+  min-width: 100px;
+}
+
+.miro-canvas-enhancement-modal :is(.miro-canvas-palette-editor__form, .miro-canvas-custom-style-editor__form) {
+  display: grid;
+  gap: 8px;
+}
+
+.miro-canvas-enhancement-modal label {
+  display: grid;
+  gap: 4px;
+}
+
+.miro-canvas-enhancement-modal button {
+  --miro-canvas-button-padding: 6px 10px;
+  padding: var(--miro-canvas-button-padding);
+}
+
+.miro-canvas-palette-editor__swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.miro-canvas-enhancement-modal :is(.miro-canvas-properties-input, .miro-canvas-custom-style-editor__declarations) {
+  width: 100%;
+  min-height: 160px;
+  font-family: var(--font-monospace);
+  resize: vertical;
+}
+
+.miro-canvas-enhancement-modal .miro-canvas-properties-setting {
+  display: block;
+}
+
+.miro-canvas-root .miro-canvas-group-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.miro-canvas-root .canvas-node.miro-canvas-group-collapsed {
+  pointer-events: none;
+}
+
+.miro-canvas-root .canvas-node.miro-canvas-group-collapsed .canvas-node-container {
+  width: min(100%, 280px);
+  height: min(100%, 64px);
+  min-height: 0;
+  pointer-events: auto;
+}
+
+.miro-canvas-root .canvas-node.miro-canvas-group-collapsed .canvas-group-label {
+  pointer-events: auto;
+  max-width: 280px;
+}
+
+.miro-canvas-root .canvas-node.miro-canvas-group-collapsed :is(.canvas-node-resizer, .canvas-node-content) {
+  display: none;
+}
+
+.miro-canvas-root .miro-canvas-line-related .canvas-display-path {
+  filter: drop-shadow(0 0 3px var(--interactive-accent));
+}
+
+.miro-canvas-card-embed {
+  display: block;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 12px;
+  overflow: auto;
+  max-height: 600px;
+}
+.miro-canvas-property-results {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(280px, 35dvh);
+  overflow: auto;
+  padding: var(--size-2-2) var(--size-2-4);
+}

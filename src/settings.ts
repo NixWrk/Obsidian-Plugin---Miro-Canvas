@@ -10,12 +10,13 @@
 
 import { hasValidFilenameCharacters } from "./control-characters";
 
-import { OFFERED_FONT_FAMILIES, isSafeFontFamily } from "./appearance";
+import { OFFERED_FONT_FAMILIES, isSafeFontFamily, normalizePalette, validatePalette, type PaletteColor } from "./appearance";
 import { words } from "./i18n";
 import { normalizePanelLayout, type PanelLayout } from "./panel-layout";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
 import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, type ToolbarItem } from "./quick-tools";
 import { readAvailableUpdate, type AvailableUpdate } from "./update-check";
+import type { CustomBoardStyle } from "./custom-board-styles";
 export type WheelZoomModifier = "none" | "ctrl" | "shift" | "alt";
 
 /**
@@ -61,6 +62,16 @@ export interface FontListEntry {
 }
 
 export interface MiroCanvasSettings {
+  readonly contentTextThreshold: number;
+  readonly contentFileThreshold: number;
+  readonly contentLinkThreshold: number;
+  readonly contentPluginThreshold: number;
+  readonly highlightConnectedLines: boolean;
+  readonly boardKnowledge: boolean;
+  readonly automaticPropertyEdges: boolean;
+  readonly relationProperties: readonly string[];
+  readonly customStyles: readonly CustomBoardStyle[];
+  readonly permanentPalette: readonly PaletteColor[] | undefined;
   /** Multiplier applied per zoom step. */
   readonly zoomStep: number;
   readonly minZoom: number;
@@ -156,7 +167,7 @@ interface NumberBound {
 }
 
 export const SETTING_BOUNDS: Readonly<Record<
-  "zoomStep" | "minZoom" | "maxZoom" | "panStep" | "fastPanMultiplier" | "connectorMagnet" | "connectorSnap" | "connectorLabelPosition",
+  "zoomStep" | "minZoom" | "maxZoom" | "panStep" | "fastPanMultiplier" | "connectorMagnet" | "connectorSnap" | "connectorLabelPosition" | "contentTextThreshold" | "contentFileThreshold" | "contentLinkThreshold" | "contentPluginThreshold",
   NumberBound
 >> = Object.freeze({
   zoomStep: { min: 1.02, max: 2, step: 0.01 },
@@ -167,6 +178,10 @@ export const SETTING_BOUNDS: Readonly<Record<
   connectorMagnet: { min: 0, max: 96, step: 2 },
   connectorSnap: { min: 0, max: 64, step: 2 },
   connectorLabelPosition: { min: 0, max: 1, step: 0.05 },
+  contentTextThreshold: { min: 0, max: 2, step: 0.05 },
+  contentFileThreshold: { min: 0, max: 2, step: 0.05 },
+  contentLinkThreshold: { min: 0, max: 2, step: 0.05 },
+  contentPluginThreshold: { min: 0, max: 2, step: 0.05 },
 });
 
 export const WHEEL_ZOOM_MODIFIERS: readonly WheelZoomModifier[] = ["none", "ctrl", "shift", "alt"];
@@ -177,6 +192,16 @@ const DEFAULT_DEVICE_LAYOUT: DeviceLayout = Object.freeze({
 });
 
 export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
+  contentTextThreshold: 0,
+  contentFileThreshold: 0,
+  contentLinkThreshold: 0,
+  contentPluginThreshold: 0,
+  highlightConnectedLines: true,
+  boardKnowledge: true,
+  automaticPropertyEdges: false,
+  relationProperties: Object.freeze([]),
+  customStyles: Object.freeze([]),
+  permanentPalette: undefined,
   zoomStep: 1.2,
   minZoom: 0.0625,
   maxZoom: 16,
@@ -433,6 +458,23 @@ export function removeFromFontList(fontList: readonly FontListEntry[], families:
  * the kind of device in use; left out, the value's own `layoutKind` (an
  * earlier result passed back in) or else a computer is taken.
  */
+function readCustomStyles(value: unknown): readonly CustomBoardStyle[] {
+  if (!Array.isArray(value)) return [];
+  const styles: CustomBoardStyle[] = [];
+  const seen = new Set<string>();
+  let characters = 0;
+  for (const item of value.slice(0, 128)) {
+    if (!isRecord(item) || typeof item.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u.test(item.id)
+      || typeof item.name !== "string" || item.name.trim() === "" || item.name.length > 256
+      || typeof item.declarations !== "string" || item.declarations.length > 32768 || seen.has(item.id)) continue;
+    characters += item.declarations.length;
+    if (characters > 262144) break;
+    seen.add(item.id);
+    styles.push(Object.freeze({ id: item.id, name: item.name.trim(), declarations: item.declarations }));
+  }
+  return Object.freeze(styles);
+}
+
 export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvasSettings {
   const wanted = kind ?? (isRecord(value) && LAYOUT_KINDS.includes(value.layoutKind as LayoutKind) ? value.layoutKind as LayoutKind : "desktop");
   if (!isRecord(value)) {
@@ -463,6 +505,18 @@ export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvas
     minimapVisible: readBoolean(value, "minimapVisible", DEFAULT_SETTINGS.minimapVisible),
     selectionToolbarEnabled: readBoolean(value, "selectionToolbarEnabled", DEFAULT_SETTINGS.selectionToolbarEnabled),
     boardFindKey: readBoolean(value, "boardFindKey", DEFAULT_SETTINGS.boardFindKey),
+    contentTextThreshold: readNumber(value, "contentTextThreshold", 0),
+    contentFileThreshold: readNumber(value, "contentFileThreshold", 0),
+    contentLinkThreshold: readNumber(value, "contentLinkThreshold", 0),
+    contentPluginThreshold: readNumber(value, "contentPluginThreshold", 0),
+    highlightConnectedLines: readBoolean(value, "highlightConnectedLines", true),
+    boardKnowledge: readBoolean(value, "boardKnowledge", true),
+    automaticPropertyEdges: readBoolean(value, "automaticPropertyEdges", false),
+    relationProperties: Object.freeze(Array.isArray(value.relationProperties)
+      ? [...new Set(value.relationProperties.filter((item): item is string => typeof item === "string" && item.trim().length > 0 && item.length <= 256).map((item) => item.trim()))].slice(0, 128) : []),
+    customStyles: readCustomStyles(value.customStyles),
+    permanentPalette: value.permanentPalette !== undefined && validatePalette(value.permanentPalette).valid
+      ? normalizePalette(value.permanentPalette) : undefined,
     holdStraightLine: readBoolean(value, "holdStraightLine", DEFAULT_SETTINGS.holdStraightLine),
     penPressure: readBoolean(value, "penPressure", DEFAULT_SETTINGS.penPressure),
     fingerDrawing: readBoolean(value, "fingerDrawing", DEFAULT_SETTINGS.fingerDrawing),

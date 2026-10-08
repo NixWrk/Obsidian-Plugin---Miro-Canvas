@@ -328,8 +328,69 @@ def main() -> int:
                 toolbar.get_by_label('Custom line color', exact=True).fill('#ff5500')
                 assert page.evaluate("miroBrowser.runtime.getData().miroCanvas.connectors['menu-line'].color") == '#ff5500'
                 toolbar.get_by_role('button', name='Line color', exact=True).click()
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session,r=b.runtime;
+                  if(!Object.hasOwn(r,'history')||!Object.hasOwn(r.history,'data')
+                    ||!Object.hasOwn(r.history,'current')||r.history.max!==100)
+                    throw Error('Synthetic host has no inspected native history object');
+                  if(!Object.hasOwn(r.requestPushHistory,'run')||!Object.hasOwn(r.requestPushHistory,'cancel'))
+                    throw Error('Synthetic history queue is missing own run/cancel');
+                  b.setHistoryDeferred(true);
+                  const prior=r.getData();prior.syntheticPendingNativeStep='before-flip';r.importData(prior);
+                  s.connectorLayer.select(['menu-line']);s.refresh();
+                  r.requestSave(true);
+                  if(!b.historyPending())throw Error('Prior native step did not remain queued');
+                  b.flipBefore=r.getData();b.flipHistoryLength=b.getHistoryLength();
+                  b.flipHistoryIndex=b.getHistoryIndex();b.flipSaves=b.getSaves();
+                  b.flipGeometry=s.landingGeometry().geometry.edges['menu-line'];
+                  const label=b.root.querySelector('.miro-canvas-connector-label[data-connector-id="menu-line"]').getBoundingClientRect();
+                  b.flipLabelCenter={x:label.left+label.width/2,y:label.top+label.height/2};
+                }""")
                 toolbar.get_by_role('button', name='Swap line ends', exact=True).click()
                 assert page.evaluate("miroBrowser.runtime.getData().miroCanvas.connectors['menu-line'].startCap") == 'arrow'
+                page.evaluate("""() => {
+                  const b=miroBrowser,s=b.session,r=b.runtime;
+                  try{
+                    const after=r.getData(),c=after.miroCanvas.connectors['menu-line'],old=b.flipBefore.miroCanvas.connectors['menu-line'];
+                    if(old.startCap!=='none'||old.endCap!=='arrow'||c.endCap!=='none')throw Error('Flip lost the asymmetric caps');
+                    if(JSON.stringify(c.from)!==JSON.stringify(old.to)||JSON.stringify(c.to)!==JSON.stringify(old.from))
+                      throw Error('Flip did not reverse the original endpoints');
+                    if(c.label!==old.label||Math.abs(c.labelT-(1-old.labelT))>1e-9)throw Error('Flip lost label content/route position');
+                    const geo=s.landingGeometry().geometry.edges['menu-line'];
+                    if(JSON.stringify(geo.start)!==JSON.stringify(b.flipGeometry.end)||JSON.stringify(geo.end)!==JSON.stringify(b.flipGeometry.start))
+                      throw Error('Flip landing geometry did not follow reversed endpoints');
+                    const label=b.root.querySelector('.miro-canvas-connector-label[data-connector-id="menu-line"]').getBoundingClientRect();
+                    if(Math.abs(label.left+label.width/2-b.flipLabelCenter.x)>1||Math.abs(label.top+label.height/2-b.flipLabelCenter.y)>1)
+                      throw Error('Flip moved the visible label away from its original route position');
+                    if(b.getSaves()!==b.flipSaves+1||b.getHistoryLength()!==b.flipHistoryLength+2
+                      ||b.getHistoryIndex()!==b.flipHistoryIndex+2||b.historyPending())
+                      throw Error('Flip did not separately flush the prior step and its one own history step');
+                    r.undo();s.refresh();
+                    if(JSON.stringify(r.getData())!==JSON.stringify(b.flipBefore))throw Error('One Flip undo lost the prior queued edit');
+                    r.redo();s.refresh();
+                    if(JSON.stringify(r.getData())!==JSON.stringify(after))throw Error('Flip redo lost caps/geometry/content');
+                    r.undo();s.refresh();s.connectorLayer.select(['menu-line']);s.refresh();
+                    const beforeFault=r.getData(),rows=r.history.data.slice(),cursor=r.history.current;
+                    const originalSave=r.requestSave;let fail=true;
+                    r.requestSave=function(addHistory=true){
+                      Reflect.apply(originalSave,this,[addHistory]);
+                      if(addHistory&&fail){fail=false;throw Error('Synthetic save failure after enqueue');}
+                    };
+                    try{s.flipSelectionEdges();}finally{r.requestSave=originalSave;}
+                    if(JSON.stringify(r.getData())!==JSON.stringify(beforeFault)||r.history.current!==cursor
+                      ||r.history.data.length!==rows.length||r.history.data.some((row,index)=>row!==rows[index])||b.historyPending())
+                      throw Error('Failed Flip left changed geometry/history or a pending redo');
+                    r.redo();s.refresh();
+                    if(JSON.stringify(r.getData())!==JSON.stringify(after))throw Error('Failed Flip destroyed the original redo branch');
+                  }finally{b.setHistoryDeferred(false);}
+                  // Restore the free-end setup for the next grip test, and prove two Flips round-trip.
+                  s.connectorLayer.select(['menu-line']);s.refresh();s.flipSelectionEdges();
+                  const roundTrip=r.getData().miroCanvas.connectors['menu-line'],old=b.flipBefore.miroCanvas.connectors['menu-line'];
+                  const canonical=value=>JSON.stringify(value,(_key,item)=>item&&typeof item==='object'&&!Array.isArray(item)
+                    ?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))):item);
+                  if(Math.abs(roundTrip.labelT-old.labelT)>1e-9||canonical({...roundTrip,labelT:old.labelT})!==canonical(old))
+                    throw Error('Two Flips did not restore the original cap/endpoint/label geometry');
+                }""")
                 page.evaluate("miroBrowser.session.armTool('connector')")
                 panel = page.locator('.miro-canvas-tools__connectors')
                 assert panel.locator('[data-shape]').evaluate_all("els=>els.map(e=>e.dataset.shape)") == ['arrow', 'elbow', 'block', 'line', 'curve', 'polyline', 'spline']

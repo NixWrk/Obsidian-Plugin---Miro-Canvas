@@ -62,10 +62,43 @@ drawing. The interface is available in English and Russian.
 
 Open the GIF at full size for small controls.
 
-Export runs in the background, so you can keep editing or open another board.
+Export renders an independent board snapshot without screen capture, so you can
+keep editing or open another board.
 Files are saved as new vault attachments. **Each page or slide is an image of
 the board**; PowerPoint text and shapes are not separate editable objects.
 Live web embeds and video are omitted.
+
+## Canvas expansion in development
+
+The following additions are implemented in the development worktree and remain
+unreleased. Verification and remaining checks are tracked in the
+[feature plan](docs/canvas-enhancement-plan.md) and
+[integration checks](docs/obsidian-integration-checks.md).
+
+| Feature | Behavior and limits |
+| --- | --- |
+| **Search linked notes** | Board search includes Markdown file-card contents and heading/block slices, with match-case and a bounded regular-expression mode. |
+| **Connections** | Reverse direction with **Reverse connection direction** (Flip), select incoming/outgoing/connected lines, or highlight them without changing selection. |
+| **Compact groups** | Collapse a group for viewing; its real cards, connections and stored positions remain in the file. |
+| **Move a selection** | Move cards and internal lines to a new board; crossing lines attach to its file card. Undo restores the source selection and retains the new board file. |
+| **Board properties and card links** | Edit properties, tags and aliases; copy a link or embed for an individual card. Supported metadata integration adds graph, outgoing and backlink data through temporary caches and reversible pane hooks. |
+| **Note-property connections** | Optionally generate connections between file cards from note-property links, preserving manual connections. |
+| **Shared colors and styles** | Prefer a permanent palette across boards while retaining customized local palettes. Apply named, scoped CSS declarations from a restricted subset. |
+| **Zoom content** | Set content thresholds for text, file, web and Miro cards; selected or edited cards stay readable. |
+
+Board-property/tag search supplements native results for positive
+conjunctions, such as `tag:project [status:"active"]`. OR, negation, regex and
+mixed content/path queries are not supplemented; native search still runs.
+Property-only backlink rows require an empty backlink filter and open the real
+board without invented text offsets. Private API shapes, scan limits and
+unsupported syntax can prevent supplementation. These additions do not make
+Canvas root properties native Markdown frontmatter.
+
+Windows checks now cover a typed property query, opening its real board result,
+and following a property-only outgoing link. The corresponding tablet check
+and complete native acceptance remain pending.
+
+[Behavior, persistence and remaining checks](docs/miro-canvas.md#canvas-expansion--unreleased)
 
 ## Installing
 

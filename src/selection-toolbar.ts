@@ -114,6 +114,8 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
 export type SelectionStylePatch = SelectionToolbarStyle;
 
 export interface SelectionToolbarActions {
+  readonly onFlipEdges?: () => void;
+  readonly onMoreActions?: (button: HTMLElement) => void;
   readonly onTextSelectionWanted?: () => void;
   readonly onDelete?: () => void;
   readonly onEditConnectorLabel?: () => void;
@@ -901,6 +903,14 @@ export class SelectionToolbar {
     openLink.hidden = true;
     // Delete stays last, a danger item; the native elements the host puts
     // here keep their own order and behaviour, ahead of it.
+    if (this.actions.onMoreActions !== undefined) {
+      const actionsButton = append(more.panel, makeButton(document, words().enhancements.selectionActions));
+      this.icon(actionsButton, "workflow", "⋯");
+      this.listen(actionsButton, "click", () => {
+        this.closePopovers();
+        this.actions.onMoreActions?.(more.button);
+      });
+    }
     const nativeSlot = append(more.panel, make(document, "span", "miro-canvas-toolbar__native"));
     const deleteSelection = append(nativeSlot, makeButton(document,words().toolbar.deleteSelection,"miro-canvas-toolbar__button--delete"));
     this.icon(deleteSelection,"trash-2","⌫");
@@ -980,6 +990,10 @@ export class SelectionToolbar {
       }
     }
     this.listen(refs.swapEnds, "click", () => {
+      if (this.actions.onFlipEdges !== undefined) {
+        if (this.state?.editable === true) this.actions.onFlipEdges();
+        return;
+      }
       const { start, end } = this.caps();
       if (start !== end) this.style({ connector: { startCap: end, endCap: start } });
     });

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Expand board search to linked Markdown note contents and heading/block slices, with match-case, bounded regular expressions and explicit invalid/unsupported-pattern feedback.
+- Add Flip for native and independent connections, connected/incoming/outgoing selection and optional highlighting. Add reversible group collapse as a view projection, retaining native cards, lines and stored geometry.
+- Move a selection into a new board with preserved card IDs, styling, unknown fields and Miro source evidence; redirect crossing lines to the new file card and retain old card links through redirects. Undo restores the source selection but deliberately retains the target board.
+- Add board properties, tags/aliases and individual-card links/embeds. Use guarded transient metadata caches plus graph/outgoing/backlink integration; discover property-only backlinks outside native results with genuine board navigation, supported only with an empty backlink filter.
+- Add a separate board-property/tag file-result supplement for positive conjunctions, including typed searches. Unsupported OR, negation, regex, comparisons, typed operands and mixed content/file/path syntax fail closed for the supplement; native search remains unchanged.
+- Add optional note-property-derived connections between file cards, reconciling only marked generated edges and preserving manual connections. Maintain property links and moved-card redirects across renames through checked writers.
+- Prefer a permanent palette for new or uncustomized boards while preserving customized local palettes. Add named scoped CSS declarations from a restricted subset and zoom content thresholds with selection/editing exemptions.
+- Wait for native Markdown rendering before independent PDF/PowerPoint capture so card text remains in background exports under default throttling.
+
+The expansion remains unreleased; verification and remaining checks are
+tracked in the [feature plan](docs/canvas-enhancement-plan.md).
+
 - Refresh all 58 English/Russian guide GIFs with readable step captions, simpler workflows and clear final states. Add one board-theme switch example per language; keep card colors and content visible across both themes. Place panels beside the work, select cards before following links, and verify actual drawing/erasure and reachable controls.
 - Simplify the English and Russian READMEs with a feature overview, quick installation and first steps. Keep all detailed instructions and existing GIFs in linked user guides; move CLI examples and source-warning notes to the contributor guides.
 - Update development ESLint to 10.12.0 and Node 22 declarations to 22.20.5; development now requires Node 22.13+ on supported lines. Keep the three plugin runtime files unchanged and CLI/MCP downloads on Node 20+; rebuilding the standalone tools changes only unused package metadata. Pin html2canvas-pro 2.5.0: the next two patches declare Node 24 and are deferred.

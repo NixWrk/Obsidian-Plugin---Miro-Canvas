@@ -12,6 +12,7 @@
  */
 
 import { createHtmlElement } from "./dom-elements";
+import { checkExportCanvasFrame, settleExportMarkdown } from "./export-canvas";
 import {
   PAPER_FORMATS, captureTiles, exportPixels, paperLabels, type ExportPageRecord, type ExportQuality, type ExportRect,
   type ExportState, type PaperFormat, type PaperOrientation,
@@ -394,6 +395,37 @@ function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 
+/** Hidden desktop windows may suspend RAF; Stop and the timer both release it. */
+function exportFrame(view: Window, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let frame: number | undefined;
+    let timer: number | undefined;
+    let settled = false;
+    const finish = (error?: Error): void => {
+      if (settled) return;
+      settled = true;
+      if (frame !== undefined) view.cancelAnimationFrame(frame);
+      if (timer !== undefined) view.clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      if (error === undefined) resolve();
+      else reject(error);
+    };
+    const abort = (): void => finish(new Error(words().export.exportStopped));
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      timer = view.setTimeout(() => finish(), 150);
+      if (!settled) frame = view.requestAnimationFrame(() => finish());
+      if (settled) {
+        if (timer !== undefined) view.clearTimeout(timer);
+        if (frame !== undefined) view.cancelAnimationFrame(frame);
+      }
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error(words().export.pageNotDrawn));
+    }
+  });
+}
+
 /** Render only an independently owned Canvas surface; never the working board. */
 export async function renderExportPages(
   canvas: CaptureCanvas,
@@ -443,8 +475,12 @@ export async function renderExportPages(
         canvas.viewportChanged = true;
         canvas.requestFrame();
         await abortable(pause(120), controller.signal);
-        await abortable(new Promise<void>(resolve => view.requestAnimationFrame(() => resolve())), controller.signal);
+        await exportFrame(view, controller.signal);
+        checkExportCanvasFrame(canvas);
+        await settleExportMarkdown(canvas, controller.signal);
         prepare?.();
+        // Let scoped style observers reassert paint before the rasterizer clones it.
+        await abortable(Promise.resolve(), controller.signal);
         const picture = await html2canvas(wrapper, {
           signal: controller.signal,
           scale: 1, logging: false, backgroundColor: view.getComputedStyle(wrapper).backgroundColor,
@@ -497,12 +533,14 @@ function prepareExportSvgs(source: HTMLElement, cloned: HTMLElement): void {
     if (copy === undefined || original.getBoundingClientRect().width === 0) continue;
     const elements = [original, ...Array.from(original.querySelectorAll("*"))];
     const targets = [copy, ...Array.from(copy.querySelectorAll("*"))];
+    const hiddenByGroup = original.closest(".miro-canvas-group-hidden") !== null;
     elements.forEach((element, at) => {
       const target = targets[at] as SVGElement | undefined;
       if (target === undefined) return;
       const computed = view.getComputedStyle(element);
-      for (const property of ["color", "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity", "font-family", "font-size"]) {
-        target.style.setProperty(property, computed.getPropertyValue(property));
+      for (const property of ["visibility", "display", "color", "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity", "font-family", "font-size", "font-weight", "font-style", "font-variant", "letter-spacing", "word-spacing", "text-decoration", "text-anchor", "dominant-baseline"]) {
+        // Native screenshot content may reveal descendants of a collapsed group.
+        target.style.setProperty(property, hiddenByGroup && property === "visibility" ? "hidden" : computed.getPropertyValue(property));
       }
     });
     if (!original.classList.contains("canvas-edges")) continue;

@@ -14,7 +14,6 @@ import { watchNativeUiVisibility } from "./native-ui-visibility";
 import { NativeStyleProperties } from "./native-style-properties";
 import {
 	APPEARANCE_ACTIONS,
-	mergeAppearanceMetadata,
 	normalizeAppearanceState,
 	appearanceReducer,
 	colorToCss,
@@ -127,9 +126,15 @@ import { DoubleTapWatch, RecentPresses, DOUBLE_TAP_MS, TAP_MAX_MS, TAP_SLOP } fr
 import { pressureStrokePath, remapStrokeWidths } from "./pressure-stroke";
 import { controlToLetGo } from "./board-focus";
 import { edgeLanding } from "./edge-landing";
-import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentMutationResult } from "./local-comments";
+import { addLocalComment, addReply, deleteLocalComment, deleteLocalReply, listCommentThreads, renameCommentDisplayAuthor, setCommentResolved, type CommentOrigin, type CommentThread, type CommentMutationResult } from "./local-comments";
 import { CommentThreadCard, threadMessages } from "./comment-thread";
-import { buildSearchIndex, findMatches, focusRect, stepMatch, type SearchEntry, type SearchKind } from "./board-search";
+import { buildSearchIndex, searchMatches, focusRect, stepMatch, type SearchEntry, type SearchKind, type SearchOptions, type SearchError } from "./board-search";
+import { LinkedNoteSearch, type LinkedNoteSearchAdapter } from "./linked-note-search";
+import { planFlipBoardEdges, planConnectedBoardLineIds, type BoardLineDirection } from "./board-edge-actions";
+import { collapsedGroupOwners, groupCollapse, groupSelectionIds, toggleGroupCollapse, compactGroupRect, projectCollapsedGroups } from "./board-groups";
+import { ContentBreakpoints, type ContentTarget } from "./content-breakpoints";
+import { CustomBoardStyles, type CustomStyleTarget } from "./custom-board-styles";
+import { displayedBoardPalette, mergeDisplayedAppearance } from "./board-palette";
 import { BoardSearchBar } from "./board-search-bar";
 import {
 	NATIVE_TOOLBAR_ITEMS, QUICK_TOOL_KEYS, QuickTools, isDrawingTool, type ArmedTool, type NativeToolbarItem, type QuickTool, type ToolbarItem,
@@ -174,10 +179,20 @@ import {
 } from "./export-pages";
 import { ExportOverlay, ExportPanel, renderExportPages, type ExportKind } from "./board-export";
 import { packExport } from "./export-worker-client";
-import { createExportCanvas } from "./export-canvas";
+import { createExportCanvas, exportCanvasSettings } from "./export-canvas";
 import { words } from "./i18n";
 
 export interface M1SessionOptions {
+  readonly noteSearchAdapter?: LinkedNoteSearchAdapter;
+  readonly subscribeNoteChanges?: (changed: (path: string) => void) => () => void;
+  readonly noteTextSlice?: (path: string, text: string, subpath: string) => string | undefined;
+  readonly onSelectionActions?: (button: HTMLElement, actions: readonly { readonly title: string; readonly run: () => void; readonly disabled?: boolean }[]) => void;
+  readonly onCommittedBoardDocument?: (document: object, identity: object) => void;
+  readonly onReleaseBoardDocument?: () => void;
+  readonly onOpenPalette?: () => void;
+  readonly onOpenBoardProperties?: () => void;
+  readonly onEncapsulateSelection?: () => void;
+  readonly onCopyNodeReference?: (id: string, embed: boolean) => void;
 	readonly document?: Document;
 	readonly panelHost?: HTMLElement;
 	readonly onNotice?: (message: string) => void;
@@ -1503,6 +1518,7 @@ export class M1CanvasSession {
 	private selectedCommentKeys = new Set<string>();
 	private scene: CanvasScene = { nodes: [], edges: [] };
 	private minimap: MinimapModel | undefined;
+ private minimapProjection: { document: unknown; owners: ReadonlyMap<string, string>; scene: CanvasScene } | undefined;
 	private transientDiagnostics: string[] = [];
 	private lastSnapshot: M1SessionSnapshot = {
 		status: "unavailable",
@@ -1569,6 +1585,22 @@ export class M1CanvasSession {
 	private commentDraft: CanvasAnchor | undefined;
 	/** The search bar at the top right, made the first time it opens. */
 	private searchBar: BoardSearchBar | undefined;
+	private noteSearch: LinkedNoteSearch | undefined;
+	private noteTexts: ReadonlyMap<string, string> = new Map();
+	private noteSearchPaths = "";
+	private searchOptions: SearchOptions = {};
+	private searchError: SearchError | undefined;
+	private collapsedCache: { readonly document: unknown; readonly owners: ReadonlyMap<string, string> } | undefined;
+	private contentBreakpoints: ContentBreakpoints | undefined;
+	private customBoardStyles: CustomBoardStyles | undefined;
+	private enhancementDomIdentity = 0;
+	private enhancementPaintKey = "";
+ private searchPeekId: string | undefined;
+ private peekOwners: { owners: ReadonlyMap<string, string>; id: string; visible: ReadonlyMap<string, string> } | undefined;
+ private visibleCommentThreads: { threads: readonly CommentThread[]; owners: ReadonlyMap<string, string>; visible: readonly CommentThread[] } | undefined;
+	private enhancementDocument: unknown;
+	private highlightedLines: { readonly document: unknown; readonly selection: string; readonly ids: ReadonlySet<string> } | undefined;
+	private readonly enhancementClasses = new Set<Element>();
 	/** The one outline around the match shown; it never takes a press. */
 	private searchHit: HTMLElement | undefined;
 	/** The label or pin the outline hugs, found once per match rather than every frame. */
@@ -1657,6 +1689,7 @@ export class M1CanvasSession {
 	private spacePanHeld = false;
 	private pointerEditIds: readonly string[] | undefined;
 	private nativeHistoryDepth = 0;
+	private boardCommitQueued = false;
 	/**
 	 * The board and the selection the last native edit was checked against.
 	 * Native Canvas moves a selection card by card, in one go; while neither
@@ -1705,6 +1738,7 @@ export class M1CanvasSession {
 			getEdges: () => this.adapter.getEdges(),
 			getSelectionMovePreviewIds: () => this.selectionMovePreview === undefined ? undefined : this.selectionMoveIds,
 			getRotationPreview: () => this.rotationPreview,
+			getCollapsedNodeOwners: () => this.collapsedOwners(),
 			getSourceScene: (document) => {
 				const cache = this.landingCache;
 				return cache !== undefined && cache.document === document ? cache.scene : undefined;
@@ -1719,6 +1753,33 @@ export class M1CanvasSession {
 		}, renderDocument);
 		const settings = options.settings ?? DEFAULT_SETTINGS;
 		this.settings = settings;
+		if (options.noteSearchAdapter !== undefined) {
+			this.noteSearch = new LinkedNoteSearch(options.noteSearchAdapter);
+			this.disposers.push(() => this.noteSearch?.dispose());
+			const unsubscribe = options.subscribeNoteChanges?.((path) => {
+				this.noteSearch?.invalidate(path);
+				this.noteSearchPaths = "";
+				if (this.searchBar?.isOpen === true) this.loadSearchNotes();
+			});
+			if (unsubscribe !== undefined) this.disposers.push(unsubscribe);
+		}
+		if (this.root?.ownerDocument !== undefined && typeof readRuntime(this.root, "querySelectorAll") === "function" && typeof this.root.contains === "function") {
+			this.contentBreakpoints = new ContentBreakpoints(this.root);
+			this.customBoardStyles = new CustomBoardStyles(this.root);
+			const observer = this.root.ownerDocument.defaultView?.MutationObserver;
+			if (observer !== undefined) {
+				const watcher = new observer((records) => {
+					if (records.some((entry) => entry.type === "childList")) this.enhancementDomIdentity += 1;
+				});
+				watcher.observe(this.root, { childList: true, subtree: true });
+				this.disposers.push(() => watcher.disconnect());
+			}
+			this.disposers.push(() => {
+				this.contentBreakpoints?.dispose();
+				this.customBoardStyles?.dispose();
+				for (const element of this.enhancementClasses) element.classList.remove("miro-canvas-group-hidden", "miro-canvas-group-collapsed", "miro-canvas-line-related");
+			});
+		}
 		this.viewport = new ViewportController(this.adapter, {
 			// A user preference narrows the safe range; it never widens it.
 			minZoom: Math.max(DEFAULT_MIN_ZOOM, settings.minZoom),
@@ -1747,6 +1808,8 @@ export class M1CanvasSession {
 			onTextSelectionWanted: () => this.captureTextFragment(),
 			onAppearance: (action) => this.applyAppearance(action),
 			onStyle: (patch) => this.applyElementStyle(patch),
+			onFlipEdges: () => this.flipSelectionEdges(),
+			onMoreActions: (button) => this.options.onSelectionActions?.(button, this.enhancementActions()),
 			onEditConnectorLabel: () => {this.editSelectedConnectorLabel();},
 			onDelete: () => this.deleteBoardSelection(),
 			onLock: (locked) => (locked ? this.lockSelection() : this.unlockSelection()),
@@ -2063,6 +2126,7 @@ export class M1CanvasSession {
 			return;
 		}
 		bar.open();
+		this.loadSearchNotes();
 		// Text left from the last search is looked for again on the board as it is now.
 		this.syncSearch();
 		this.placeSearchHit();
@@ -2073,6 +2137,10 @@ export class M1CanvasSession {
 		const bar = this.searchBar;
 		if (bar === undefined || !bar.isOpen) return;
 		bar.close();
+		this.searchPeekId = undefined;
+		this.landingCache = undefined;
+		this.enhancementPaintKey = "";
+		this.refresh();
 		this.closeSearchThread();
 		this.placeSearchHit();
 		this.root?.focus?.({ preventScroll: true });
@@ -2103,13 +2171,13 @@ export class M1CanvasSession {
 		const document = this.options.document ?? ownerDocument(root);
 		if (root === undefined || document === undefined || this.disposed) return undefined;
 		const bar = new BoardSearchBar(document, {
-			onQuery: (query) => this.runSearch(query),
+			onQuery: (query, options) => this.runSearch(query, options),
 			onStep: (direction) => this.stepSearch(direction),
 			onClose: () => this.closeSearch(),
 			// A large board waits for a pause in the typing before it searches.
 			queryDelay: () => ((this.searchIndexCache?.index.length ?? 0) > SEARCH_DEBOUNCE_ENTRIES ? SEARCH_DEBOUNCE_MS : 0),
 			...(this.options.setIcon === undefined ? {} : { setIcon: this.options.setIcon }),
-		});
+		}, { labels: words().enhancements.search, initialOptions: this.searchOptions });
 		const hit = createHtmlElement(document, "div");
 		hit.className = "miro-canvas-search-hit";
 		hit.setAttribute("aria-hidden", "true");
@@ -2149,10 +2217,28 @@ export class M1CanvasSession {
 			scene,
 			geometry,
 			threads,
+			noteTexts: this.noteTexts,
+			...(this.options.noteTextSlice === undefined ? {} : { noteTextSlice: this.options.noteTextSlice }),
 			labelFallback: this.settings.connectorLabelPosition,
 		});
 		this.searchIndexCache = { document, threads, index };
 		return index;
+	}
+
+	private loadSearchNotes(): void {
+		if (this.noteSearch === undefined || this.disposed || this.searchBar?.isOpen !== true) return;
+		const document = this.currentRawDocument;
+		const paths = isRecord(document) && Array.isArray(document.nodes)
+			? [...new Set(document.nodes.flatMap((node) => isRecord(node) && node.type === "file" && typeof node.file === "string" && /\.md$/iu.test(node.file) ? [node.file] : []))] : [];
+		const key = paths.join("\n");
+		if (key === this.noteSearchPaths) return;
+		this.noteSearchPaths = key;
+		void this.noteSearch.load(paths).then((result) => {
+			if (this.disposed || result.status !== "ready" || key !== this.noteSearchPaths) return;
+			this.noteTexts = result.noteTexts;
+			this.searchIndexCache = undefined;
+			this.syncSearch();
+		});
 	}
 
 	private currentSearchEntry(): SearchEntry | undefined {
@@ -2161,11 +2247,14 @@ export class M1CanvasSession {
 	}
 
 	/** The field's text changed: find it anew and show the first match. */
-	private runSearch(query: string): void {
+	private runSearch(query: string, options: SearchOptions = this.searchOptions): void {
 		this.searchQuery = query;
+		this.searchOptions = options;
 		const index = this.searchIndex();
 		this.searchMatched = index;
-		this.searchMatches = findMatches(index, query);
+		const result = searchMatches(index, query, options);
+		this.searchMatches = result.matches;
+		this.searchError = result.error;
 		this.searchCurrent = this.searchMatches.length > 0 ? 0 : -1;
 		this.showSearchMatch(true);
 	}
@@ -2185,12 +2274,15 @@ export class M1CanvasSession {
 	 */
 	private syncSearch(): void {
 		if (this.searchBar?.isOpen !== true || this.searchQuery.trim() === "") return;
+		this.loadSearchNotes();
 		const index = this.searchIndex();
 		if (index === this.searchMatched) return;
 		const previousKey = this.currentSearchEntry()?.key;
 		const previousPlace = this.searchCurrent;
 		this.searchMatched = index;
-		this.searchMatches = findMatches(index, this.searchQuery);
+		const result = searchMatches(index, this.searchQuery, this.searchOptions);
+		this.searchMatches = result.matches;
+		this.searchError = result.error;
 		const kept = this.searchMatches.findIndex((position) => index[position]?.key === previousKey);
 		this.searchCurrent = kept >= 0
 			? kept
@@ -2204,6 +2296,7 @@ export class M1CanvasSession {
 		this.searchBar?.showResult({
 			current: entry === undefined ? -1 : this.searchCurrent,
 			total: this.searchMatches.length,
+			...(this.searchError === undefined ? {} : { error: this.searchError }),
 			...(entry === undefined ? {} : { kind: entry.kind }),
 		});
 		if (entry === undefined) {
@@ -2222,6 +2315,9 @@ export class M1CanvasSession {
 	 * opens beside the pin.  A thread with no pin opens in the comments panel.
 	 */
 	private jumpToSearchEntry(entry: SearchEntry): void {
+		this.searchPeekId = entry.kind === "comment" ? commentSelectionId(entry.origin ?? "local", entry.targetId) : entry.targetId;
+		this.landingCache = undefined;
+		this.enhancementPaintKey = "";
 		if (entry.kind !== "comment") this.closeSearchThread();
 		if (entry.rect === undefined) {
 			if (entry.kind === "comment") this.options.onOpenCommentThread?.(entry.targetId, entry.origin ?? "local");
@@ -2752,12 +2848,12 @@ export class M1CanvasSession {
 		const preview = this.rotationPreview;
 		if (preview !== undefined) {
 			const scene = buildSourceScene(document);
-			return { geometry: buildCanvasAnchorGeometry(document, { [preview.id]: { rotation: preview.rotation } }, scene), scene };
+			return { geometry: buildCanvasAnchorGeometry(document, { [preview.id]: { rotation: preview.rotation } }, scene, undefined, this.collapsedOwners()), scene };
 		}
 		let cache = this.landingCache;
 		if (cache === undefined || cache.document !== document) {
 			const scene = knownScene ?? buildSourceScene(document);
-			cache = { document, geometry: buildCanvasAnchorGeometry(document, undefined, scene, previous), scene };
+			cache = { document, geometry: buildCanvasAnchorGeometry(document, undefined, scene, previous, this.collapsedOwners()), scene };
 			this.landingCache = cache;
 		}
 		return cache;
@@ -3526,7 +3622,275 @@ export class M1CanvasSession {
 		return safeSignature({ viewport, size, coordinateMode: this.viewport.coordinateMode });
 	}
 
+	/** The membership map stays fixed during a gesture; its boxes come from live geometry. */
+	private collapsedOwners(): ReadonlyMap<string, string> {
+		const document = this.currentRawDocument;
+		let known = this.collapsedCache;
+		if (known === undefined || (known.document !== document && this.selectionMovePreview === undefined && !this.pointerHeld)) {
+			known = { document, owners: collapsedGroupOwners(document) };
+			this.collapsedCache = known;
+		}
+		const owners = known.owners;
+		const id = this.searchPeekId;
+		if (id !== undefined && owners.has(id)) {
+			if (this.peekOwners?.owners !== owners || this.peekOwners.id !== id) {
+				const visible = new Map(owners);
+				visible.delete(id);
+				this.peekOwners = { owners, id, visible };
+			}
+			return this.peekOwners.visible;
+		}
+		return owners;
+	}
+
+	public actionSnapshot(): Readonly<Record<string, unknown>> | undefined {
+		if (this.disposed) return undefined;
+		this.authoring ??= createCanvasAuthoring(this.view);
+		return this.authoring.readSnapshot().document;
+	}
+
+	public featureBusy(): boolean {
+		return this.disposed || this.pointerHeld || this.selectionMovePreview !== undefined || this.toolGesture !== undefined;
+	}
+
+	/** Publish only after an action settles, never from a render or held preview. */
+	public notifyCommittedBoardDocument(): void {
+		if (this.options.onCommittedBoardDocument === undefined || this.boardCommitQueued || this.disposed) return;
+		this.boardCommitQueued = true;
+		queueMicrotask(() => {
+			this.boardCommitQueued = false;
+			if (this.disposed || this.featureBusy() || readRuntime(this.nativeCanvas(), "isDragging") === true || this.nativeHistoryDepth > 0) return;
+			const document = this.savedDocument();
+			if (!isObject(document)) return;
+			try { this.options.onCommittedBoardDocument?.(document, document); }
+			catch { this.addDiagnostic("Committed board indexing failed."); }
+		});
+	}
+
+	public selectionForTransfer(): { readonly ids: readonly string[]; readonly routeEnds: Readonly<Record<string, SelectedRouteEnds>> } {
+		const comments = [...this.selectedCommentKeys].flatMap((key) => {
+			const separator = key.indexOf(":");
+			return separator < 0 ? [] : [commentSelectionId(key.slice(0, separator) as CommentOrigin, key.slice(separator + 1))];
+		});
+		return { ids: [...this.selectedIds, ...comments], routeEnds: Object.fromEntries(this.selectedRouteEnds) };
+	}
+
+	public rollbackFeatureDocument(): boolean {
+		const restored = this.authoring?.rollbackLastFeatureDocument() ?? false;
+		this.collapsedCache = undefined;
+		this.refresh();
+		if (restored) this.notifyCommittedBoardDocument();
+		return restored;
+	}
+
+	public applyFeatureDocument(document: unknown, expected: Readonly<Record<string, unknown>>, quiet = false): boolean {
+		if (this.featureBusy()) return false;
+		this.authoring ??= createCanvasAuthoring(this.view);
+		const result = this.authoring.applyDocument(document, expected);
+		if (!result.ok && !quiet) this.options.onNotice?.(words().enhancements.actionFailed);
+		this.collapsedCache = undefined;
+		this.refresh();
+		if (result.ok) this.notifyCommittedBoardDocument();
+		return result.ok;
+	}
+
+	public flipSelectionEdges(): void {
+		const before = this.actionSnapshot();
+		if (before === undefined) return;
+		const lineIds = new Set([...(Array.isArray(before.edges) ? before.edges.flatMap((edge) => isRecord(edge) && typeof edge.id === "string" ? [edge.id] : []) : []), ...boardConnectors(before).map((connector) => connector.id)]);
+		const plan = planFlipBoardEdges(before, this.selectedIds.filter((id) => lineIds.has(id)), { defaultLabelT: this.settings.connectorLabelPosition });
+		if (!plan.ok) {
+			this.options.onNotice?.(words().enhancements.actionFailed);
+			return;
+		}
+		this.applyFeatureDocument(plan.document, before);
+	}
+
+	public selectRelatedLines(direction: BoardLineDirection = "connected"): void {
+		const original = this.adapter.getDocument();
+		const seeds = [...this.selectedIds];
+		const plan = planConnectedBoardLineIds(original, seeds, direction, "direct");
+		if (!plan.ok) return;
+		const wanted = new Set([...seeds, ...plan.lineIds]);
+		for (const edge of this.adapter.getEdges() ?? []) {
+			if (wanted.has(readCanvasElementId(edge) ?? "")) this.callNative("select", [edge]);
+		}
+		const ownIds = boardConnectors(original).filter((connector) => wanted.has(connector.id)).map((connector) => connector.id);
+		this.connectorLayer?.select(ownIds);
+		const seedSet = new Set(seeds);
+		const capture = (id: string, from: unknown, to: unknown): void => {
+			const held = (value: unknown): boolean => {
+				if (typeof value === "string") return seedSet.has(value);
+				const anchor = normalizeAnchor(value).anchor;
+				return anchor?.type === "node" || anchor?.type === "image" ? seedSet.has(anchor.nodeId)
+					: anchor?.type === "edge" ? seedSet.has(anchor.edgeId) : false;
+			};
+			const first = held(from), last = held(to);
+			if (first || last) this.selectedRouteEnds.set(id, { from: first, to: last, wholeRoute: first && last });
+		};
+		if (isRecord(original) && Array.isArray(original.edges)) for (const edge of original.edges) {
+			if (isRecord(edge) && typeof edge.id === "string" && plan.lineIds.includes(edge.id)) capture(edge.id, edge.fromNode, edge.toNode);
+		}
+		for (const connector of boardConnectors(original)) if (plan.lineIds.includes(connector.id)) capture(connector.id, connector.from, connector.to);
+		this.refresh();
+	}
+
+	public toggleSelectedGroup(): void {
+		const before = this.actionSnapshot();
+		if (before === undefined || this.selectedIds.length !== 1) return;
+		const next = toggleGroupCollapse(before, this.selectedIds[0]);
+		if (next !== undefined) this.applyFeatureDocument(next, before);
+	}
+
+	public setSelectionCustomStyles(styleIds: readonly string[]): void {
+		if (!this.selectedIds.length || !this.editAllowed("restyle", this.selectedIds)) return;
+		this.writeMetadata("set-custom-styles", (draft) => {
+			const overrides = isRecord(draft.localOverrides) ? { ...draft.localOverrides } : {};
+			for (const id of this.selectedIds) {
+				const own = isRecord(overrides[id]) ? { ...overrides[id] } : {};
+				if (styleIds.length) own.customStyles = [...styleIds];
+				else delete own.customStyles;
+				overrides[id] = own;
+			}
+			draft.localOverrides = overrides;
+		});
+	}
+
+	public enhancementActions(): readonly { readonly title: string; readonly run: () => void; readonly disabled?: boolean }[] {
+		const labels = words().enhancements;
+		const actions = [
+			{ title: labels.selectConnected, run: () => this.selectRelatedLines("connected") },
+			{ title: labels.selectIncoming, run: () => this.selectRelatedLines("incoming") },
+			{ title: labels.selectOutgoing, run: () => this.selectRelatedLines("outgoing") },
+			{ title: labels.paletteTitle, run: () => this.options.onOpenPalette?.() },
+			{ title: labels.boardProperties, run: () => this.options.onOpenBoardProperties?.() },
+			{ title: labels.encapsulate, run: () => this.options.onEncapsulateSelection?.() },
+		];
+		if (this.selectedIds.length === 1) {
+			const id = this.selectedIds[0];
+			const nodes: readonly unknown[] = isRecord(this.currentRawDocument) && Array.isArray(this.currentRawDocument.nodes) ? this.currentRawDocument.nodes as unknown[] : [];
+			const node = nodes.find((value) => isRecord(value) && value.id === id);
+			if (isRecord(node)) {
+				actions.push({ title: labels.copyNodeLink, run: () => this.options.onCopyNodeReference?.(id, false) });
+				actions.push({ title: labels.copyNodeEmbed, run: () => this.options.onCopyNodeReference?.(id, true) });
+				if (node.type === "group") actions.push({ title: groupCollapse(this.currentRawDocument, id) ? labels.expandGroup : labels.collapseGroup, run: () => this.toggleSelectedGroup() });
+			}
+		}
+		for (const style of this.settings.customStyles) actions.push({ title: style.name, run: () => this.setSelectionCustomStyles([style.id]) });
+		if (this.settings.customStyles.length) actions.push({ title: labels.clearStyles, run: () => this.setSelectionCustomStyles([]) });
+		return actions;
+	}
+
 	/** Read the current document and repaint only the plugin-owned decoration. */
+	private refreshEnhancementRendering(): void {
+		const root = this.root;
+		if (root === undefined || typeof readRuntime(root, "querySelectorAll") !== "function" || typeof root.contains !== "function") return;
+		const document = this.currentRawDocument;
+		const selection = this.selectedIds.join("\n");
+		const presentationDocument = this.settledBoard();
+		const paintKey = `${selection}|${this.searchPeekId ?? ""}|${this.enhancementDomIdentity}`;
+		const selected = new Set(this.selectedIds);
+		this.contentBreakpoints?.update({
+			zoom: this.zoom(),
+			thresholds: { text: this.settings.contentTextThreshold, file: this.settings.contentFileThreshold, link: this.settings.contentLinkThreshold, plugin: this.settings.contentPluginThreshold },
+			boardIdentity: presentationDocument,
+			targetsIdentity: this.enhancementDomIdentity,
+			interactionIdentity: selection,
+			targets: () => {
+				const targets: ContentTarget[] = [];
+				for (const node of this.adapter.getNodes() ?? []) {
+					const id = readCanvasElementId(node);
+					const shell = readCanvasElementDom(node);
+					if (id === undefined || !isElement(shell)) continue;
+					const kind = readCanvasElementType(node);
+					if (kind === "group") continue;
+					const content = readRuntime(node, "contentEl");
+					const plugin = this.landingGeometry().scene.items.get(id)?.structured !== undefined;
+					const base = { id, shell, kind: plugin ? "plugin" as const : kind === "file" ? "file" as const : kind === "link" ? "link" as const : "text" as const, selected: selected.has(id), editing: readRuntime(node, "isEditing") === true };
+					if (isElement(content)) targets.push({ ...base, content });
+					for (const decoration of Array.from(shell.querySelectorAll(".miro-source-decoration"))) {
+						if ("style" in decoration) targets.push({ ...base, id: `${id}:decoration`, kind: "plugin", content: decoration as HTMLElement | SVGElement });
+					}
+				}
+				return targets;
+			},
+		});
+		if (paintKey === this.enhancementPaintKey && presentationDocument === this.enhancementDocument) return;
+		this.enhancementPaintKey = paintKey;
+		this.enhancementDocument = presentationDocument;
+		const owners = this.collapsedOwners();
+		let related = this.highlightedLines;
+		if (related === undefined || related.document !== presentationDocument || related.selection !== selection) {
+			const plan = this.settings.highlightConnectedLines ? planConnectedBoardLineIds(document, this.selectedIds) : undefined;
+			const ids = new Set(plan?.ok ? plan.lineIds : []);
+			if (plan?.ok) {
+				// Selecting connected lines must keep their highlight; the command planner omits selected lines.
+				const native = isRecord(document) && Array.isArray(document.edges) ? document.edges.filter(isRecord) : [];
+				const lines = new Set([...native.map((edge) => edge.id), ...boardConnectors(document).map((connector) => connector.id)]);
+				for (const id of this.selectedIds) if (lines.has(id)) ids.add(id);
+			}
+			related = { document: presentationDocument, selection, ids };
+			this.highlightedLines = related;
+		}
+		const targets: CustomStyleTarget[] = [];
+		const assignments: Record<string, readonly string[]> = {};
+		const overrides = isRecord(document) ? readRuntime(readRuntime(document, "miroCanvas"), "localOverrides") : undefined;
+		const mark = (element: Element, hidden: boolean, highlighted: boolean): void => {
+			this.enhancementClasses.add(element);
+			if (hidden) element.classList.add("miro-canvas-group-hidden");
+			else element.classList.remove("miro-canvas-group-hidden");
+			if (highlighted) element.classList.add("miro-canvas-line-related");
+			else element.classList.remove("miro-canvas-line-related");
+		};
+		for (const node of this.adapter.getNodes() ?? []) {
+			const id = readCanvasElementId(node), shell = readCanvasElementDom(node);
+			if (id === undefined || !isElement(shell)) continue;
+			mark(shell, owners.has(id), false);
+			if (groupCollapse(document, id) !== undefined) shell.classList.add("miro-canvas-group-collapsed");
+			else shell.classList.remove("miro-canvas-group-collapsed");
+			const face = readRuntime(node, "containerEl") ?? shell.querySelector(".canvas-node-container");
+			const content = readRuntime(node, "contentEl");
+			const elements: (HTMLElement | SVGElement)[] = [];
+			if (isElement(face)) elements.push(face);
+			if (isElement(content)) elements.push(content);
+			for (const element of Array.from(shell.querySelectorAll(".miro-source-decoration, .miro-source-decoration path, .miro-source-decoration text"))) if ("style" in element) elements.push(element as HTMLElement | SVGElement);
+			targets.push({ id, shell, channels: {
+				opacity: shell,
+				face: isElement(face) ? [face] : [],
+				content: isElement(content) ? [content] : isElement(face) ? [face] : [],
+				paint: elements.filter((element): element is SVGElement => element.namespaceURI === "http://www.w3.org/2000/svg"),
+			} });
+			const ids = readRuntime(readRuntime(overrides, id), "customStyles");
+			if (Array.isArray(ids)) assignments[id] = ids.filter((value): value is string => typeof value === "string");
+		}
+		const addLine = (id: string, shell: Element, internal: boolean): void => {
+			if (!("style" in shell)) return;
+			mark(shell, internal, related.ids.has(id));
+			const paths = Array.from(shell.querySelectorAll<SVGElement>("path:not(.canvas-interaction-path)")).filter((element) => element.closest("defs, marker") === null);
+			targets.push({ id, shell: shell as HTMLElement | SVGElement, channels: { opacity: shell as HTMLElement | SVGElement, paint: paths } });
+			const ids = readRuntime(readRuntime(overrides, id), "customStyles");
+			if (Array.isArray(ids)) assignments[id] = ids.filter((value): value is string => typeof value === "string");
+		};
+		if (isRecord(document) && Array.isArray(document.edges)) {
+			const values = new Map(document.edges.filter(isRecord).map((edge) => [edge.id, edge]));
+			for (const edge of this.adapter.getEdges() ?? []) {
+				const id = readCanvasElementId(edge);
+				const shell = readRuntime(edge, "edgeEl") ?? readRuntime(edge, "lineGroupEl");
+				if (id === undefined || shell === undefined || typeof readRuntime(shell, "querySelectorAll") !== "function") continue;
+				const data = values.get(id);
+				const first = typeof data?.fromNode === "string" ? owners.get(data.fromNode) : undefined;
+				const last = typeof data?.toNode === "string" ? owners.get(data.toNode) : undefined;
+				addLine(id, shell as Element, first !== undefined && first === last);
+			}
+		}
+		const connectorDom = new Map(Array.from(root.querySelectorAll("[data-connector-id]"), (element) => [element.getAttribute("data-connector-id"), element.parentElement]));
+		for (const connector of boardConnectors(document)) {
+			const shell = connectorDom.get(connector.id);
+			if (shell !== null && shell !== undefined) addLine(connector.id, shell, owners.has(connector.id));
+		}
+		for (const issue of this.customBoardStyles?.update({ definitions: this.settings.customStyles, assignments, targets }) ?? []) this.addDiagnostic(`Custom CSS style ${issue.styleId} was refused.`);
+	}
+
 	public refresh(): void {
 		if (this.disposed) {
 			return;
@@ -3542,11 +3906,16 @@ export class M1CanvasSession {
 		const parsed = this.parseMetadata(this.currentRawDocument);
 		if (parsed.status === "valid" && parsed.metadata !== undefined) {
 			this.currentMetadata = parsed.metadata;
-			if (this.appearanceSource !== parsed.metadata) this.appearance = normalizeAppearanceState(parsed.metadata);
+			if (this.appearanceSource !== parsed.metadata) {
+				this.appearance = normalizeAppearanceState(parsed.metadata);
+				const inherited = displayedBoardPalette(parsed.metadata, this.settings.permanentPalette);
+				if (inherited !== undefined) this.appearance = { ...this.appearance, settings: { ...this.appearance.settings, palette: inherited } };
+			}
 			this.appearanceSource = parsed.metadata;
 		} else {
 			this.currentMetadata = undefined;
 			this.appearance = normalizeAppearanceState(undefined);
+			if (this.settings.permanentPalette !== undefined) this.appearance = { ...this.appearance, settings: { ...this.appearance.settings, palette: this.settings.permanentPalette } };
 			this.appearanceSource = undefined;
 			if (parsed.status !== "absent") {
 				for (const diagnostic of parsed.diagnostics) {
@@ -3600,10 +3969,10 @@ export class M1CanvasSession {
 		this.lastPolicySignature = policySignature;
 		const size = clientSize(this.root);
 		const viewport = this.displayViewport();
-		const minimapSignature = `${sceneSignature}|${this.viewportSignature(viewport, size)}`;
+		const minimapSignature = `${sceneSignature}|${this.identityFor(this.collapsedOwners())}|${this.viewportSignature(viewport, size)}`;
 		const minimapChanged = minimapSignature !== this.lastMinimapSignature;
 		if (this.minimap === undefined || minimapChanged) {
-			this.minimap = new MinimapModel(this.scene, {
+			this.minimap = new MinimapModel(this.sceneForMinimap(), {
 				width: 240,
 				height: 160,
 				padding: 8,
@@ -3636,6 +4005,7 @@ export class M1CanvasSession {
 		this.syncNativeReadonly(this.appearance.settings.reviewMode === true, diagnostics);
 		this.applyTheme(this.appearance.settings.displayTheme);
 		if (appearanceChanged) {
+			this.customBoardStyles?.restoreBeforeRender();
 			// Source paint was applied last; remove it before restoring our
 			// older appearance, or shape undo brings back stale card fills.
 			this.sourceRenderer?.restoreBeforeAppearanceChange();
@@ -3647,6 +4017,7 @@ export class M1CanvasSession {
 			diagnostics.push(diagnostic);
 		}
 		this.refreshBoardConnectors();
+		this.refreshEnhancementRendering();
 		this.updateMixedSelectionFrame();
 		const markerModel = this.updateCommentMarkers();
 		for (const diagnostic of markerModel?.diagnostics ?? []) {
@@ -3765,8 +4136,13 @@ export class M1CanvasSession {
 	}
 
 	private updateCommentMarkers(): ReturnType<CommentMarkers["update"]> | undefined {
+		const threads = this.commentThreads();
+		const owners = this.collapsedOwners();
+		if (this.visibleCommentThreads?.threads !== threads || this.visibleCommentThreads.owners !== owners) {
+			this.visibleCommentThreads = { threads, owners, visible: threads.filter((thread) => !owners.has(commentSelectionId(thread.origin, thread.id))) };
+		}
 		const model = this.commentMarkers?.update({
-			threads: this.commentThreads(),
+			threads: this.visibleCommentThreads.visible,
 			selectedKeys: this.selectedCommentKeys,
 			includeResolved: true,
 			geometry: this.landingGeometry().geometry,
@@ -3931,7 +4307,7 @@ export class M1CanvasSession {
 		this.placeSearchHit();
 		this.updateExportOverlay();
 		const size = this.boardSize(), viewport = this.displayViewport();
-		const signature = `${this.lastSceneSignature}|${this.viewportSignature(viewport, size)}`;
+		const signature = `${this.lastSceneSignature}|${this.identityFor(this.collapsedOwners())}|${this.viewportSignature(viewport, size)}`;
 		// Mid-drag, the minimap follows the cards a few times a second: redrawn
 		// every frame, a large board's would cost more than the drag itself.
 		const now = Date.now();
@@ -3939,7 +4315,7 @@ export class M1CanvasSession {
 		// A map the stylesheet hides - a phone's narrow screen - is not
 		// followed at all; it is brought up to date when it shows again.
 		if (!this.minimapLaidOut) return;
-		this.minimap = new MinimapModel(this.scene, {
+		this.minimap = new MinimapModel(this.sceneForMinimap(), {
 			width: 240, height: 160, padding: 8, viewport, viewportSize: size, coordinateMode: this.viewport.coordinateMode,
 		});
 		this.lastMinimapSignature = signature;
@@ -4365,7 +4741,8 @@ export class M1CanvasSession {
 	 * by its avatar.  Shift adds to the selection.
 	 */
 	private selectInRectangle(first: { x: number; y: number }, last: { x: number; y: number }, add: boolean): void {
-		const geometry = buildCanvasAnchorGeometry(this.boardDocument());
+		const geometry = this.landingGeometry().geometry;
+		const owners = this.collapsedOwners();
 		const nodes = readRuntime(this.currentRawDocument, "nodes");
 		const groups = new Set((Array.isArray(nodes) ? nodes as readonly unknown[] : [])
 			.filter((item) => readRuntime(item, "type") === "group").map((item) => readRuntime(item, "id")));
@@ -4390,7 +4767,11 @@ export class M1CanvasSession {
 		};
 		const caught: unknown[] = [];
 		for (const node of this.adapter.getNodes() ?? []) {
-			const id = readCanvasElementId(node), rect = boundingRect(readCanvasElementDom(node));
+			const id = readCanvasElementId(node);
+			if (id === undefined || owners.has(id)) continue;
+			const shell = readCanvasElementDom(node);
+			const face = groupCollapse(this.currentRawDocument, id) === undefined ? shell : readRuntime(node, "containerEl") ?? shell;
+			const rect = boundingRect(face);
 			if (id === undefined || rect === undefined) continue;
 			const inside = groups.has(id)
 				? rectIntersectsBox(rect, first, last, true)
@@ -4399,9 +4780,9 @@ export class M1CanvasSession {
 		}
 		for (const edge of this.adapter.getEdges() ?? []) {
 			const id = readCanvasElementId(edge);
-			if (id !== undefined && catchEnds(id)) caught.push(edge);
+			if (id !== undefined && !owners.has(id) && catchEnds(id)) caught.push(edge);
 		}
-		const connectorIds = boardConnectors(this.currentRawDocument).filter((connector) => catchEnds(connector.id)).map((connector) => connector.id);
+		const connectorIds = boardConnectors(this.currentRawDocument).filter((connector) => !owners.has(connector.id) && catchEnds(connector.id)).map((connector) => connector.id);
 		this.selectedRouteEnds = ends;
 		if (!add) {
 			this.callNative("deselectAll");
@@ -4409,6 +4790,7 @@ export class M1CanvasSession {
 		}
 		for (const item of caught) this.callNative("select", [item]);
 		for (const [key, point] of Object.entries(geometry.comments ?? {})) {
+			if (owners.has(`miro-comment:${key}`)) continue;
 			const at = this.viewportPoint(point);
 			// The 32 px avatar sits above and to the right of its anchor.
 			if (at !== undefined && pointInSelectionBox({ x: at.x + 16, y: at.y - 16 }, first, last)) this.selectedCommentKeys.add(key);
@@ -4525,6 +4907,22 @@ export class M1CanvasSession {
 	private settledBoard(): unknown {
 		const moving = this.pointerHeld || this.selectionMovePreview !== undefined;
 		return moving ? this.savedBoard?.document ?? this.currentRawDocument : this.currentRawDocument;
+	}
+
+	private sceneForMinimap(): CanvasScene {
+		const document = this.currentRawDocument;
+		const owners = this.collapsedOwners();
+		const known = this.minimapProjection;
+		if (known !== undefined && known.document === document && known.owners === owners) return known.scene;
+		const projected = isRecord(document) ? projectCollapsedGroups(document, owners) : document;
+		let scene = this.scene;
+		if (projected !== document && isRecord(projected) && Array.isArray(projected.nodes)) {
+			const nodes = (projected.nodes as unknown[]).filter((node) => !owners.has(String(readRuntime(node, "id"))));
+			const edges = Object.entries(this.landingGeometry().geometry.edges ?? {}).filter(([id]) => !owners.has(id)).map(([id, route]) => ({ id, ...route }));
+			scene = { nodes, edges };
+		}
+		this.minimapProjection = { document, owners, scene };
+		return scene;
 	}
 
 	/**
@@ -6018,6 +6416,7 @@ export class M1CanvasSession {
 		// A selected comment pin has no handles; it is moved by itself.
 		if (this.selectedCommentKeys.size > 0) return { selectedIds: [], rotation: 0, editable, isEdge: false };
 		const id = this.selectedIds[0];
+		if (id !== undefined && groupCollapse(this.currentRawDocument, id) !== undefined) return { selectedIds: [], rotation: 0, editable, isEdge: false };
 		const { geometry, scene } = this.landingGeometry();
 		return {
 			selectedIds: this.selectedIds,
@@ -6210,6 +6609,7 @@ export class M1CanvasSession {
 		const node = Array.isArray(nodes)
 			? (nodes as readonly unknown[]).find((item) => readRuntime(item, "id") === id)
 			: undefined;
+		if (groupCollapse(this.currentRawDocument, id) !== undefined) return compactGroupRect(node);
 		const x = finite(readRuntime(node, "x")), y = finite(readRuntime(node, "y"));
 		const width = finite(readRuntime(node, "width")), height = finite(readRuntime(node, "height"));
 		return x === undefined || y === undefined || width === undefined || height === undefined || !(width > 0) || !(height > 0)
@@ -6465,7 +6865,7 @@ export class M1CanvasSession {
 			}
 			background = createExportCanvas(this.view, snapshot, document);
 			const writer = new MetadataWriter({ readDocument: () => snapshot, commitDocument: () => false });
-			renderer = new M1CanvasSession(background.view, writer, { document, settings: this.settings, onFontUsed: this.options.onFontUsed });
+			renderer = new M1CanvasSession(background.view, writer, { document, settings: exportCanvasSettings(this.settings), onFontUsed: this.options.onFontUsed });
 			renderer.refresh();
 			const pictures = await renderExportPages(background.canvas as never, pages, state.quality, (done, total) => {
 				if (exporting.stop || exporting.abort?.signal.aborted) return false;
@@ -6573,7 +6973,8 @@ export class M1CanvasSession {
 			if (id === undefined || !ids.has(id)) continue;
 			const card = readCanvasElementDom(item);
 			if (card !== undefined) {
-				elements.push({ element: card, card: true });
+				const face = groupCollapse(this.currentRawDocument, id) === undefined ? card : readRuntime(item, "containerEl") ?? card;
+				elements.push({ element: face, card: true });
 				continue;
 			}
 			const line = withLines ? readRuntime(item, "lineGroupEl") : undefined;
@@ -6824,7 +7225,8 @@ export class M1CanvasSession {
 					next = appearanceReducer(next, { ...action, nodeId });
 				}
 			}
-			const merged = mergeAppearanceMetadata(draft, next, previous);
+			const merged = mergeDisplayedAppearance(draft, next, this.settings.permanentPalette,
+				action.type === APPEARANCE_ACTIONS.addPaletteColor || action.type === APPEARANCE_ACTIONS.removePaletteColor);
 			if (slot === "edge") {
 				// The board's own connectors carry their colour in their record; a reset gives them the default ink.
 				const color = readRuntime(action, "color");
@@ -7551,7 +7953,7 @@ export class M1CanvasSession {
 		mark("miro-canvas-mixed-selection", framed);
 		// Native Canvas's own frame cannot enclose what it does not know of; the plugin's shows then.
 		mark("miro-canvas-mixed-selection--independent",
-			framed && (connectorIds.length > 0 || this.selectedCommentKeys.size > 0 || partial.length > 0));
+			framed && (connectorIds.length > 0 || this.selectedCommentKeys.size > 0 || partial.length > 0 || this.selectedIds.some((id) => groupCollapse(this.currentRawDocument, id) !== undefined)));
 		if (framed && this.followMovingFrame()) return;
 		const box = framed ? boundingRect(root) : undefined;
 		if (!framed || box === undefined) {
@@ -7674,12 +8076,25 @@ export class M1CanvasSession {
 	 */
 	private startSelectionMove(event: PointerEvent, options: { readonly single?: boolean } = {}): boolean {
 		this.readInteractionState();
+		const pressedId = this.eventElementId(event.target);
+		const collapsedPress = pressedId !== undefined && groupCollapse(this.currentRawDocument, pressedId) !== undefined;
+		if (collapsedPress && event.button === 0 && !event.shiftKey && !this.closestTarget(event, "input,textarea,[contenteditable=true],.cm-editor")
+			&& !this.selectedIds.includes(pressedId)) {
+			const group = (this.adapter.getNodes() ?? []).find((node) => readCanvasElementId(node) === pressedId);
+			if (group !== undefined) {
+				this.callNative("selectOnly", [group]);
+				this.readInteractionState();
+			}
+		}
 		const commentIds = [...this.selectedCommentKeys].flatMap((key) => {
 			const separator = key.indexOf(":");
 			return separator < 0 ? [] : [commentSelectionId(key.slice(0, separator) as CommentOrigin, key.slice(separator + 1))];
 		});
-		const ids = [...this.selectedIds, ...commentIds];
-		const alone = ids.length < 2 && options.single !== true && !this.selectedRouteEnds.has(ids[0]);
+		const selectionIds = [...this.selectedIds, ...commentIds];
+		const groupIds = groupSelectionIds(this.currentRawDocument, selectionIds);
+		const carried = [...this.collapsedOwners()].filter(([, owner]) => selectionIds.includes(owner)).map(([id]) => id);
+		const ids = [...new Set([...groupIds, ...carried])];
+		const alone = ids.length < 2 && options.single !== true && !collapsedPress && !this.selectedRouteEnds.has(ids[0]);
 		if (event.button !== 0 || event.shiftKey || ids.length === 0 || alone
 			|| this.closestTarget(event, "input,textarea,[contenteditable=true],.cm-editor")) return false;
 		const target = this.eventElementId(event.target);
@@ -7692,9 +8107,9 @@ export class M1CanvasSession {
 		if (first === undefined || view === undefined || view === null || !isRecord(original)) return false;
 		event.preventDefault();
 		event.stopImmediatePropagation();
-		const lockedComment = [...this.selectedCommentKeys].some((key) => {
-			const separator = key.indexOf(":");
-			return this.commentLocked(key.slice(separator + 1), key.slice(0, separator) as CommentOrigin);
+		const lockedComment = ids.some((id) => {
+			const comment = selectedComment(id);
+			return comment !== undefined && this.commentLocked(comment.id, comment.origin);
 		});
 		if (lockedComment) {
 			this.options.onNotice?.(words().session.lockedCommentCannotMove);
@@ -7750,6 +8165,11 @@ export class M1CanvasSession {
 			if (at === undefined) return;
 			dx = at.x - first.x;
 			dy = at.y - first.y;
+			// Native cards store integer positions; every carried line and pin shares that delta.
+			if (cards.length > 0) {
+				dx = Math.round(dx);
+				dy = Math.round(dy);
+			}
 			changed ||= Math.hypot(moved.clientX - event.clientX, moved.clientY - event.clientY) > 3;
 			if (!changed) return;
 			this.selectionMovePreview = previewBoardSelection(original, ids, dx, dy, routeEnds);
@@ -7792,7 +8212,7 @@ export class M1CanvasSession {
 		// Native Canvas may change its own selection while the move is written; it is put back.
 		const restoreSelection = (): void => {
 			if (this.disposed) return;
-			const nativeIds = new Set(ids.filter((id) => !connectorIds.includes(id) && selectedComment(id) === undefined));
+			const nativeIds = new Set(selectionIds.filter((id) => !connectorIds.includes(id) && selectedComment(id) === undefined));
 			const selected = new Set((this.adapter.getSelection() ?? []).flatMap((item) => allIds([item])));
 			if (selected.size !== nativeIds.size || [...nativeIds].some((id) => !selected.has(id))) {
 				this.callNative("deselectAll");
@@ -7829,6 +8249,49 @@ export class M1CanvasSession {
 		view.addEventListener("blur", cancel);
 		this.selectionMoveEnd = cancel;
 		return true;
+	}
+
+	/** Native group dragging cannot carry the board's free lines and pins with a compact group. */
+	private startCollapsedGroupDrag(args: readonly unknown[]): Readonly<Record<"move" | "end" | "cancel" | "cleanup" | "keydown" | "keyup", () => void>> | undefined {
+		const event = args[0];
+		const owner = args[1], node = args[2];
+		const button = readRuntime(event, "button"), buttons = readRuntime(event, "buttons"), primary = readRuntime(event, "isPrimary");
+		const heldMove = readRuntime(event, "type") === "pointermove" && button === -1 && buttons === 1 && primary === true
+			&& ["touch", "mouse"].includes(String(readRuntime(event, "pointerType")));
+		if (!isObject(event) || (button !== 0 && !heldMove) || (buttons !== undefined && buttons !== 1)
+			|| (primary !== undefined && primary !== true)
+			|| ["shiftKey", "ctrlKey", "altKey", "metaKey"].some((key) => readRuntime(event, key) === true)
+			|| !Number.isFinite(readRuntime(event, "clientX")) || !Number.isFinite(readRuntime(event, "clientY"))
+			|| typeof readRuntime(event, "preventDefault") !== "function" || typeof readRuntime(event, "stopImmediatePropagation") !== "function"
+			|| !isElement(owner) || this.root?.contains(owner) !== true) return undefined;
+		if (node !== undefined) {
+			const shell = readRuntime(node, "nodeEl");
+			if (!(this.adapter.getNodes() ?? []).includes(node) || !isElement(shell) || !shell.contains(owner)) return undefined;
+		} else {
+			const selection = readRuntime(readRuntime(readRuntime(this.nativeCanvas(), "menu"), "selection"), "selectionEl");
+			if (owner !== selection) return undefined;
+		}
+		this.readInteractionState();
+		const pressed = this.eventElementId(owner);
+		const collapsed = pressed !== undefined && groupCollapse(this.currentRawDocument, pressed) !== undefined
+			|| this.selectedIds.some((id) => groupCollapse(this.currentRawDocument, id) !== undefined);
+		if (!collapsed) return undefined;
+		// Native touch passes a MOVE here; its press owner is separate from the MOVE's target.
+		// Delegate getters/methods to the original event to preserve native receiver checks.
+		const pointer = new Proxy({ target: owner, targetNode: owner }, {
+			get: (_context, key): unknown => {
+				if (key === "target" || key === "targetNode") return owner;
+				if (key === "button") return 0;
+				const value: unknown = Reflect.get(event, key, event);
+				return typeof value === "function" ? (...values: unknown[]): unknown => Reflect.apply(value, event, values) : value;
+			},
+		});
+		if (!this.startSelectionMove(pointer as unknown as PointerEvent, { single: true })) return undefined;
+		const cancel = this.selectionMoveEnd;
+		// Native touch/mouse callers keep their own lifecycle; only this group's movement is ours.
+		const idle = (): void => undefined;
+		return { move: idle, end: idle, cleanup: idle, keydown: idle, keyup: idle,
+			cancel: () => { if (this.selectionMoveEnd === cancel) cancel?.(); } };
 	}
 
 	/** Delete everything selected - native items and the board's own connectors - as one step. */
@@ -9196,6 +9659,8 @@ export class M1CanvasSession {
 						if (this.nativeHistoryDepth === 0) {
 							this.readInteractionState();
 							this.attachNativeGuards();
+							this.refresh();
+							this.notifyCommittedBoardDocument();
 						}
 					}
 				});
@@ -9245,6 +9710,8 @@ export class M1CanvasSession {
 		// the order set by hand; the lift happens as the drag starts, so the
 		// layers are put back as soon as it has.
 		this.guardNativeMethod(canvas, "handleSelectionDrag", (original, receiver, args) => {
+			const collapsed = this.startCollapsedGroupDrag(args);
+			if (collapsed !== undefined) return collapsed;
 			const layers = new Map<unknown, unknown>();
 			for (const node of this.adapter.getNodes() ?? []) {
 				layers.set(node, readRuntime(node, "zIndex"));
@@ -9597,6 +10064,7 @@ export class M1CanvasSession {
 			return;
 		}
 		this.disposed = true;
+		this.options.onReleaseBoardDocument?.();
 		this.nativeUiVisibility?.dispose();
 		this.nativeUiVisibility = undefined;
 		this.cancelPendingPenDot();
