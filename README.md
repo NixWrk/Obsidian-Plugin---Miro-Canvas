@@ -94,9 +94,10 @@ board without invented text offsets. Private API shapes, scan limits and
 unsupported syntax can prevent supplementation. These additions do not make
 Canvas root properties native Markdown frontmatter.
 
-Windows checks now cover a typed property query, opening its real board result,
-and following a property-only outgoing link. The corresponding tablet check
-and complete native acceptance remain pending.
+Windows, tablet and legacy-phone checks cover typed property search and genuine
+board/note navigation. The SM-A336E/Obsidian 1.12.7 checks also cover gestures,
+themes and independent exports; that app is below the supported minimum.
+[Phone input distinctions and results](docs/smartphone-enhancement-checks.md).
 
 [Behavior, persistence and remaining checks](docs/miro-canvas.md#canvas-expansion--unreleased)
 

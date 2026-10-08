@@ -10,6 +10,9 @@ const args = process.argv.slice(2);
 const option = (key, fallback) => args.includes(key) ? args[args.indexOf(key) + 1] : fallback;
 const port = Number(option('--port', '9346'));
 const serial = option('--serial');
+const escapeKey = option('--escape-key', serial ? 'adb' : 'cdp');
+assert.ok(['adb', 'cdp'].includes(escapeKey), 'escape-key must be adb or cdp');
+assert.ok(escapeKey !== 'adb' || serial, 'ADB Escape requires a device serial');
 const adb = 'C:/Program Files/VirtualTablet Server/adb/adb.exe';
 const android = fileURLToPath(new URL('./android.mjs', import.meta.url));
 const out = option('--out', fileURLToPath(new URL(`.out/theme-${serial ?? 'Windows'}.json`, import.meta.url)));
@@ -35,7 +38,7 @@ async function checked(code) {
   } finally { clearTimeout(timer); }
 }
 async function tap(selector) {
-  const point = await checked(`const e=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.getBoundingClientRect().width>0);if(!e)throw Error('missing '+${JSON.stringify(selector)});const r=e.getBoundingClientRect(),p={x:r.x+r.width/2,y:r.y+r.height/2};if(!e.contains(document.elementFromPoint(p.x,p.y)))throw Error('obscured '+${JSON.stringify(selector)});return p;`);
+  const point = await checked(`const matched=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.getBoundingClientRect().width>0);if(!matched)throw Error('missing '+${JSON.stringify(selector)});const e=matched.closest('button')??matched,r=e.getBoundingClientRect(),p={x:r.x+r.width/2,y:r.y+r.height/2};if(!e.contains(document.elementFromPoint(p.x,p.y)))throw Error('obscured '+${JSON.stringify(selector)});return p;`);
   if (serial) {
     const focus = execFileSync(adb, ['-s', serial, 'shell', 'dumpsys', 'window'], { encoding: 'utf8', windowsHide: true });
     assert.ok(focus.split('\n').find(line => line.includes('mCurrentFocus='))?.includes('md.obsidian/'), 'Obsidian must be foreground for ADB input');
@@ -112,16 +115,20 @@ try {
       assert.ok(dark ? brightness(editor.color) > 150 : brightness(editor.color) < 130, `wrong editor text: ${JSON.stringify(editor)}`);
       const editorBackground = editor.background === 'rgba(0, 0, 0, 0)' ? editor.face : editor.background;
       assert.ok(dark ? brightness(editorBackground) < 110 : brightness(editorBackground) > 190, `wrong editor surface: ${JSON.stringify(editor)}`);
-      if (serial) {
+      if (serial && escapeKey === 'adb') {
         execFileSync(adb, ['-s', serial, 'shell', 'input', 'keyevent', 'KEYCODE_ESCAPE'], { windowsHide: true });
         report.input.push({ method: 'real ADB key', key: 'KEYCODE_ESCAPE', purpose: 'leave card editor' });
-      } else { await pressKey(client.send, 'Escape'); }
+      } else {
+        await pressKey(client.send, 'Escape');
+        report.input.push({ method: 'CDP renderer key', key: 'Escape', purpose: 'leave card editor' });
+      }
       await checked(`app.workspace.activeLeaf.view.canvas.deselectAll();return true;`);
       await dismissKeyboard();
       await tap('.miro-canvas-dock__bar [data-icon="search"]');
       const search = await inspect(['.miro-canvas-search']);
       assertPalette(search, dark);
-      await tap('.miro-canvas-search button:nth-of-type(3)');
+      await tap('.miro-canvas-search .lucide-x');
+      assert.equal(await checked(`const e=document.querySelector('.miro-canvas-search');return Boolean(e&&!e.hidden&&e.getBoundingClientRect().width);`),false,'search close must hide the bar');
       await dismissKeyboard();
       await tap('.miro-canvas-dock__bar [data-icon="settings-2"]');
       await tap('.miro-canvas-dock__menu--board [data-icon="file-output"]');

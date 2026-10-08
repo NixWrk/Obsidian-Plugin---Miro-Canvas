@@ -2112,3 +2112,14 @@ typed property query/result navigation with the keyboard still open on tablet,
 outgoing link navigation, desktop native results remaining accessible, CSS gate,
 focused sidecar tests and full types. Phone acceptance remains pending while
 the device is disconnected; no synthetic result substitutes for ADB input.
+
+Follow-up acceptance — 2026-10-08: the reconnected SM-A336E / Android 14 /
+Obsidian 1.12.7 passes the latest build's property-result keyboard placement
+(result y190.6, keyboard top526.6), genuine board/outgoing-note navigation,
+nine feature phases, eight measured theme combinations and independent PDF/PPTX
+content readiness. Real ADB taps/gestures, CDP text/preparation and renderer
+Escape are recorded separately in the [phone receipt](smartphone-enhancement-checks.md).
+Native ADB Escape navigates to the prior board on this legacy app and is not
+a same-board cancellation pass. Original source/appearance/settings bytes are
+restored. This closes the disconnected-device follow-up for that installation;
+supported-version phone checks and the broader matrix remain pending.

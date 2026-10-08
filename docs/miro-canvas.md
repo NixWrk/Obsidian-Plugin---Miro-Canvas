@@ -17,8 +17,9 @@ from the plugin.
 
 The 2026-10-07/08 feature modules are present and wired from main/session.
 The native-discovered search, keyboard and held-group defects are repaired.
-Representative Windows and supported-tablet checks pass; advanced matrix cases
-and final phone acceptance remain pending. The [execution plan](canvas-enhancement-plan.md) and
+Representative Windows, supported-tablet and legacy-phone checks pass; advanced
+matrix cases and supported-version phone evidence remain pending.
+The [execution plan](canvas-enhancement-plan.md) and
 feature check documents distinguish source inspection, pure/unit/synthetic
 results and actual app input. This section describes implemented behavior and
 its limits; it is not a release or completed native-test receipt.
@@ -177,8 +178,12 @@ Escape cancellation and Undo pass at 50% and 125% zoom on both. Windows uses
 trusted CDP input in an invisible owned instance; tablet actions use real ADB
 input with CDP text and fixture preparation. No screen capture is used.
 
-Advanced matrix cases and final phone rebuild acceptance remain pending.
-SM-A336E disconnected; its Obsidian 1.12.7 is below the minimum 1.13.7.
+The reconnected SM-A336E passes the latest build's feature, property-pane,
+eight-theme and independent PDF/PPTX checks. Its Obsidian 1.12.7 is below the
+minimum 1.13.7. ADB Escape returns to the previous board; same-board cancellation
+uses CDP Escape followed by real ADB release. The [phone receipt](smartphone-enhancement-checks.md)
+records these input distinctions. Advanced matrix cases and supported-version
+phone evidence remain pending.
 The [execution plan](canvas-enhancement-plan.md) preserves earlier failures,
 current receipts and the exact limits of each check. These results do not
 claim complete coverage of every query, gesture or private-API version.

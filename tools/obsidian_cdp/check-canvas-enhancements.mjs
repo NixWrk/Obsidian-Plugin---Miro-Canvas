@@ -11,13 +11,16 @@ const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name)
 const port = Number(option('--port', '9346'));
 const serial = option('--serial');
 const phase = option('--phase', 'groups');
+const cancelKey = option('--cancel-key', serial ? 'adb' : 'cdp');
+assert.ok(['adb', 'cdp'].includes(cancelKey), 'cancel-key must be adb or cdp');
+assert.ok(cancelKey !== 'adb' || serial, 'ADB cancellation requires a device serial');
 const run = promisify(execFile);
 const adb = process.env.ADB ?? 'C:/Program Files/VirtualTablet Server/adb/adb.exe';
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const client = await connectByTitle(port, serial ? 'Obsidian' : undefined);
 const out = new URL('./.out/feature-expansion/', import.meta.url);
 mkdirSync(out, { recursive: true });
-const receipt = { phase, device: serial ?? 'Windows', input: serial ? 'ADB action taps; CDP text/preparation' : 'trusted CDP renderer input; bounded native frame preparation', checks: [], passed: false };
+const receipt = { phase, device: serial ?? 'Windows', cancelKey, input: serial ? 'ADB action taps; CDP text/preparation' : 'trusted CDP renderer input; bounded native frame preparation', checks: [], passed: false };
 async function checked(body) {
   let timer;
   try {
@@ -198,7 +201,7 @@ try {
               close(chain.x, oldChain.x+dx, 'dependent chain preview x'); close(chain.y, oldChain.y+dy, 'dependent chain preview y');
             });
             if (ending === 'cancel') {
-              if (serial) await adbInput('input keyevent 111');
+              if (serial && cancelKey === 'adb') await adbInput('input keyevent 111');
               else await key('Escape', 'Escape');
             }
             await motion('UP', moved);
@@ -214,7 +217,7 @@ try {
               await wait(300);
               finished = await sample();
             }
-            receipt.checks.push({ name: `group ${ending} ${scale}`, input: serial ? ending==='cancel'?'real ADB Escape key then touchscreen UP':'real ADB touchscreen UP' : 'trusted CDP mouse release/Escape', geometry: finished });
+            receipt.checks.push({ name: `group ${ending} ${scale}`, input: serial ? ending==='cancel'?`${cancelKey === 'adb' ? 'real ADB' : 'CDP renderer'} Escape key then real ADB touchscreen UP`:'real ADB touchscreen UP' : 'trusted CDP mouse release/Escape', geometry: finished });
             verify(`group ${ending} outcome ${scale}`, () => {
               assert.equal(finished.nodes.find(node=>node.id==='group').width, 900);
               assert.equal(finished.nodes.find(node=>node.id==='group').height, 500);
@@ -350,17 +353,19 @@ try {
     receipt.checks.push({name:'properties UI projects native metadata/cache/references',cache});
     const propertyPath=`Canvas property mention ${Date.now()}.canvas`;
     await checked(`await app.vault.create(${JSON.stringify(propertyPath)},JSON.stringify({nodes:[],edges:[],miroCanvas:{schemaVersion:1,properties:{related:'[[Feature Reference]]'}}}));return true;`);await wait(1600);
-    await checked(`const file=app.vault.getAbstractFileByPath('Feature Reference.md');await app.workspace.getLeaf(false).openFile(file,{active:true});app.workspace.rightSplit.expand();
-      let leaf=app.workspace.getLeavesOfType('backlink').find(l=>l.view.backlink);if(!leaf){leaf=app.workspace.getLeaf(false);await leaf.setViewState({type:'backlink',state:{file:file.path}});}
-      await leaf.view.loadFile(file);app.workspace.setActiveLeaf(leaf,{focus:false});leaf.view.update();return true;`);await wait(1200);
-    const backlink=await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.view.backlink).view,b=v.backlink;app.plugins.plugins['miro-canvas'].backlinks.refresh();b.backlinkDom.onResize();b.backlinkDom.changed.run();b.backlinkDom.infinityScroll.compute();return {file:v.file?.path,rect:v.containerEl.getBoundingClientRect().toJSON(),count:b.backlinkCountEl.textContent,text:v.containerEl.textContent,propertyRows:[...v.containerEl.querySelectorAll('[data-miro-canvas-property]')].map(e=>e.textContent),html:v.containerEl.innerHTML.slice(-1500)};`);
+    const backlinkLeafId=await checked(`const file=app.vault.getAbstractFileByPath('Feature Reference.md');await app.workspace.getLeaf(false).openFile(file,{active:true});
+      const leaf=app.isMobile?app.workspace.getRightLeaf(false):app.workspace.getLeavesOfType('backlink').find(l=>l.view.backlink)??app.workspace.getLeaf(false);
+      await leaf.setViewState({type:'backlink',state:{file:file.path}});if(app.isMobile)await app.workspace.revealLeaf(leaf);app.workspace.rightSplit.expand();
+      await leaf.view.loadFile(file);app.workspace.setActiveLeaf(leaf,{focus:false});return leaf.id;`);await wait(1200);
+    const backlink=await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.id===${JSON.stringify(backlinkLeafId)}).view,b=v.backlink;app.plugins.plugins['miro-canvas'].backlinks.refresh();b.backlinkDom.onResize();b.backlinkDom.changed.run();b.backlinkDom.infinityScroll.compute();return {file:v.file?.path,rect:v.containerEl.getBoundingClientRect().toJSON(),count:b.backlinkCountEl.textContent,text:v.containerEl.textContent,propertyRows:[...v.containerEl.querySelectorAll('[data-miro-canvas-property]')].map(e=>e.textContent),html:v.containerEl.innerHTML.slice(-1500)};`);
+    assert.equal(backlink.file,'Feature Reference.md','backlink pane source must be the prepared note');
     assert.ok(Number(backlink.count)>0,JSON.stringify(backlink));
     assert.ok(backlink.text.includes('Launch card'),JSON.stringify(backlink));
     receipt.checks.push({name:'native backlinks count and visible card excerpts',count:backlink.count,text:backlink.text});
     // Hidden Chromium does not acknowledge wheel compositor input. Scroll only
     // this test pane through its native viewport, recorded as preparation.
-    await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.view.backlink).view,d=v.backlink.backlinkDom;d.infinityScroll.scrollEl.scrollTop=d.infinityScroll.scrollEl.scrollHeight;d.infinityScroll.onScroll();return true;`);await wait(300);
-    const bottom=await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.view.backlink).view,d=v.backlink.backlinkDom;d.infinityScroll.compute();return {text:v.containerEl.textContent,rows:[...v.containerEl.querySelectorAll('[data-miro-canvas-property-key]')].map(e=>({text:e.textContent,rect:e.getBoundingClientRect().toJSON()}))};`);
+    await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.id===${JSON.stringify(backlinkLeafId)}).view,d=v.backlink.backlinkDom;d.infinityScroll.scrollEl.scrollTop=d.infinityScroll.scrollEl.scrollHeight;d.infinityScroll.onScroll();return true;`);await wait(300);
+    const bottom=await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.id===${JSON.stringify(backlinkLeafId)}).view,d=v.backlink.backlinkDom;d.infinityScroll.compute();return {text:v.containerEl.textContent,rows:[...v.containerEl.querySelectorAll('[data-miro-canvas-property-key]')].map(e=>({text:e.textContent,rect:e.getBoundingClientRect().toJSON()}))};`);
     assert.ok(bottom.text.includes(propertyPath),JSON.stringify(bottom));assert.ok(bottom.rows.some(r=>r.text.includes('Feature Reference')&&r.rect.width>0));
     receipt.checks.push({name:'scroll to native property-only backlink rows',bottom});
     receipt.checks.push({name:'native backlinks counts/excerpts and property-only source rows',count:backlink.count,text:backlink.text});

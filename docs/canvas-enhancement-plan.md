@@ -77,10 +77,12 @@ Native status reconciled on 2026-10-08 from ignored receipts in
 
 Windows uses trusted CDP input with bounded native frame preparation. Tablet
 receipts use ADB action taps with CDP text/preparation; they do not establish
-physical stylus/palm behavior. SM-A336E / 1.12.7 is below minimum 1.13.7;
-the phone disconnected before final rebuild acceptance. Earlier legacy-device
-smokes remain recorded; they do not certify the newest build or supported
-phone versions.
+physical stylus/palm behavior. SM-A336E / 1.12.7 is below minimum 1.13.7.
+The reconnected phone now passes the latest build's feature, property-pane,
+eight-theme and independent-export checks. ADB Escape navigates to the prior
+board on this legacy app; same-board cancellation is separately tested with
+CDP Escape and real ADB release. See the [phone receipt](smartphone-enhancement-checks.md).
+This does not change the declared minimum or certify a supported phone version.
 
 The final post-repair suite passes 3,004 tests with one pre-existing skip in
 158 files. Full typecheck, build, CSS, schema `225a8a`, submission, MCP/CLI and
