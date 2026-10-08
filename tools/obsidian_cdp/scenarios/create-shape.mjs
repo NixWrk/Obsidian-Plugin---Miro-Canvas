@@ -15,6 +15,16 @@ export default async function(s){
   await s.wait(300);
   await s.type(s.lang==='ru'?'Все готовы?':'Everyone ready?',{interval:100});
   await s.key('Escape');
+  await s.wait(650);
+  await s.caption({ru:'2. Сделайте подпись крупнее',en:'2. Make the label easy to read'});
+  await click(s,{x:640,y:350});
+  await s.wait(650);
+  await click(s,{selector:'.miro-canvas-toolbar:not(.miro-canvas-tools) input[aria-label="'+(s.lang==='ru'?'Размер шрифта':'Font size')+'"]'});
+  await s.key('A',{modifiers:2});
+  await s.type('28');
+  await s.key('Tab');
+  await s.key('Escape');
+  await click(s,{x:90,y:650});
   await checked(s,`if(!app.workspace.activeLeaf.view.canvas.getData().nodes.some(n=>n.text===${JSON.stringify(s.lang==='ru'?'Все готовы?':'Everyone ready?')})) throw new Error('shape text missing'); return true;`);
   await finish(s,{ru:'Фигура и подпись готовы — можно строить схему дальше',en:'The shape and label are ready for the next step'});
 }

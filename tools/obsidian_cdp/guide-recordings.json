@@ -1,0 +1,212 @@
+[
+  {
+    "name": "sticky-with-note",
+    "platform": "desktop",
+    "scenario": "sticky-with-note",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "tool-bar",
+    "platform": "desktop",
+    "scenario": "tool-bar",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "text",
+    "platform": "desktop",
+    "scenario": "text",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "shapes",
+    "platform": "desktop",
+    "scenario": "shapes",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "frames",
+    "platform": "desktop",
+    "scenario": "frames",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "insert-note",
+    "platform": "desktop",
+    "scenario": "insert-note",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "obsidian-links",
+    "platform": "desktop",
+    "scenario": "obsidian-links",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "nested-canvas",
+    "platform": "desktop",
+    "scenario": "nested-canvas",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "create-shape",
+    "platform": "desktop",
+    "scenario": "create-shape",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "frame-group",
+    "platform": "desktop",
+    "scenario": "frame-group",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "select-together",
+    "platform": "desktop",
+    "scenario": "select-together",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "format-card",
+    "platform": "desktop",
+    "scenario": "format-card",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "move-connected",
+    "platform": "desktop",
+    "scenario": "move-connected",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "draw-and-erase",
+    "platform": "desktop",
+    "scenario": "draw-and-erase",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "comment-thread",
+    "platform": "desktop",
+    "scenario": "comment-thread",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "board-search",
+    "platform": "desktop",
+    "scenario": "board-search",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "arrange-panels",
+    "platform": "desktop",
+    "scenario": "arrange-panels",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "board-theme",
+    "platform": "desktop",
+    "scenario": "board-theme",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "export-page-layout",
+    "platform": "desktop",
+    "scenario": "export-page-layout",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "export-pages",
+    "platform": "desktop",
+    "scenario": "export-pages",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "welcome-board",
+    "platform": "desktop",
+    "scenario": "welcome-board",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "phone-move",
+    "platform": "phone",
+    "scenario": "mobile-move",
+    "width": 384,
+    "height": 854
+  },
+  {
+    "name": "phone-navigation",
+    "platform": "phone",
+    "scenario": "mobile-navigation",
+    "width": 384,
+    "height": 854
+  },
+  {
+    "name": "phone-layout",
+    "platform": "phone",
+    "scenario": "mobile-layout",
+    "width": 384,
+    "height": 854
+  },
+  {
+    "name": "tablet-move",
+    "platform": "tablet",
+    "scenario": "mobile-move",
+    "width": 600,
+    "height": 960
+  },
+  {
+    "name": "tablet-navigation",
+    "platform": "tablet",
+    "scenario": "mobile-navigation",
+    "width": 600,
+    "height": 960
+  },
+  {
+    "name": "tablet-layout",
+    "platform": "tablet",
+    "scenario": "mobile-layout",
+    "width": 600,
+    "height": 960
+  },
+  {
+    "name": "tablet-drawing",
+    "platform": "tablet",
+    "scenario": "tablet-drawing",
+    "width": 600,
+    "height": 960
+  },
+  {
+    "name": "minimap-size",
+    "platform": "desktop",
+    "scenario": "minimap-size",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "panel-folding",
+    "platform": "tablet",
+    "scenario": "panel-folding",
+    "width": 600,
+    "height": 960
+  }
+]

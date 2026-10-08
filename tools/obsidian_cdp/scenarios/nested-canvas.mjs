@@ -11,8 +11,8 @@ export default async function(s){
   const t=copy[s.lang];
   await s.wait(2000);
   await checked(s,`if(!document.querySelector('.internal-embed .canvas-minimap')) throw new Error('nested canvas missing'); return true;`);
-  await s.caption({ru:'2. Откроем вложенную доску, чтобы продолжить работу',en:'2. Open the embedded board to continue working'});
-  await click(s,{selector:'.internal-embed .embed-title'});
+  await s.caption({ru:'2. Выделите карточку и нажмите название доски',en:'2. Select the card and click the board title'});
+  await click(s,{selector:'[data-demo-id="a100000000000001"]'});
   await click(s,{selector:'.internal-embed .embed-title'});
   await s.wait(600);
   await checked(s,`if(app.workspace.getActiveFile()?.path!==${JSON.stringify(t.nested)}) throw new Error('nested board did not open'); return true;`);

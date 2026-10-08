@@ -1,5 +1,6 @@
-// Shorten capture pauses in playback; exports themselves run to completion.
+// Compress export waits; keep a separate reading pause on the finished document.
 export const maxHoldMs = 450;
+export const tailMs = 2800;
 import {board,checked,click,finish,cleanup as releaseWindow} from './_guide.mjs';
 export async function prepare(s){
   const ru=s.lang==='ru';

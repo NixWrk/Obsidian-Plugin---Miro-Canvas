@@ -268,8 +268,10 @@ node tools/obsidian_cdp/record.mjs --scenario tools/obsidian_cdp/scenarios/stick
 python tools/obsidian_cdp/stop.py --port 9336
 ```
 
-GIFs go at `docs/media/<lang>/<scenario-name>.gif`. Embed one in a README
-with plain Markdown: `![Sticky note](docs/media/en/sticky-note.gif)`.
+GIFs go at `docs/media/<lang>/<scenario-name>.gif`. Embed them beside the
+corresponding instruction in `docs/guide.md` and `docs/guide.ru.md` with plain
+Markdown: `![Sticky note](media/en/sticky-with-note.gif)`. The READMEs show a
+small selection and link to those guides.
 
 The published series and its remaining coverage are listed in
 [the guide review](../../docs/visual-guide.md). `_guide.mjs` prepares native
@@ -278,11 +280,12 @@ away from the minimap when a result is held, to avoid a hover hint.
 `export-pages.mjs` exercises the actual cross-platform PDF/PPTX exporters
 and verifies attachments saved through Obsidian’s vault API, then opens the
 finished PDF in the real viewer. Its GIF shortens capture pauses with
-`maxHoldMs = 450`; no export or input is simulated. The recording overlay hides while the
-plugin captures a page, so captions and the cursor never enter exported files.
+`maxHoldMs = 450` and preserves a separate 2.8-second final pause; no export
+or input is simulated. The exporter renders its independent owned surface,
+so recording captions and the cursor are not part of the exported pages.
 
 After recording both languages, run `python tools/obsidian_cdp/audit_guide.py`
-to check their README references, dimensions, durations and file sizes, and
+to check all guide references, dimensions, durations and file sizes, and
 write start/middle/end contact sheets for manual review into `.out/guide-review`.
 Test the recording helpers with `node --test tools/obsidian_cdp/tests/cdp-key-events.test.mjs`
 and `python -m pytest -q tools/obsidian_cdp/tests`.
@@ -603,3 +606,52 @@ observes hidden export roots during capture, restoration and actual close.
 Query entry and screenshot-class timing are explicitly synthesized. Original
 board data, theme and viewport are restored; results go to `.out/visibility-*`.
 Native focus and DOM hit-target guards prevent tapping obscured Android UI.
+
+## Refresh the complete guide
+
+`guide-recordings.json` lists every published GIF: 22 desktop, three phone and
+five tablet scenarios, each in English and Russian. The recording presentation
+uses one clear example per task, larger step captions, a click indicator and a marked final
+result. Existing prepared text cards use 26px type; short demos retain a
+three-second reading pause. Portrait screen proportions stay intact.
+
+Record candidates before replacing published media:
+
+```powershell
+python tools/obsidian_cdp/refresh_gifs.py --platform desktop --language en --port 9336
+python tools/obsidian_cdp/refresh_gifs.py --platform desktop --language ru --port 9336
+python tools/obsidian_cdp/refresh_gifs.py --platform tablet --language en --port 9340 --serial <tablet-serial>
+python tools/obsidian_cdp/refresh_gifs.py --platform phone --language en --port 9341 --serial <phone-serial>
+```
+
+Repeat each mobile run with `--language ru`. Keep Obsidian visible on the
+unlocked device. Do not run two jobs on the same device or desktop port.
+`--names <name> ...` records selected scenes for review or repair.
+
+The runner refuses an occupied desktop port. Every desktop scene starts in a
+new workspace-owned profile and vault; only the instance started by that run
+is closed. Mobile runs require `MiroCanvasTest`, preserve the previous language,
+theme, plugin settings and active file, and restore them when the run ends.
+Generated mobile boards have a `GIF —` prefix to preserve existing test boards.
+Device files and custom fonts are not accessed by these scenarios.
+
+Candidates and per-run metrics are saved in `.out/gif-refresh/`. The runner
+checks dimensions, looping, duration and the 4 MiB limit. Review first, middle
+and final frames and the full animations before copying candidates into
+`docs/media/en/` and `docs/media/ru/`, then run `audit_guide.py` again. The
+catalogue covers all current assets; it does not complete every pending GIF
+in the contributor guide.
+
+Mobile reading pauses use the screencast stream, kept active by the caption.
+The separate final screenshot is skipped on Android: in movement recordings,
+it changed the cards' apparent text scale relative to the preceding video.
+
+Ordinary mobile taps and drags use ADB. Held panel drags and two-finger zoom
+use CDP touch points. Pressure examples use generated CDP pen samples. These
+recordings show real Obsidian on physical devices and do not certify physical
+stylus pressure, hover or palm rejection.
+
+The board-theme scenario alone shows switching light/dark appearance. Do not
+publish whole parallel series for each theme. Optional `--theme` is for scoped
+recording/review. Phone layout media may use an explicitly documented trim of
+existing real-device footage when the device is no longer available.

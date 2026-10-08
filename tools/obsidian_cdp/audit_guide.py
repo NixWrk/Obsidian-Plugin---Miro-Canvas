@@ -5,40 +5,30 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageSequence
 
-NAMES = [
-    "sticky-with-note", "insert-note", "obsidian-links", "nested-canvas",
-    "create-shape", "frame-group", "select-together", "format-card",
-    "move-connected", "draw-and-erase", "comment-thread", "board-search",
-    "export-pages", "arrange-panels", "welcome-board",
-]
-MOBILE_NAMES = ["phone-move", "phone-navigation", "tablet-move", "tablet-navigation", "phone-layout", "tablet-layout", "tablet-drawing", "minimap-size"]
-
-
 def audit(root: Path, out: Path) -> list[dict]:
     out.mkdir(parents=True, exist_ok=True)
     records = []
+    scenes = json.loads((root / 'tools' / 'obsidian_cdp' / 'guide-recordings.json').read_text(encoding='utf-8'))
     for language in ("ru", "en"):
-        readme = (root / ("README.ru.md" if language == "ru" else "README.md")).read_text(encoding="utf-8")
-        names_to_check = NAMES + MOBILE_NAMES
+        guide = (root / "docs" / ("guide.ru.md" if language == "ru" else "guide.md")).read_text(encoding="utf-8")
+        names_to_check = [scene['name'] for scene in scenes]
+        assert set(names_to_check) == {path.stem for path in (root / 'docs' / 'media' / language).glob('*.gif')}, 'unlisted GIFs'
         for chunk in range(0, len(names_to_check), 3):
             names = names_to_check[chunk:chunk + 3]
             sheet = Image.new("RGB", (1440, 330 * len(names)), "#eeeeee")
             labels = ImageDraw.Draw(sheet)
             for row, name in enumerate(names):
                 path = root / "docs" / "media" / language / f"{name}.gif"
-                assert f"docs/media/{language}/{name}.gif" in readme, path
-                scenario = "mobile-" + name.split("-", 1)[1] if name in {"phone-move", "phone-navigation", "tablet-move", "tablet-navigation", "phone-layout", "tablet-layout"} else name
+                scene = next(scene for scene in scenes if scene['name'] == name)
+                assert f"media/{language}/{name}.gif" in guide, path
+                scenario = scene['scenario']
                 assert (root / "tools" / "obsidian_cdp" / "scenarios" / f"{scenario}.mjs").is_file()
                 with Image.open(path) as gif:
-                    if name in MOBILE_NAMES:
-                        expected_width = 384 if name.startswith("phone-") else 600
-                        assert gif.width == expected_width and gif.height > gif.width, (path, gif.size)
-                    else:
-                        assert gif.size == (960, 600), (path, gif.size)
+                    assert gif.width == scene['width'] and abs(gif.height - scene['height']) <= 2, (path, gif.size)
                     assert gif.info.get("loop") == 0, path
                     frames = [(frame.convert("RGB"), frame.info.get("duration", 0)) for frame in ImageSequence.Iterator(gif)]
                 duration = sum(timing for _, timing in frames)
-                assert len(frames) > 2 and 5000 <= duration <= 35000, (path, duration)
+                assert len(frames) > 2 and 5000 <= duration <= 45000, (path, duration)
                 assert path.stat().st_size < 4 * 1024 * 1024, path
                 records.append({"language": language, "name": name, "frames": len(frames), "seconds": round(duration / 1000, 2), "bytes": path.stat().st_size})
                 labels.text((8, row * 330 + 5), f"{language}/{name} — {duration / 1000:.1f}s", fill="black")

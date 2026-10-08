@@ -22,11 +22,9 @@ export default async function(s) {
   await s.key('Escape');
   await s.wait(1600);
   await checked(s,`if(!document.querySelector('[data-demo-id] .internal-embed')) throw new Error('note embed missing'); return true;`);
-  await s.caption({ru:'2. Нажмём ссылку — откроется сама заметка',en:'2. Follow the link to open the original note'});
+  await s.caption({ru:'2. Выделите карточку, затем нажмите ссылку',en:'2. Select the card, then follow its link'});
+  await click(s,card);
   await click(s,{selector:'[data-demo-id] a.internal-link'});
-  if (await checked(s,`return app.workspace.getActiveFile()?.extension === 'canvas';`)) {
-    await click(s,{selector:'[data-demo-id] a.internal-link'});
-  }
   await checked(s,`if(app.workspace.getActiveFile()?.path!==${JSON.stringify(t.note+'.md')}) throw new Error('link did not open the note'); return true;`);
   await finish(s,{ru:'Заметка хранится в Obsidian и доступна с доски',en:'The note stays in Obsidian and is accessible from the board'});
 }

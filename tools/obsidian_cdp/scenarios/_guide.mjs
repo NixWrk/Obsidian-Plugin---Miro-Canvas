@@ -5,12 +5,26 @@ export async function checked(s, code) {
 }
 
 export async function board(s, name, data, files = []) {
+  data = {
+    ...data,
+    miroCanvas: { schemaVersion: 1, ...data.miroCanvas, settings: { minimapVisible: false, ...data.miroCanvas?.settings }, localOverrides: { ...data.miroCanvas?.localOverrides } },
+  };
+  for (const node of data.nodes) {
+    if (node.type !== 'text') continue;
+    const appearance = data.miroCanvas.localOverrides[node.id] ?? {};
+    data.miroCanvas.localOverrides[node.id] = {
+      ...appearance,
+      typography: { fontSize: 26, ...appearance.typography },
+    };
+  }
   await checked(s, `
     const window = require('@electron/remote').getCurrentWindow();
     window.setAlwaysOnTop(true);
     window.show();
     window.focus();
-    await app.plugins.plugins['miro-canvas'].saveCanvasSettings({panelLayout:{}});
+    app.changeTheme(${JSON.stringify(s.theme==='dark'?'obsidian':'moonstone')});
+    app.updateTheme();
+    await app.plugins.plugins['miro-canvas'].saveCanvasSettings({panelLayout:{},minimapVisible:false,toolbarItems:['select','lasso','text','card','sticky','shape','pen','connector','comment','frame','note','media']});
     const files = ${JSON.stringify([...files, [name, JSON.stringify(data)]])};
     for (const [path, body] of files) {
       const file = app.vault.getAbstractFileByPath(path);
@@ -18,6 +32,8 @@ export async function board(s, name, data, files = []) {
       else await app.vault.create(path, body);
     }
     await app.workspace.getLeaf(false).openFile(app.vault.getAbstractFileByPath(${JSON.stringify(name)}), {active:true});
+    app.plugins.plugins['miro-canvas'].m1Session.resetTools();
+    app.plugins.plugins['miro-canvas'].m1Session.setTheme(${JSON.stringify(s.theme)});
     app.workspace.leftSplit.collapse();
     app.workspace.rightSplit.collapse();
     return true;
@@ -32,6 +48,7 @@ export async function board(s, name, data, files = []) {
   `);
   await s.wait(600);
   await s.move({x:90,y:650});
+  await s.click({x:90,y:650});
 }
 
 export async function cleanup(s) {
@@ -39,6 +56,14 @@ export async function cleanup(s) {
 }
 
 export async function click(s, target) {
+  if (target.selector) {
+    let ready = await s.find(target);
+    for (let attempt = 0; !ready && attempt < 25; attempt += 1) {
+      await s.wait(100);
+      ready = await s.find(target);
+    }
+    if (!ready) throw new Error('The recording control did not become visible: ' + target.selector);
+  }
   await s.move(target, {duration:650});
   await s.wait(180);
   await s.click(target);
@@ -46,7 +71,7 @@ export async function click(s, target) {
 }
 
 export async function finish(s, caption) {
-  await s.caption(caption);
+  await s.caption(typeof caption === 'string' ? '✓ ' + caption : Object.fromEntries(Object.entries(caption).map(([language, text]) => [language, '✓ ' + text])));
   await s.move({x:90,y:650}, {duration:550});
-  await s.wait(2500);
+  await s.wait(3000);
 }

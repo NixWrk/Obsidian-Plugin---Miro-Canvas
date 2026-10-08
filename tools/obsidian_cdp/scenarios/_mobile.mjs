@@ -4,7 +4,7 @@ export async function checked(s, code) {
   return result;
 }
 
-export async function board(s, name, { arrange = false } = {}) {
+export async function board(s, name, { arrange = false, minimap = false } = {}) {
   await s.key('Escape');
   const text = s.lang === 'ru' ? ['Встреча в пятницу', 'Выбрать место'] : ['Meet on Friday', 'Choose a place'];
   const data = {nodes:[
@@ -13,11 +13,13 @@ export async function board(s, name, { arrange = false } = {}) {
   ],edges:[{id:'a200000000000001',fromNode:'a100000000000001',fromSide:'right',toNode:'a100000000000002',toSide:'top'}],miroCanvas:{schemaVersion:1,localOverrides:{
     a100000000000001:{colors:{fill:'#fff7a1',text:'#282820'},typography:{fontSize:22,alignment:'center',verticalAlign:'center'}},
     a100000000000002:{colors:{fill:'#d5f1a8',text:'#282820'},typography:{fontSize:22,alignment:'center',verticalAlign:'center'}},
-  }}};
+  },settings:{minimapVisible:minimap}}};
   await checked(s, `
     if (app.vault.getName() !== 'MiroCanvasTest') throw new Error('wrong vault');
     const plugin = app.plugins.plugins['miro-canvas'];
     if (!plugin) throw new Error('plugin is not loaded');
+    app.changeTheme(${JSON.stringify(s.theme==='dark'?'obsidian':'moonstone')});
+    app.updateTheme();
     const phone = innerWidth < 500;
     const toolbarItems = phone
       ? ['select','sticky','text','note','shape','pen','connector']
@@ -28,14 +30,15 @@ export async function board(s, name, { arrange = false } = {}) {
       toolbar: {anchor:'left-middle',dx:16,dy:0,orientation:'vertical'},
       dockBar: {anchor:'bottom-right',dx:16,dy:20,orientation:'horizontal'},
     };
-    await plugin.saveCanvasSettings({panelLayout,toolbarItems,hiddenPanelButtons:[],importQuestionAnswered:true,minimapVisible:false});
+    await plugin.saveCanvasSettings({panelLayout,toolbarItems,hiddenPanelButtons:[],importQuestionAnswered:true,minimapVisible:${minimap}});
     document.querySelector('.modal-close-button')?.click();
-    const name = ${JSON.stringify(name)};
+    const name = ${JSON.stringify('GIF — ' + name)};
     const data = ${JSON.stringify(JSON.stringify(data))};
     const existing = app.vault.getAbstractFileByPath(name);
     if (existing) await app.vault.modify(existing, data);
     else await app.vault.create(name, data);
     await app.workspace.getLeaf(false).openFile(app.vault.getAbstractFileByPath(name), {active:true});
+    plugin.m1Session.setTheme(${JSON.stringify(s.theme)});
     app.workspace.leftSplit?.collapse();
     app.workspace.rightSplit?.collapse();
     return true;
@@ -54,7 +57,7 @@ export async function board(s, name, { arrange = false } = {}) {
 }
 
 export async function finish(s, copy) {
-  await s.caption(copy);
+  await s.caption(Object.fromEntries(Object.entries(copy).map(([language, text]) => [language, '✓ ' + text])));
   await checked(s, "document.getElementById('__cdp_cursor__').style.opacity='0'; return true;");
-  await s.wait(2500);
+  await s.wait(3000);
 }

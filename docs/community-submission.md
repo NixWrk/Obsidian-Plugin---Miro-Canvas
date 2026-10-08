@@ -50,13 +50,14 @@ Long description, if a description field is offered:
 > Desktop exports save to the location chosen in the system dialog.
 
 The directory reads the manifest from the default branch and README excerpt
-from the repository. The README includes bilingual instructions and 56 GIFs.
+from the repository. The README introduces the plugin in both languages and
+links to the illustrated user guides with the full demonstrations.
 Examples for the listing or a reviewer:
 
 - [First edit](media/en/sticky-with-note.gif)
 - [Current welcome board](media/en/welcome-board.gif)
 - [Feature coverage audit](welcome-board-coverage.md)
-- [Full English instructions](../README.md) and [Russian instructions](../README.ru.md)
+- [Full English instructions](guide.md) and [Russian instructions](guide.ru.md)
 
 ## Verified packaging and disclosures
 

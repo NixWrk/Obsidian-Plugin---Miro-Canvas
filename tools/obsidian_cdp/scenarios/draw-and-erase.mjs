@@ -6,16 +6,17 @@ export async function prepare(s){
 }
 export default async function(s){
   await s.wait(1100);
-  await click(s,{selector:'[data-tool-group="drawing"]'});
+  await click(s,{selector:'.miro-canvas-tools > .miro-canvas-toolbar__bar [data-tool-group="drawing"]'});
   await click(s,{selector:'[data-pen-color="#f24726"]'});
   await s.move({x:490,y:490},{duration:650});
   await s.drag({x:490,y:490},{x:790,y:505},{duration:1400});
   await s.wait(700);
-  await checked(s,`const m=app.workspace.activeLeaf.view.canvas.getData().miroCanvas; if(!m) throw new Error('drawing was not saved'); return m;`);
+  await checked(s,`const d=app.workspace.activeLeaf.view.canvas.getData();const strokes=Object.values(d.miroCanvas?.localOverrides??{}).filter(o=>o.item?.stroke);if(strokes.length!==1||strokes[0].item.stroke.points.length<2)throw Error('visible stroke was not created');return true;`);
   await s.caption({ru:'2. Ластик уберёт штрих, карточка останется',en:'2. Erase the stroke and keep the card'});
   await click(s,{selector:'[data-tool="eraser"]'});
   await s.move({x:580,y:495},{duration:650});
   await s.drag({x:580,y:495},{x:680,y:500},{duration:900});
   await s.key('Escape');
+  await checked(s,`const d=app.workspace.activeLeaf.view.canvas.getData();if(Object.values(d.miroCanvas?.localOverrides??{}).some(o=>o.item?.stroke)||!d.nodes.some(n=>n.id==='a100000000000001'))throw Error('eraser did not remove just the stroke');return true;`);
   await finish(s,{ru:'Рисуйте и исправляйте прямо на доске',en:'Draw and make corrections directly on the board'});
 }

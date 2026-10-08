@@ -72,6 +72,10 @@ def test_frame_durations_preserves_a_reading_pause_on_a_still_board() -> None:
     assert frame_durations([0, 2500, 5000], [0, 1, 2]) == [2500, 2500, TAIL_MS]
 
 
+def test_compressed_export_waits_keep_the_final_document_readable() -> None:
+    assert frame_durations([0, 2500, 5000], [0, 1, 2], max_ms=450, tail_ms=2800) == [450, 450, 2800]
+
+
 def test_load_manifest_reads_frame_list(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.json"
     manifest.write_text(json.dumps({"frames": [{"file": "frame-0.png", "t": 1.0}]}), encoding="utf-8")

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh all 58 English/Russian guide GIFs with readable step captions, simpler workflows and clear final states. Add one board-theme switch example per language; keep card colors and content visible across both themes. Place panels beside the work, select cards before following links, and verify actual drawing/erasure and reachable controls.
+- Simplify the English and Russian READMEs with a feature overview, quick installation and first steps. Keep all detailed instructions and existing GIFs in linked user guides; move CLI examples and source-warning notes to the contributor guides.
 - Update development ESLint to 10.12.0 and Node 22 declarations to 22.20.5; development now requires Node 22.13+ on supported lines. Keep the three plugin runtime files unchanged and CLI/MCP downloads on Node 20+; rebuilding the standalone tools changes only unused package metadata. Pin html2canvas-pro 2.5.0: the next two patches declare Node 24 and are deferred.
 
 ## 0.2.10 - 2026-10-07

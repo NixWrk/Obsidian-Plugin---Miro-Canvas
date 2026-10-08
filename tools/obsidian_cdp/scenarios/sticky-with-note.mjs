@@ -32,16 +32,20 @@ export async function prepare(s) {
     window.setAlwaysOnTop(true);
     window.show();
     window.focus();
+    app.changeTheme(${JSON.stringify(s.theme==='dark'?'obsidian':'moonstone')});
+    app.updateTheme();
+    await app.plugins.plugins['miro-canvas'].saveCanvasSettings({panelLayout:{},minimapVisible:false});
     for (const [path, body] of [[text.note, text.body], [text.project, text.projectBody]]) {
       const existing = app.vault.getAbstractFileByPath(path);
       if (!existing) await app.vault.create(path, body);
       else await app.vault.modify(existing, body);
     }
-    const board = { nodes: [{ id: "f100000000000001", type: "file", file: text.note, x: 200, y: -180, width: 390, height: 350 }], edges: [] };
+    const board = { nodes: [{ id: "f100000000000001", type: "file", file: text.note, x: 200, y: -180, width: 390, height: 350 }], edges: [], miroCanvas: {schemaVersion:1,settings:{minimapVisible:false}} };
     let file = app.vault.getAbstractFileByPath(text.board);
     if (file) await app.vault.modify(file, JSON.stringify(board));
     else file = await app.vault.create(text.board, JSON.stringify(board));
     await app.workspace.getLeaf(false).openFile(file, { active: true });
+    app.plugins.plugins['miro-canvas'].m1Session.setTheme(${JSON.stringify(s.theme)});
     app.workspace.leftSplit.collapse();
     app.workspace.rightSplit.collapse();
     return true;
@@ -55,7 +59,7 @@ export async function prepare(s) {
     return true;
   `);
   await s.wait(700);
-  await s.caption({ en: "1. Add a quick idea beside your note", ru: "1. Добавим стикер рядом с заметкой" });
+  await s.caption({ en: "1. Add a sticky note beside an Obsidian note", ru: "1. Добавьте стикер рядом с заметкой" });
   await s.move({ x: 550, y: 620 });
 }
 
@@ -98,6 +102,8 @@ export default async function (s) {
     return { from: {x: from.right - 4, y: from.y}, to: {x: to.left + 4, y: to.y} };
   `);
   await s.key("L");
+  await s.caption({ en: "2. Connect them with an arrow (L)", ru: "2. Соедините карточки стрелкой (L)" });
+  await s.wait(800);
   await s.move(endpoints.from, { duration: 600 });
   await s.wait(250);
   await s.drag(endpoints.from, endpoints.to, { duration: 1000 });
@@ -108,7 +114,7 @@ export default async function (s) {
     if (data.nodes.length !== 2 || data.edges.length !== 1) throw new Error("expected two cards and one native edge");
     return { cards: data.nodes.length, edges: data.edges.length };
   `);
-  await s.caption({ en: "2. Quick ideas on sticky notes. Details in Obsidian.", ru: "2. Короткая мысль — на стикере. Подробности — в заметке." });
+  await s.caption({ en: "✓ Ideas on the board. Details in your notes.", ru: "✓ Идеи — на доске. Подробности — в заметках." });
   await s.move({ x: place.x - 110, y: note.y + note.height / 2 + 65 }, { duration: 650 });
-  await s.wait(2300);
+  await s.wait(3000);
 }

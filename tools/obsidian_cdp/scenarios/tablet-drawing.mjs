@@ -2,7 +2,7 @@ import {board, checked, finish} from './_mobile.mjs';
 
 export async function prepare(s) {
   await board(s, s.lang==='ru'?'Рисование — перо и палец.canvas':'Drawing — pen and finger.canvas');
-  await checked(s, `const p=app.plugins.plugins['miro-canvas'];await p.saveCanvasSettings({penPressure:false,fingerDrawing:false,holdStraightLine:false});const c=app.workspace.activeLeaf.view.canvas;c.clear();c.importData({nodes:[],edges:[]});c.setViewport(0,0,0);p.m1Session.armTool('pen');p.m1Session.penWidth=14;return true;`);
+  await checked(s, `const p=app.plugins.plugins['miro-canvas'];await p.saveCanvasSettings({penPressure:false,fingerDrawing:false,holdStraightLine:false});const c=app.workspace.activeLeaf.view.canvas;c.clear();c.importData({nodes:[],edges:[]});c.setViewport(0,0,0);p.m1Session.setTheme(${JSON.stringify(s.theme)});p.m1Session.armTool('pen');p.m1Session.penWidth=14;p.m1Session.penColor='#7954cb';return true;`);
   await s.wait(800);
   await s.caption({ru:'Нажим меняет толщину прямо во время рисования',en:'Pressure changes width while you draw'});
 }

@@ -89,7 +89,7 @@ unit/synthetic and physical-device evidence.
 ### Task: the visual guide (GIFs)
 
 **Goal** (`FUT-012`). A GIF for every feature in
-[the introduction to Miro Canvas](../README.md)
+[the Miro Canvas user guide](guide.md)
 and every setting, each showing two things in turn:
 
 1. **How to set it up** - where to click and what to choose. The caption
@@ -97,11 +97,11 @@ and every setting, each showing two things in turn:
 2. **The result** on the board. Name what changed, for example
    "2. The cards move together".
 
-Each GIF exists in two languages: the English interface for README.md, the
-Russian one for README.ru.md.
+Each GIF exists in two languages: the English interface for guide.md, the
+Russian one for guide.ru.md.
 
-**Recorded:** 14 desktop examples and six phone/tablet examples in both
-languages (40 GIFs), placed beside their
+**Recorded:** 22 desktop examples and eight phone/tablet examples in both
+languages (60 GIFs), placed beside their
 feature descriptions. Coverage, readability review and remaining topics are
 in the [guide review](../docs/visual-guide.md). Broad checklist items below stay
 open when a recording covers only part of their actions.
@@ -131,10 +131,10 @@ open when a recording covers only part of their actions.
    - nothing is cut off;
    - it is 960 px wide and no more than 4 MB.
 5. Embed it right under the paragraph, list item or table row that
-   describes the feature or setting: `![<what it shows>](docs/media/en/<name>.gif)`
-   in README.md, `docs/media/ru/` in README.ru.md.
+   describes the feature or setting: `![<what it shows>](media/en/<name>.gif)`
+   in docs/guide.md, `media/ru/` in docs/guide.ru.md.
 6. Commit each scenario with its two GIFs, and tick its line below in both
-   READMEs.
+   contributor guides.
 
 **A ready prompt for an agent:** "Read the section 'Working on this repository
 with an AI agent' in README.md and AGENTS.md. Do the task 'The visual guide
@@ -250,3 +250,40 @@ Run `npm run submission:check` after building and
 Follow [the submission package](community-submission.md); new submissions
 use Community Directory, not a pull request to obsidian-releases.
 The local checker does not certify developer-policy compliance.
+
+## Optional CLI and MCP downloads
+
+With Node 20 or later, download `miro-canvas-cli.mjs` or `miro-canvas-mcp.mjs`
+from the [release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/latest).
+These optional agent tools run separately; put them outside the plugin folder.
+To build the CLI locally, use `npm run cli:build`:
+
+```bash
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault list
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault call read_board --input read.json
+node mcp/dist/miro-canvas-cli.mjs --vault /absolute/path/to/vault batch --input batch.json
+```
+
+The CLI uses the same tool operations as MCP and prints one JSON result.
+Exit codes are 0 for success, 1 for a tool or board-validation failure and 2
+for bad usage or input. `--read-only` permits reading and checking only.
+See the [CLI reference](../mcp/README.md#cli) for `--args`, `--stdin`, sequential
+batches, revision handoff and undo limited to the current process.
+
+## Remaining source warnings
+
+The recorded 0.2.9 scan of `src/` and `mcp/src/` with the official Obsidian rules reports
+**10 warnings and no errors**. The standalone Node lint reports no warnings or
+errors; the plugin-only lint retains the one command-ID warning below.
+
+| Warning | Sites | Reason |
+| --- | --- | --- |
+| Node builtin imports | 8 | The optional CLI/MCP programs use files, paths, hashes and stdin. They run under Node 20+, are excluded from `main.js`, and are never started by the plugin. |
+| Literal `.obsidian` | 1 | The ordinary configuration folder is an explicit default. Custom folders work through `--config-dir`; operations use the selected folder. |
+| `m1-commands` command ID | 1 | Existing users' saved hotkeys refer to this ID. Retaining it preserves them. |
+
+The two console warnings and the type-only `node:stream` import from the 0.2.8
+report are removed. CLI adds one necessary `node:fs` import, included in the
+eight sites above. Standalone code forbids console calls; Ajv logging is disabled
+while validation errors remain in JSON responses. These explanations do not
+certify Community Directory acceptance; its next scan may report differently.

@@ -25,12 +25,19 @@ const INJECT_OVERLAY_JS = `
     const style = document.createElement('style');
     style.id = '__cdp_overlay_style__';
     style.textContent = \`
-      #__cdp_cursor__ { position:fixed; left:0; top:0; z-index:2147483647; width:18px; height:24px; pointer-events:none; filter:drop-shadow(0 1px 1px #000); }
-      #__cdp_cursor__::before { content:''; position:absolute; inset:0; background:#fff; clip-path:polygon(0 0,0 85%,25% 65%,45% 100%,65% 90%,45% 57%,90% 57%); }
-      #__cdp_cursor__.__cdp_click__::after { content:''; position:absolute; left:8px; top:8px; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%; background:rgba(255,80,80,.9); animation:__cdp_ripple__ .5s ease-out; }
-      @keyframes __cdp_ripple__ { from { transform:scale(1); opacity:1; } to { transform:scale(5); opacity:0; } }
+      #__cdp_cursor__ { position:fixed; left:0; top:0; z-index:2147483647; width:22px; height:29px; pointer-events:none; filter:drop-shadow(0 1px 1px #fff) drop-shadow(0 2px 2px #0005); }
+      #__cdp_cursor__::before { content:''; position:absolute; inset:0; background:#302746; clip-path:polygon(0 0,0 85%,25% 65%,45% 100%,65% 90%,45% 57%,90% 57%); }
+      #__cdp_cursor__.__cdp_click__::after { content:''; position:absolute; left:8px; top:8px; width:9px; height:9px; margin:-4px 0 0 -4px; border-radius:50%; border:2px solid #7954cb; animation:__cdp_ripple__ .6s ease-out; }
+      @keyframes __cdp_ripple__ { from { transform:scale(1); opacity:.85; } to { transform:scale(4); opacity:0; } }
       body:has(.miro-canvas-exporting) :is(#__cdp_cursor__, #__cdp_caption__) { visibility:hidden !important; }
-      #__cdp_caption__ { position:fixed; left:0; top:0; right:0; z-index:2147483647; box-sizing:border-box; padding:10px 18px; background:rgba(20,20,20,.85); color:#fff; font:600 20px/1.4 sans-serif; text-align:center; display:none; }
+      #__cdp_caption__ { position:fixed; left:50%; top:12px; transform:translateX(-50%); z-index:2147483647; box-sizing:border-box; width:max-content; max-width:calc(100% - 32px); padding:12px 20px 12px 12px; background:#fff; color:#292332; border:1px solid #e7e1ef; border-radius:14px; box-shadow:0 4px 18px #2b203a18; font:600 26px/1.35 'Segoe UI',sans-serif; text-align:left; align-items:center; gap:14px; display:none; pointer-events:none; }
+      .__cdp_step__ { display:grid; place-items:center; flex:0 0 36px; width:36px; height:36px; border-radius:10px; background:#eee7fb; color:#6943b2; font-size:21px; font-weight:700; }
+      .__cdp_copy__ { min-width:0; }
+      #__cdp_caption__[data-theme="dark"] { background:#29242f; color:#f4f1f7; border-color:#494152; box-shadow:0 4px 18px #0005; }
+      #__cdp_caption__[data-theme="dark"] .__cdp_step__ { background:#473756; color:#dac7ff; }
+      #__cdp_cursor__[data-theme="dark"]::before { background:#f5f1ff; }
+      @media (max-width:900px) { #__cdp_caption__ { font-size:23px; } }
+      @media (max-width:500px) { #__cdp_caption__ { top:8px; max-width:calc(100% - 20px); font-size:18px; padding:10px 12px; gap:10px; border-radius:12px; } .__cdp_step__ { flex-basis:28px; width:28px; height:28px; font-size:17px; border-radius:8px; } }
     \`;
     document.head.appendChild(style);
     const cursor = document.createElement('div');
@@ -49,7 +56,17 @@ const INJECT_OVERLAY_JS = `
   window.__cdpCaption = (text) => {
     const el = document.getElementById('__cdp_caption__');
     if (!el) return;
-    if (text) { el.textContent = text; el.style.display = 'block'; }
+    if (text) {
+      const match = /^(\\d+)\\.\\s*|^(✓)\\s*/.exec(text);
+      const step = document.createElement('span');
+      step.className = '__cdp_step__';
+      step.textContent = match ? match[1] || match[2] : '•';
+      const copy = document.createElement('span');
+      copy.className = '__cdp_copy__';
+      copy.textContent = match ? text.slice(match[0].length) : text;
+      el.replaceChildren(step, copy);
+      el.style.display = 'flex';
+    }
     else { el.style.display = 'none'; }
   };
   return "overlay-ready";
@@ -80,8 +97,9 @@ class WindowConnection {
 }
 
 class Recorder {
-  constructor(port, frames) {
+  constructor(port, frames, theme = "light") {
     this.port = port;
+    this.theme = theme;
     this.frames = frames; // shared across every window this scenario visits
     this.connections = new Map(); // targetId -> WindowConnection
     this.current = null;
@@ -120,6 +138,8 @@ class Recorder {
     const connection = new WindowConnection(target, send, ws, unsubscribe);
     this.connections.set(target.id, connection);
     await evaluate(send, INJECT_OVERLAY_JS);
+    await evaluate(send, `document.getElementById('__cdp_caption__').dataset.theme=${JSON.stringify(this.theme)};document.getElementById('__cdp_cursor__').dataset.theme=${JSON.stringify(this.theme)};return true;`);
+    await send("Emulation.setEmulatedMedia", {features:[{name:"prefers-color-scheme",value:this.theme}]});
     return connection;
   }
 
@@ -150,6 +170,7 @@ class Recorder {
     for (const connection of this.connections.values()) {
       try {
         await this.stopScreencast(connection);
+        await connection.send("Emulation.setEmulatedMedia", {features:[]});
         await evaluate(connection.send, REMOVE_OVERLAY_JS);
       } catch {
         // The window may already be gone (a scenario closed it); nothing to clean up there.
@@ -178,6 +199,8 @@ async function findElement(recorder, { selector = "*", textEn, textRu, controlSe
     const match = nodes.find((el) => {
       const box = el.getBoundingClientRect();
       if (box.width === 0 || box.height === 0 || el.closest('[hidden]')) return false;
+      const style = getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
       if (wanted.length === 0) return true;
       const text = (el.textContent || "").trim();
       return wanted.some((want) => text === want || text.includes(want));
@@ -188,6 +211,8 @@ async function findElement(recorder, { selector = "*", textEn, textRu, controlSe
     // Canvas places cards with transforms; scrolling them shifts the whole board.
     if (!scoped.closest(".canvas-wrapper")) scoped.scrollIntoView({ block: "center", inline: "center" });
     const rect = scoped.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (!hit || !scoped.contains(hit)) return null;
     return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2), width: rect.width, height: rect.height };
   `;
   return evaluate(recorder.current.send, code);
@@ -251,6 +276,7 @@ function buildScenarioApi(recorder, lang, androidSerial) {
   };
   return {
     lang,
+    theme: recorder.theme,
 
     touchTap: async (target) => {
       const point = await screenPoint(target);
@@ -403,9 +429,9 @@ function buildScenarioApi(recorder, lang, androidSerial) {
   };
 }
 
-async function runScenario(scenarioPath, port, outPath, fps, width, androidSerial) {
+async function runScenario(scenarioPath, port, outPath, fps, width, androidSerial, theme) {
   const frames = [];
-  const recorder = new Recorder(port, frames);
+  const recorder = new Recorder(port, frames, theme);
   const targets = await listTargets(port);
   const main = targets.find((t) => t.type === "page" && (androidSerial ? t.title.includes("Obsidian") && t.url === "http://localhost/" : t.url.startsWith("app://obsidian.md")));
   if (!main) throw new Error("no Obsidian page target; is launch.py's instance running on this port?");
@@ -419,7 +445,7 @@ async function runScenario(scenarioPath, port, outPath, fps, width, androidSeria
     if (app.vault.getName() !== 'MiroCanvasTest') throw new Error('mobile recordings require MiroCanvasTest');
     const style = document.createElement('style');
     style.id = '__cdp_mobile_style__';
-    style.textContent = '#__cdp_cursor__ { width:24px; height:24px; border:2px solid #fff; border-radius:50%; background:#a78bfa55; opacity:0; } #__cdp_cursor__::before { display:none; } #__cdp_caption__ { font-size:16px; padding:8px 10px; animation:__cdp_mobile_frames__ 1s infinite alternate; } @keyframes __cdp_mobile_frames__ { from {opacity:1} to {opacity:.999} }';
+    style.textContent = '#__cdp_cursor__ { width:28px; height:28px; border:2px solid #7954cb; border-radius:50%; background:#a78bfa44; opacity:0; } #__cdp_cursor__::before { display:none; } #__cdp_caption__ { animation:__cdp_mobile_frames__ 1s infinite alternate; } @keyframes __cdp_mobile_frames__ { from {opacity:1} to {opacity:.999} }';
     document.head.appendChild(style);
     const touch = (event) => {
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
@@ -450,9 +476,12 @@ async function runScenario(scenarioPath, port, outPath, fps, width, androidSeria
       await recorder.startScreencast(recorder.current);
     }
     await scenarioModule.default(s);
-    // A still page sends no screencast frames. Keep the final reading pause.
-    const finalFrame = await recorder.current.send("Page.captureScreenshot", { format: "png" });
-    if (finalFrame.result?.data) frames.push({ dataBase64: finalFrame.result.data, timestampMs: Date.now() });
+    // Android's animated caption keeps frames coming during the reading pause.
+    // Its separate screenshot path can change the cards' apparent text scale.
+    if (!androidSerial) {
+      const finalFrame = await recorder.current.send("Page.captureScreenshot", { format: "png" });
+      if (finalFrame.result?.data) frames.push({ dataBase64: finalFrame.result.data, timestampMs: Date.now() });
+    }
   } finally {
     try {
       await scenarioModule.cleanup?.(s);
@@ -465,10 +494,10 @@ async function runScenario(scenarioPath, port, outPath, fps, width, androidSeria
   for (const connection of recorder.connections.values()) {
     if (connection.captureError) throw connection.captureError;
   }
-  writeGif(frames, outPath, fps, width, scenarioModule.maxHoldMs ?? 10000);
+  writeGif(frames, outPath, fps, width, scenarioModule.maxHoldMs ?? 10000, scenarioModule.tailMs ?? 900);
 }
 
-function writeGif(frames, outPath, fps, width, maxHoldMs) {
+function writeGif(frames, outPath, fps, width, maxHoldMs, tailMs) {
   const workDir = mkdtempSync(path.join(tmpdir(), "obsidian-cdp-frames-"));
   try {
     const manifestFrames = frames.map((frame, index) => {
@@ -488,6 +517,7 @@ function writeGif(frames, outPath, fps, width, maxHoldMs) {
       "--width", String(width),
       "--fps", String(fps),
       "--max-hold-ms", String(maxHoldMs),
+      "--tail-ms", String(tailMs),
     ], { stdio: "inherit" });
     if (result.status !== 0) throw new Error(`frames_to_gif.py failed with exit code ${result.status}`);
   } finally {
@@ -496,7 +526,7 @@ function writeGif(frames, outPath, fps, width, maxHoldMs) {
 }
 
 function parseArgs(argv) {
-  const args = { port: 9333, fps: 10, width: 960 };
+  const args = { port: 9333, fps: 10, width: 960, theme: "light" };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === "--scenario") args.scenario = argv[++i];
@@ -505,12 +535,14 @@ function parseArgs(argv) {
     else if (flag === "--fps") args.fps = Number(argv[++i]);
     else if (flag === "--width") args.width = Number(argv[++i]);
     else if (flag === "--android-serial") args.androidSerial = argv[++i];
+    else if (flag === "--theme") args.theme = argv[++i];
     else throw new Error(`unknown argument: ${flag}`);
   }
   if (!args.scenario || !args.out) throw new Error("usage: node record.mjs --scenario <file.mjs> --out <file.gif> [--port 9333] [--fps 10] [--width 960] [--android-serial <serial>]");
+  if (args.theme !== "light" && args.theme !== "dark") throw new Error("theme must be light or dark");
   return args;
 }
 
 const args = parseArgs(process.argv.slice(2));
-await runScenario(args.scenario, args.port, args.out, args.fps, args.width, args.androidSerial);
+await runScenario(args.scenario, args.port, args.out, args.fps, args.width, args.androidSerial, args.theme);
 console.log(`saved ${args.out}`);

@@ -14,7 +14,7 @@ async function moveControl(s, selector, dx, dy) {
 export default async function (s) {
     await click(s, { selector: '.miro-canvas-dock button:has(.lucide-settings-2)' });
     await click(s, { selector: '.miro-canvas-dock__menu--board [role="menuitem"]', textRu: 'Экспорт в PDF или PowerPoint', textEn: 'Export to PDF or PowerPoint' });
-    await checked(s, `const s=app.plugins.plugins['miro-canvas'].m1Session;s.exporting.panel.actions.onFormat('free','landscape');window.__layoutBefore={...s.exporting.state.pages[0]};return true;`);
+    await checked(s, `const s=app.plugins.plugins['miro-canvas'].m1Session;if(document.querySelector('.miro-canvas-export select')?.value!=='free')throw Error('prepared free-size page is missing');window.__layoutBefore={...s.exporting.state.pages[0]};return true;`);
     await moveControl(s, '.miro-canvas-export-page__tab', 65, 35);
     await checked(s, `const p=app.plugins.plugins['miro-canvas'].m1Session.exporting.state.pages[0];if(p.x<=window.__layoutBefore.x||p.y<=window.__layoutBefore.y)throw Error('page did not move');window.__layoutMoved={...p};return true;`);
     await s.caption({ ru: '2. Изменим размер за кружок в правом нижнем углу', en: '2. Resize using the dot at the bottom-right corner' });
