@@ -7,6 +7,7 @@ import type { MiroCanvasSettings } from "./settings";
 export function exportCanvasSettings(settings: MiroCanvasSettings): MiroCanvasSettings {
   return {
     ...settings,
+    shapeRadiusControlEnabled: false,
     contentTextThreshold: 0,
     contentFileThreshold: 0,
     contentLinkThreshold: 0,

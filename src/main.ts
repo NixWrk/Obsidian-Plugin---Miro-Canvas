@@ -691,6 +691,7 @@ export default class MiroCanvasPlugin extends Plugin {
       settings: this.canvasSettings,
       initialArrangeMode: wasArranging,
       onPanelLayoutChanged: (layout) => void this.saveSettingsQuietly({ panelLayout: layout }),
+      onShapeCornerRadiusChanged: (radius) => void this.saveSettingsQuietly({ shapeCornerRadius: radius }),
       onToolbarItemsChanged: (items) => void this.saveCanvasSettings({ toolbarItems: items }),
       onResetPanels: () => void this.saveCanvasSettings({ toolbarItems: DEFAULT_TOOLBAR_ITEMS, panelLayout: {} }),
       ...(this.metadataStoreProbe?.store !== undefined ? {} : {

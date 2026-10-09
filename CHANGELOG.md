@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep rectangular shape corners circular at any width/height. Add a drag handle and exact input directly on the selected figure, plus a plugin-settings switch; remember the last radius for new rounded rectangles. Use wide/tall/square catalogue proportions for click/drop creation instead of making every figure a square.
+
 - Add adjustable card corner radius (0–48 board pixels; square by default), preserving diagram and drawing geometry.
 - Exclude supported CSS snippets from Canvas by default, with individual permissions in searchable settings. Preserve ordinary note styling and native/theme/plugin CSS; diagnose unsupported global rules and popout ownership instead of claiming complete isolation.
 - Add independent SVG export with actual vector geometry/text and vertically stacked clipped pages. Preserve computed card typography/radius and native arrow transforms; embed only intrinsic raster attachments. Unsupported rich content reports a refusal; fonts remain references and cosmetic shadows are omitted.

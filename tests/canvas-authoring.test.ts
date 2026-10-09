@@ -2145,3 +2145,37 @@ describe("authoring reflected host failures", () => {
 		expect(result.diagnostics.map((entry) => entry.code)).toContain("native-runtime-read-failed");
 	});
 });
+
+
+describe("rectangular shape corner radius transactions", () => {
+  const board = () => ({ nodes: [{ id: "shape", type: "text", text: "", x: 0, y: 0, width: 240, height: 80, future: [1] }], edges: [],
+    miroSource: { evidence: { exact: true } }, miroCanvas: { schemaVersion: 1, localOverrides: { shape: { shape: { kind: "round_rectangle", fallback: "text", future: true }, future: { keep: true } } } } });
+  it("stores one physical radius in one native history step and preserves source and unknown fields", () => {
+    const before = board();
+    const runtime = new NativeGraph(before);
+    const authoring = createCanvasAuthoring(runtime);
+    expect(authoring.updateElementStyles([{ id: "shape", cornerRadius: 20 }]).ok).toBe(true);
+    const after = runtime.getData() as any;
+    expect(after.miroCanvas.localOverrides.shape).toEqual({ ...before.miroCanvas.localOverrides.shape, cornerRadius: 20 });
+    expect(after.miroSource).toEqual(before.miroSource);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(runtime.history).toHaveLength(2);
+    runtime.undo();
+    expect(runtime.getData()).toEqual(before);
+    runtime.redo();
+    expect(runtime.getData()).toEqual(after);
+  });
+  it.each([-1, 1001, NaN, Infinity, "16", null])("rejects invalid radius %s without history or mutations", radius => {
+    const before = board();
+    const runtime = new NativeGraph(before);
+    expect(createCanvasAuthoring(runtime).updateElementStyles([{ id: "shape", cornerRadius: radius } as never]).ok).toBe(false);
+    expect(runtime.getData()).toEqual(before);
+    expect(runtime.history).toHaveLength(1);
+  });
+  it("creates a rounded figure with the remembered radius", () => {
+    const runtime = new NativeGraph({ nodes: [], edges: [], miroSource: { evidence: true } });
+    const result = createCanvasAuthoring(runtime).createShape({ shape: "round_rectangle", text: "", x: 0, y: 0, width: 240, height: 160, cornerRadius: 16 });
+    expect(result.ok).toBe(true);
+    expect((runtime.getData() as any).miroCanvas.localOverrides[result.nodeId!].cornerRadius).toBe(16);
+  });
+});

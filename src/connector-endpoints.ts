@@ -441,7 +441,12 @@ export function buildCanvasAnchorGeometry(
     nodes[id] = nodes[owner];
     if (images[id] !== undefined) images[id] = nodes[owner];
   }
-  const nodeOutline = (id: string) => shapeOutline(nodeOwners?.has(id) ? "rectangle" : sourceScene.items.get(id)?.shape);
+  const nodeOutline = (id: string) => {
+    const item = sourceScene.items.get(id);
+    const rect = nodes[id];
+    return shapeOutline(nodeOwners?.has(id) ? "rectangle" : item?.shape,
+      rect === undefined ? undefined : { ...rect, cornerRadius: item?.cornerRadius });
+  };
   const edges = Object.create(null) as Record<string, AnchorEdgeGeometry>;
   const comments = Object.create(null) as Record<string, AnchorPoint>;
   const projectedPoint = (id: string, point: AnchorPoint): AnchorPoint => {

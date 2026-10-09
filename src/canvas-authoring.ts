@@ -24,6 +24,7 @@ import {
 	type UpdateConnectorEndpointInput,
 } from "./connector-endpoints";
 import type { CanvasAnchor } from "./anchors";
+import { hasShapeCorners } from "./shape-geometry";
 import { selectedComment, translateBoardSelection, type SelectedRouteEnds } from "./board-selection";
 import { migrateLineNodes, boardConnectors, readBoardConnector, type BoardConnector } from "./board-connectors";
 import { readLocalItem, type LocalItem } from "./local-items";
@@ -61,6 +62,7 @@ export interface CanvasShapeAction {
 	readonly typography?: unknown;
 	readonly borderStyle?: unknown;
 	readonly borderWidth?: unknown;
+	readonly cornerRadius?: unknown;
 }
 
 /** ID is supplied by the caller's selection; absent fields retain their source/local values. */
@@ -178,6 +180,7 @@ export interface UpdateElementStyleInput {
 	readonly typography?: Readonly<Record<string, unknown>>;
 	readonly borderStyle?: "solid" | "dashed" | "dotted" | "none";
 	readonly borderWidth?: number;
+	readonly cornerRadius?: number;
 	readonly connector?: LocalConnectorSettings;
 }
 
@@ -1096,7 +1099,7 @@ function readStylePatch(action: unknown, diagnostics: CanvasAuthoringDiagnostic[
 	const patch: UnknownRecord = {};
 	try {
 		if (!isPlainObject(action)) throw new SnapshotError("style action expected");
-		for (const key of ["colors", "typography", "borderStyle", "borderWidth", "connector"]) {
+		for (const key of ["colors", "typography", "borderStyle", "borderWidth", "cornerRadius", "connector"]) {
 			const property = Object.getOwnPropertyDescriptor(action, key);
 			if (property === undefined) continue;
 			if (!("value" in property)) throw new SnapshotError("style accessor refused");
@@ -1123,6 +1126,7 @@ function readStylePatch(action: unknown, diagnostics: CanvasAuthoringDiagnostic[
 			}
 		}
 		if (patch.borderStyle !== undefined && !["solid", "dashed", "dotted", "none"].includes(patch.borderStyle as string)) throw new SnapshotError("invalid border style");
+		if (patch.cornerRadius !== undefined && (!isFiniteNumber(patch.cornerRadius) || patch.cornerRadius < 0 || patch.cornerRadius > 1000)) throw new SnapshotError("invalid corner radius");
 		if (patch.borderWidth !== undefined && (!isFiniteNumber(patch.borderWidth) || patch.borderWidth < 0 || patch.borderWidth > 100)) throw new SnapshotError("invalid border width");
 		if (patch.connector !== undefined) {
 			const connector = only(patch.connector, ["route", "strokeStyle", "startCap", "endCap", "width", "headSize", "labelT", "color", "waypoints", "block"]);
@@ -1179,6 +1183,7 @@ function readShapeAction(action: unknown, diagnostics: CanvasAuthoringDiagnostic
 	readonly typography?: unknown;
 	readonly borderStyle?: unknown;
 	readonly borderWidth?: unknown;
+	readonly cornerRadius?: unknown;
 } | undefined {
 	if (!isPlainObject(action)) {
 		addDiagnostic(diagnostics, "shape-action-invalid", "error", "A shape action must be a plain object.");
@@ -2947,7 +2952,7 @@ export class CanvasAuthoring {
 			let changed = false;
 			for (const input of inputs) {
 				const action = copyStyleData(input) as UnknownRecord;
-				if (!isPlainObject(action) || Object.keys(action).some((key) => !["id", "shape", "colors", "typography", "borderStyle", "borderWidth", "connector"].includes(key))) throw new SnapshotError("invalid action");
+				if (!isPlainObject(action) || Object.keys(action).some((key) => !["id", "shape", "colors", "typography", "borderStyle", "borderWidth", "cornerRadius", "connector"].includes(key))) throw new SnapshotError("invalid action");
 				const id = readGraphActionId(action, diagnostics, "element-style");
 				if (id === undefined) return reject();
 				const node = before.nodes.find((item) => item.id === id);
@@ -2965,6 +2970,10 @@ export class CanvasAuthoring {
 						return reject();
 					}
 					patch.shape = { kind: action.shape, fallback: "text" };
+				}
+				if (hasOwn(patch, "cornerRadius") && (edge !== undefined || !hasShapeCorners(typeof action.shape === "string" ? action.shape : scene.items.get(id)?.shape))) {
+					addDiagnostic(diagnostics, "element-style-invalid", "error", "Corner radius applies only to rectangular shapes.");
+					return reject();
 				}
 				if (edge !== undefined && (hasOwn(patch, "borderStyle") || hasOwn(patch, "borderWidth"))) {
 					addDiagnostic(diagnostics, "element-style-invalid", "error", "Use connector settings for an edge stroke.");

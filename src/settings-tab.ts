@@ -214,6 +214,9 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     this.slider(rows, labels.maxZoomName, labels.maxZoomDesc,
       "maxZoom", (value) => `${Math.round(value * 100)}%`);
     const enhancementLabels = words().enhancements;
+    new SettingsRow(rows).setName(enhancementLabels.shapeRadiusControl).setDesc(enhancementLabels.shapeRadiusControlHint)
+      .addToggle(toggle => toggle.setValue(this.host.settings.shapeRadiusControlEnabled)
+        .onChange(value => void this.host.saveSettings({ shapeRadiusControlEnabled: value })));
     this.slider(rows, enhancementLabels.cardCornerRadius, enhancementLabels.cardCornerRadiusHint,
       "cardCornerRadius", (value) => `${value} px`);
     new SettingsRow(rows).setName(enhancementLabels.canvasSnippets).setDesc(enhancementLabels.canvasSnippetsHint);

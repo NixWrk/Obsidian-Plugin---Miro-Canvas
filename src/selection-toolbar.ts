@@ -82,6 +82,7 @@ export interface SelectionToolbarStyle {
   readonly shape?: ShapeKind;
   readonly borderStyle?: BorderStyle;
   readonly borderWidth?: number;
+  readonly cornerRadius?: number;
   readonly connector?: LocalConnectorSettings & { readonly headSize?: number };
 }
 

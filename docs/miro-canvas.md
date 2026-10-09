@@ -2447,3 +2447,10 @@ The coordinated builder/test/browser/Actions updates, development SDK Moment
 override and TypeScript 7 / Node 26 declaration deferrals are recorded in
 [the maintenance report](dependency-maintenance.md). Development requires
 Node 22.13+; standalone CLI/MCP retain their Node 20+ target.
+
+
+## Shape corners — 2026-10-10
+
+Rectangular figures now use equal physical corner radii. The selected figure owns a radius handle and inline exact input; a global toggle hides these controls while retaining saved geometry. New rounded rectangles remember the last radius, and click/drop creation respects each catalogue aspect. Free drag dimensions stay unchanged.
+
+[Checks](shape-radius-acceptance.md).

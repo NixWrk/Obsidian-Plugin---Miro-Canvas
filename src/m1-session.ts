@@ -118,6 +118,7 @@ import {
 	takesShape,
 	usesNativeCardSurface,
 	type SourceScene,
+	type SourceItemDescriptor,
 } from "./source-model";
 import { CommentMarkers } from "./comment-markers";
 import { matchesPointer } from "./pointer-bindings";
@@ -164,7 +165,9 @@ import {
 	snapToStandardPoint,
 } from "./connector-endpoints";
 import { normalizeAnchor, resolveAnchor, type AnchorGeometry, type CanvasAnchor } from "./anchors";
-import { shapeOutline } from "./shape-geometry";
+import { shapeOutline, shapeCornerRadius, hasShapeCorners } from "./shape-geometry";
+import { shapeDefaultSize } from "./shape-catalog";
+import { ShapeRadiusHandle } from "./shape-radius-handle";
 import { frameColors, miroStickyColors, readableInk } from "./miro-palette";
 import { highlightText, isHtmlText, markSelection, unhighlightText } from "./text-highlight";
 import { formatTextSelection } from "./text-format";
@@ -206,6 +209,7 @@ export interface M1SessionOptions {
 	readonly setIcon?: (element: HTMLElement, icon: string) => void;
 	/** Opens this plugin's page in Obsidian's settings, from the board menu. */
 	readonly onOpenSettings?: () => void;
+	readonly onShapeCornerRadiusChanged?: (radius: number) => void;
 	readonly onSaveExport?: (name: string, bytes: Uint8Array, sourcePath?: string) => Promise<string>;
 	readonly onExportJob?: (controller: AbortController) => () => void;
 	readonly onAddFile?: (button: HTMLElement, fromVault: () => void) => void;
@@ -343,7 +347,7 @@ const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.
 const SELECTION_FRAME_SELECTOR = ".miro-canvas-mixed-selection-frame, .canvas-selection, .canvas-node-resizer";
 /** A card, a native line or one of the board's own, which is selected when it carries one of the two classes below. */
 const SELECTABLE_SELECTOR = ".canvas-node, .canvas-edge, .miro-board-connector";
-const PANEL_SELECTOR = ".miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
+const PANEL_SELECTOR = ".miro-canvas-shape-radius-handle, .miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
 	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray,"
 	+ " .miro-canvas-export, .miro-canvas-export-page__tab, .miro-canvas-export-page__corner";
 
@@ -950,6 +954,7 @@ export class M1CanvasSession {
 	public resetTools(): void {
 		this.cancelPendingPenDot();
 		this.handles.cancelGesture();
+		this.shapeRadiusHandle?.update(undefined);
 		this.rectangleSelectionEnd?.();
 		this.selectedRouteEnds.clear();
 		this.selectionMoveEnd?.();
@@ -1531,6 +1536,9 @@ export class M1CanvasSession {
 	};
 	private authoring: CanvasAuthoring | undefined;
 	private interactionBlock: string | undefined;
+	private shapeRadiusHandle?: ShapeRadiusHandle;
+	private rememberedShapeCornerRadius = 16;
+	private radiusPreview?: { readonly document: UnknownRecord; readonly id: string; radius: number; readonly scene: SourceScene; readonly items: Map<string, SourceItemDescriptor>; readonly original: SourceItemDescriptor };
 	private rotationPreview: { readonly id: string; readonly rotation: number } | undefined;
 	/** The one selected card kept on its own layer, which native Canvas would lift to the top. */
 	private shownLayer: { readonly id: string; readonly node: unknown; readonly element: HTMLElement; readonly previous: StylePropertySnapshot } | undefined;
@@ -1741,8 +1749,10 @@ export class M1CanvasSession {
 			getEdges: () => this.adapter.getEdges(),
 			getSelectionMovePreviewIds: () => this.selectionMovePreview === undefined ? undefined : this.selectionMoveIds,
 			getRotationPreview: () => this.rotationPreview,
+			getShapeRadiusPreview: () => this.radiusPreview,
 			getCollapsedNodeOwners: () => this.collapsedOwners(),
 			getSourceScene: (document) => {
+				if (this.radiusPreview !== undefined && this.radiusPreview.document === document) return this.radiusPreview.scene;
 				const cache = this.landingCache;
 				return cache !== undefined && cache.document === document ? cache.scene : undefined;
 			},
@@ -1756,6 +1766,7 @@ export class M1CanvasSession {
 		}, renderDocument);
 		const settings = options.settings ?? DEFAULT_SETTINGS;
 		this.settings = settings;
+		this.rememberedShapeCornerRadius = settings.shapeCornerRadius;
 		if (options.noteSearchAdapter !== undefined) {
 			this.noteSearch = new LinkedNoteSearch(options.noteSearchAdapter);
 			this.disposers.push(() => this.noteSearch?.dispose());
@@ -1810,6 +1821,12 @@ export class M1CanvasSession {
 			...(options.onOpenSettings === undefined ? {} : { openSettings: options.onOpenSettings }),
 		};
 		const controlDocument = options.document ?? ownerDocument(this.root);
+		if (controlDocument !== undefined && settings.shapeRadiusControlEnabled) this.shapeRadiusHandle = new ShapeRadiusHandle({
+			document: controlDocument,
+			onPreview: (id, radius) => this.previewShapeRadius(id, radius),
+			onCommit: (id, radius) => this.commitShapeRadius(id, radius),
+			onCancel: () => this.cancelShapeRadius(),
+		});
 		this.controls = new M1Controls(actions, {
 			...(controlDocument === undefined ? {} : { document: controlDocument }),
 			...(options.setIcon === undefined ? {} : { setIcon: options.setIcon }),
@@ -2862,7 +2879,7 @@ export class M1CanvasSession {
 		}
 		let cache = this.landingCache;
 		if (cache === undefined || cache.document !== document) {
-			const scene = knownScene ?? buildSourceScene(document);
+			const scene = this.radiusPreview !== undefined && this.radiusPreview.document === document ? this.radiusPreview.scene : knownScene ?? buildSourceScene(document);
 			cache = { document, geometry: buildCanvasAnchorGeometry(document, undefined, scene, previous, this.collapsedOwners()), scene };
 			this.landingCache = cache;
 		}
@@ -2873,7 +2890,7 @@ export class M1CanvasSession {
 	private pulledFrom(nodeId: string, side: HandleSide, position: number): { readonly x: number; readonly y: number } | undefined {
 		const { geometry, scene } = this.landingGeometry();
 		const rect = geometry.nodes?.[nodeId];
-		const anchor = rect === undefined ? undefined : sideAnchorOnOutline(nodeId, shapeOutline(scene.items.get(nodeId)?.shape), side, position);
+		const anchor = rect === undefined ? undefined : sideAnchorOnOutline(nodeId, shapeOutline(scene.items.get(nodeId)?.shape, { ...rect, cornerRadius: scene.items.get(nodeId)?.cornerRadius }), side, position);
 		return anchor === undefined || rect === undefined ? undefined : resolveAnchor(anchor, { nodes: { [nodeId]: rect } }).point;
 	}
 
@@ -2919,7 +2936,7 @@ export class M1CanvasSession {
 			if (nodeId === exclude || !(rect.width > 0) || !(rect.height > 0)) continue;
 			const reach = Math.hypot(rect.width, rect.height) / 2 + magnet;
 			if (Math.hypot(board.x - (rect.x + rect.width / 2), board.y - (rect.y + rect.height / 2)) > reach) continue;
-			const outline = shapeOutline(scene.items.get(nodeId)?.shape);
+			const outline = shapeOutline(scene.items.get(nodeId)?.shape, { ...rect, cornerRadius: scene.items.get(nodeId)?.cornerRadius });
 			const closest = boundaryAnchorOnRect(nodeId, rect, outline, board);
 			const at = closest === undefined ? undefined : resolveAnchor(closest, { nodes: { [nodeId]: rect } }).point;
 			if (closest === undefined || at === undefined) continue;
@@ -3159,6 +3176,69 @@ export class M1CanvasSession {
 			return;
 		}
 		this.createEdge(fromNode, created.nodeId, side, position, undefined, created.document);
+	}
+
+	private updateShapeRadiusHandle(editable: boolean): void {
+		if (this.shapeRadiusHandle === undefined || !this.settings.shapeRadiusControlEnabled || !editable) {
+			this.shapeRadiusHandle?.update(undefined);
+			return;
+		}
+		const id = this.selectedIds.length === 1 ? this.selectedIds[0] : undefined;
+		const item = id === undefined ? undefined : this.landingGeometry().scene.items.get(id);
+		const runtime = id === undefined ? undefined : this.adapter.getNodes()?.find(node => readCanvasElementId(node) === id);
+		const nodeEl = readRuntime(runtime, "nodeEl");
+		const rect = id === undefined ? undefined : this.nodeRect(id);
+		if (!this.settings.shapeRadiusControlEnabled || !editable || id === undefined || !hasShapeCorners(item?.shape) || !isElement(nodeEl) || rect === undefined) {
+			this.shapeRadiusHandle?.update(undefined);
+			return;
+		}
+		this.shapeRadiusHandle?.update({ id, nodeEl, width: rect.width, height: rect.height,
+			radius: shapeCornerRadius(item?.shape, { ...rect, cornerRadius: item?.cornerRadius }), editable,
+			zoom: finite(this.viewport.getViewport()?.zoom) ?? 1 });
+	}
+
+	private previewShapeRadius(id: string, radius: number): void {
+		if (this.disposed || this.selectedIds.length !== 1 || this.selectedIds[0] !== id || !this.settings.shapeRadiusControlEnabled) return;
+		if (this.radiusPreview === undefined) {
+			const document = this.currentRawDocument;
+			if (!isRecord(document)) return;
+			const scene = this.landingGeometry().scene;
+			const original = scene.items.get(id);
+			if (original === undefined || !hasShapeCorners(original.shape)) return;
+			const items = new Map(scene.items);
+			this.radiusPreview = { document, id, radius, original, items, scene: { ...scene, items } };
+		}
+		if (this.radiusPreview.id !== id) return;
+		this.radiusPreview.radius = radius;
+		this.radiusPreview.items.set(id, { ...this.radiusPreview.original, cornerRadius: radius });
+		this.landingCache = undefined;
+		this.refresh();
+	}
+
+	private cancelShapeRadius(): void {
+		if (this.radiusPreview === undefined) return;
+		this.radiusPreview = undefined;
+		this.landingCache = undefined;
+		if (!this.disposed) this.refresh();
+	}
+
+	private commitShapeRadius(id: string, radius: number): void {
+		const expected = this.radiusPreview?.document;
+		this.radiusPreview = undefined;
+		this.landingCache = undefined;
+		this.readInteractionState();
+		if (this.disposed || this.selectedIds.length !== 1 || this.selectedIds[0] !== id || !this.editAllowed("restyle", [id])) {
+			this.refresh();
+			return;
+		}
+		this.authoring ??= createCanvasAuthoring(this.view);
+		const result = this.authoring.updateElementStyles([{ id, cornerRadius: radius }], expected);
+		if (!result.ok) this.addDiagnostic(firstProblem(result.diagnostics) ?? "Canvas rejected the corner radius.");
+		else {
+			this.rememberedShapeCornerRadius = radius;
+			this.options.onShapeCornerRadiusChanged?.(radius);
+		}
+		this.refresh();
 	}
 
 	private applyElementStyle(patch: SelectionStylePatch): void {
@@ -4096,6 +4176,7 @@ export class M1CanvasSession {
 		}
 		this.lastToolbarState = toolbarState;
 		this.handles.update(this.handlesState(toolbarState.editable));
+		this.updateShapeRadiusHandle(toolbarState.editable);
 		this.updateExportOverlay();
 		// An open search follows a saved change; the outline follows the board.
 		this.syncSearch();
@@ -5651,7 +5732,7 @@ export class M1CanvasSession {
 			this.promptLink(a, start);
 			return;
 		}
-		const size = tool === "shape" ? { width: 200, height: 200 }
+		const size = tool === "shape" ? shapeDefaultSize(this.toolShape)
 			: LOCAL_ITEM_SIZES[tool === "sticky" ? "sticky_note" : tool as "text" | "code" | "frame" | "table"];
 		const rect = dragged
 			? { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.max(20, Math.abs(b.x - a.x)), height: Math.max(20, Math.abs(b.y - a.y)) }
@@ -5663,7 +5744,7 @@ export class M1CanvasSession {
 		this.authoring ??= createCanvasAuthoring(this.view);
 		let created: { readonly ok: boolean; readonly nodeId?: string; readonly diagnostics: readonly { readonly level: string; readonly message: string }[] };
 		if (tool === "shape") {
-			created = this.authoring.createShape({ shape: this.toolShape, text: "", ...rect });
+			created = this.authoring.createShape({ shape: this.toolShape, text: "", ...rect, ...(this.toolShape === "round_rectangle" ? { cornerRadius: this.rememberedShapeCornerRadius } : {}) });
 		} else {
 			const item: LocalItem = tool === "sticky" ? { type: "sticky_note", color: "light_yellow" }
 				: tool === "code" ? { type: "code", title: words().session.codeBlockDefaultTitle }
@@ -10049,6 +10130,7 @@ export class M1CanvasSession {
 		const window = readRuntime(ownerDocument(this.root), "defaultView");
 		if (isObject(window)) this.listen(window as unknown as EventTarget, "blur", () => {
 			this.handles.cancelGesture();
+		this.shapeRadiusHandle?.update(undefined);
 			clearGesture();
 			this.spacePanHeld = false;
 		});
@@ -10097,6 +10179,7 @@ export class M1CanvasSession {
 		this.connectorLabels?.dispose();
 		this.toolbar.dispose();
 		this.handles.dispose();
+		this.shapeRadiusHandle?.dispose();
 		this.commentMarkers?.destroy();
 		this.removeMixedSelectionFrame();
 		this.root?.classList.remove("miro-canvas-mixed-selection");

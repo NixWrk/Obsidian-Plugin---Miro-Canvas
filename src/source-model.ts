@@ -152,6 +152,7 @@ export interface SourceItemDescriptor {
   readonly sourceId?: string;
   readonly kind: SourceItemKind;
   readonly shape?: string;
+  readonly cornerRadius?: number;
   readonly rotation: number;
   readonly zIndex?: number;
   readonly css: Readonly<Record<string, string>>;
@@ -865,6 +866,11 @@ function indexSource(document: unknown, diagnostics: string[]): IndexedSource {
   return { byId, insertion: Object.freeze(insertion), connectorIds, canvasForSource, sourceForCanvas, copies, tagDefinitions };
 }
 
+function localCornerRadius(document: unknown, canvasId: string): number | undefined {
+  const radius = finiteNumber(valueOf(localOverride(document, canvasId), "cornerRadius"));
+  return radius !== undefined && radius >= 0 && radius <= 1000 ? radius : undefined;
+}
+
 function localShapeKind(document: unknown, canvasId: string): string | undefined {
   const shape = valueOf(localOverride(document, canvasId), "shape");
   const kind = valueOf(shape, "kind");
@@ -898,7 +904,7 @@ function descriptorFor(document: unknown, canvasId: string, sourceId: string, so
   return Object.freeze({
     sourceId,
     kind,
-    ...(shape === undefined ? {} : { shape }),
+    ...(shape === undefined ? {} : { shape, cornerRadius: localCornerRadius(document, canvasId) }),
     rotation: effectiveRotationFor(document, canvasId, source),
     ...(zIndex === undefined ? {} : { zIndex }),
     css: Object.freeze(css),
@@ -1042,7 +1048,7 @@ export function buildSourceScene(document: unknown): SourceScene {
       if (shape === undefined && rotation === 0 && Object.keys(css).length === 0) continue;
       items.set(canvasId, Object.freeze(shape === undefined
         ? { kind: "text", rotation, css: Object.freeze(css) }
-        : { kind: "shape", shape, rotation, css: Object.freeze(css) }));
+        : { kind: "shape", shape, cornerRadius: localCornerRadius(document, canvasId), rotation, css: Object.freeze(css) }));
     }
   }
 

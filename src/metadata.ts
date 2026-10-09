@@ -306,7 +306,7 @@ const SETTINGS_FIELDS = new Set([
  */
 const OVERRIDE_FIELDS = new Set([
   "typography", "colors", "locked", "showAttachmentName", "rotation", "item",
-  "shape", "borderStyle", "borderWidth", "connector", "connectorAnchors", "customStyles", "groupCollapse",
+  "shape", "borderStyle", "borderWidth", "cornerRadius", "connector", "connectorAnchors", "customStyles", "groupCollapse",
 ]);
 export const KNOWN_OVERRIDE_FIELDS: ReadonlySet<string> = OVERRIDE_FIELDS;
 const TYPOGRAPHY_FIELDS = new Set([
@@ -1057,6 +1057,12 @@ function validateLocalOverrides(
     }
     validateBooleanIfPresent(property.value, "locked", overridePath, diagnostics);
     validateBooleanIfPresent(property.value, "showAttachmentName", overridePath, diagnostics);
+    const radius = readOwn(property.value, "cornerRadius");
+    if (radius.state === "error") {
+      addError(diagnostics, "property-read-failed", pathFor(overridePath, "cornerRadius"), "Corner radius could not be read safely.");
+    } else if (radius.state === "present" && (typeof radius.value !== "number" || !Number.isFinite(radius.value) || radius.value < 0 || radius.value > 1000)) {
+      addError(diagnostics, "corner-radius-invalid", pathFor(overridePath, "cornerRadius"), "Corner radius must be a finite number between 0 and 1000.");
+    }
     const rotation = readOwn(property.value, "rotation");
     if (rotation.state === "error") {
       addError(diagnostics, "property-read-failed", pathFor(overridePath, "rotation"), "The rotation could not be read safely.");

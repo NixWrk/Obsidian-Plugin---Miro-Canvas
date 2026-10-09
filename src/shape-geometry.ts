@@ -10,13 +10,43 @@
  * is why a connector met a triangle in mid-air and a hand-tuned percentage
  * decided where its label sat.
  *
- * Everything here works in a normalized 0..100 box so one outline serves a
- * node of any size, and stays pure so it can be checked without a DOM.
+ * Everything here works in a normalized 0..100 box so a cached outline serves a
+ * node of any size. Physical corner radii are normalized from its current
+ * dimensions. The geometry stays pure so it can be checked without a DOM.
  */
 
 export interface ShapePoint {
   readonly x: number;
   readonly y: number;
+}
+
+/** Board dimensions and an optional radius in board units. */
+export interface ShapeBox {
+  readonly width: number;
+  readonly height: number;
+  readonly cornerRadius?: number;
+}
+
+/** Only plain rectangles support an adjustable corner radius. */
+export function hasShapeCorners(shape: string | undefined): boolean {
+  return shape === "rectangle" || shape === "round_rectangle" || shape === "flow_chart_process";
+}
+
+/** Invalid options and unsupported shapes retain square corners. */
+export function shapeCornerRadius(shape: string | undefined, box: ShapeBox): number {
+  if (!hasShapeCorners(shape)
+    || !Number.isFinite(box.width) || box.width <= 0
+    || !Number.isFinite(box.height) || box.height <= 0) {
+    return 0;
+  }
+  const shorter = Math.min(box.width, box.height);
+  const radius = box.cornerRadius === undefined
+    ? (shape === "round_rectangle" ? Number((shorter * 0.12).toPrecision(12)) : 0)
+    : box.cornerRadius;
+  if (!Number.isFinite(radius) || radius < 0 || (box.cornerRadius !== undefined && radius > 1000)) {
+    return 0;
+  }
+  return Math.min(radius, shorter / 2);
 }
 
 export type ShapeInsets = readonly [number, number, number, number];
@@ -72,8 +102,20 @@ const SHAPE_PATHS: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /** The drawing path of a shape in the 0..100 box, or undefined for a shape left to native rendering. */
-export function shapePath(shape: string | undefined): string | undefined {
+export function shapePath(shape: string | undefined, box?: ShapeBox): string | undefined {
   if (shape === undefined) return undefined;
+  if (box !== undefined && hasShapeCorners(shape)) {
+    const radius = shapeCornerRadius(shape, box);
+    if (radius === 0) {
+      return SHAPE_PATHS.rectangle;
+    }
+    const rx = radius / box.width * 100;
+    const ry = radius / box.height * 100;
+    return `M${rx} 0H${100 - rx}A${rx} ${ry} 0 0 1 100 ${ry}`
+      + `V${100 - ry}A${rx} ${ry} 0 0 1 ${100 - rx} 100`
+      + `H${rx}A${rx} ${ry} 0 0 1 0 ${100 - ry}`
+      + `V${ry}A${rx} ${ry} 0 0 1 ${rx} 0Z`;
+  }
   const aliases: Record<string, string> = {
     flow_chart_process: "rectangle", flow_chart_connector: "circle",
     flow_chart_note_curly_left: "left_brace", flow_chart_note_curly_right: "right_brace",
@@ -120,16 +162,16 @@ function ellipse(steps = 64): readonly ShapePoint[] {
 }
 
 /** A rectangle with quarter-circle corners, sampled as a polygon. */
-function roundedRectangle(radius: number, steps = 6): readonly ShapePoint[] {
+function roundedRectangle(radius: number, steps = 6, radiusY = radius): readonly ShapePoint[] {
   const corners: readonly (readonly [number, number, number])[] = [
-    [100 - radius, radius, -90], [100 - radius, 100 - radius, 0],
-    [radius, 100 - radius, 90], [radius, radius, 180],
+    [100 - radius, radiusY, -90], [100 - radius, 100 - radiusY, 0],
+    [radius, 100 - radiusY, 90], [radius, radiusY, 180],
   ];
   const points: ShapePoint[] = [];
   for (const [cx, cy, start] of corners) {
     for (let index = 0; index <= steps; index += 1) {
       const angle = ((start + (index / steps) * 90) * Math.PI) / 180;
-      points.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+      points.push({ x: cx + radius * Math.cos(angle), y: cy + radiusY * Math.sin(angle) });
     }
   }
   return Object.freeze(points);
@@ -196,14 +238,42 @@ function parsePolygon(value: string): readonly ShapePoint[] | undefined {
 }
 
 const outlineCache = new Map<string, readonly ShapePoint[] | undefined>();
+const RADIUS_OUTLINE_CACHE_LIMIT = 128;
+const radiusOutlineCache = new Map<string, readonly ShapePoint[]>();
+
+function radiusOutline(shape: string, box: ShapeBox): readonly ShapePoint[] {
+  const radius = shapeCornerRadius(shape, box);
+  if (radius === 0) {
+    return RECTANGLE;
+  }
+  const rx = radius / box.width * 100;
+  const ry = radius / box.height * 100;
+  const key = `${rx},${ry}`;
+  const cached = radiusOutlineCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const outline = roundedRectangle(rx, 6, ry);
+  if (radiusOutlineCache.size >= RADIUS_OUTLINE_CACHE_LIMIT) {
+    const oldest = radiusOutlineCache.keys().next().value;
+    if (oldest !== undefined) {
+      radiusOutlineCache.delete(oldest);
+    }
+  }
+  radiusOutlineCache.set(key, outline);
+  return outline;
+}
 
 /**
  * The silhouette of a shape in the normalized box, or undefined when the kind
  * is unknown and the caller should keep using the bounding rectangle.
  */
-export function shapeOutline(shape: string | undefined): readonly ShapePoint[] | undefined {
+export function shapeOutline(shape: string | undefined, box?: ShapeBox): readonly ShapePoint[] | undefined {
   if (shape === undefined) {
     return undefined;
+  }
+  if (box !== undefined && hasShapeCorners(shape)) {
+    return radiusOutline(shape, box);
   }
   if (outlineCache.has(shape)) {
     return outlineCache.get(shape);

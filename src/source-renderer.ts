@@ -6,7 +6,7 @@ import {
   buildCanvasAnchorGeometry, nativeAnchorEnd, nativeEdgeEnd, nativeEdgeRoute, nativeFreeEnd, roundCoordinate,
   type NativeEdgeEnd, type NodeMeasurements,
 } from "./connector-endpoints";
-import { inscribedInsets, shapeOutline, shapePath, type ShapePoint } from "./shape-geometry";
+import { hasShapeCorners, shapeCornerRadius, inscribedInsets, shapeOutline, shapePath, type ShapePoint } from "./shape-geometry";
 import { CAP_PATHS, capFilled, strokeDash, headMarkerAttributes } from "./connector-style";
 import { fontStack } from "./appearance";
 import { readableInk } from "./miro-palette";
@@ -28,6 +28,7 @@ export interface SourceRendererHost {
   getDocument(): unknown;
   getNodes(): readonly unknown[] | undefined;
   getEdges(): readonly unknown[] | undefined;
+  getShapeRadiusPreview?(): { readonly id: string; readonly radius: number } | undefined;
   getRotationPreview?(): { readonly id: string; readonly rotation: number } | undefined;
   /** The scene the host built from this very document, if it has one. */
   getSourceScene?(document: unknown): SourceScene | undefined;
@@ -66,6 +67,7 @@ interface RenderedItem {
   readonly descriptor: SourceItemDescriptor;
   readonly markup?: { readonly element: DomElementLike; readonly refresh: () => void };
   readonly styleOwnership?: NativeStyleProperties;
+  readonly radiusGeometry?: { readonly preview: (radius: number) => void; readonly clear: () => void };
   /** The host element this item decorates, and the runtime properties that expose it. */
   readonly anchor: { readonly keys: readonly string[]; readonly element: DomElementLike };
   /** Replaces the marker check for an item that puts no marker on the host. */
@@ -892,8 +894,8 @@ function decorateTags(
   return appendOwnedChild(shell, list, patches) ? list : undefined;
 }
 
-function decorateShape(document: Document | undefined, layer: DomElementLike, descriptor: SourceItemDescriptor): boolean {
-  const d = shapePath(descriptor.shape);
+function decorateShape(document: Document | undefined, layer: DomElementLike, descriptor: SourceItemDescriptor, size?: { readonly width: number; readonly height: number }): boolean {
+  const d = shapePath(descriptor.shape, size === undefined ? undefined : { ...size, cornerRadius: descriptor.cornerRadius });
   if (d === undefined) return false;
   const svg = createSvg(document, "svg"), path = createSvg(document, "path");
   if (svg === undefined || path === undefined) return false;
@@ -911,7 +913,8 @@ function decorateShape(document: Document | undefined, layer: DomElementLike, de
     "stroke-width": css["border-width"]?.replace(/px$/, "") ?? "1",
     "fill-opacity": css["--miro-fill-opacity"] ?? "1", "stroke-opacity": css["--miro-border-opacity"] ?? "1",
     "stroke-dasharray": css["border-style"] === "dashed" ? "8 6" : css["border-style"] === "dotted" ? "2 5" : "none",
-    "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round",
+    "vector-effect": "non-scaling-stroke", "stroke-linejoin": hasShapeCorners(descriptor.shape)
+      && (size === undefined ? descriptor.shape !== "round_rectangle" : shapeCornerRadius(descriptor.shape, { ...size, cornerRadius: descriptor.cornerRadius }) === 0) ? "miter" : "round",
   })) setOwnedElementAttribute(path, name, value);
   if (css["border-style"] === "none") setOwnedElementAttribute(path, "stroke", "none");
   safeCall(svg, "appendChild", [path]);
@@ -1868,6 +1871,12 @@ function applyNode(
     if (sourceMindmap.shape !== undefined) patchAttribute(shell, "data-miro-source-mindmap-shape", sourceMindmap.shape, patches);
   }
 
+  const shapeBox = (): { readonly width: number; readonly height: number } | undefined => {
+    const width = safeGet(runtime, "width");
+    const height = safeGet(runtime, "height");
+    return typeof width === "number" && Number.isFinite(width) && width > 0
+      && typeof height === "number" && Number.isFinite(height) && height > 0 ? { width, height } : size;
+  };
   const plainItem = sourceAppCard === undefined && sourceCard === undefined && sourceMindmap === undefined;
   if ((descriptor.kind === "text" || descriptor.kind === "shape") && plainItem && descriptor.css.color === undefined) {
     // Miro's default ink is near-black, which a dark theme's text colour
@@ -1927,7 +1936,7 @@ function applyNode(
       setOwnedElementStyle(created, "z-index", covers ? "2" : "0");
       if (sourceMindmap?.branchColor !== undefined) setOwnedElementStyle(created, "--miro-mindmap-color", sourceMindmap.branchColor);
       const drawable = descriptor.kind === "shape"
-        ? decorateShape(document, created, descriptor)
+        ? decorateShape(document, created, descriptor, shapeBox())
         : descriptor.kind === "code"
           ? decorateCode(document, created, descriptor)
           : sourceStroke !== undefined
@@ -1969,7 +1978,7 @@ function applyNode(
   if (descriptor.kind === "shape" && descriptor.shape !== undefined && layer !== undefined) {
     // Measured from the silhouette the contour encloses, so a new shape needs
     // no hand-tuned table and the text can never sit outside what is drawn.
-    const inset = inscribedInsets(shapeOutline(descriptor.shape));
+    const inset = inscribedInsets(shapeOutline(descriptor.shape, shapeBox() === undefined ? undefined : { ...shapeBox()!, cornerRadius: descriptor.cornerRadius }));
     // In pixels, not percentages: a percentage padding resolves against the
     // width on every side, so a reserve meant for the height would be wrong on
     // any node that is not square.
@@ -2036,11 +2045,37 @@ function applyNode(
     projectNativeCardStyles(shell as unknown as HTMLElement,
       (element, property, value, variable) => styleOwnership.write(element, property, value, variable));
   };
+  let previewRadius: number | undefined;
+  let lastRadiusGeometry = "";
+  const reflowRadius = (): void => {
+    if (layer === undefined || !hasShapeCorners(descriptor.shape)) return;
+    const box = shapeBox();
+    if (box === undefined) return;
+    const radius = previewRadius ?? descriptor.cornerRadius;
+    const key = `${box.width}/${box.height}/${radius ?? "default"}`;
+    if (key === lastRadiusGeometry) return;
+    const path = safeCall(layer, "querySelector", ["svg path"]);
+    if (!isElement(path)) return;
+    const d = shapePath(descriptor.shape, { ...box, cornerRadius: radius });
+    if (d === undefined) return;
+    setOwnedElementAttribute(path, "d", d);
+    setOwnedElementAttribute(path, "stroke-linejoin", shapeCornerRadius(descriptor.shape, { ...box, cornerRadius: radius }) === 0 ? "miter" : "round");
+    const inset = inscribedInsets(shapeOutline(descriptor.shape, { ...box, cornerRadius: radius }));
+    if (inset !== undefined) styleOwnership.write(content as unknown as HTMLElement, "padding",
+      inset.map((value, index) => `${Math.round((value / 100 * (index % 2 === 0 ? box.height : box.width) + 4) * 10) / 10}px`).join(" "));
+    lastRadiusGeometry = key;
+  };
+  const radiusGeometry = layer !== undefined && hasShapeCorners(descriptor.shape) ? {
+    preview: (radius: number): void => { previewRadius = radius; reflowRadius(); },
+    clear: (): void => { previewRadius = undefined; reflowRadius(); },
+  } : undefined;
   patches.push(() => styleOwnership.restore());
   projectStyles();
+  reflowRadius();
   return {
     id, kind: "node", element: primary, marker: shell, ownedChildren, expectedRotations, descriptor,
-    markup: { element: shell, refresh: () => { codeHeadings?.refresh(); projectStyles(); } },
+    markup: { element: shell, refresh: () => { codeHeadings?.refresh(); projectStyles(); reflowRadius(); } },
+    ...(radiusGeometry === undefined ? {} : { radiusGeometry }),
     styleOwnership,
     anchor: { keys: NODE_SHELL_KEYS, element: shell },
   };
@@ -2120,6 +2155,7 @@ export class SourceRenderer {
   private cardDiagnostics: readonly string[] = [];
   /** What the cards were drawn from: everything about them but where they stand. */
   private drawnCards: string | undefined;
+  private cornerPreviewItem: RenderedItem | undefined;
   /** What the lines were drawn from. */
   private linesDrawnFor: LinesDrawnFor | undefined;
   /** The cards' drawn sizes, measured as a drag began. */
@@ -2247,7 +2283,8 @@ export class SourceRenderer {
       if (typeof nodeId !== "string") return undefined;
       const rect = geometry.nodes?.[nodeId];
       if (rect === undefined) return undefined;
-      const outline = collapsedOwners.has(nodeId) ? rectangle : shapeOutline(scene.items.get(nodeId)?.shape);
+      const item = scene.items.get(nodeId);
+      const outline = collapsedOwners.has(nodeId) ? rectangle : shapeOutline(item?.shape, { ...rect, cornerRadius: item?.cornerRadius });
       return { rect, outline: outline === rectangle ? undefined : outline };
     };
     const reshaped = (nodeId: unknown): boolean => {
@@ -2294,8 +2331,18 @@ export class SourceRenderer {
     // A card that only moves - dragged by a selection or by native Canvas - keeps
     // what is drawn on it: only the lines that follow it are drawn again.  The
     // cards are drawn again when anything else about them changes.
+    const radiusPreview = safeCall(this.host, "getShapeRadiusPreview") as { readonly id: string; readonly radius: number } | undefined;
+    if (this.cornerPreviewItem !== undefined && this.cornerPreviewItem.id !== radiusPreview?.id) {
+      this.cornerPreviewItem.radiusGeometry?.clear();
+      this.cornerPreviewItem = undefined;
+    }
+    if (radiusPreview !== undefined) {
+      this.cornerPreviewItem ??= this.cardItems.find(item => item.id === radiusPreview.id);
+      this.cornerPreviewItem?.radiusGeometry?.preview(radiusPreview.radius);
+    }
     const cardSignature = safeSignature({
-      descriptors: [...descriptors], routes: [...nativeRoutes.keys()], collapsedGroups: [...collapsedGroups], ready, order: scene.order, preview, diagnostics, fittedTexts,
+      descriptors: [...descriptors].map(([id, descriptor]) => [id,
+        id === radiusPreview?.id && this.cornerPreviewItem !== undefined ? this.cornerPreviewItem.descriptor : descriptor]), routes: [...nativeRoutes.keys()], collapsedGroups: [...collapsedGroups], ready, order: scene.order, preview, diagnostics, fittedTexts,
       sizes: [...descriptors.keys()].map((id) => [id, documentSizes.get(id) ?? null]),
     });
     const linesDrawnFor: LinesDrawnFor = {
@@ -2635,6 +2682,7 @@ export class SourceRenderer {
     this.cardPatches = [];
     this.linePatches = [];
     this.cardItems = [];
+    this.cornerPreviewItem = undefined;
     this.lineItems = [];
     this.cardDiagnostics = [];
     this.drawnCards = undefined;

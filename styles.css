@@ -5216,3 +5216,69 @@
   overflow: auto;
   padding: var(--size-2-2) var(--size-2-4);
 }
+
+/* One control on the figure, without another selection outline. */
+.miro-canvas-root .miro-canvas-shape-radius-handle {
+  position: absolute;
+  z-index: 8;
+  width: 44px;
+  height: 44px;
+  transform-origin: center;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle__button {
+  --miro-canvas-button-padding: 0;
+  padding: var(--miro-canvas-button-padding);
+  position: relative;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle__button::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 50%;
+  background: var(--background-primary);
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle__button:hover::before {
+  background: var(--background-modifier-hover);
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle__button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -4px;
+  border-radius: var(--radius-s, 4px);
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle__input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 96px;
+  height: 44px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle__input[aria-invalid="true"] {
+  border-color: var(--text-error);
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle [hidden] {
+  display: none;
+}

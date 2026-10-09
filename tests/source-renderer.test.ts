@@ -1757,3 +1757,17 @@ describe("source renderer document ownership", () => {
     } finally { vi.unstubAllGlobals(); }
   });
 });
+
+
+describe("rectangular corner appearance", () => {
+  it("uses a sharp border join with zero corner radius, including thick borders", () => {
+    const f = fixture("round_rectangle");
+    f.data.miroCanvas.localOverrides.a = { cornerRadius: 0, borderWidth: 20 };
+    f.renderer.refresh();
+    const path = f.nodeEl.querySelectorAll("svg")[0].querySelectorAll("path")[0];
+    expect(path.getAttribute("d")).toBe("M0 0H100V100H0Z");
+    expect(path.getAttribute("stroke-linejoin")).toBe("miter");
+    expect(path.getAttribute("stroke-width")).toBe("20");
+    f.renderer.dispose();
+  });
+});

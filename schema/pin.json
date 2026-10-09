@@ -2,6 +2,6 @@
   "description": "The board schema this plugin is built against: a copy of miro2obsidian's published schema and fixtures at one commit. scripts/sync-schema.mjs refreshes the copy or, with --check, proves it unchanged.",
   "repository": "NixWrk/Miro_2_Obsidian",
   "path": "miro2obsidian/schemas/v1",
-  "commit": "225a8a4414484d57840f22bca08819186f1ca3e2",
+  "commit": "2679e203ab94bf8116d3374e06d7be14809a2f62",
   "schemaVersion": 1
 }

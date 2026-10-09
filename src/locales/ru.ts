@@ -12,6 +12,12 @@ import type { Messages } from "./en";
 
 export const RU: Messages = {
   enhancements: {
+    shapeRadiusControl: "Регулировка скругления фигур",
+    shapeRadiusControlHint: "Меняй радиус ручкой прямо на фигуре. Отключение скрывает ручку и сохраняет записанные радиусы.",
+    shapeRadiusHandle: "Изменить радиус скругления фигуры",
+    shapeRadiusValue: (radius: number) => `Радиус скругления: ${Number(radius.toFixed(2))} пикселей доски. Потяни ручку или нажми, чтобы ввести точное значение.`,
+    shapeRadiusInput: "Радиус скругления фигуры в пикселях доски",
+    shapeRadiusInvalid: "Введи конечное число для радиуса скругления.",
     cardCornerRadius: "Радиус скругления карточек",
     cardCornerRadiusHint: "Радиус в пикселях доски. Ноль даёт прямые углы. Фигуры и рисунки сохраняют свою геометрию.",
     canvasSnippets: "CSS-сниппеты на досках",

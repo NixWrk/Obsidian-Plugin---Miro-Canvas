@@ -2134,3 +2134,27 @@ Android16 / Obsidian1.13.8 checks pass. Native SDK controls, ADB taps, CDP text
 and frame/DOM preparation are explicitly distinguished. Exact scope, file saves,
 source/worker cleanup and pending broader scenarios are recorded in the
 [appearance receipt](card-appearance-checks.md). No new source/CSS warning remains.
+
+## Shape corner radius and initial proportions — 2026-10-10
+
+Trace before edits: on SM-X736B/Android16/Obsidian1.13.8 in MiroCanvasTest,
+round_rectangle nodes cd83b7ccc2c5b4c2 (250x60) and a443eab2bdbc202d
+(210x200) use shapePath's fixed normalized12 corners, stretching the horizontal
+and vertical radii differently. CardAppearance intentionally excludes shapes,
+so cardCornerRadius0 does not control these outlines. finishToolGesture gives
+every shape200x200 for a click/bar drop; the catalogue already declares wide,
+tall or square. Drawn rectangles keep the user's drag dimensions.
+
+Required checks: catalogue default proportions and aliases; tap/bar-drop vs
+free drag/Shift constraints; actual tablet ADB creation; per-shape radius0 and
+nonzero, circular physical corners on wide/tall nodes, explicit size clamping;
+one native history transaction, persistence/reopen/Undo, locks/review and
+unknown-field/miroSource preservation. Shape paths, text insets, edge/connector
+landing and preview resize/rotation must use the same current dimensions and
+normalized outline before release, after commit/cancel and at non-default zoom.
+Independent SVG/PDF/PPTX must reuse that geometry without source/camera mutation.
+Change the upstream checked schema before adding a stored cornerRadius.
+Record real Android input separately from CDP setup; leave unverified cases
+pending. The current request concerns shape outlines, not card CSS radius.
+
+Final parent integration/real-device results: [shape radius acceptance](shape-radius-acceptance.md). Earlier worker snapshots are historical; pending native cases remain explicit.

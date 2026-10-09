@@ -569,6 +569,8 @@ describe("export presentation settings", () => {
     const settings = { ...DEFAULT_SETTINGS, contentTextThreshold: .5, contentFileThreshold: .6, contentLinkThreshold: .7, contentPluginThreshold: .8 };
     const capture = planCapture([{ x: 0, y: 0, width: 10_000, height: 8000 }], "standard", { width: 1000, height: 800 }, 1, 1)[0]!;
     const exported = exportCanvasSettings(settings);
+    expect(exported.shapeRadiusControlEnabled).toBe(false);
+    expect(settings.shapeRadiusControlEnabled).toBe(true);
     const thresholds = (value: typeof settings) => ({ text: value.contentTextThreshold, file: value.contentFileThreshold, link: value.contentLinkThreshold, plugin: value.contentPluginThreshold });
     expect(capture.scale).toBe(.2);
     expect(contentThresholdBand(2 ** capture.tiles[0]!.zoom, thresholds(settings))).toBe("0000");
@@ -580,6 +582,8 @@ describe("export presentation settings", () => {
   it("detaches ordered global styles and palette from settings edits during capture", () => {
     const settings = { ...DEFAULT_SETTINGS, customStyles: [{ id: "stable", name: "Named", declarations: "color: var(--text-normal); opacity: .6" }], permanentPalette: [{ id: "blue", label: "Blue", color: "#0000ff", source: "custom" as const }] };
     const exported = exportCanvasSettings(settings);
+    expect(exported.shapeRadiusControlEnabled).toBe(false);
+    expect(settings.shapeRadiusControlEnabled).toBe(true);
     settings.customStyles[0]!.name = "Changed";
     settings.customStyles.reverse();
     settings.permanentPalette[0]!.color = "#ff0000";

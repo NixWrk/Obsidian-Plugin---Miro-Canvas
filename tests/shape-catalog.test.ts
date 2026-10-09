@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { setLocale } from "../src/i18n";
-import { SHAPE_CATALOG, shapeCatalogEntry, shapeCatalogLabel } from "../src/shape-catalog";
+import { SHAPE_CATALOG, shapeCatalogEntry, shapeCatalogLabel, shapeDefaultSize } from "../src/shape-catalog";
 import { shapePath } from "../src/shape-geometry";
 import { LOCAL_SHAPE_KINDS } from "../src/source-model";
 
@@ -47,6 +47,41 @@ describe("shape catalogue", () => {
     expect(shapeCatalogLabel(shapeCatalogEntry("star")!)).toBe("Star");
     expect(shapeCatalogEntry("not_a_shape")).toBeUndefined();
     expect(shapeCatalogEntry(undefined)).toBeUndefined();
+  });
+});
+
+describe("shape default size", () => {
+  const expectedSizes = {
+    wide: { width: 240, height: 160 },
+    tall: { width: 160, height: 240 },
+    square: { width: 200, height: 200 },
+  };
+
+  it.each(SHAPE_CATALOG)("sizes $kind from its $aspect catalogue aspect", (item) => {
+    expect(shapeDefaultSize(item.kind)).toEqual(expectedSizes[item.aspect]);
+  });
+
+  const aliases = SHAPE_CATALOG.flatMap((item) => item.aliases.map((alias) => ({
+    alias,
+    kind: item.kind,
+    aspect: item.aspect,
+  })));
+
+  it.each(aliases)("sizes alias $alias like $kind", ({ alias, kind, aspect }) => {
+    expect(shapeDefaultSize(alias)).toEqual(expectedSizes[aspect]);
+    expect(shapeDefaultSize(alias)).toEqual(shapeDefaultSize(kind));
+  });
+
+  it.each([undefined, "", "not_a_shape", "constructor"])("uses a square fallback for %s", (kind) => {
+    expect(shapeDefaultSize(kind)).toEqual({ width: 200, height: 200 });
+  });
+
+  it.each(["rectangle", "can", "circle", "not_a_shape"])("returns a fresh size for %s", (kind) => {
+    const expected = shapeDefaultSize(kind);
+    const size = shapeDefaultSize(kind);
+    size.width = 1;
+    size.height = 2;
+    expect(shapeDefaultSize(kind)).toEqual(expected);
   });
 });
 
