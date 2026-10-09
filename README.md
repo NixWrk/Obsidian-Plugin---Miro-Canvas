@@ -85,6 +85,18 @@ unreleased. Verification and remaining checks are tracked in the
 | **Note-property connections** | Optionally generate connections between file cards from note-property links, preserving manual connections. |
 | **Shared colors and styles** | Prefer a permanent palette across boards while retaining customized local palettes. Apply named, scoped CSS declarations from a restricted subset. |
 | **Zoom content** | Set content thresholds for text, file, web and Miro cards; selected or edited cards stay readable. |
+| **Card corners** | Set a radius from 0 to 48 board pixels using a slider or a precise value; zero gives square cards. Diagram geometry stays unchanged. |
+| **CSS snippets** | Supported Obsidian snippets are excluded from boards by default. Allow individual installed snippets in searchable settings; normal notes and the selected theme retain their styling. |
+| **Vector export** | Export actual shapes, lines and text to SVG, with clipped pages stacked vertically. Intrinsic raster attachments remain images. |
+
+SVG references installed fonts and omits cosmetic shadows. Unsupported rich
+content is refused explicitly, including live/PDF embeds, list markers and
+complex or rotated HTML text. [SVG scope and checks](docs/vector-export-checks.md).
+Snippet isolation supports ordinary selectors and conditional rules, including
+inheritance and `!important`. Imports, font-face/keyframe/property definitions,
+unverified popout styles and layout effects on ancestors outside the board are
+not fully isolated; unsupported sheets produce a notice and may still apply.
+[Snippet scope and checks](docs/canvas-snippet-checks.md).
 
 Board-property/tag search supplements native results for positive
 conjunctions, such as `tag:project [status:"active"]`. OR, negation, regex and

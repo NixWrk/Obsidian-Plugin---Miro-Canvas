@@ -53,6 +53,7 @@ const native = vi.hoisted(() => {
     limits: unknown[] = [];
     options = new Map<string, string>();
     selectEl = new Element();
+    inputEl = new Element();
     change?: (value: unknown) => unknown;
     click?: () => unknown;
     constructor(kind: string) { this.kind = kind; }
@@ -154,10 +155,11 @@ const { MiroCanvasSettingTab } = compiled.exports;
 
 afterEach(() => setLocale("en"));
 
-function rig() {
+function rig(cssSnippets: readonly string[] = []) {
   let settings = normalizeSettings({ fontPacks: [FONT_PACK_CATALOGUE[0].id], customFonts: [{ file: "custom.woff", family: "My font" }], commentAuthorColors: { Inter: "#123456" } });
   const saveSettings = vi.fn(async (patch) => { settings = mergeSettings(settings, patch); });
   const host: SettingsTabHost = {
+    cssSnippets: () => cssSnippets,
     get settings() { return settings; },
     saveSettings,
     commentAuthors: () => ["Anna", "Inter"],
@@ -243,6 +245,30 @@ describe("native searchable settings definitions", () => {
     expect(r.row(labels.zoomStepName).descEl.textContent).toContain("50%");
     expect(r.app.vault.setConfig).not.toHaveBeenCalled();
     expect(r.plugin.saveData).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "ru"] as const)("indexes corner radius and individual snippet controls in %s", async locale => {
+    setLocale(locale);
+    const r = rig(["Red line", "Wide paragraphs"]);
+    const entries = rows(r.tab.getSettingDefinitions());
+    expect(entries.some(item => item.name === words().enhancements.cardCornerRadius)).toBe(true);
+    expect(entries.some(item => item.name === "Red line")).toBe(true);
+    r.tab.update();
+    await r.row(words().enhancements.cardCornerRadius).controls[0].change?.(20);
+    const numeric = r.row(words().enhancements.cardCornerRadius).controls[1];
+    expect(numeric.value).toBe("20");
+    await numeric.change?.("invalid");
+    expect(r.host.settings.cardCornerRadius).toBe(20);
+    await numeric.change?.("99");
+    expect(r.host.settings.cardCornerRadius).toBe(48);
+    expect(numeric.value).toBe("48");
+    expect(r.row(words().enhancements.cardCornerRadius).controls[0].value).toBe(48);
+    await numeric.change?.("20");
+    await r.row("Red line").controls[0].change?.(true);
+    await r.row("Wide paragraphs").controls[0].change?.(true);
+    await r.row("Red line").controls[0].change?.(false);
+    expect(r.host.settings).toMatchObject({ cardCornerRadius: 20, allowedCanvasSnippets: ["Wide paragraphs"] });
+    expect(r.app.vault.setConfig).not.toHaveBeenCalled();
   });
 
   it("keeps toolbar ordering and scroll when definitions are updated", async () => {

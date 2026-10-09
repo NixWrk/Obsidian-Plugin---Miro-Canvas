@@ -58,6 +58,14 @@ recorded separately; unavailable device checks stay pending.
 
 ## Status
 
+The 2026-10-09 follow-up adds adjustable card corners, independent SVG export
+and per-snippet Canvas permissions (default none). Representative Windows and
+SM-X736B native checks pass, including original-note CSS, real native setting
+controls, saved SVG geometry/text and unchanged working state. Old PDF/PPTX
+native regressions pass too. Exact input methods and remaining broader cases
+are in [card appearance checks](card-appearance-checks.md); SVG and snippet
+boundaries have their own documents. No version/tag/release is created.
+
 The feature modules and main/session integration are present in the worktree;
 the expansion remains unreleased; the native-discovered defects below are repaired.
 Focused unit/synthetic checks are recorded

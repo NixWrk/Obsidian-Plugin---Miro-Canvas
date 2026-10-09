@@ -12,6 +12,7 @@ export function exportCanvasSettings(settings: MiroCanvasSettings): MiroCanvasSe
     contentLinkThreshold: 0,
     contentPluginThreshold: 0,
     customStyles: cloneCanvasJson(settings.customStyles),
+    allowedCanvasSnippets: [...settings.allowedCanvasSnippets],
     permanentPalette: settings.permanentPalette === undefined ? undefined : cloneCanvasJson(settings.permanentPalette),
   };
 }
@@ -299,7 +300,7 @@ function installExportFrames(canvas: object, element: HTMLElement, root: HTMLEle
 }
 
 /** An unregistered native view: never open a workspace leaf or bind global keys. */
-export function createExportCanvas(sourceView: unknown, snapshot: unknown, document: Document): BackgroundCanvas {
+export function createExportCanvas(sourceView: unknown, snapshot: unknown, document: Document, registerScope?: (scope: HTMLElement) => (() => void)): BackgroundCanvas {
   const sourceLeaf = property(sourceView, "leaf");
   const sourceCanvas = property(sourceView, "canvas");
   const app = property(sourceView, "app");
@@ -324,6 +325,7 @@ export function createExportCanvas(sourceView: unknown, snapshot: unknown, docum
   let view: unknown;
   let canvas: unknown;
   let restoreFrames: (() => void) | undefined;
+  let releaseScope: (() => void) | undefined;
   let disposed = false;
   const dispose = (): void => {
     if (disposed) return;
@@ -344,7 +346,7 @@ export function createExportCanvas(sourceView: unknown, snapshot: unknown, docum
         // A failed render must still remove the independently owned surface.
       }
     }
-    host.remove();
+    try { releaseScope?.(); } finally { host.remove(); }
   };
   try {
     const candidateLeaf: unknown = Reflect.construct(Leaf, [app]);
@@ -392,6 +394,7 @@ export function createExportCanvas(sourceView: unknown, snapshot: unknown, docum
         if (name.startsWith("--")) wrapper.style.setProperty(name, palette.getPropertyValue(name));
       }
     }
+    releaseScope = registerScope?.(leafElement);
     call(canvas, "setData", nativeData);
     if (!Reflect.set(candidateCanvas, "getData", () => snapshot)) throw new Error(words().export.unavailable);
     call(canvas, "onResize");

@@ -15,6 +15,19 @@ from the plugin.
 
 ## Canvas expansion — Unreleased
 
+The 2026-10-09 card appearance work adds a global 0–48px corner radius
+(slider and numeric field, zero by default), without changing diagram geometry.
+Native CSS snippets are excluded from owned Canvas scopes by default, with a
+per-snippet allowlist in searchable definitions. Native/theme/plugin styles and
+ordinary notes remain outside that policy; unsupported stylesheet/window shapes
+report an explicit notice. See [card checks](card-appearance-checks.md) and
+[snippet boundaries](canvas-snippet-checks.md).
+
+Independent SVG export serializes real rect/path/text geometry and computed
+native arrow transforms. Pages stack vertically with clipping; intrinsic raster
+attachments remain images. Fonts remain references, shadows are omitted and
+unsupported rich layout fails explicitly. See [vector checks](vector-export-checks.md).
+
 The 2026-10-07/08 feature modules are present and wired from main/session.
 The native-discovered search, keyboard and held-group defects are repaired.
 Representative Windows, supported-tablet and legacy-phone checks pass; advanced

@@ -6,7 +6,7 @@
  * fallbacks stay testable without an Obsidian runtime.
  */
 
-import { PluginSettingTab, setIcon, type App, type Plugin, type Setting, type SettingDefinitionItem, type SettingDefinitionRender } from "obsidian";
+import { PluginSettingTab, setIcon, type App, type Plugin, type Setting, type SettingDefinitionItem, type SettingDefinitionRender, type SliderComponent, type TextComponent } from "obsidian";
 
 import { fontStack } from "./appearance";
 import { authorColor } from "./comment-thread";
@@ -29,6 +29,7 @@ import {
 export interface SettingsTabHost {
   readonly openCustomStyles?: () => void;
   readonly openPalette?: () => void;
+  readonly cssSnippets?: () => readonly string[];
   readonly settings: MiroCanvasSettings;
   readonly saveSettings: (patch: Partial<MiroCanvasSettings>) => Promise<void>;
   /** Everyone who has written on the open board, for their colours. */
@@ -213,6 +214,21 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     this.slider(rows, labels.maxZoomName, labels.maxZoomDesc,
       "maxZoom", (value) => `${Math.round(value * 100)}%`);
     const enhancementLabels = words().enhancements;
+    this.slider(rows, enhancementLabels.cardCornerRadius, enhancementLabels.cardCornerRadiusHint,
+      "cardCornerRadius", (value) => `${value} px`);
+    new SettingsRow(rows).setName(enhancementLabels.canvasSnippets).setDesc(enhancementLabels.canvasSnippetsHint);
+    const snippetNames = this.host.cssSnippets?.() ?? [];
+    if (snippetNames.length === 0) new SettingsRow(rows).setName(enhancementLabels.noSnippets);
+    for (const name of snippetNames) {
+      new SettingsRow(rows).setName(name).setDesc(enhancementLabels.snippetEnabledHint)
+        .addToggle((toggle) => toggle.setValue(this.host.settings.allowedCanvasSnippets.includes(name))
+          .onChange((enabled) => {
+            const selected = new Set(this.host.settings.allowedCanvasSnippets);
+            if (enabled) selected.add(name);
+            else selected.delete(name);
+            void this.host.saveSettings({ allowedCanvasSnippets: [...selected] });
+          }));
+    }
     for (const [key, title] of [
       ["contentTextThreshold", enhancementLabels.contentText],
       ["contentFileThreshold", enhancementLabels.contentFile],
@@ -656,13 +672,37 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     const currently = words().settings.currently;
     new SettingsRow(rows).setName(name).setDesc(`${description} ${currently(format(value))}`)
       .configure((setting) => {
-        setting.addSlider((slider) => slider
+        let valueInput: TextComponent | undefined;
+        let valueSlider: SliderComponent | undefined;
+        setting.addSlider((slider) => {
+          valueSlider = slider;
+          slider
           .setLimits(bound.min, bound.max, bound.step)
           .setValue(value)
           .onChange((next) => {
+            valueInput?.setValue(String(next));
             setting.setDesc(`${description} ${currently(format(next))}`);
             void this.host.saveSettings({ [key]: next });
-          }));
+          });
+        });
+        if (key === "cardCornerRadius") {
+          setting.addText((text) => {
+            valueInput = text;
+            text.inputEl.addClass("miro-canvas-card-radius-value");
+            text.inputEl.setAttribute("inputmode", "decimal");
+            text.inputEl.setAttribute("aria-label", name);
+            text.setValue(String(value)).onChange((entered) => {
+              if (entered.trim() === "") return;
+              const number = Number(entered);
+              if (!Number.isFinite(number)) return;
+              const next = Math.max(bound.min, Math.min(bound.max, number));
+              valueSlider?.setValue(next);
+              if (number !== next) text.setValue(String(next));
+              setting.setDesc(`${description} ${currently(format(next))}`);
+              void this.host.saveSettings({ cardCornerRadius: next });
+            });
+          });
+        }
       });
   }
 }

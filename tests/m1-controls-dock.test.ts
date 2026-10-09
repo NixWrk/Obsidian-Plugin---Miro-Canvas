@@ -246,7 +246,7 @@ describe("corner dock", () => {
   it("offers exporting to PDF or PowerPoint from the board menu", () => {
     const { root, calls } = build();
     byLabel(root, "Board settings").dispatch("click");
-    row(root, "Export to PDF or PowerPoint").dispatch("click");
+    row(root, "Export to PDF, PowerPoint or SVG").dispatch("click");
     expect(menu(root, "board").hidden).toBe(true);
     expect(calls.opened).toEqual(["export"]);
   });

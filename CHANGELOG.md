@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add adjustable card corner radius (0–48 board pixels; square by default), preserving diagram and drawing geometry.
+- Exclude supported CSS snippets from Canvas by default, with individual permissions in searchable settings. Preserve ordinary note styling and native/theme/plugin CSS; diagnose unsupported global rules and popout ownership instead of claiming complete isolation.
+- Add independent SVG export with actual vector geometry/text and vertically stacked clipped pages. Preserve computed card typography/radius and native arrow transforms; embed only intrinsic raster attachments. Unsupported rich content reports a refusal; fonts remain references and cosmetic shadows are omitted.
+
 - Expand board search to linked Markdown note contents and heading/block slices, with match-case, bounded regular expressions and explicit invalid/unsupported-pattern feedback.
 - Add Flip for native and independent connections, connected/incoming/outgoing selection and optional highlighting. Add reversible group collapse as a view projection, retaining native cards, lines and stored geometry.
 - Move a selection into a new board with preserved card IDs, styling, unknown fields and Miro source evidence; redirect crossing lines to the new file card and retain old card links through redirects. Undo restores the source selection but deliberately retains the target board.

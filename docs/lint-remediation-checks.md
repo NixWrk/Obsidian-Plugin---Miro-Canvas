@@ -2123,3 +2123,14 @@ Native ADB Escape navigates to the prior board on this legacy app and is not
 a same-board cancellation pass. Original source/appearance/settings bytes are
 restored. This closes the disconnected-device follow-up for that installation;
 supported-version phone checks and the broader matrix remain pending.
+
+## Card appearance, vector export and snippet isolation — 2026-10-09
+
+Before implementation, card-appearance-checks.md traced native/imported card
+faces, settings/session rebuilds and independent export. The vector and snippet
+documents traced their owned rendering/native CSS boundaries and lint fixes
+before editing. Final representative Windows 1.14.4 and physical SM-X736B /
+Android16 / Obsidian1.13.8 checks pass. Native SDK controls, ADB taps, CDP text
+and frame/DOM preparation are explicitly distinguished. Exact scope, file saves,
+source/worker cleanup and pending broader scenarios are recorded in the
+[appearance receipt](card-appearance-checks.md). No new source/CSS warning remains.

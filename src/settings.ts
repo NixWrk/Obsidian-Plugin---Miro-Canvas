@@ -62,6 +62,8 @@ export interface FontListEntry {
 }
 
 export interface MiroCanvasSettings {
+  readonly cardCornerRadius: number;
+  readonly allowedCanvasSnippets: readonly string[];
   readonly contentTextThreshold: number;
   readonly contentFileThreshold: number;
   readonly contentLinkThreshold: number;
@@ -167,9 +169,10 @@ interface NumberBound {
 }
 
 export const SETTING_BOUNDS: Readonly<Record<
-  "zoomStep" | "minZoom" | "maxZoom" | "panStep" | "fastPanMultiplier" | "connectorMagnet" | "connectorSnap" | "connectorLabelPosition" | "contentTextThreshold" | "contentFileThreshold" | "contentLinkThreshold" | "contentPluginThreshold",
+  "cardCornerRadius" | "zoomStep" | "minZoom" | "maxZoom" | "panStep" | "fastPanMultiplier" | "connectorMagnet" | "connectorSnap" | "connectorLabelPosition" | "contentTextThreshold" | "contentFileThreshold" | "contentLinkThreshold" | "contentPluginThreshold",
   NumberBound
 >> = Object.freeze({
+  cardCornerRadius: { min: 0, max: 48, step: 1 },
   zoomStep: { min: 1.02, max: 2, step: 0.01 },
   minZoom: { min: 0.01, max: 1, step: 0.01 },
   maxZoom: { min: 1, max: 64, step: 0.5 },
@@ -192,6 +195,8 @@ const DEFAULT_DEVICE_LAYOUT: DeviceLayout = Object.freeze({
 });
 
 export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
+  cardCornerRadius: 0,
+  allowedCanvasSnippets: Object.freeze([]),
   contentTextThreshold: 0,
   contentFileThreshold: 0,
   contentLinkThreshold: 0,
@@ -486,6 +491,9 @@ export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvas
   const maxZoom = readNumber(value, "maxZoom", DEFAULT_SETTINGS.maxZoom);
   return Object.freeze({
     zoomStep: readNumber(value, "zoomStep", DEFAULT_SETTINGS.zoomStep),
+    cardCornerRadius: readNumber(value, "cardCornerRadius", DEFAULT_SETTINGS.cardCornerRadius),
+    allowedCanvasSnippets: Object.freeze(Array.isArray(value.allowedCanvasSnippets)
+      ? [...new Set(value.allowedCanvasSnippets.filter((name): name is string => typeof name === "string" && name.length > 0 && name.length <= 256))].slice(0, 256) : []),
     // An inverted range would leave no zoom at all, so the pair is ordered.
     minZoom: Math.min(minZoom, maxZoom),
     maxZoom: Math.max(minZoom, maxZoom),

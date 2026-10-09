@@ -311,6 +311,21 @@ describe("independent native Markdown readiness", () => {
 });
 
 describe("independent native export surface", () => {
+  it("registers scoped snippet isolation before native data rendering and releases it on disposal", () => {
+    const f = fixture();
+    const release = vi.fn();
+    const register = vi.fn((scope: HTMLElement) => {
+      expect(f.canvas.setData).not.toHaveBeenCalled();
+      expect(f.document.body.contains(scope as unknown as Element)).toBe(true);
+      return release;
+    });
+    const background = createExportCanvas(f.sourceView, { nodes: [], edges: [] }, f.document as unknown as Document, register);
+    expect(register).toHaveBeenCalledOnce();
+    background.dispose();
+    background.dispose();
+    expect(release).toHaveBeenCalledOnce();
+  });
+
   it("uses an unregistered view with disabled persistence and no global key binding", () => {
     const f = fixture();
     const snapshot = { nodes: [], edges: [], miroSource: { evidence: "keep" }, future: { keep: true } };

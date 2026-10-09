@@ -20,7 +20,8 @@ import {
 import { words } from "./i18n";
 import html2canvas from "html2canvas-pro";
 
-export type ExportKind = "pdf" | "pptx";
+export type ExportKind = "pdf" | "pptx" | "svg";
+export { renderVectorExportPages } from "./vector-export";
 
 
 export interface ExportPanelState {
@@ -136,7 +137,7 @@ export class ExportPanel {
     }
 
     const out = this.add(root, "div", "miro-canvas-export__actions miro-canvas-export__out");
-    for (const [kind, label] of [["pdf", words().export.exportPdf], ["pptx", words().export.exportPptx]] as const) {
+    for (const [kind, label] of [["pdf", words().export.exportPdf], ["pptx", words().export.exportPptx], ["svg", words().export.exportSvg]] as const) {
       const run = this.button(out, label, label, kind === "pdf" ? "mod-cta" : "");
       run.disabled = busy || view.unavailable !== undefined || view.state.pages.length === 0;
       this.on(run, "click", () => this.actions.onExport(kind));
@@ -366,7 +367,7 @@ export function planCapture(
 }
 
 /** Camera and pixels belonging exclusively to the background renderer. */
-interface CaptureCanvas {
+export interface CaptureCanvas {
   x: number; y: number; tx: number; ty: number; zoom: number; tZoom: number;
   screenshotting?: boolean;
   viewportChanged?: boolean;
@@ -377,7 +378,7 @@ interface CaptureCanvas {
   setViewport?(x: number, y: number, zoom: number): void;
 }
 
-function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+export function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const abort = (): void => reject(new Error(words().export.exportStopped));
     if (signal.aborted) {
@@ -396,7 +397,7 @@ function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /** Hidden desktop windows may suspend RAF; Stop and the timer both release it. */
-function exportFrame(view: Window, signal: AbortSignal): Promise<void> {
+export function exportFrame(view: Window, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     let frame: number | undefined;
     let timer: number | undefined;

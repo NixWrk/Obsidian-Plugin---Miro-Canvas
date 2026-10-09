@@ -19,6 +19,7 @@ import { storeDeviceFiles } from "./device-files";
 import { M1CanvasSession } from "./m1-session";
 import { PaletteEditor } from "./palette-editor";
 import { CustomStyleEditor } from "./custom-style-editor";
+import { CanvasSnippetManager, readNativeSnippetEntries, readNativeSnippetNames } from "./canvas-snippets";
 import { cloneCanvasJson } from "./canvas-json";
 import { newCanvasId } from "./canvas-ids";
 import { graphDrift } from "./native-graph";
@@ -200,6 +201,8 @@ export default class MiroCanvasPlugin extends Plugin {
   private readonly initializationTimerHost: Window = window;
   private initializationRetry: number | null = null;
   public canvasSettings: MiroCanvasSettings = DEFAULT_SETTINGS;
+  private canvasSnippets: CanvasSnippetManager | undefined;
+  private readonly canvasSnippetScopes = new Map<HTMLElement, () => void>();
   /** The `<style>` this plugin owns in every window's head; loads a family's faces lazily, only once something wants it. */
   private readonly fontFaces = new FontFaceRegistry();
   /** The hover text of a stylus, which Obsidian's own tooltips do not show on a phone or a tablet; every window gets it, and the computer's none. */
@@ -216,6 +219,13 @@ export default class MiroCanvasPlugin extends Plugin {
     // A stored settings file is user-editable and may predate this release,
     // so it is normalized rather than trusted.
     this.canvasSettings = normalizeSettings(await this.loadData(), layoutKindFor(Platform));
+    this.canvasSnippets = new CanvasSnippetManager(
+      (owner) => readNativeSnippetEntries(Reflect.get(this.app, "customCss"), owner),
+      this.canvasSettings.allowedCanvasSnippets,
+      (diagnostic) => new Notice(diagnostic.name === undefined ? words().enhancements.snippetUnavailable : words().enhancements.snippetRefused(diagnostic.name)),
+    );
+    this.canvasSnippets.attach(document);
+    this.registerEvent(this.app.workspace.on("css-change", () => this.canvasSnippets?.refresh()));
     setAuthorColors(this.canvasSettings.commentAuthorColors);
     // Every window that can show a Canvas gets the plugin's own font-face
     // sheet; a popout gets one as it opens, and loses it as it closes.  A
@@ -226,10 +236,17 @@ export default class MiroCanvasPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("window-open", (_win, openedWindow) => {
       this.fontFaces.attach(openedWindow.document);
       this.penTooltips.attach(openedWindow.document);
+      this.canvasSnippets?.attach(openedWindow.document);
     }));
     this.registerEvent(this.app.workspace.on("window-close", (_win, closedWindow) => {
       this.fontFaces.detach(closedWindow.document);
       this.penTooltips.detach(closedWindow.document);
+      this.canvasSnippets?.detach(closedWindow.document);
+      for (const [scope, release] of this.canvasSnippetScopes) {
+        if (scope.ownerDocument !== closedWindow.document) continue;
+        release();
+        this.canvasSnippetScopes.delete(scope);
+      }
     }));
     await this.loadFontPacks();
     this.addSettingTab(new MiroCanvasSettingTab(this.app, this, {
@@ -240,6 +257,7 @@ export default class MiroCanvasPlugin extends Plugin {
       openImportGuide: () => this.openImportGuide(),
       createWelcomeBoard: () => void this.openWelcomeBoard(true),
       openPalette: () => this.openPermanentPalette(),
+      cssSnippets: () => readNativeSnippetNames(Reflect.get(this.app, "customCss")) ?? [],
       openCustomStyles: () => this.openCustomStyles(),
       pluginVersion: this.manifest.version,
       checkForUpdate: () => this.checkForUpdates(),
@@ -530,6 +548,7 @@ export default class MiroCanvasPlugin extends Plugin {
       if (!stillTheBoard(this.currentCanvasBinding, leaf?.view, this.m1Session?.status === "ready")) this.handleActiveLeafChange(leaf);
     }));
     this.registerEvent(this.app.workspace.on("layout-change", () => {
+      this.syncCanvasSnippetScopes();
       const currentClosed = this.currentCanvasView !== null && !this.currentCanvasStillOpen();
       if (currentClosed || this.m1Session?.status !== "ready") {
         this.handleActiveLeafChange(this.focusedLeaf());
@@ -548,6 +567,9 @@ export default class MiroCanvasPlugin extends Plugin {
 
   override onunload(): void {
     this.disposeShell();
+    for (const release of this.canvasSnippetScopes.values()) release();
+    this.canvasSnippetScopes.clear();
+    this.canvasSnippets?.dispose();
     this.fontFaces.dispose();
     this.penTooltips.dispose();
   }
@@ -557,6 +579,7 @@ export default class MiroCanvasPlugin extends Plugin {
     attempt = 0,
   ): void => {
     if (this.shellDisposed) return;
+    this.syncCanvasSnippetScopes();
     this.settingsOfThisDevice();
     if (this.initializationRetry !== null) this.initializationTimerHost.clearTimeout(this.initializationRetry);
     this.initializationRetry = null;
@@ -593,6 +616,7 @@ export default class MiroCanvasPlugin extends Plugin {
       : null;
     const indexedFile = (view as { file?: unknown }).file;
     this.m1Session = new M1CanvasSession(view, this.metadataWriter, {
+      onRegisterSnippetScope: (scope) => this.canvasSnippets?.register(scope) ?? (() => undefined),
       onCommittedBoardDocument: (document, identity) => {
         if (this.currentCanvasView !== view || !(indexedFile instanceof TFile) || (view as { file?: unknown }).file !== indexedFile) return;
         this.boardIndex?.ingestLiveDocument(indexedFile, document, { owner: view, identity });
@@ -708,6 +732,7 @@ export default class MiroCanvasPlugin extends Plugin {
       throw error;
     }
     if ("boardKnowledge" in patch) this.configureBoardIndex();
+    if ("allowedCanvasSnippets" in patch) this.canvasSnippets?.configure(this.canvasSettings.allowedCanvasSnippets);
     const leaf = this.focusedLeaf();
     if (this.m1Session !== null && leaf !== null && leaf !== undefined) {
       this.handleActiveLeafChange(leaf);
@@ -748,6 +773,7 @@ export default class MiroCanvasPlugin extends Plugin {
     if (this.shellDisposed) return;
     const before = this.settingsOfThisDevice();
     this.canvasSettings = settingsFromExternalChange(before, await this.loadData());
+    this.canvasSnippets?.configure(this.canvasSettings.allowedCanvasSnippets);
     if (before.boardKnowledge !== this.canvasSettings.boardKnowledge) this.configureBoardIndex();
     setAuthorColors(this.canvasSettings.commentAuthorColors);
     if (sameOnThisDevice(before, this.canvasSettings)) return;
@@ -765,6 +791,25 @@ export default class MiroCanvasPlugin extends Plugin {
   private settingsOfThisDevice(): MiroCanvasSettings {
     this.canvasSettings = useLayoutKind(this.canvasSettings, layoutKindFor(Platform));
     return this.canvasSettings;
+  }
+
+  /** Inactive Canvas panes need the same snippet policy as the edited board. */
+  private syncCanvasSnippetScopes(): void {
+    if (this.shellDisposed || this.canvasSnippets === undefined) return;
+    const current = new Set<HTMLElement>();
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (!isNativeCanvasView(leaf.view)) return;
+      const scope = leaf.view.containerEl;
+      current.add(scope);
+      if (!this.canvasSnippetScopes.has(scope)) {
+        this.canvasSnippetScopes.set(scope, this.canvasSnippets?.register(scope) ?? (() => undefined));
+      }
+    });
+    for (const [scope, release] of this.canvasSnippetScopes) {
+      if (current.has(scope)) continue;
+      release();
+      this.canvasSnippetScopes.delete(scope);
+    }
   }
 
   /** Once a day at start, unless turned off, ask GitHub whether a newer release is out. */

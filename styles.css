@@ -121,6 +121,19 @@
    own Canvas controls, whose zoom, undo, redo and snapping it carries, so a
    board has one set of view controls.  Selectors are doubled where
    Obsidian styles every button. */
+/* Card appearance is scoped to marked faces, never diagram outlines. */
+.miro-canvas-settings .miro-canvas-card-radius-value {
+  min-width: 64px;
+  max-width: 72px;
+}
+
+.miro-canvas-root.canvas-wrapper [data-miro-canvas-card-corners="true"] > .canvas-node-container,
+.miro-canvas-root.canvas-wrapper [data-miro-canvas-card-corners="true"] > .miro-source-decoration-card,
+.miro-canvas-root.canvas-wrapper [data-miro-canvas-card-corners="true"] > .miro-source-decoration-app-card {
+  border-radius: var(--miro-canvas-card-radius, 0px);
+  --canvas-node-radius: var(--miro-canvas-card-radius, 0px);
+}
+
 .miro-canvas-root .canvas-controls {
   /* M1 tracks native visibility and restores each original inline value
      when these native controls return to their owner. */

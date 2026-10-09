@@ -11,7 +11,7 @@ import { replaceInvalidFilenameCharacters } from "../src/control-characters";
 const source = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("main.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const plugin = ast.statements.find(ts.isClassDeclaration)!;
-const names = ["initializationTimerHost", "initializationRetry", "shellDisposed", "exportJobs", "enhancementModals", "focusedLeaf", "handleActiveLeafChange", "disposeShell", "activeM1Session", "updateStatus", "pickFontFile", "openFileSourceMenu"];
+const names = ["initializationTimerHost", "initializationRetry", "shellDisposed", "canvasSnippets", "canvasSnippetScopes", "syncCanvasSnippetScopes", "exportJobs", "enhancementModals", "focusedLeaf", "handleActiveLeafChange", "disposeShell", "activeM1Session", "updateStatus", "pickFontFile", "openFileSourceMenu"];
 const methods = names.map(name => plugin.members.find(member => member.name?.getText(ast) === name)!.getText(ast)).join("\n");
 const sanitizer = ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "sanitizeFontFileName")!;
 const code = transformSync(`class PlatformProbe { ${methods}\nsettingsOfThisDevice() {}\ncurrentCanvasStillOpen() { return false; } }\nthis.PlatformProbe = PlatformProbe;\nthis.sanitize = ${sanitizer.getText(ast)};`, { loader: "ts", target: "es2020" }).code;

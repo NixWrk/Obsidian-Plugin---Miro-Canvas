@@ -1,4 +1,5 @@
 import { watchAttachmentLabel } from "./native-markup-state";
+import { CardAppearance } from "./card-appearance";
 import { createHtmlElement, createSvgElement } from "./dom-elements";
 /**
  * Runtime owner for the M1 feature set.
@@ -177,7 +178,7 @@ import {
 	DEFAULT_EXPORT_STATE, MAX_EXPORT_PAGES, exportRecord, pageAround, paperRatio, paperSize, readExportState, reshapePage,
 	type ExportPageRecord, type ExportRect, type ExportState,
 } from "./export-pages";
-import { ExportOverlay, ExportPanel, renderExportPages, type ExportKind } from "./board-export";
+import { ExportOverlay, ExportPanel, renderExportPages, renderVectorExportPages, type ExportKind } from "./board-export";
 import { packExport } from "./export-worker-client";
 import { createExportCanvas, exportCanvasSettings } from "./export-canvas";
 import { words } from "./i18n";
@@ -216,6 +217,7 @@ export interface M1SessionOptions {
 	readonly onConnectorMenu?: (event: MouseEvent, run: (action: "cut" | "copy" | "paste" | "delete") => void) => void;
 	/** A card, a label or the toolbar's own font list just named this family; the host reads its faces only now. */
 	readonly onFontUsed?: (family: string) => void;
+	readonly onRegisterSnippetScope?: (scope: HTMLElement) => (() => void);
 	/** Re-enter "arrange panels" right after this session replaces the last one - a settings save from inside the mode, on the same board, must not close it. */
 	readonly initialArrangeMode?: boolean;
 	/** A panel was dragged to a new place: a light change to persist, with no session rebuild needed for it to show. */
@@ -1595,6 +1597,7 @@ export class M1CanvasSession {
 	private customBoardStyles: CustomBoardStyles | undefined;
 	private enhancementDomIdentity = 0;
 	private enhancementPaintKey = "";
+	private cardAppearance: CardAppearance | undefined;
  private searchPeekId: string | undefined;
  private peekOwners: { owners: ReadonlyMap<string, string>; id: string; visible: ReadonlyMap<string, string> } | undefined;
  private visibleCommentThreads: { threads: readonly CommentThread[]; owners: ReadonlyMap<string, string>; visible: readonly CommentThread[] } | undefined;
@@ -1764,6 +1767,13 @@ export class M1CanvasSession {
 			if (unsubscribe !== undefined) this.disposers.push(unsubscribe);
 		}
 		if (this.root?.ownerDocument !== undefined && typeof readRuntime(this.root, "querySelectorAll") === "function" && typeof this.root.contains === "function") {
+			const scope = readRuntime(view, "containerEl");
+			const unregister = options.onRegisterSnippetScope?.(isElement(scope) && scope.contains(this.root) ? scope : this.root);
+			if (unregister !== undefined) this.disposers.push(unregister);
+			if (typeof this.root.style?.getPropertyValue === "function" && typeof this.root.style.getPropertyPriority === "function") {
+				this.cardAppearance = new CardAppearance(this.root, settings);
+				this.disposers.push(() => this.cardAppearance?.dispose());
+			}
 			this.contentBreakpoints = new ContentBreakpoints(this.root);
 			this.customBoardStyles = new CustomBoardStyles(this.root);
 			const observer = this.root.ownerDocument.defaultView?.MutationObserver;
@@ -3846,6 +3856,7 @@ export class M1CanvasSession {
 			const id = readCanvasElementId(node), shell = readCanvasElementDom(node);
 			if (id === undefined || !isElement(shell)) continue;
 			mark(shell, owners.has(id), false);
+			this.cardAppearance?.mark(shell, readCanvasElementType(node));
 			if (groupCollapse(document, id) !== undefined) shell.classList.add("miro-canvas-group-collapsed");
 			else shell.classList.remove("miro-canvas-group-collapsed");
 			const face = readRuntime(node, "containerEl") ?? shell.querySelector(".canvas-node-container");
@@ -6863,28 +6874,36 @@ export class M1CanvasSession {
 				const settings = isObject(metadata.settings) ? metadata.settings : {};
 				snapshot.miroCanvas = { ...metadata, schemaVersion: metadata.schemaVersion ?? 1, settings: { ...settings, displayTheme: resolvedTheme } };
 			}
-			background = createExportCanvas(this.view, snapshot, document);
+			background = createExportCanvas(this.view, snapshot, document, this.options.onRegisterSnippetScope);
 			const writer = new MetadataWriter({ readDocument: () => snapshot, commitDocument: () => false });
-			renderer = new M1CanvasSession(background.view, writer, { document, settings: exportCanvasSettings(this.settings), onFontUsed: this.options.onFontUsed });
+			renderer = new M1CanvasSession(background.view, writer, { document, settings: exportCanvasSettings(this.settings), onFontUsed: this.options.onFontUsed, onRegisterSnippetScope: this.options.onRegisterSnippetScope });
 			renderer.refresh();
-			const pictures = await renderExportPages(background.canvas as never, pages, state.quality, (done, total) => {
+			const progress = (done: number, total: number): boolean => {
 				if (exporting.stop || exporting.abort?.signal.aborted) return false;
 				renderer?.refresh();
 				exporting.busy = words().export.capturingProgress(done, total);
 				if (!this.disposed && this.exporting === exporting) this.renderExport();
 				return true;
-			}, exporting.abort.signal, () => renderer?.refresh());
-			exporting.busy = kind === "pdf" ? words().export.writingPdf : words().export.writingPptx;
-			this.renderExport();
-			const sheets = pages.map((page, index) => {
-				const size = paperSize(state.format, state.orientation, page);
-				const picture = pictures[index];
-				return {
-					width: size.width, height: size.height, image: picture.jpeg, pixelWidth: picture.width, pixelHeight: picture.height,
-					...(page.name === undefined ? {} : { title: page.name }),
-				};
-			});
-			const bytes = await packExport(kind, sheets, { title: base }, document, exporting.abort.signal);
+			};
+			let bytes: Uint8Array;
+			if (kind === "svg") {
+				bytes = await renderVectorExportPages(background.canvas as never, pages, progress, exporting.abort.signal, () => renderer?.refresh());
+				exporting.busy = words().export.writingSvg;
+				this.renderExport();
+			} else {
+				const pictures = await renderExportPages(background.canvas as never, pages, state.quality, progress, exporting.abort.signal, () => renderer?.refresh());
+				exporting.busy = kind === "pdf" ? words().export.writingPdf : words().export.writingPptx;
+				this.renderExport();
+				const sheets = pages.map((page, index) => {
+					const size = paperSize(state.format, state.orientation, page);
+					const picture = pictures[index];
+					return {
+						width: size.width, height: size.height, image: picture.jpeg, pixelWidth: picture.width, pixelHeight: picture.height,
+						...(page.name === undefined ? {} : { title: page.name }),
+					};
+				});
+				bytes = await packExport(kind, sheets, { title: base }, document, exporting.abort.signal);
+			}
 			if (this.options.onSaveExport === undefined) throw new Error(words().export.unavailable);
 			if (exporting.abort.signal.aborted) throw new Error(words().export.exportStopped);
 			const saved = await this.options.onSaveExport(`${base}.${kind}`, bytes, typeof sourcePath === "string" ? sourcePath : undefined);

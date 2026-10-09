@@ -248,6 +248,14 @@ describe("ExportPanel", () => {
     expect(calls.quality[0]).toBe("high");
   });
 
+  it("runs SVG from the incumbent export panel without adding a new dialog", () => {
+    const { root, calls, render } = buildPanel();
+    byLabel(root, words().export.exportSvg).dispatch("click");
+    expect(calls.exportKind).toEqual(["svg"]);
+    render({ busy: "Exporting" });
+    expect(byLabel(root, words().export.exportSvg).disabled).toBe(true);
+  });
+
   it("runs pdf or pptx export and closes from its own buttons", () => {
     const { root, calls } = buildPanel();
     byLabel(root, words().export.exportPptx).dispatch("click");

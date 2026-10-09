@@ -655,7 +655,7 @@ describe("presentations, groups and ink", () => {
     expect(bar.parentNode?.parentNode).toBe(deck);
     const buttons = created.filter((element) => element.classes.has("miro-source-deck-button"));
     expect(buttons.map((button) => button.getAttribute("aria-label")))
-      .toEqual(["Present slides", "Show all slides", "Export slides as PDF or PowerPoint"]);
+      .toEqual(["Present slides", "Show all slides", "Export slides as PDF, PowerPoint or SVG"]);
     const stopped: string[] = [];
     const fire = (button: Element, type: string) => handlers.get(button)?.get(type)?.({ type, stopPropagation: () => stopped.push(type) });
     fire(buttons[0]!, "pointerdown");
