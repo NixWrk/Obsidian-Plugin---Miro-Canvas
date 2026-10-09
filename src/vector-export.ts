@@ -356,11 +356,14 @@ export async function serializeVectorTile(
     if (style.filter && style.filter !== "none") unsupported("css:filter");
     if (style.clipPath && style.clipPath !== "none") unsupported("css:clip-path");
     const box = geometry(item);
+    const clipped = [style.overflowX, style.overflowY].some(value => ["hidden", "clip", "auto", "scroll"].includes(value));
+    let rx = 0;
+    let ry = 0;
     let content = "";
     if (box.width > 0 && box.height > 0) {
       const radii = [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius];
       const painted = solid(style.backgroundColor) || ["top", "right", "bottom", "left"].some(side => Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0);
-      if (painted && radii.some(radius => radius !== radii[0])) unsupported("css:unequal-corner-radius");
+      if ((painted || clipped) && radii.some(radius => radius !== radii[0])) unsupported("css:unequal-corner-radius");
       const radiusParts = (radii[0] || "0").split(" ");
       const radius = (value: string, length: number): number => value.endsWith("%") ? Number.parseFloat(value) * length / 100 : Number.parseFloat(value);
       const horizontal = radius(radiusParts[0], box.width);
@@ -368,8 +371,8 @@ export async function serializeVectorTile(
       if (![horizontal, vertical].every(value => Number.isFinite(value) && value >= 0)) unsupported("css:corner-radius");
       // CSS shrinks both axes together when adjacent card corners overlap.
       const factor = Math.min(1, box.width / (2 * horizontal), box.height / (2 * vertical));
-      const rx = horizontal * factor;
-      const ry = vertical * factor;
+      rx = horizontal * factor;
+      ry = vertical * factor;
       const face = { x: 0, y: 0, width: box.width, height: box.height, rx, ry, transform: matrixText(box.matrix) };
       if (solid(style.backgroundColor)) content += rectangle({ ...face, fill: style.backgroundColor });
       const borders = ["Top", "Right", "Bottom", "Left"] as const;
@@ -420,10 +423,10 @@ export async function serializeVectorTile(
           "text-anchor": "middle", "dominant-baseline": "central" })}>${escaped(badge.value)}</text></g>`;
     }
     if (content === "") return "";
-    if ([style.overflowX, style.overflowY].some(value => ["hidden", "clip", "auto", "scroll"].includes(value))) {
+    if (clipped) {
       const id = `${namespace}-clip-${++sequence}`;
       content = `<defs><clipPath id="${id}">${rectangle({ x: 0, y: 0, width: box.width, height: box.height,
-        rx: Number.parseFloat(style.borderTopLeftRadius) || 0, transform: matrixText(box.matrix) })}</clipPath></defs><g clip-path="url(#${id})">${content}</g>`;
+        rx, ry, transform: matrixText(box.matrix) })}</clipPath></defs><g clip-path="url(#${id})">${content}</g>`;
     }
     const label = element.matches(".miro-canvas-comment-marker") ? `<title>${escaped(element.getAttribute("aria-label") ?? "")}</title>` : "";
     return `<g${attributes({ opacity: style.opacity || "1" })}>${label}${content}</g>`;

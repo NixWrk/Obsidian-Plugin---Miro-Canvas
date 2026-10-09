@@ -36,7 +36,9 @@ Mandatory checks before accepting:
 
 Windows uses an isolated, permanently hidden/unfocused Obsidian 1.14.4 runtime
 (launcher user agent 1.12.7). SM-X736B/R52Y808PDJB uses Android 16, Obsidian
-1.13.8 and WebView 153 in MiroCanvasTest. Phone checks are outside this request.
+1.13.8 and WebView 153 in MiroCanvasTest. The owner subsequently requested a
+phone follow-up; its new check is pending ADB authorization and is not covered
+by the Windows/tablet results.
 Receipts are ignored files under tools/obsidian_cdp/.out/card-appearance.
 
 Both native receipts pass: square text cards, nonzero radius and unchanged
@@ -50,10 +52,10 @@ to 24 and enables the snippet with real ADB taps. Mounting, note/board opening,
 text readiness and hidden-window frame preparation are instrumentation.
 These receipts do not claim a native global-settings search interaction.
 
-SVG is actually saved through the guarded vault callback: Windows 76,632 bytes
-(10 paths/61 text elements), tablet 78,055 bytes (10 paths/60 text elements).
+SVG is actually saved through the guarded vault callback: Windows 76,719 bytes
+(10 paths/61 text elements), tablet 78,146 bytes (10 paths/60 text elements).
 Both have zero image/foreignObject substitutions and include all three expected
-card texts. 63/35 samples respectively preserve source camera/selection/classes;
+card texts. 63/37 samples respectively preserve source camera/selection/classes;
 source bytes are unchanged and job/renderer registries are empty after export.
 
 Existing PDF/PPTX checks also pass on both native surfaces with radius20:
@@ -64,7 +66,7 @@ payloads rather than writing attachments; SVG checks do write the attachment.
 No screen capture or foreground takeover is used for any export. Original
 paths/preferences are restored and the temporary acceptance snippet is removed.
 
-The final suite passes 3,102 tests with one existing skip, all types/builds,
+The final suite passes 3,103 tests with one existing skip, all types/builds,
 schema/submission, three synthetic smoke modes and 77 Python cases. Source lint
 has only the retained command-ID advisory; CSS has zero !important/:has.
 One design detector run reports three pre-existing CSS warnings and palette
@@ -74,7 +76,13 @@ Remaining broader cases: native imported/file/link card variants, every theme
 combination, editor-mode snippet styling and unsupported/global/popout cases.
 Unit/local Chromium coverage for these stays distinct from native acceptance.
 
-Final corner overlap follow-up: all 3,102 tests pass with the existing skip.
-Windows and tablet --small-card receipts additionally verify radius48 on a
-100x40 native card exports as rx20/ry20, with the same source/cleanup invariants.
-The standard-card receipt sizes above describe the earlier standard fixture.
+Final corner overlap follow-up: all 3,103 tests pass with the existing skip.
+Windows and tablet --small-card receipts separately verify radius48 on a
+100x40 native card exports with rx20/ry20 for both the painted face and overflow
+clip, with the same source/cleanup invariants. Small SVGs are 76,695/77,485 bytes
+and 49/34 invariant samples. Standard and small fixtures use separate receipts.
+The first tablet small-card assertion wrongly required a literal XML space
+between wrapped words; all expected glyphs were present. The corrected checker
+compares glyph text without whitespace and reruns successfully on both devices.
+The earlier claim of that first assertion passing was premature and is corrected
+by these final receipts.

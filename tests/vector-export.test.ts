@@ -148,9 +148,16 @@ describe("vector DOM serialization", () => {
     ["0px", 0, 0],
   ] as const)("normalizes overlapping uniform corners (%s) with one CSS factor", async (radius, rx, ry) => {
     const f = fixture();
-    Object.assign(f.card.computed, { borderTopLeftRadius: radius, borderTopRightRadius: radius, borderBottomLeftRadius: radius, borderBottomRightRadius: radius });
+    Object.assign(f.card.computed, { overflowX: "hidden", borderTopLeftRadius: radius, borderTopRightRadius: radius, borderBottomLeftRadius: radius, borderBottomRightRadius: radius });
     const output = await serializeVectorTile(asHtml(f.wrapper), "corners", new AbortController().signal);
     expect(output).toContain(`width="100" height="40" rx="${rx}" ry="${ry}"`);
+    expect(output).toContain(`<clipPath id="corners-clip-1"><rect x="0" y="0" width="100" height="40" rx="${rx}" ry="${ry}"`);
+  });
+
+  it("refuses unequal corners on a transparent overflow clip", async () => {
+    const f = fixture();
+    Object.assign(f.card.computed, { backgroundColor: "transparent", overflowY: "hidden", borderTopLeftRadius: "12px" });
+    await expect(serializeVectorTile(asHtml(f.wrapper), "corners", new AbortController().signal)).rejects.toThrow("css:unequal-corner-radius");
   });
 
   it("refuses unresolved computed corner values instead of writing NaN geometry", async () => {

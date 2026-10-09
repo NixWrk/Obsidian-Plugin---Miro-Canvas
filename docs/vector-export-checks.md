@@ -266,7 +266,7 @@ Reference: [CSS corner overlap](https://drafts.csswg.org/css-backgrounds/#corner
 
 The rebuilt module passes actual Obsidian Windows 1.14.4 and physical
 SM-X736B/Android16/Obsidian1.13.8 checks. Guarded saving writes SVG attachments
-in the test vaults: 76,632/78,055 bytes, 10 vector paths each, 61/60 text
+in the test vaults: 76,719/78,146 bytes, 10 vector paths each, 61/60 text
 elements and zero image/foreignObject substitutions for the vector-only fixture.
 Native CSS-transformed arrow groups and Markdown whitespace spacers now export.
 Expected Launch card, Second card and Outside text is present; source bytes,
@@ -275,7 +275,11 @@ No screen capture or foreground activation is used. Input/preparation methods,
 old PDF/PPTX regressions and remaining broader cases are recorded in
 [card appearance checks](card-appearance-checks.md).
 
-Corner overlap correction complete: five focused cases cover circular,
-elliptical, percentage and zero radii plus unresolved-value refusal. Full types,
-3,102 tests, lint/build, all smoke modes and packaging gates pass. Real Windows
-and tablet small-card exports verify 100x40/radius48 gives rx20/ry20.
+Corner overlap correction complete: six focused cases cover circular,
+elliptical, percentage and zero radii, unresolved-value refusal and transparent
+unequal clipped corners. The first four check both the face and overflow clip.
+Full types, 3,103 tests, lint/build and packaging gates pass; existing smoke
+results remain green. Real Windows and tablet small-card exports verify
+100x40/radius48 gives rx20/ry20 for every matching face/clip rectangle.
+
+Follow-up trace before editing: native small-card receipt contains all Launch/card glyphs but drops zero-width line-wrap separators, so raw XML textContent is not a whitespace-preserving comparison. The painted 100x40/radius48 rect correctly uses20/20, while its overflow clip still uses48 with an implicit second axis. Share the normalized corners with overflow clips; refuse unequal clipped corners. Required checks: the four radius cases inspect both face and clip, transparent unequal clip refusal, native standard/small-card exports on Windows/tablet, source and cleanup invariants. The prior tablet small-card assertion was not a pass. The corrected checker now passes both native surfaces; details and correction of the premature claim are recorded in card-appearance-checks.md. A newly requested phone retry remains pending ADB authorization and is not a native pass.

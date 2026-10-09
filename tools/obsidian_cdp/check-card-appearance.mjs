@@ -116,11 +116,17 @@ try {
   assert.ok(receipt.export.saved, JSON.stringify(receipt.export.notices));
   assert.ok(receipt.export.saved.name.endsWith('.svg'));
   assert.ok(receipt.export.saved.paths > 0 && receipt.export.saved.texts > 0);
-  assert.ok(receipt.export.saved.text.includes('Launch card') && receipt.export.saved.text.includes('Outside'));
+  // Wrapped spaces can have zero-width Range boxes; compare the exported glyphs.
+  const visibleText = receipt.export.saved.text.replace(/\s+/gu, '');
+  assert.ok(['Launchcard', 'Secondcard', 'Outside'].every(text => visibleText.includes(text)));
   assert.equal(receipt.export.saved.foreign, 0);
   assert.equal(receipt.export.saved.images, 0);
   assert.ok(receipt.export.saved.radii.includes(String(rounded.value)));
-  if (smallCard) assert.ok(receipt.export.saved.cornerRects.some(rect => rect.width === '100' && rect.height === '40' && rect.rx === '20' && rect.ry === '20'));
+  if (smallCard) {
+    const smallRects = receipt.export.saved.cornerRects.filter(rect => rect.width === '100' && rect.height === '40');
+    assert.ok(smallRects.length >= 2);
+    assert.ok(smallRects.every(rect => rect.rx === '20' && rect.ry === '20'));
+  }
   assert.equal(receipt.export.sourceUnchanged, true);
   assert.equal(receipt.export.workers, 0);
   assert.equal(receipt.export.surfaces, 0);
@@ -133,7 +139,7 @@ try {
   try {
     receipt.restore = await checked(`document.querySelector('#card-appearance-native-control')?.remove();if(window.cardAppearancePrior?.controlScope){app.keymap.popScope(app.setting.scope);window.cardAppearancePrior.controlScope=false;}const prior=window.cardAppearancePrior;if(!prior)return false;const p=app.plugins.plugins['miro-canvas'];await p.saveCanvasSettings(prior.settings);if(prior.snippetPath){app.customCss.setCssEnabledStatus('miro-canvas-acceptance-indent',false);await app.vault.adapter.remove(prior.snippetPath);await app.customCss.readSnippets();await app.customCss.loadSnippets();}prior.noteLeaf?.detach();const f=app.vault.getAbstractFileByPath(prior.path);if(f)await app.workspace.getLeaf(false).openFile(f,{active:true});if(!app.isMobile)require('@electron/remote').getCurrentWindow().webContents.setBackgroundThrottling(true);delete window.cardAppearancePrior;return true;`);
   } finally {
-    writeFileSync(new URL(`native-${serial ?? 'Windows'}.json`, out), JSON.stringify(receipt, null, 2));
+    writeFileSync(new URL(`native-${serial ?? 'Windows'}${smallCard ? '-small' : ''}.json`, out), JSON.stringify(receipt, null, 2));
     if (!serial) await client.send('Emulation.setFocusEmulationEnabled', { enabled: false });
     client.close();
   }
