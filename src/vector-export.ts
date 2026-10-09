@@ -363,8 +363,13 @@ export async function serializeVectorTile(
       if (painted && radii.some(radius => radius !== radii[0])) unsupported("css:unequal-corner-radius");
       const radiusParts = (radii[0] || "0").split(" ");
       const radius = (value: string, length: number): number => value.endsWith("%") ? Number.parseFloat(value) * length / 100 : Number.parseFloat(value);
-      const rx = Math.min(box.width / 2, radius(radiusParts[0], box.width));
-      const ry = Math.min(box.height / 2, radius(radiusParts[1] ?? radiusParts[0], box.height));
+      const horizontal = radius(radiusParts[0], box.width);
+      const vertical = radius(radiusParts[1] ?? radiusParts[0], box.height);
+      if (![horizontal, vertical].every(value => Number.isFinite(value) && value >= 0)) unsupported("css:corner-radius");
+      // CSS shrinks both axes together when adjacent card corners overlap.
+      const factor = Math.min(1, box.width / (2 * horizontal), box.height / (2 * vertical));
+      const rx = horizontal * factor;
+      const ry = vertical * factor;
       const face = { x: 0, y: 0, width: box.width, height: box.height, rx, ry, transform: matrixText(box.matrix) };
       if (solid(style.backgroundColor)) content += rectangle({ ...face, fill: style.backgroundColor });
       const borders = ["Top", "Right", "Bottom", "Left"] as const;

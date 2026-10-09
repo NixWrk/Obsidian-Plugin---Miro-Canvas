@@ -64,7 +64,7 @@ payloads rather than writing attachments; SVG checks do write the attachment.
 No screen capture or foreground takeover is used for any export. Original
 paths/preferences are restored and the temporary acceptance snippet is removed.
 
-The final suite passes 3,097 tests with one existing skip, all types/builds,
+The final suite passes 3,102 tests with one existing skip, all types/builds,
 schema/submission, three synthetic smoke modes and 77 Python cases. Source lint
 has only the retained command-ID advisory; CSS has zero !important/:has.
 One design detector run reports three pre-existing CSS warnings and palette
@@ -73,3 +73,8 @@ sidecar advisories; none is introduced by the radius/value-field rules.
 Remaining broader cases: native imported/file/link card variants, every theme
 combination, editor-mode snippet styling and unsupported/global/popout cases.
 Unit/local Chromium coverage for these stays distinct from native acceptance.
+
+Final corner overlap follow-up: all 3,102 tests pass with the existing skip.
+Windows and tablet --small-card receipts additionally verify radius48 on a
+100x40 native card exports as rx20/ry20, with the same source/cleanup invariants.
+The standard-card receipt sizes above describe the earlier standard fixture.

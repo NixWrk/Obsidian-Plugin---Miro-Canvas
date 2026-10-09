@@ -256,6 +256,14 @@ Only vector-export.ts, vector-export tests and this register changed in that bat
 
 ## Parent native acceptance — 2026-10-09
 
+Before the final corner-overlap correction: uniform HTML radii larger than
+half a small card were capped independently by SVG width/height. CSS reduces
+both axes by one common factor, so a 48px radius on a 100x40 card becomes
+20x20, not 48x20. Required checks: circular and elliptical radii, percentages,
+zero radius, unsupported unresolved values, existing typography/arrow/layout
+and independent cleanup tests, full gates and native main-card export regression.
+Reference: [CSS corner overlap](https://drafts.csswg.org/css-backgrounds/#corner-overlap).
+
 The rebuilt module passes actual Obsidian Windows 1.14.4 and physical
 SM-X736B/Android16/Obsidian1.13.8 checks. Guarded saving writes SVG attachments
 in the test vaults: 76,632/78,055 bytes, 10 vector paths each, 61/60 text
@@ -266,3 +274,8 @@ camera and selection remain unchanged, and no job/background surface leaks.
 No screen capture or foreground activation is used. Input/preparation methods,
 old PDF/PPTX regressions and remaining broader cases are recorded in
 [card appearance checks](card-appearance-checks.md).
+
+Corner overlap correction complete: five focused cases cover circular,
+elliptical, percentage and zero radii plus unresolved-value refusal. Full types,
+3,102 tests, lint/build, all smoke modes and packaging gates pass. Real Windows
+and tablet small-card exports verify 100x40/radius48 gives rx20/ry20.

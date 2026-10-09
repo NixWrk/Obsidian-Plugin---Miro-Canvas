@@ -141,6 +141,25 @@ function unchanged(f: ReturnType<typeof fixture>) {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 describe("vector DOM serialization", () => {
+  it.each([
+    ["48px", 20, 20],
+    ["80px 20px", 50, 12.5],
+    ["100%", 50, 20],
+    ["0px", 0, 0],
+  ] as const)("normalizes overlapping uniform corners (%s) with one CSS factor", async (radius, rx, ry) => {
+    const f = fixture();
+    Object.assign(f.card.computed, { borderTopLeftRadius: radius, borderTopRightRadius: radius, borderBottomLeftRadius: radius, borderBottomRightRadius: radius });
+    const output = await serializeVectorTile(asHtml(f.wrapper), "corners", new AbortController().signal);
+    expect(output).toContain(`width="100" height="40" rx="${rx}" ry="${ry}"`);
+  });
+
+  it("refuses unresolved computed corner values instead of writing NaN geometry", async () => {
+    const f = fixture();
+    const radius = "calc(50% - 2px)";
+    Object.assign(f.card.computed, { borderTopLeftRadius: radius, borderTopRightRadius: radius, borderBottomLeftRadius: radius, borderBottomRightRadius: radius });
+    await expect(serializeVectorTile(asHtml(f.wrapper), "corners", new AbortController().signal)).rejects.toThrow("css:corner-radius");
+  });
+
   it("emits painted geometry and escaped, positioned text with prepared typography and radius", async () => {
     const f = fixture();
     Object.assign(f.card.computed, { borderTopLeftRadius: "12px", borderTopRightRadius: "12px", borderBottomLeftRadius: "12px", borderBottomRightRadius: "12px",

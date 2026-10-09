@@ -10,6 +10,7 @@ const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const port = Number(option('--port', '9346'));
 const serial = option('--serial');
+const smallCard = args.includes('--small-card');
 const client = await connectByTitle(port, serial ? 'Obsidian' : undefined);
 const run = promisify(execFile);
 const adb = 'C:/Program Files/VirtualTablet Server/adb/adb.exe';
@@ -28,8 +29,8 @@ async function checked(code) {
     return result;
   } finally { clearTimeout(timeout); }
 }
-async function tap(selector) {
-  const point = await checked(`const e=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.getBoundingClientRect().width>0);if(!e)throw Error('missing control');const r=e.getBoundingClientRect(),p={x:r.x+r.width/2,y:r.y+r.height/2};if(!e.contains(document.elementFromPoint(p.x,p.y)))throw Error('obscured control');return {...p,dpr:devicePixelRatio};`);
+async function tap(selector, end = false) {
+  const point = await checked(`const e=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.getBoundingClientRect().width>0);if(!e)throw Error('missing control');const r=e.getBoundingClientRect(),p={x:${end ? 'r.right - 2' : 'r.x+r.width/2'},y:r.y+r.height/2};if(!e.contains(document.elementFromPoint(p.x,p.y)))throw Error('obscured control');return {...p,dpr:devicePixelRatio};`);
   if (serial) {
     const focus = await run(adb, ['-s', serial, 'shell', 'dumpsys window'], { windowsHide: true, timeout: 12000, maxBuffer: 8 * 1024 * 1024 });
     assert.ok(focus.stdout.split('\n').find(line => line.includes('mCurrentFocus='))?.includes('md.obsidian/'));
@@ -55,7 +56,10 @@ try {
   }
   receipt.sdk = await captureNativeSdk(client.send);
   await checked(`window.cardAppearancePrior={path:app.workspace.getActiveFile()?.path,settings:structuredClone(app.plugins.plugins['miro-canvas'].canvasSettings),enabled:[...app.customCss.enabledSnippets]};if(!app.isMobile)require('@electron/remote').getCurrentWindow().webContents.setBackgroundThrottling(false);return true;`);
-  receipt.fixture = await checked(readFileSync(new URL('./canvas-enhancement-fixture.js', import.meta.url), 'utf8'));
+  let fixtureCode = readFileSync(new URL('./canvas-enhancement-fixture.js', import.meta.url), 'utf8');
+  if (smallCard) fixtureCode = fixtureCode.replace('width: 160, height: 110', 'width: 100, height: 40');
+  receipt.smallCard = smallCard;
+  receipt.fixture = await checked(fixtureCode);
   receipt.runtime = await checked(`return {vault:app.vault.getName(),mobile:app.isMobile,version:app.plugins.plugins['miro-canvas'].manifest.version,userAgent:navigator.userAgent};`);
   await checked(`await app.plugins.plugins['miro-canvas'].saveCanvasSettings({cardCornerRadius:0,allowedCanvasSnippets:[]});return true;`);
   await settle();
@@ -64,10 +68,10 @@ try {
   assert.equal(square.radius, '0px');
   receipt.checks.push({ name: 'square native text card', square });
   receipt.radiusControl = await mountControl('radius');
-  await tap('#card-appearance-native-control input[type="range"]');
+  await tap('#card-appearance-native-control input[type="range"]', smallCard);
   if (!serial) {
     await checked(`const input=document.querySelector('#card-appearance-native-control .miro-canvas-card-radius-value');input.focus();input.select();return true;`);
-    await client.send('Input.insertText', { text: '20' });
+    await client.send('Input.insertText', { text: smallCard ? '48' : '20' });
     await wait(350);
   }
   await checked(`document.querySelector('#card-appearance-native-control')?.remove();if(window.cardAppearancePrior?.controlScope){app.keymap.popScope(app.setting.scope);window.cardAppearancePrior.controlScope=false;}return true;`);
@@ -108,7 +112,7 @@ try {
   await checked(`await app.plugins.plugins['miro-canvas'].saveCanvasSettings({allowedCanvasSnippets:[]});return true;`);
   await wait(300);
   if (!serial) await checked(`require('@electron/remote').getCurrentWindow().webContents.setBackgroundThrottling(true);return true;`);
-  receipt.export = await checked(`const p=app.plugins.plugins['miro-canvas'],s=p.m1Session,c=s.view.canvas,f=app.workspace.getActiveFile(),before=await app.vault.read(f),read=()=>({x:c.x,y:c.y,tx:c.tx,ty:c.ty,zoom:c.zoom,tZoom:c.tZoom,selection:[...c.selection].map(n=>n.id),classes:c.wrapperEl.className,screenshotting:Boolean(c.screenshotting)}),baseline=read(),samples=[],notices=[],backgroundTransforms=[],generated=[];const old=s.exporting,notice=s.options.onNotice;let saved;const save=s.options.onSaveExport;const timer=setInterval(()=>{samples.push(read());if(backgroundTransforms.length===0){const host=document.querySelector('.miro-canvas-export-renderer');if(host){if(generated.length===0){for(const e of host.querySelectorAll('*')){if(e.closest('svg'))continue;for(const pseudo of ['::before','::after']){const st=getComputedStyle(e,pseudo);if(st.content&&st.content!=='none'&&st.content!=='normal')generated.push({tag:e.tagName,class:e.className,pseudo,content:st.content,display:st.display,width:st.width,height:st.height,color:st.color,background:st.backgroundColor});}}}const entries=[...host.querySelectorAll('svg,svg *')].map(e=>({tag:e.tagName,class:e.getAttribute('class'),attr:e.getAttribute('transform'),css:getComputedStyle(e).transform,origin:getComputedStyle(e).transformOrigin,box:getComputedStyle(e).transformBox,ctm:e.getCTM?.()?.toString(),html:e.outerHTML.slice(0,300)})).filter(e=>e.css&&e.css!=='none'&&!e.attr);if(entries.length)backgroundTransforms.push(...entries);}}},10);s.options.onNotice=m=>notices.push(m);s.options.onSaveExport=async(name,bytes,path)=>{const text=new TextDecoder().decode(bytes),xml=new DOMParser().parseFromString(text,'image/svg+xml');if(xml.querySelector('parsererror'))throw Error('invalid SVG XML');saved={name,size:bytes.length,text:xml.documentElement.textContent,paths:xml.querySelectorAll('path').length,texts:xml.querySelectorAll('text').length,images:xml.querySelectorAll('image').length,foreign:xml.querySelectorAll('foreignObject').length,radii:[...xml.querySelectorAll('rect[rx]')].map(e=>e.getAttribute('rx')),source:path};const savedPath=await save(name,bytes,path);saved.path=savedPath;return savedPath;};try{s.exporting={mode:'board',title:'Vector acceptance',state:{format:'free',orientation:'landscape',quality:'standard',pages:[{id:'page',x:0,y:0,width:1400,height:700}]},panel:{update(){},element:document.createElement('div')},overlay:{update(){}},stop:false};await s.runExport('svg');samples.push(read());return {saved,notices,generated,backgroundTransforms,baseline,samples,sourceUnchanged:await app.vault.read(f)===before,workers:p.exportJobs.size,surfaces:document.querySelectorAll('.miro-canvas-export-renderer').length};}finally{clearInterval(timer);s.exporting=old;s.options.onSaveExport=save;s.options.onNotice=notice;}`);
+  receipt.export = await checked(`const p=app.plugins.plugins['miro-canvas'],s=p.m1Session,c=s.view.canvas,f=app.workspace.getActiveFile(),before=await app.vault.read(f),read=()=>({x:c.x,y:c.y,tx:c.tx,ty:c.ty,zoom:c.zoom,tZoom:c.tZoom,selection:[...c.selection].map(n=>n.id),classes:c.wrapperEl.className,screenshotting:Boolean(c.screenshotting)}),baseline=read(),samples=[],notices=[],backgroundTransforms=[],generated=[];const old=s.exporting,notice=s.options.onNotice;let saved;const save=s.options.onSaveExport;const timer=setInterval(()=>{samples.push(read());if(backgroundTransforms.length===0){const host=document.querySelector('.miro-canvas-export-renderer');if(host){if(generated.length===0){for(const e of host.querySelectorAll('*')){if(e.closest('svg'))continue;for(const pseudo of ['::before','::after']){const st=getComputedStyle(e,pseudo);if(st.content&&st.content!=='none'&&st.content!=='normal')generated.push({tag:e.tagName,class:e.className,pseudo,content:st.content,display:st.display,width:st.width,height:st.height,color:st.color,background:st.backgroundColor});}}}const entries=[...host.querySelectorAll('svg,svg *')].map(e=>({tag:e.tagName,class:e.getAttribute('class'),attr:e.getAttribute('transform'),css:getComputedStyle(e).transform,origin:getComputedStyle(e).transformOrigin,box:getComputedStyle(e).transformBox,ctm:e.getCTM?.()?.toString(),html:e.outerHTML.slice(0,300)})).filter(e=>e.css&&e.css!=='none'&&!e.attr);if(entries.length)backgroundTransforms.push(...entries);}}},10);s.options.onNotice=m=>notices.push(m);s.options.onSaveExport=async(name,bytes,path)=>{const text=new TextDecoder().decode(bytes),xml=new DOMParser().parseFromString(text,'image/svg+xml');if(xml.querySelector('parsererror'))throw Error('invalid SVG XML');saved={name,size:bytes.length,text:xml.documentElement.textContent,paths:xml.querySelectorAll('path').length,texts:xml.querySelectorAll('text').length,images:xml.querySelectorAll('image').length,foreign:xml.querySelectorAll('foreignObject').length,radii:[...xml.querySelectorAll('rect[rx]')].map(e=>e.getAttribute('rx')),cornerRects:[...xml.querySelectorAll('rect[rx]')].map(e=>({width:e.getAttribute('width'),height:e.getAttribute('height'),rx:e.getAttribute('rx'),ry:e.getAttribute('ry')})),source:path};const savedPath=await save(name,bytes,path);saved.path=savedPath;return savedPath;};try{s.exporting={mode:'board',title:'Vector acceptance',state:{format:'free',orientation:'landscape',quality:'standard',pages:[{id:'page',x:0,y:0,width:1400,height:700}]},panel:{update(){},element:document.createElement('div')},overlay:{update(){}},stop:false};await s.runExport('svg');samples.push(read());return {saved,notices,generated,backgroundTransforms,baseline,samples,sourceUnchanged:await app.vault.read(f)===before,workers:p.exportJobs.size,surfaces:document.querySelectorAll('.miro-canvas-export-renderer').length};}finally{clearInterval(timer);s.exporting=old;s.options.onSaveExport=save;s.options.onNotice=notice;}`);
   assert.ok(receipt.export.saved, JSON.stringify(receipt.export.notices));
   assert.ok(receipt.export.saved.name.endsWith('.svg'));
   assert.ok(receipt.export.saved.paths > 0 && receipt.export.saved.texts > 0);
@@ -116,6 +120,7 @@ try {
   assert.equal(receipt.export.saved.foreign, 0);
   assert.equal(receipt.export.saved.images, 0);
   assert.ok(receipt.export.saved.radii.includes(String(rounded.value)));
+  if (smallCard) assert.ok(receipt.export.saved.cornerRects.some(rect => rect.width === '100' && rect.height === '40' && rect.rx === '20' && rect.ry === '20'));
   assert.equal(receipt.export.sourceUnchanged, true);
   assert.equal(receipt.export.workers, 0);
   assert.equal(receipt.export.surfaces, 0);
