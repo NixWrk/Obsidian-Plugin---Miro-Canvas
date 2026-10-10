@@ -304,10 +304,18 @@ export function keepPanelInView(panel: HTMLElement): void {
     && panel.parentElement != null) {
     const bar = toolbar.getBoundingClientRect();
     const host = panel.parentElement.getBoundingClientRect();
-    // Android's text-selection menu sits below the bar. Keep formatting above it.
-    setElementStyles(panel, { "top": "auto" });
-    panel.style.setProperty("bottom", `${Math.round(host.bottom - bar.top + 10)}px`);
-    panel.style.setProperty("max-height", `${Math.round(Math.max(44, bar.top - bounds.top - 18))}px`);
+    const above = Math.max(44, bar.top - bounds.top - 18);
+    const below = Math.max(44, bounds.bottom - bar.bottom - 18);
+    if (panel.getAttribute?.("data-miro-action-menu") === "true" && below > above) {
+      setElementStyles(panel, { "bottom": "auto" });
+      panel.style.setProperty("top", `${Math.round(bar.bottom - host.top + 10)}px`);
+      panel.style.setProperty("max-height", `${Math.round(below)}px`);
+    } else {
+      // Formatting stays above Android's text-selection menu.
+      setElementStyles(panel, { "top": "auto" });
+      panel.style.setProperty("bottom", `${Math.round(host.bottom - bar.top + 10)}px`);
+      panel.style.setProperty("max-height", `${Math.round(above)}px`);
+    }
     panel.setAttribute("data-keyboard-popover", "true");
   }
   const rect = panel.getBoundingClientRect();
@@ -889,6 +897,7 @@ export class SelectionToolbar {
     const more = this.makePopover(lastGroup, words().toolbar.more, "miro-canvas-toolbar__button--more");
     this.icon(more.button, "more-vertical", "⋮");
     more.panel.className += " miro-canvas-toolbar__panel--actions";
+    more.panel.setAttribute("data-miro-action-menu", "true");
     const layerSection = append(more.panel, make(document, "div", "miro-canvas-toolbar__menu-section"));
     const layerRow = this.block(layerSection, words().layer.menu, "miro-canvas-toolbar__menu-list");
     const layerOptions = layerActions().map(({ direction, label, icon }) => {

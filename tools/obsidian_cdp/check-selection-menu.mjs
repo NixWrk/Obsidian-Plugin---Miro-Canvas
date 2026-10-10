@@ -115,13 +115,27 @@ try {
   receipt.edit = await checked(`const n=app.workspace.activeLeaf.view.canvas.nodes.get('a');return {classes:n.nodeEl.className,focused:n.nodeEl.contains(document.activeElement),editing:n.isEditing};`);
   assert.ok(receipt.edit.editing === true || receipt.edit.classes.includes('is-editing') || receipt.edit.focused);
   receipt.checks.push('native edit handler enters editor');
+  if (serial) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (await checked("return parseFloat(getComputedStyle(document.body).getPropertyValue('--keyboard-height'))>0;")) break;
+      await wait(200);
+    }
+    if (await checked('return document.querySelector(".miro-canvas-toolbar__panel--actions").hidden;')) await tap('.miro-canvas-toolbar__button--more');
+    receipt.keyboardMenu = await checked("const p=document.querySelector('.miro-canvas-toolbar__panel--actions'),b=p.closest('.miro-canvas-root');return {panel:p.getBoundingClientRect().toJSON(),board:b.getBoundingClientRect().toJSON(),keyboard:getComputedStyle(document.body).getPropertyValue('--keyboard-height')};");
+    assert.ok(parseFloat(receipt.keyboardMenu.keyboard) > 0);
+    assert.ok(receipt.keyboardMenu.panel.top >= receipt.keyboardMenu.board.top + 7);
+    assert.ok(receipt.keyboardMenu.panel.bottom <= receipt.keyboardMenu.board.bottom - 7);
+    receipt.checks.push('ADB Edit then More stays inside keyboard-constrained board');
+  }
   await checked(`app.workspace.activeLeaf.view.canvas.nodes.get('a').blur();return true;`);
   if (serial) {
     const keyboard = await run(adb, ['-s', serial, 'shell', 'dumpsys', 'input_method'], { windowsHide: true, timeout: 12000 });
     if (/mInputShown=true/u.test(keyboard.stdout)) await run(adb, ['-s', serial, 'shell', 'input', 'keyevent', '4'], { windowsHide: true, timeout: 12000 });
   }
   await wait(500);
-  await checked("const c=app.workspace.activeLeaf.view.canvas;c.selectOnly(c.edges.get('e'));app.plugins.plugins['miro-canvas'].m1Session.refresh();return true;");
+  await checked(`if(app.workspace.getActiveFile()?.path!==${JSON.stringify(receipt.fixture.path)})await app.workspace.getLeaf(false).openFile(app.vault.getAbstractFileByPath(${JSON.stringify(receipt.fixture.path)}),{active:true});return true;`);
+  await wait(400);
+  await checked("const c=app.workspace.activeLeaf.view.canvas;const edge=c.edges.get('e');if(!edge)throw Error('fixture edge missing');c.selectOnly(edge);app.plugins.plugins['miro-canvas'].m1Session.refresh();return true;");
   await tap('.miro-canvas-toolbar__button--more');
   receipt.edge = await layout();
   assert.ok(!receipt.edge.buttons.some(row => ['front', 'forward', 'backward', 'back'].some(value => row.name === value)));

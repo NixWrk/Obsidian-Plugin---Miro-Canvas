@@ -929,6 +929,42 @@ describe("keepPanelInView", () => {
     expect(attributes.has("data-keyboard-popover")).toBe(false);
   });
 
+  it.each([140, 720])("keeps keyboard action menus inside the side with more room (bar %s)", (barTop) => {
+    const style = new Map<string, string>();
+    const attributes = new Map([["data-miro-action-menu", "true"]]);
+    let keyboard = true;
+    const board = {
+      getAttribute: () => keyboard ? "open" : null,
+      getBoundingClientRect: () => ({ left: 0, top: 122, right: 753, bottom: 804 }),
+    };
+    const toolbar = { getAttribute: () => "true", getBoundingClientRect: () => ({ top: barTop, bottom: barTop + 40 }) };
+    const panel = {
+      style: { setProperty: (name: string, value: string) => style.set(name, value), removeProperty: (name: string) => style.delete(name) },
+      getAttribute: (name: string) => attributes.get(name) ?? null,
+      setAttribute: (name: string, value: string) => attributes.set(name, value),
+      removeAttribute: (name: string) => attributes.delete(name),
+      parentElement: { getBoundingClientRect: () => ({ top: barTop, bottom: barTop + 40 }) },
+      closest: (selector: string) => selector === ".miro-canvas-root" ? board : toolbar,
+      getBoundingClientRect: () => {
+        const height = Math.min(440, Number.parseFloat(style.get("max-height") ?? "440"));
+        const top = style.get("top") !== "auto" && style.has("top")
+          ? barTop + Number.parseFloat(style.get("top")!)
+          : barTop + 40 - Number.parseFloat(style.get("bottom") ?? "0") - height;
+        return { left: 460, right: 740, top, bottom: top + height };
+      },
+    };
+    keepPanelInView(panel as unknown as HTMLElement);
+    const rect = panel.getBoundingClientRect();
+    expect(rect.top).toBeGreaterThanOrEqual(130);
+    expect(rect.bottom).toBeLessThanOrEqual(796);
+    expect(style.get(barTop === 140 ? "bottom" : "top")).toBe("auto");
+    keyboard = false;
+    keepPanelInView(panel as unknown as HTMLElement);
+    expect(style.has("top")).toBe(false);
+    expect(style.has("bottom")).toBe(false);
+    expect(attributes.has("data-keyboard-popover")).toBe(false);
+  });
+
   it("cuts a panel longer than the strip the keyboard leaves, so it scrolls", () => {
     expect(panelAt(100, 342, 200, 170).get("max-height")).toBe("125px");
   });

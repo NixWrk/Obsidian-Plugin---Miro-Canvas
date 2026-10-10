@@ -2457,4 +2457,4 @@ Rectangular figures now use equal physical corner radii. The selected figure own
 
 ### Selection More actions (2026-10-10)
 
-More uses labelled full-width rows, preserving adopted native buttons and their handlers. Native captions follow aria-label; an owned watcher removes captions/attributes and restores native ordering on disposal. Delete is last in DOM and visual order. Coarse-pointer sizing is independent of Obsidian device classes. See [selection menu checks](selection-menu-checks.md) for native receipts and pending cases.
+More uses labelled full-width rows, preserving adopted native buttons and their handlers. Native captions follow aria-label; an owned watcher removes captions/attributes and restores native ordering on disposal. Delete is last in DOM and visual order. Coarse-pointer sizing is independent of Obsidian device classes. With the keyboard open, More chooses the side with more board room; formatting pickers keep their existing placement. See [selection menu checks](selection-menu-checks.md) for native receipts and pending cases.

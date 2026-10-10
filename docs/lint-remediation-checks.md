@@ -2181,3 +2181,7 @@ recorded separately from synthetic/unit proof. No export/screenshot concurrency.
 Full results belong in selection-menu-checks.md; unverified scenarios stay pending.
 
 Final menu results: [selection menu checks](selection-menu-checks.md). Native Android ADB and Windows renderer input are distinguished; remaining native matrix is explicit.
+
+Keyboard follow-up before edit: real tablet final capture has IME400.94116px and More clipped above the board after native Edit. keepPanelInView forces every keyboard popover above the toolbar; long action lists need the side with more available board room. Change only marked More, preserve formatting pickers, cap/scroll within bounds and restore inline placement when IME closes. Mandatory: native ADB Edit→More with keyboard, both side choices and reset unit checks.
+
+Keyboard follow-up passed: two side/reset unit cases and real SM-X736B ADB Edit→More with IME400.94116px; original file bytes remain exact. See selection-menu-checks.md.
