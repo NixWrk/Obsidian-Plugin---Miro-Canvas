@@ -222,8 +222,9 @@ test("generated notes link matching plugin and tools releases and keep Node-only
   assert.match(notes.run, /Node 20\+ outside the Obsidian plugin folder/u);
   assert.ok(steps.indexOf(notes) < steps.indexOf(stepNamed("Create companion tools prerelease")));
   const readme = await readFile(new URL("../mcp/README.md", import.meta.url), "utf8");
+  const manifest = JSON.parse(await readFile(new URL("../manifest.json", import.meta.url), "utf8"));
   for (const asset of ["miro-canvas-cli.mjs", "miro-canvas-mcp.mjs"]) {
-    assert.ok(readme.includes(`/releases/download/tools-0.3.1/${asset}`));
+    assert.ok(readme.includes(`/releases/download/tools-${manifest.version}/${asset}`));
   }
   assert.match(readme, /tools-<plugin-version>/u);
   assert.match(readme, /Earlier downloads remain/u);

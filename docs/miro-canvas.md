@@ -2531,3 +2531,6 @@ Radius controls in0.3.0 appear from the configured global minimum displayed zoom
 
 
 Release0.3.1 keeps the mobile plugin below5MB through lossless offline PDF-font compression and excludes unused external-viewer/script-loader code at build time. CLI/MCP remain available from a separate companion tools release. [Packaging checks](release-0.3.1-checks.md).
+
+
+Release0.3.2 removes the no-op Range.detach call from vector glyph measurement. The remaining Node/config/legacy command warnings have their standalone/compatibility reasons documented; they do not justify importing Obsidian into the Node tools.
