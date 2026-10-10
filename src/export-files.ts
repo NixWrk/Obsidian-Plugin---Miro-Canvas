@@ -438,7 +438,7 @@ const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships
 const PKG_REL = "http://schemas.openxmlformats.org/package/2006/relationships";
 const FIXED_DATE = "1980-01-01T00:00:00Z"; // deterministic output, same spirit as the ZIP's fixed DOS date
 
-function contentTypesXml(slideCount: number): string {
+function contentTypesXml(slideCount: number, vector = false): string {
   const slideOverrides = Array.from({ length: slideCount }, (_, i) =>
     `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
@@ -446,6 +446,7 @@ function contentTypesXml(slideCount: number): string {
     `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
     `<Default Extension="xml" ContentType="application/xml"/>` +
     `<Default Extension="jpeg" ContentType="image/jpeg"/>` +
+    (vector ? `<Default Extension="svg" ContentType="image/svg+xml"/>` : "") +
     `<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>` +
     `<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>` +
     `<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>` +
@@ -606,12 +607,21 @@ const SLIDE_LAYOUT_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="
   `<Relationship Id="rId1" Type="${REL}/slideMaster" Target="../slideMasters/slideMaster1.xml"/>` +
   `</Relationships>`;
 
-function slideXml(page: ExportPage, picture: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): string {
+function slideXml(
+  page: ExportPage,
+  picture: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  vector = false,
+): string {
   const descr = hasTitle(page) ? ` descr="${xmlEscape(page.title)}"` : "";
   const x = toEmu(picture.x);
   const y = toEmu(picture.y);
   const cx = toEmu(picture.width);
   const cy = toEmu(picture.height);
+  const blip = vector
+    ? `<a:blip r:embed="rId1"><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}">` +
+      `<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rId3"/>` +
+      `</a:ext></a:extLst></a:blip>`
+    : `<a:blip r:embed="rId1"/>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
     `<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${REL}" ` +
     `xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">` +
@@ -619,7 +629,7 @@ function slideXml(page: ExportPage, picture: { readonly x: number; readonly y: n
     `<p:pic>` +
     `<p:nvPicPr><p:cNvPr id="2" name="Picture 1"${descr}/>` +
     `<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
-    `<p:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+    `<p:blipFill>${blip}<a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
     `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
     `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>` +
     `</p:pic>` +
@@ -628,18 +638,22 @@ function slideXml(page: ExportPage, picture: { readonly x: number; readonly y: n
     `</p:sld>`;
 }
 
-function slideRelsXml(slideNumber: number): string {
+function slideRelsXml(slideNumber: number, vector = false): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
     `<Relationships xmlns="${PKG_REL}">` +
     `<Relationship Id="rId1" Type="${REL}/image" Target="../media/image${slideNumber}.jpeg"/>` +
     `<Relationship Id="rId2" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>` +
+    (vector ? `<Relationship Id="rId3" Type="${REL}/image" Target="../media/image${slideNumber}.svg"/>` : "") +
     `</Relationships>`;
 }
 
 /** A PowerPoint presentation (.pptx) with one slide per entry. */
 export function makePptx(pages: readonly ExportPage[], info: ExportInfo = {}): Uint8Array {
   validatePages(pages);
+  return packPptx(pages, info);
+}
 
+function packPptx(pages: readonly ExportPage[], info: ExportInfo, vectors?: readonly Uint8Array[]): Uint8Array {
   // PowerPoint has one slide size for the whole file; the first page sets it.
   const slideWidthPt = pages[0].width;
   const slideHeightPt = pages[0].height;
@@ -649,7 +663,7 @@ export function makePptx(pages: readonly ExportPage[], info: ExportInfo = {}): U
   const files: { path: string; data: Uint8Array }[] = [];
   const addXml = (path: string, xml: string): void => { files.push({ path, data: UTF8_ENCODER.encode(xml) }); };
 
-  addXml("[Content_Types].xml", contentTypesXml(pages.length));
+  addXml("[Content_Types].xml", contentTypesXml(pages.length, vectors !== undefined));
   addXml("_rels/.rels", ROOT_RELS_XML);
   addXml("docProps/core.xml", corePropsXml(info));
   addXml("docProps/app.xml", appPropsXml(pages));
@@ -667,10 +681,252 @@ export function makePptx(pages: readonly ExportPage[], info: ExportInfo = {}): U
   pages.forEach((page, index) => {
     const n = index + 1;
     const picture = slidePicture(page, slideWidthPt, slideHeightPt);
-    addXml(`ppt/slides/slide${n}.xml`, slideXml(page, picture));
-    addXml(`ppt/slides/_rels/slide${n}.xml.rels`, slideRelsXml(n));
+    addXml(`ppt/slides/slide${n}.xml`, slideXml(page, picture, vectors !== undefined));
+    addXml(`ppt/slides/_rels/slide${n}.xml.rels`, slideRelsXml(n, vectors !== undefined));
     files.push({ path: `ppt/media/image${n}.jpeg`, data: page.image });
+    if (vectors !== undefined) files.push({ path: `ppt/media/image${n}.svg`, data: vectors[index] });
   });
 
   return makeZip(files);
+}
+
+/** A vector slide with a JPEG rendered from the same SVG for older readers. */
+export interface VectorPptxPage extends ExportPage {
+  readonly svg: string;
+}
+
+const PPTX_SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+const MAX_VECTOR_PPTX_PAGES = 200;
+const MAX_VECTOR_PPTX_SVG_BYTES = 32 * 1024 * 1024;
+const MAX_VECTOR_PPTX_MEDIA_BYTES = 64 * 1024 * 1024;
+const MAX_VECTOR_PPTX_ELEMENTS = 200_000;
+const MAX_VECTOR_PPTX_DEPTH = 128;
+const MAX_VECTOR_PPTX_EXPANSION = 1_000_000;
+const PPTX_SVG_TAGS = new Set([
+  "svg", "g", "defs", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image",
+  "text", "tspan", "marker", "clipPath", "linearGradient", "radialGradient", "stop", "title", "desc", "use",
+]);
+const PPTX_SVG_ATTRIBUTES = new Set([
+  "xmlns", "xmlns:xlink", "xml:space", "id", "d", "points", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry",
+  "width", "height", "viewBox", "preserveAspectRatio", "transform", "markerWidth", "markerHeight", "markerUnits", "refX", "refY",
+  "orient", "offset", "gradientUnits", "gradientTransform", "spreadMethod", "clipPathUnits", "dx", "dy", "rotate", "textLength",
+  "lengthAdjust", "href", "xlink:href", "overflow", "data-miro-page", "data-miro-raster-attachment",
+  "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin",
+  "stroke-miterlimit", "fill-rule", "clip-rule", "opacity", "fill-opacity", "stroke-opacity", "color", "font-family", "font-size",
+  "font-weight", "font-style", "font-variant", "letter-spacing", "word-spacing", "text-decoration", "text-anchor",
+  "dominant-baseline", "marker-start", "marker-mid", "marker-end", "clip-path", "stop-color", "stop-opacity", "paint-order", "vector-effect",
+]);
+const PPTX_SVG_URL_ATTRIBUTES = new Set(["fill", "stroke", "clip-path", "marker-start", "marker-mid", "marker-end"]);
+const PPTX_SVG_ID = /^[A-Za-z_][A-Za-z0-9_.:-]*$/u;
+
+function invalidVectorSlide(page: number, reason: string): never {
+  throw new Error(`Vector PowerPoint page ${page}: ${reason}.`);
+}
+
+function isXmlCharacter(point: number): boolean {
+  return point === 9 || point === 10 || point === 13 || point >= 0x20 && point <= 0xd7ff
+    || point >= 0xe000 && point <= 0xfffd || point >= 0x10000 && point <= 0x10ffff;
+}
+
+/** No DTD, custom entities or namespace aliases are accepted in the generated subset. */
+function svgXmlValue(value: string, page: number): string {
+  const entities: Readonly<Record<string, string>> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+  return value.replace(/&[^&;]*;|&/gu, entity => {
+    const name = entity.slice(1, -1);
+    if (entity !== "&" && Object.prototype.hasOwnProperty.call(entities, name)) return entities[name];
+    if (entity !== "&" && /^#(?:[0-9]{1,7}|x[0-9a-fA-F]{1,6})$/u.test(name)) {
+      const point = name.startsWith("#x") ? Number.parseInt(name.slice(2), 16) : Number.parseInt(name.slice(1), 10);
+      if (isXmlCharacter(point)) return String.fromCodePoint(point);
+    }
+    return invalidVectorSlide(page, "unsupported XML entity");
+  });
+}
+
+function validateSvgAttribute(tag: string, name: string, value: string, page: number): void {
+  if (!PPTX_SVG_ATTRIBUTES.has(name)) invalidVectorSlide(page, `unsupported SVG attribute ${name}`);
+  if (name === "xmlns" && value !== PPTX_SVG_NAMESPACE
+    || name === "xmlns:xlink" && value !== "http://www.w3.org/1999/xlink") {
+    invalidVectorSlide(page, "unsupported SVG namespace");
+  }
+  if (name === "id" && !PPTX_SVG_ID.test(value)) invalidVectorSlide(page, "invalid SVG id");
+  if (name === "href" || name === "xlink:href") {
+    if (tag === "image") {
+      // Native attachment serialization emits PNG; JPEG is also a safe raster resource.
+      const raster = /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/u;
+      if (!raster.test(value) || (value.length - value.indexOf(",") - 1) % 4 !== 0 || !(value.startsWith("data:image/png;base64,iVBORw0KGgo") || value.startsWith("data:image/jpeg;base64,/9j/"))) {
+        invalidVectorSlide(page, "image must be an embedded PNG or JPEG");
+      }
+    } else if (!["use", "linearGradient", "radialGradient"].includes(tag) || !value.startsWith("#") || !PPTX_SVG_ID.test(value.slice(1))) {
+      invalidVectorSlide(page, "only local SVG definition references are supported");
+    }
+  }
+  if (PPTX_SVG_URL_ATTRIBUTES.has(name)) {
+    // These are presentation attributes, never arbitrary CSS declarations.
+    if (/[\\;@]/u.test(value) || /url/i.test(value)
+      && !/^url\([ \t]*(?:#[A-Za-z_][A-Za-z0-9_.:-]*|"#[A-Za-z_][A-Za-z0-9_.:-]*"|'#[A-Za-z_][A-Za-z0-9_.:-]*')[ \t]*\)$/u.test(value)) {
+      invalidVectorSlide(page, "only local SVG paint references are supported");
+    }
+  }
+}
+
+/** Worker-safe validation of our static SVG output, not an arbitrary SVG importer. */
+function validatePptxSvg(svg: string, page: number): void {
+  for (const character of svg) {
+    if (!isXmlCharacter(character.codePointAt(0)!)) invalidVectorSlide(page, "invalid XML character");
+  }
+  let offset = 0;
+  if (svg.startsWith("<?xml")) {
+    const declaration = /^<\?xml version=(?:"1\.0"|'1\.0')(?: encoding=(?:"UTF-8"|'UTF-8'))?(?: standalone=(?:"yes"|'yes'))?\?>/u.exec(svg);
+    if (declaration === null) invalidVectorSlide(page, "unsupported XML declaration");
+    offset = declaration[0].length;
+  }
+  const stack: Array<{ tag: string; node: number }> = [];
+  const nodes: Array<{ children: number[]; references: string[] }> = [];
+  const ids = new Map<string, number>();
+  let rootSeen = false;
+  let elements = 0;
+  const opening = /<([A-Za-z][A-Za-z0-9]*)/uy;
+  const closing = /<\/([A-Za-z][A-Za-z0-9]*)[ \t\r\n]*>/uy;
+  const ending = /[ \t\r\n]*(\/?>)/uy;
+  const attribute = /[ \t\r\n]+([A-Za-z_][A-Za-z0-9_.:-]*)[ \t\r\n]*=[ \t\r\n]*(?:"([^"<]*)"|'([^'<]*)')/uy;
+  while (offset < svg.length) {
+    if (svg[offset] !== "<") {
+      const end = svg.indexOf("<", offset);
+      const raw = svg.slice(offset, end === -1 ? svg.length : end);
+      if (stack.length === 0 && /[^ \t\r\n]/u.test(raw)) invalidVectorSlide(page, "text outside SVG root");
+      if (raw.includes("]]>") || svgXmlValue(raw, page).trim() !== "" && !["text", "tspan", "title", "desc"].includes(stack[stack.length - 1]?.tag)) {
+        invalidVectorSlide(page, "unexpected SVG text");
+      }
+      offset += raw.length;
+      continue;
+    }
+    if (svg.startsWith("</", offset)) {
+      closing.lastIndex = offset;
+      const match = closing.exec(svg);
+      if (match === null || stack.pop()?.tag !== match[1]) invalidVectorSlide(page, "mismatched SVG closing tag");
+      offset = closing.lastIndex;
+      continue;
+    }
+    opening.lastIndex = offset;
+    const match = opening.exec(svg);
+    if (match === null || !PPTX_SVG_TAGS.has(match[1])) invalidVectorSlide(page, "unsupported SVG element");
+    const tag = match[1];
+    const root = stack.length === 0;
+    if (root && (rootSeen || tag !== "svg")) invalidVectorSlide(page, "expected one SVG root");
+    rootSeen = true;
+    const node = nodes.length;
+    nodes.push({ children: [], references: [] });
+    if (stack.length > 0) nodes[stack[stack.length - 1].node].children.push(node);
+    elements += 1;
+    if (elements > MAX_VECTOR_PPTX_ELEMENTS || stack.length >= MAX_VECTOR_PPTX_DEPTH) invalidVectorSlide(page, "SVG structure budget exceeded");
+    offset = opening.lastIndex;
+    const values = new Map<string, string>();
+    let selfClosing = false;
+    while (true) {
+      ending.lastIndex = offset;
+      const end = ending.exec(svg);
+      if (end !== null) {
+        selfClosing = end[1] === "/>";
+        offset = ending.lastIndex;
+        break;
+      }
+      attribute.lastIndex = offset;
+      const found = attribute.exec(svg);
+      if (found === null || values.has(found[1]) || values.size >= 64) invalidVectorSlide(page, "invalid SVG attribute syntax");
+      const value = svgXmlValue(found[2] ?? found[3], page);
+      validateSvgAttribute(tag, found[1], value, page);
+      values.set(found[1], value);
+      if (found[1] === "id") {
+        if (ids.has(value)) invalidVectorSlide(page, "duplicate SVG id");
+        ids.set(value, node);
+      }
+      if (found[1] === "href" && value.startsWith("#")) nodes[node].references.push(value.slice(1));
+      if (PPTX_SVG_URL_ATTRIBUTES.has(found[1]) && value.startsWith("url(")) {
+        const target = /#([A-Za-z_][A-Za-z0-9_.:-]*)/u.exec(value);
+        if (target !== null) nodes[node].references.push(target[1]);
+      }
+      offset = attribute.lastIndex;
+    }
+    if (root && values.get("xmlns") !== PPTX_SVG_NAMESPACE) invalidVectorSlide(page, "SVG root namespace is required");
+    if (values.has("xlink:href")) invalidVectorSlide(page, "use canonical href instead of xlink aliases");
+    if ((tag === "image" || tag === "use") && !values.has("href")) invalidVectorSlide(page, `SVG ${tag} has no href`);
+    if (!selfClosing) stack.push({ tag, node });
+  }
+  if (!rootSeen || stack.length !== 0) invalidVectorSlide(page, "incomplete SVG document");
+  for (const node of nodes) {
+    for (const id of node.references) {
+      const target = ids.get(id);
+      if (target === undefined) invalidVectorSlide(page, "missing local SVG definition");
+      node.children.push(target);
+    }
+  }
+  // Static use/paint references must not turn a small XML tree into recursive work.
+  const state = new Uint8Array(nodes.length);
+  const costs = new Uint32Array(nodes.length);
+  const pending = [{ node: 0, child: 0, cost: 1 }];
+  state[0] = 1;
+  while (pending.length > 0) {
+    const frame = pending[pending.length - 1];
+    const children = nodes[frame.node].children;
+    if (frame.child === children.length) {
+      costs[frame.node] = frame.cost;
+      state[frame.node] = 2;
+      pending.pop();
+      continue;
+    }
+    const child = children[frame.child];
+    if (state[child] === 1) invalidVectorSlide(page, "cyclic local SVG definition");
+    if (state[child] === 0) {
+      if (pending.length >= MAX_VECTOR_PPTX_DEPTH) invalidVectorSlide(page, "SVG reference depth budget exceeded");
+      state[child] = 1;
+      pending.push({ node: child, child: 0, cost: 1 });
+    } else {
+      frame.child += 1;
+      frame.cost += costs[child];
+      if (frame.cost > MAX_VECTOR_PPTX_EXPANSION) invalidVectorSlide(page, "SVG reference expansion budget exceeded");
+    }
+  }
+}
+
+/** SVG per slide for Office 2019+, with the supplied JPEG as the main blip fallback. */
+export function makeVectorPptx(pages: readonly VectorPptxPage[], info: ExportInfo = {}): Uint8Array {
+  if (pages.length > MAX_VECTOR_PPTX_PAGES) throw new Error("Vector PowerPoint page budget exceeded (200).");
+  validatePages(pages);
+  for (const value of [info.title, info.author, ...pages.map(page => page.title)]) {
+    if (value === undefined) continue;
+    if (value.length > 65_536) throw new Error("Vector PowerPoint metadata budget exceeded.");
+    for (const character of value) {
+      if (!isXmlCharacter(character.codePointAt(0)!)) throw new Error("Vector PowerPoint metadata has an invalid XML character.");
+    }
+  }
+  let svgBytes = 0;
+  let mediaBytes = 0;
+  const vectors = pages.map((page, index) => {
+    const number = index + 1;
+    if (typeof page.svg !== "string" || page.svg.length === 0) invalidVectorSlide(number, "missing SVG");
+    if (page.svg.length > MAX_VECTOR_PPTX_SVG_BYTES) invalidVectorSlide(number, "SVG byte budget exceeded");
+    const bytes = UTF8_ENCODER.encode(page.svg);
+    svgBytes += bytes.length;
+    mediaBytes += bytes.length + page.image.length;
+    if (svgBytes > MAX_VECTOR_PPTX_SVG_BYTES || mediaBytes > MAX_VECTOR_PPTX_MEDIA_BYTES) {
+      invalidVectorSlide(number, "SVG/media byte budget exceeded");
+    }
+    validatePptxSvg(page.svg, number);
+    const jpeg = jpegSize(page.image);
+    if (jpeg === undefined || jpeg.width !== page.pixelWidth || jpeg.height !== page.pixelHeight) {
+      invalidVectorSlide(number, "JPEG fallback dimensions do not match");
+    }
+    const placement = resolvedPlacement(page);
+    if (![placement.x, placement.y, placement.width, placement.height].every(Number.isFinite) || placement.width <= 0 || placement.height <= 0
+      || ![page.width, page.height, Math.abs(placement.x), Math.abs(placement.y), placement.width, placement.height].every(value => Number.isSafeInteger(toEmu(value)))) {
+      invalidVectorSlide(number, "invalid slide placement");
+    }
+    const picture = slidePicture(page, pages[0].width, pages[0].height);
+    if (![page.width, page.height, picture.width, picture.height].every(value => toEmu(value) > 0)
+      || ![picture.x, picture.y, picture.width, picture.height].every(value => Number.isSafeInteger(toEmu(value)))) {
+      invalidVectorSlide(number, "invalid fitted slide geometry");
+    }
+    return bytes;
+  });
+  return packPptx(pages, info, vectors);
 }

@@ -34,6 +34,8 @@
  */
 
 import { words } from "./i18n";
+import { EN } from "./locales/en";
+import { RU } from "./locales/ru";
 import { hasAsciiControl } from "./control-characters";
 
 export const DEFAULT_FONT_FAMILY = "Inter" as const;
@@ -236,6 +238,12 @@ export function defaultPalette(): readonly PaletteColor[] {
   const names = words().palette.builtin;
   return Object.freeze(BUILTIN_PALETTE_SWATCHES.map(({ id, color, source, key }) =>
     Object.freeze({ id, label: names[key], color, source })));
+}
+
+/** Localization does not turn an old default palette into an individual one. */
+export function isBuiltinPaletteLabel(id: string, label: string): boolean {
+  const swatch = BUILTIN_PALETTE_SWATCHES.find((entry) => entry.id === id);
+  return swatch !== undefined && (EN.palette.builtin[swatch.key] === label || RU.palette.builtin[swatch.key] === label);
 }
 
 type UnknownRecord = Record<string, unknown>;

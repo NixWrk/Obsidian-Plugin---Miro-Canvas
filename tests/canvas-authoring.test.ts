@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { commentSelectionId } from "../src/board-selection";
+import { planFlipBoardEdges } from "../src/board-edge-actions";
+import type { CanvasAnchor } from "../src/anchors";
+import type { BoardConnector } from "../src/board-connectors";
 
 import {
 	createCanvasAuthoring,
@@ -324,6 +327,374 @@ function endpointDocument(): CanvasDocument {
 		},
 	};
 }
+
+describe("checked feature document transactions", () => {
+	// Feature plans change a whole board; only NativeGraph models native import/history here.
+	function document() {
+		const base = endpointDocument();
+		const held = (t: number): CanvasAnchor => ({ type: "edge", edgeId: "e1", t, futureAnchor: "kept" });
+		return {
+			...base,
+			futureRootField: base.futureRootField,
+			nodes: base.nodes as CanvasDocument[],
+			edges: base.edges as CanvasDocument[],
+			miroSource: {
+				...(base.miroSource as CanvasDocument),
+				board: (base.miroSource as CanvasDocument).board,
+				comments: [{ id: "source-pin", text: "Imported evidence", anchor: held(0.7), messages: [] }],
+			},
+			miroCanvas: {
+				schemaVersion: 1,
+				futureMetadataField: ["keep"],
+				localOverrides: {
+					e1: { connector: { route: "straight", startCap: "diamond", endCap: "arrow", labelT: 0.2 }, futureOverrideField: "kept" },
+				} as Record<string, CanvasDocument>,
+				connectors: {
+					conn: { id: "conn", from: held(0.25), to: { type: "free", x: 320, y: 160 }, route: "straight", color: "#123456", width: 2, startCap: "none", endCap: "arrow", futureConnector: ["keep"] },
+					chain: { id: "chain", from: { type: "edge", edgeId: "conn", t: 0.3 }, to: { type: "free", x: 500, y: 240 }, route: "straight", color: "#123456", width: 2, startCap: "none", endCap: "none" },
+				} as Record<string, BoardConnector>,
+				localComments: [{ id: "pin", origin: "local", text: "Discussion", anchor: held(0.25), replies: [], futureComment: "kept" }] as CanvasDocument[],
+				commentPlaces: { "local:pin": held(0.4), "imported:source-pin": held(0.8) } as Record<string, CanvasAnchor>,
+				commentDecorations: {} as Record<string, CanvasDocument>,
+				freeAnchors: { loose: held(0.2) } as Record<string, CanvasAnchor>,
+			},
+		};
+	}
+	type FeatureDocument = ReturnType<typeof document>;
+	function flip(before: FeatureDocument): FeatureDocument {
+		const plan = planFlipBoardEdges(before, ["e1", "conn"]);
+		expect(plan.ok, JSON.stringify(plan.diagnostics)).toBe(true);
+		if (!plan.ok) throw new Error(plan.reason);
+		return plan.document as FeatureDocument;
+	}
+	function expectUnwritten(runtime: NativeGraph, before: CanvasDocument): void {
+		expect(runtime.getData()).toEqual(before);
+		expect(runtime.importDataSpy).not.toHaveBeenCalled();
+		expect(runtime.requestSaveSpy).not.toHaveBeenCalled();
+		expect(runtime.history).toEqual([before]);
+		expect(runtime.historyIndex).toBe(0);
+	}
+
+	it("applies a mixed Flip plan in one native history step and undoes/redoes the exact snapshots", () => {
+		const before = document();
+		const untouched = clone(before);
+		const next = flip(before);
+		const planned = clone(next);
+		const runtime = new NativeGraph(before);
+		const authoring = createCanvasAuthoring(runtime);
+		const expected = authoring.readSnapshot();
+		expect(expected.document).toEqual(before);
+		const result = authoring.applyDocument(next, expected);
+		expect(result).toMatchObject({ ok: true, status: "applied", document: next });
+		expect(runtime.getData()).toEqual(next);
+		expect(runtime.history).toEqual([before, next]);
+		expect(runtime.historyIndex).toBe(1);
+		expect(runtime.requestSaveSpy.mock.calls.filter(([addHistory]) => addHistory === true)).toHaveLength(1);
+		expect(before).toEqual(untouched);
+		expect(next).toEqual(planned);
+		expect(runtime.getData().miroSource).toEqual(before.miroSource);
+		expect(runtime.getData().futureRootField).toEqual(before.futureRootField);
+		expect(new NativeGraph(runtime.getData()).getData()).toEqual(next);
+		runtime.undo();
+		expect(runtime.getData()).toEqual(before);
+		runtime.redo();
+		expect(runtime.getData()).toEqual(next);
+	});
+	it("certifies retained native edge order and repairs feature metadata before one history step", () => {
+		const before = initialDocument();
+		before.edges = [
+			{ id: "second", fromNode: "existing", toNode: "existing", future: { keep: true } },
+			{ id: "first", fromNode: "existing", toNode: "existing" },
+		];
+		class RetainedEdges extends NativeGraph {
+			public override importData(value: CanvasDocument, rebuild: boolean): void {
+				const roots = clone(this.data);
+				super.importData(value, rebuild);
+				this.edges = new Map([...this.edges].sort(([left], [right]) => right.localeCompare(left)));
+				this.data = roots;
+			}
+			public override undo(): void {
+				if (this.historyIndex > 0) this.data = clone(this.history[this.historyIndex - 1]!);
+				super.undo();
+			}
+			public override redo(): void {
+				if (this.historyIndex + 1 < this.history.length) this.data = clone(this.history[this.historyIndex + 1]!);
+				super.redo();
+			}
+		}
+		const runtime = new RetainedEdges(before);
+		const next = clone(before);
+		next.edges = [...(next.edges as CanvasDocument[])].reverse();
+		(next.miroCanvas as CanvasDocument).properties = { status: "approved" };
+		const result = createCanvasAuthoring(runtime).applyDocument(next, before);
+		expect(result.ok).toBe(true);
+		expect(runtime.getData().miroCanvas).toEqual(next.miroCanvas);
+		expect(runtime.getData().miroSource).toEqual(before.miroSource);
+		expect(runtime.edges.get("second")!.future).toEqual({ keep: true });
+		expect(runtime.history).toHaveLength(2);
+		runtime.undo();
+		expect(runtime.getData().miroCanvas).toEqual(before.miroCanvas);
+		runtime.redo();
+		expect(runtime.getData().miroCanvas).toEqual(next.miroCanvas);
+	});
+	it("still refuses field drift on a native edge despite reordered serialization", () => {
+		const before = initialDocument();
+		before.edges = [
+			{ id: "second", fromNode: "existing", toNode: "existing", future: "exact" },
+			{ id: "first", fromNode: "existing", toNode: "existing" },
+		];
+		class DriftingEdges extends NativeGraph {
+			public override importData(value: CanvasDocument, rebuild: boolean): void {
+				super.importData(value, rebuild);
+				this.edges = new Map([...this.edges].reverse());
+				this.edges.get("second")!.future = "changed";
+			}
+		}
+		const runtime = new DriftingEdges(before), next = clone(before);
+		(next.miroCanvas as CanvasDocument).properties = { status: "approved" };
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before).ok).toBe(false);
+		expect(runtime.history).toHaveLength(1);
+	});
+	it("applies additions, deletions and native/metadata edits as one undoable board action", () => {
+		const before = document();
+		const next = clone(before);
+		next.nodes = next.nodes.filter((node) => node.id !== "c");
+		next.nodes.push({ id: "replacement", type: "text", text: "Replacement", x: 400, y: 0, width: 100, height: 80, futureNode: "kept" });
+		next.nodes[0]!.text = "Updated";
+		next.edges[0]!.label = "Updated line";
+		next.miroCanvas.connectors.conn = { ...next.miroCanvas.connectors.conn!, to: { type: "free", x: 350, y: 190 } };
+		next.miroCanvas.localComments[0]!.text = "Updated discussion";
+		next.miroCanvas.commentPlaces["local:pin"] = { type: "free", x: 140, y: 60 };
+		next.miroCanvas.freeAnchors.loose = { type: "free", x: 120, y: 60 };
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before).ok).toBe(true);
+		expect(runtime.getData()).toEqual(next);
+		expect(runtime.history).toEqual([before, next]);
+		runtime.undo();
+		expect(runtime.getData()).toEqual(before);
+		runtime.redo();
+		expect(runtime.getData()).toEqual(next);
+	});
+	it.each(["node", "connector", "comment place", "source", "unknown root"])("rejects a captured plan before import when the live %s changed", (kind) => {
+		const before = document();
+		const next = flip(before);
+		const live = clone(before);
+		if (kind === "node") live.nodes[0]!.text = "Another edit";
+		if (kind === "connector") live.miroCanvas.connectors.conn = { ...live.miroCanvas.connectors.conn!, color: "#ff0000" };
+		if (kind === "comment place") live.miroCanvas.commentPlaces["local:pin"] = { type: "free", x: 900, y: 400 };
+		if (kind === "source") live.miroSource.board = "Another source";
+		if (kind === "unknown root") live.futureRootField = { unrelatedEdit: true };
+		const runtime = new NativeGraph(live);
+		const result = createCanvasAuthoring(runtime).applyDocument(next, { document: before });
+		expect(result).toMatchObject({ ok: false, status: "rejected" });
+		expect(result.diagnostics.map((item) => item.code)).toContain("stale-feature-plan");
+		expectUnwritten(runtime, live);
+	});
+	it.each([
+		["node", "change"], ["node", "delete"],
+		["edge", "change"], ["edge", "delete"],
+		["connector", "change"], ["connector", "delete"],
+	] as const)("rejects the entire plan to %s %s when the original item is locked", (kind, operation) => {
+		const before = document();
+		const id = kind === "node" ? "c" : kind === "edge" ? "e1" : "conn";
+		before.miroCanvas.localOverrides[id] = { ...before.miroCanvas.localOverrides[id], locked: true };
+		const next = clone(before);
+		// A valid edit to another card must not leak through the refused transaction.
+		next.nodes[0]!.text = "Would otherwise apply";
+		if (kind === "node" && operation === "change") next.nodes.find((node) => node.id === id)!.x = 500;
+		if (kind === "node" && operation === "delete") next.nodes = next.nodes.filter((node) => node.id !== id);
+		if (kind === "edge" && operation === "change") next.edges[0]!.label = "Locked label";
+		if (kind === "edge" && operation === "delete") {
+			next.edges = [];
+			next.miroCanvas.connectors.conn = { ...next.miroCanvas.connectors.conn!, from: { type: "free", x: 125, y: 40 } };
+			next.miroCanvas.commentPlaces["local:pin"] = { type: "free", x: 140, y: 40 };
+			next.miroCanvas.commentPlaces["imported:source-pin"] = { type: "free", x: 180, y: 40 };
+			next.miroCanvas.freeAnchors.loose = { type: "free", x: 120, y: 40 };
+		}
+		if (kind === "connector" && operation === "change") next.miroCanvas.connectors.conn = { ...next.miroCanvas.connectors.conn!, width: 3 };
+		if (kind === "connector" && operation === "delete") {
+			delete next.miroCanvas.connectors.conn;
+			delete next.miroCanvas.connectors.chain;
+		}
+		// Planned metadata cannot unlock an item to bypass the original board's policy.
+		delete next.miroCanvas.localOverrides[id];
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before)).toMatchObject({ ok: false, status: "rejected" });
+		expectUnwritten(runtime, before);
+	});
+	it("rejects changes confined to a locked dependent connector's endpoint override", () => {
+		const before = document();
+		before.miroCanvas.connectors.conn = { ...before.miroCanvas.connectors.conn!, from: { type: "free", x: 125, y: 40 } };
+		before.miroCanvas.localOverrides.e1.locked = true;
+		before.miroCanvas.localOverrides.e1.connectorAnchors = { from: { type: "edge", edgeId: "conn", t: 0.25 } };
+		const next = clone(before);
+		next.miroCanvas.localOverrides.e1.connectorAnchors = { from: { type: "edge", edgeId: "conn", t: 0.75 } };
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before).ok).toBe(false);
+		expectUnwritten(runtime, before);
+	});
+	it("rejects a Flip plan that rewrites a locked connector-to-connector dependent", () => {
+		const before = document();
+		const next = flip(before);
+		before.miroCanvas.localOverrides.chain = { locked: true };
+		next.miroCanvas.localOverrides.chain = { locked: true };
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before).ok).toBe(false);
+		expectUnwritten(runtime, before);
+	});
+	it("permits an unrelated card edit while locked comments, places and free anchors stay unchanged", () => {
+		const before = document();
+		before.miroCanvas.localComments[0]!.locked = true;
+		before.miroCanvas.commentDecorations["local:pin"] = { locked: true };
+		before.miroCanvas.commentDecorations["imported:source-pin"] = { locked: true };
+		before.miroCanvas.localOverrides.loose = { locked: true };
+		const next = clone(before);
+		next.nodes[0]!.text = "Allowed unrelated edit";
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before).ok).toBe(true);
+		expect(runtime.getData()).toEqual(next);
+		expect(runtime.history).toEqual([before, next]);
+	});
+	it.each(["local thread", "local place", "imported place", "free anchor"])("rejects a Flip plan touching a locked dependent %s", (kind) => {
+		const before = document();
+		const next = flip(before);
+		if (kind === "local thread") {
+			before.miroCanvas.localComments[0]!.locked = true;
+			next.miroCanvas.localComments[0]!.locked = true;
+		}
+		if (kind === "local place" || kind === "imported place") {
+			const key = kind === "local place" ? "local:pin" : "imported:source-pin";
+			before.miroCanvas.commentDecorations[key] = { locked: true };
+			next.miroCanvas.commentDecorations[key] = { locked: true };
+		}
+		if (kind === "free anchor") {
+			before.miroCanvas.localOverrides.loose = { locked: true };
+			next.miroCanvas.localOverrides.loose = { locked: true };
+		}
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before)).toMatchObject({ ok: false, status: "rejected" });
+		expectUnwritten(runtime, before);
+	});
+	it.each(["thread", "place", "free anchor"])("rejects deleting a locked %s even if the plan removes its lock metadata", (kind) => {
+		const before = document();
+		if (kind === "thread") before.miroCanvas.localComments[0]!.locked = true;
+		if (kind === "place") before.miroCanvas.commentDecorations["imported:source-pin"] = { locked: true };
+		if (kind === "free anchor") before.miroCanvas.localOverrides.loose = { locked: true };
+		const next = clone(before);
+		next.nodes[0]!.text = "Would otherwise apply";
+		if (kind === "thread") {
+			next.miroCanvas.localComments = [];
+			delete next.miroCanvas.commentPlaces["local:pin"];
+		}
+		if (kind === "place") {
+			delete next.miroCanvas.commentPlaces["imported:source-pin"];
+			delete next.miroCanvas.commentDecorations["imported:source-pin"];
+		}
+		if (kind === "free anchor") {
+			delete next.miroCanvas.freeAnchors.loose;
+			delete next.miroCanvas.localOverrides.loose;
+		}
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before)).toMatchObject({ ok: false, status: "rejected" });
+		expectUnwritten(runtime, before);
+	});
+	it("rejects a changed plan in review mode even if that plan turns review mode off", () => {
+		const before = { ...document(), miroCanvas: { ...document().miroCanvas, settings: { reviewMode: true } } };
+		const next = clone(before);
+		next.nodes[0]!.text = "Forbidden edit";
+		next.miroCanvas.settings.reviewMode = false;
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before).ok).toBe(false);
+		expectUnwritten(runtime, before);
+	});
+	it.each(["source edit", "source deletion", "unknown edit", "unknown deletion", "new unknown root"])("refuses %s without importing or mutating history", (kind) => {
+		const before = document();
+		const next: CanvasDocument = clone(before);
+		(next.nodes as CanvasDocument[])[0]!.text = "Would otherwise apply";
+		if (kind === "source edit") (next.miroSource as CanvasDocument).board = "Modified evidence";
+		if (kind === "source deletion") delete next.miroSource;
+		if (kind === "unknown edit") next.futureRootField = { lost: true };
+		if (kind === "unknown deletion") delete next.futureRootField;
+		if (kind === "new unknown root") next.anotherExtension = { unsolicited: true };
+		const runtime = new NativeGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(next, before)).toMatchObject({ ok: false, status: "rejected" });
+		expectUnwritten(runtime, before);
+	});
+	it.each(["import", "save"])("restores the exact board and history after native %s failure, then allows retry", (phase) => {
+		const before = document();
+		const next = flip(before);
+		const runtime = new NativeGraph(before);
+		const authoring = createCanvasAuthoring(runtime);
+		runtime.throwOnImport = phase === "import";
+		runtime.throwOnSave = phase === "save";
+		expect(authoring.applyDocument(next, before).ok).toBe(false);
+		expect(runtime.importDataSpy).toHaveBeenCalled();
+		expect(runtime.getData()).toEqual(before);
+		expect(runtime.history).toEqual([before]);
+		expect(runtime.historyIndex).toBe(0);
+		runtime.throwOnImport = false;
+		runtime.throwOnSave = false;
+		expect(authoring.applyDocument(next, before).ok).toBe(true);
+		expect(runtime.getData()).toEqual(next);
+		expect(runtime.history).toEqual([before, next]);
+		runtime.undo();
+		expect(runtime.getData()).toEqual(before);
+	});
+	it("rolls back native graph corruption observed after import before requesting history", () => {
+		class CorruptingGraph extends NativeGraph {
+			private corruptNextImport = true;
+			public override importData(value: CanvasDocument, rebuild: boolean): void {
+				super.importData(value, rebuild);
+				if (!this.corruptNextImport) return;
+				this.corruptNextImport = false;
+				this.nodes.get("a")!.text = "Unexpected host replacement";
+			}
+		}
+		const before = document();
+		const runtime = new CorruptingGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(flip(before), before).ok).toBe(false);
+		expect(runtime.getData()).toEqual(before);
+		expect(runtime.requestSaveSpy.mock.calls.filter(([addHistory]) => addHistory === true)).toHaveLength(0);
+		expect(runtime.history).toEqual([before]);
+	});
+	it("restores history as well as board data if native save fails after appending its step", () => {
+		class FailingHistoryGraph extends NativeGraph {
+			private failNextHistorySave = true;
+			public override requestSave(addHistory?: boolean): void {
+				super.requestSave(addHistory);
+				if (addHistory !== true || !this.failNextHistorySave) return;
+				this.failNextHistorySave = false;
+				throw new Error("save failed after native history append");
+			}
+		}
+		const before = document();
+		const runtime = new FailingHistoryGraph(before);
+		expect(createCanvasAuthoring(runtime).applyDocument(flip(before), before).ok).toBe(false);
+		expect(runtime.getData()).toEqual(before);
+		expect(runtime.history).toEqual([before]);
+		expect(runtime.historyIndex).toBe(0);
+		runtime.redo();
+		expect(runtime.getData()).toEqual(before);
+	});
+	it("does not import or save a no-op and leaves an existing redo branch intact", () => {
+		const before = document();
+		const next = flip(before);
+		const runtime = new NativeGraph(before);
+		const authoring = createCanvasAuthoring(runtime);
+		expect(authoring.applyDocument(next, before).ok).toBe(true);
+		runtime.undo();
+		runtime.importDataSpy.mockClear();
+		runtime.requestSaveSpy.mockClear();
+		const history = clone(runtime.history);
+		expect(authoring.applyDocument(clone(before), { document: before })).toMatchObject({ ok: true, status: "applied", document: before });
+		expect(runtime.importDataSpy).not.toHaveBeenCalled();
+		expect(runtime.requestSaveSpy).not.toHaveBeenCalled();
+		expect(runtime.history).toEqual(history);
+		expect(runtime.historyIndex).toBe(0);
+		runtime.redo();
+		expect(runtime.getData()).toEqual(next);
+	});
+});
 
 /**
  * A frame (never moved), four cards back to front - a, b, c, d - where a
@@ -1773,4 +2144,38 @@ describe("authoring reflected host failures", () => {
 		expect(result.ok).toBe(false);
 		expect(result.diagnostics.map((entry) => entry.code)).toContain("native-runtime-read-failed");
 	});
+});
+
+
+describe("rectangular shape corner radius transactions", () => {
+  const board = () => ({ nodes: [{ id: "shape", type: "text", text: "", x: 0, y: 0, width: 240, height: 80, future: [1] }], edges: [],
+    miroSource: { evidence: { exact: true } }, miroCanvas: { schemaVersion: 1, localOverrides: { shape: { shape: { kind: "round_rectangle", fallback: "text", future: true }, future: { keep: true } } } } });
+  it("stores one physical radius in one native history step and preserves source and unknown fields", () => {
+    const before = board();
+    const runtime = new NativeGraph(before);
+    const authoring = createCanvasAuthoring(runtime);
+    expect(authoring.updateElementStyles([{ id: "shape", cornerRadius: 20 }]).ok).toBe(true);
+    const after = runtime.getData() as any;
+    expect(after.miroCanvas.localOverrides.shape).toEqual({ ...before.miroCanvas.localOverrides.shape, cornerRadius: 20 });
+    expect(after.miroSource).toEqual(before.miroSource);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(runtime.history).toHaveLength(2);
+    runtime.undo();
+    expect(runtime.getData()).toEqual(before);
+    runtime.redo();
+    expect(runtime.getData()).toEqual(after);
+  });
+  it.each([-1, 1001, NaN, Infinity, "16", null])("rejects invalid radius %s without history or mutations", radius => {
+    const before = board();
+    const runtime = new NativeGraph(before);
+    expect(createCanvasAuthoring(runtime).updateElementStyles([{ id: "shape", cornerRadius: radius } as never]).ok).toBe(false);
+    expect(runtime.getData()).toEqual(before);
+    expect(runtime.history).toHaveLength(1);
+  });
+  it("creates a rounded figure with the remembered radius", () => {
+    const runtime = new NativeGraph({ nodes: [], edges: [], miroSource: { evidence: true } });
+    const result = createCanvasAuthoring(runtime).createShape({ shape: "round_rectangle", text: "", x: 0, y: 0, width: 240, height: 160, cornerRadius: 16 });
+    expect(result.ok).toBe(true);
+    expect((runtime.getData() as any).miroCanvas.localOverrides[result.nodeId!].cornerRadius).toBe(16);
+  });
 });

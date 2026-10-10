@@ -2081,3 +2081,431 @@ and initialization remain unchanged. No Android behavior change is introduced;
 existing real Windows/tablet evidence above applies. The disconnected legacy
 phone's independent-export check remains pending. Fresh Linux CI is required
 before merging the development-only follow-up; no new plugin tag is planned.
+# Canvas feature expansion: new lint findings (2026-10-07)
+
+Before remediation the scan found new typing/DOM/deletion advisories in
+board-encapsulation, canvas-authoring, m1-session, main, native-history-fence and
+settings-tab; board-link-lifecycle has its own integration trace. These paths
+participate in transferring cards/comments/lines, locked dependent validation,
+one-step undo/redo and failed-save compensation, scoped decoration and selected
+line highlighting, deleting only an unchanged new test/transfer target, and
+saving relation property settings. Fix typing without changing these actions;
+use FileManager.trashFile for conditional target cleanup and declarative setting
+callbacks. The m1-commands hotkey compatibility warning remains intentional.
+
+Mandatory checks: focused transfer/authoring/fence/source/search/settings tests,
+full unit suite, lint/build/CSS gates, stale/deleted/edited target retention,
+native save failure then redo, theme/unload restoration, real Windows and Android
+touch palette/group/line/search/transfer actions at non-default zoom. Unit and
+synthetic results alone do not close real-app checks; those remain pending.
+## Property-result placement and Android keyboard — 2026-10-08
+
+Trace before UI repair: CanvasPropertyResults.section appends its owned section
+after Obsidian's flex-filling native result root. On SM-X736B / Obsidian 1.13.8,
+actual ADB input focuses native search at y152; its result is y950 while the
+keyboard occupies y803..1204 (--keyboard-height 400.94116px). The second tap
+never reaches Obsidian. This is a layout defect, not a navigation pass.
+Place the owned section before the native result root and give only that section
+a bounded scroll area; preserve native query controls, rows, pane descriptors
+and all native styles. Required checks: DOM order and native-root identity,
+typed property query/result navigation with the keyboard still open on tablet,
+outgoing link navigation, desktop native results remaining accessible, CSS gate,
+focused sidecar tests and full types. Phone acceptance remains pending while
+the device is disconnected; no synthetic result substitutes for ADB input.
+
+Follow-up acceptance — 2026-10-08: the reconnected SM-A336E / Android 14 /
+Obsidian 1.12.7 passes the latest build's property-result keyboard placement
+(result y190.6, keyboard top526.6), genuine board/outgoing-note navigation,
+nine feature phases, eight measured theme combinations and independent PDF/PPTX
+content readiness. Real ADB taps/gestures, CDP text/preparation and renderer
+Escape are recorded separately in the [phone receipt](smartphone-enhancement-checks.md).
+Native ADB Escape navigates to the prior board on this legacy app and is not
+a same-board cancellation pass. Original source/appearance/settings bytes are
+restored. This closes the disconnected-device follow-up for that installation;
+supported-version phone checks and the broader matrix remain pending.
+
+## Card appearance, vector export and snippet isolation — 2026-10-09
+
+Before implementation, card-appearance-checks.md traced native/imported card
+faces, settings/session rebuilds and independent export. The vector and snippet
+documents traced their owned rendering/native CSS boundaries and lint fixes
+before editing. Final representative Windows 1.14.4 and physical SM-X736B /
+Android16 / Obsidian1.13.8 checks pass. Native SDK controls, ADB taps, CDP text
+and frame/DOM preparation are explicitly distinguished. Exact scope, file saves,
+source/worker cleanup and pending broader scenarios are recorded in the
+[appearance receipt](card-appearance-checks.md). No new source/CSS warning remains.
+
+## Shape corner radius and initial proportions — 2026-10-10
+
+Trace before edits: on SM-X736B/Android16/Obsidian1.13.8 in MiroCanvasTest,
+round_rectangle nodes cd83b7ccc2c5b4c2 (250x60) and a443eab2bdbc202d
+(210x200) use shapePath's fixed normalized12 corners, stretching the horizontal
+and vertical radii differently. CardAppearance intentionally excludes shapes,
+so cardCornerRadius0 does not control these outlines. finishToolGesture gives
+every shape200x200 for a click/bar drop; the catalogue already declares wide,
+tall or square. Drawn rectangles keep the user's drag dimensions.
+
+Required checks: catalogue default proportions and aliases; tap/bar-drop vs
+free drag/Shift constraints; actual tablet ADB creation; per-shape radius0 and
+nonzero, circular physical corners on wide/tall nodes, explicit size clamping;
+one native history transaction, persistence/reopen/Undo, locks/review and
+unknown-field/miroSource preservation. Shape paths, text insets, edge/connector
+landing and preview resize/rotation must use the same current dimensions and
+normalized outline before release, after commit/cancel and at non-default zoom.
+Independent SVG/PDF/PPTX must reuse that geometry without source/camera mutation.
+Change the upstream checked schema before adding a stored cornerRadius.
+Record real Android input separately from CDP setup; leave unverified cases
+pending. The current request concerns shape outlines, not card CSS radius.
+
+Final parent integration/real-device results: [shape radius acceptance](shape-radius-acceptance.md). Earlier worker snapshots are historical; pending native cases remain explicit.
+
+## Selection More menu layout — 2026-10-10 (trace before edits)
+
+User screenshot and real SM-X736B/Android16/Obsidian1.13.8 DOM show
+SelectionToolbar.build's More panel: four layer buttons in a seven-column
+picture grid, an empty open-link row, an unlabelled Board actions button,
+and adopted native canvas-menu trash/zoom/edit buttons. adoptNativeMenu moves
+actual host elements; watchNativeMenuState marks duplicated palette/direction
+buttons and keeps an inert panning snapshot. Fixed icon widths and separate
+native flex layout scatter actions and suppress visible captions.
+
+Required checks: localized visible captions for plugin and native actions;
+consistent icon alignment and full-width touch targets, no empty link gap;
+native handlers/disabled/hidden states preserved, delete last in DOM and visual
+order; observer cleanup returns native controls and removes owned captions;
+selection changes/card/edge/independent-only/locked/review, Escape/outside click;
+layer command closes with one history/Undo; native zoom/edit/delete still work;
+menu fits viewport and scrolls at large text/short height; theme tokens on dark
+and light, tablet padding. Real tablet ADB and Windows renderer input must be
+recorded separately from synthetic/unit proof. No export/screenshot concurrency.
+Full results belong in selection-menu-checks.md; unverified scenarios stay pending.
+
+Final menu results: [selection menu checks](selection-menu-checks.md). Native Android ADB and Windows renderer input are distinguished; remaining native matrix is explicit.
+
+Keyboard follow-up before edit: real tablet final capture has IME400.94116px and More clipped above the board after native Edit. keepPanelInView forces every keyboard popover above the toolbar; long action lists need the side with more available board room. Change only marked More, preserve formatting pickers, cap/scroll within bounds and restore inline placement when IME closes. Mandatory: native ADB Edit→More with keyboard, both side choices and reset unit checks.
+
+Keyboard follow-up passed: two side/reset unit cases and real SM-X736B ADB Edit→More with IME400.94116px; original file bytes remain exact. See selection-menu-checks.md.
+
+## Host theme and board-menu wrapping — 2026-10-10 (trace before edits)
+
+Real SM-X736B/Android16/Obsidian1.13.8 in MiroCanvasTest: body is theme-light,
+vault config theme=moonstone, board displayTheme=system, resolved Canvas=dark.
+M1CanvasSession.applyTheme and attachSystemThemeListener read only WebView
+prefers-color-scheme; Android OS preference can differ from Obsidian's chosen
+appearance. System boards must follow the current owning Obsidian document's
+body theme, with OS media only as a fallback. Observe host class changes without
+watching cards or writing metadata; explicit light/dark boards stay explicit.
+
+M1Controls.item's icon/label/switch row has width100% without explicit box sizing,
+and flex label lacks min-width0 or wrapping; inherited button white-space and
+Russian nameOnSelection text can push the label/switch past the board menu.
+Keep original strings/actions and tablet padding variable convention.
+
+Mandatory checks: light Obsidian + dark Android preference resolves light;
+reverse mismatch; real theme change while board remains open, system/explicit
+choice, reopen and independent export snapshot theme. Watcher teardown and
+missing media/body API fallback. Measure every board-menu row/label/switch
+inside panel for RU/EN, disabled/enabled selected attachment, narrow width and
+long labels; use real ADB taps on physical tablet and distinguish Windows CDP
+renderer input. Preserve board/file bytes during host-theme changes, restore
+test settings, leave unverified phone/popout/OS text scenarios pending.
+
+Attachment toggle follow-up before edit: actual ADB toggle sets localOverrides.f.showAttachmentName=true, but a second click stays true. selectedAttachmentVisibility passes a private native class instance to pure shouldShowAttachmentName, whose plain-object guard rejects it; the checkbox remains false. refreshDecorations already uses attachmentNode to build checked JSON id/type/file. Reuse that projection for checkbox state. Required: native runtime class with global/local visibility overrides, ADB on/off, non-file/absent selection fail closed, unknown-field/source preservation and native Undo.
+
+Final host appearance, menu wrapping and attachment toggle evidence: [checks](host-theme-menu-checks.md). ADB input, native API preparation, Windows renderer input and inherited SVG theme proof are distinguished; remaining matrix is explicit.
+
+
+## Discoverable shape-radius dragging — 2026-10-10 (trace before edits)
+
+ShapeRadiusHandle owns the sole selected-figure corner control. Its existing
+44px target uses pointer capture plus document listeners and inverse shape SVG
+CTM to preview a circular radius in board units; M1CanvasSession owns transient
+radiusPreview and the single native-history commit. The current 12px circular
+marker resembles native connection points. Tap opens exact numeric input, but
+touch users cannot see a drag instruction or the current value while holding.
+Replace only the marker with a rounded-corner SVG and directional affordance;
+show a non-interactive live value beside the held control. Preserve projection,
+threshold, preview transaction, input, setting, metadata, and export exclusion.
+
+Mandatory checks: actual ADB finger and ADB stylus-source held movement on
+SM-X736B in MiroCanvasTest, live value and path change before release, file and
+history unchanged while held, one commit, Undo, cancellation, exact numeric
+input, selected-only/global toggle. Verify touch/pen pointer ownership and
+rotated/non-default zoom in focused tests; distinguish actual physical pen
+handling from ADB stylus-source input. Measure 44px target, icon contrast in
+both themes, and badge above the finger; no extra selection border or input
+keyboard during dragging. Preserve fixed connector anchors/chains and source
+unknown fields. Native Windows renderer input is separate from physical mouse.
+Export jobs must be zero before screenshots; control remains excluded from
+export. Record unverified device scenarios explicitly.
+
+Final marker/live dragging evidence: [radius feedback checks](radius-feedback-checks.md). Actual ADB touch/pen-source and hidden native Windows renderer input are separated; physical S Pen and disconnected phone remain pending.
+
+
+## Fixed radius marker and visible connection circles — 2026-10-10 (before edits)
+
+ShapeRadiusHandle.render positions the whole 44px control at radius/width and
+radius/height percentages, so it slides diagonally during a gesture. Keep it
+at the existing safe corner spacing instead; animate the rounded corner's
+geometry from the clamped radius itself and retain the live number. No delayed
+geometry transitions during pointer movement. Press/release feedback may use
+a small interruptible transform transition, disabled by reduced-motion.
+
+Actual SM-X736B/Obsidian1.13.8 DOM shows the visible side circles are plugin
+buttons .miro-canvas-handle--connect, not native connection points (the native
+interaction layer is hidden for this selection). Their computed background is
+rgb246/246/246 despite .miro-canvas-handle's accent fill: Obsidian's tablet button
+selector outweighs the broad plugin rule. SelectionHandles supplies one per
+side at contourPoint positions; tap quick-creates, drag begins a connector.
+Set scoped explicit accent borders and theme background, plus filled hover/
+focus states, without changing bounds/centres/hit routing or native fallback.
+
+Mandatory: fixed marker bounding box throughout finger/pen movement and after
+commit/Undo/cancel, live icon path and number follow the same radius, zero and
+maximum radius, rotation/non-default zoom, numeric input, selection/global
+toggle. Physical tablet ADB preview/commit/Undo/CANCEL and pen-source handling
+are separate from physical S Pen. Inspect all four visible connection circles
+in both themes, tablet-rule specificity, idle/hover/focus, drag-create native
+edge before/after release and Undo, tap quick-create and Undo, cancel without
+persistence. Preserve attached native/independent/chained lines, history and
+unknown fields. Windows input stays in hidden native test Obsidian; synthetic
+host and native receipts are distinct. No screenshots during export.
+
+Final fixed marker, circle visibility and native action results: [checks](radius-marker-motion-checks.md). Native tablet ADB, native Windows renderer input, synthetic states and remaining physical-pen/phone scenarios are distinguished.
+
+
+## Bidirectional radius arrow — 2026-10-10 (before edit)
+
+The radius marker's decorative direction path currently points only inward,
+although inverse-CTM pointer movement supports increasing and decreasing the
+radius. Add the opposite arrowhead in the same SVG path, preserving the24px
+viewBox, button/target and corner indicator. Required: icon remains distinct
+from ports, both heads visible in native tablet/Windows light/dark, pointer
+handling/input/preview tests unchanged. The user is considering the preferred
+animated feedback; the arrow change does not choose a new animation variant.
+
+
+Combined motion refinement before edit: the user selected both changing the
+corner and a directional tilt. Keep synchronous corner geometry, and derive
+an increase/decrease/steady state from changes in the live clamped radius.
+Rotate only the decorative SVG by ±8° while held, returning to neutral on
+release/cancel. Keep reduced-motion stronger than the directional styles and
+never move/rotate the44px hit target. Required: reversal follows new direction,
+clamped limits do not invent commits, cancel/selection/input reset, button
+bounds fixed, actual Android held tilt/reset and bidirectional arrow, native
+Windows pointer check, reduced-motion and interruption synthetic proof.
+
+Combined feedback passed: native tablet ADB reversal and ±tilt matrices, fixed target, native Windows direction/transaction and 3301 tests. Hidden Windows does not prove visible CSS animation timing; this is recorded in the [follow-up](radius-marker-motion-checks.md#combined-cornertilt-refinement).
+
+
+## Export-panel composition — 2026-10-10 (trace before implementation edits)
+
+ExportPanel in board-export.ts builds header, paper/orientation, full placement
+paragraph, page list/add actions, quality and three output buttons;
+M1CanvasSession.openExport mounts it on owner document.body and keeps overlay
+pages on native board. Export progress replaces panel DOM; Stop/Close abort
+owned work, page show stays available. runExport/independent rendering/save
+boundaries stay outside this design change. No settings/format change.
+
+Actual tablet SM-X736B/Obsidian1.13.8: panel300×714 CSSpx at top16; default
+mobile button pills and a large paragraph overwhelm page controls, format
+buttons stack, tiny24px page actions. Body safe-area-inset-top30.117647px means
+its top currently reaches the OS status area. Layout-only detector is clean;
+rendered hierarchy and tablet specificity still require changes.
+
+Refine the existing Obsidian visual world: fixed header/close and output footer,
+one scrolling body; pages/order/help grouped, paper and quality together.
+Keep full visible placement help and existing direct PDF/PowerPoint/SVG actions
+with shorter localized format captions. Native-style SVG action icons replace
+Unicode symbols; scoped controls beat tablet pills and preserve padding vars.
+The panel bounds account for safe areas and actual --keyboard-height.
+
+Mandatory: physical tablet ADB open/add/show/reorder/remove/orientation/quality/
+close; native Windows renderer input with hidden window. Board/slides, empty/
+one/many/long-name pages, English/Russian, light/dark, narrow and large text.
+Keyboard height must leave Close/Stop/output within available bounds; all touch
+targets at least44px and no overlaps. Busy/unavailable/empty disabled states,
+Stop and Close, disposal/listener cleanup; three outputs still call original
+kind; real independent save/Stop proof without screenshots or foreground
+during export. Preserve source bytes/camera/selection except explicit page-show
+input and guarded page changes; one history boundary/Undo. Renderer/parser/
+worker source remains unchanged. Distinguish synthetic from native evidence.
+
+
+Export smoke follow-up before test edit: the tablet-padding gate toggles
+mobile/tablet classes together with the host rule, so intentional34px desktop
+versus44px mobile targets are reported as a padding failure. Hold the device
+classes constant and toggle only the reconstructed host tablet rule. Continue
+comparing padding/width/height for every button and retain the coverage guards;
+do not exempt export controls or suppress geometry checks.
+
+
+## Restore moving radius marker — 2026-10-10 (before edit)
+
+The user requests the earlier radius animation with the bidirectional arrow
+retained. ShapeRadiusHandle.render currently pins the target, morphs the SVG
+corner and exposes direction state for CSS tilt. Restore the radius-relative
+clamped left/top positions from 07dd8c5; keep inverse-CTM pointer capture, the
+44px screen target, live badge, numeric input and both arrowheads. Remove only
+the experimental corner morph/direction/tilt styles and their obsolete checks.
+Connection-circle outlines and export-panel styling remain in scope unchanged.
+
+Required: moving target follows the same live radius before release and after
+commit/cancel/Undo, both-direction reversal at rotation/non-default zoom, no
+persistence before release, one history boundary, native/independent/chained
+line invariants, exact input/toggle. Physical tablet ADB touch and stylus-source
+input are separate from physical S Pen; Windows uses hidden native renderer
+input. Preserve source bytes/settings and retain two arrowheads. No export
+screenshots or foreground takeover. Record current native results separately
+from the superseded fixed-target receipts.
+
+
+Export composition completed: native Windows and tablet action/save/Stop checks,
+plus the user's physical tablet keyboard and native bounds measurement, are
+recorded in [panel checks](export-panel-design-checks.md). The failed automated
+IME-open attempt is preserved separately; no synthetic keyboard pass replaces it.
+Moving radius restored: current native receipts and superseded animation checks
+are distinguished in [motion checks](radius-marker-motion-checks.md).
+
+
+## Vector PDF/PPTX and viewing tools — 2026-10-10 (before implementation)
+
+runExport currently uses independent renderVectorExportPages for SVG, and JPEG
+renderExportPages plus Worker packing for PDF/PPTX. Add transient export-panel
+rendering mode (raster default; SVG always vector), retain native page metadata
+without schema changes, and capture each vector page independently. PDF must
+contain real vector paths/text with Cyrillic-capable offline fonts; PPTX must
+contain SVG parts with real relationships and raster compatibility fallback.
+No runtime downloads/install/OS print or window activation. Unsupported vector
+content stays explicitly refused; Stop/save/snapshot/cleanup guards remain.
+Required: multi-page geometry, Latin/Cyrillic text, arrows/radii/clips/images,
+actual parsed PDF and PPTX SVG content, page ordering/quality/mode callbacks,
+Stop/failure/unload/switch and source/camera/selection preservation. Native
+Windows hidden input plus connected physical Android in MiroCanvasTest.
+
+SelectionToolbar.update currently draws disabled editing controls in review,
+and M1 owns adopted native menus, QuickTools, docks and context actions. Keep
+view/link/copy/navigation actions; hide styling/layer/lock/delete/creation rows,
+close stale editing popovers and restore native ownership on exit/disposal.
+Presentation is already SlideShow with native camera navigation. Add a bounded,
+non-persistent laser overlay available in review and slideshow; temporary
+trails never touch native drawing/history/data and are excluded from exports.
+Required: node/edge/mixed/independent/attachment/comment review selections,
+normal/locked menu regression, native menu regeneration, mode exit restoration;
+mouse/touch/pen pointer ownership, controls/scroll/link/pan unaffected when
+laser off, trail expiry/cancel/blur/unload/board-switch, zoom/rotation and
+slide next/previous/Escape. Distinguish ADB/CDP from physical stylus handling.
+
+
+Review smoke adjustment before edit: the interaction suite intentionally clicked
+an aria-disabled native creation button in review. Creation buttons now must be
+hidden, so replace that click with a visibility assertion plus a forced DOM
+click proving the handler still refuses arming. Normal creation/drag assertions
+and review exit restoration remain. Native ADB/CDP gestures supply real input.
+
+
+Vector document/viewing implementation and native acceptance:
+[checks](vector-viewing-acceptance.md). Windows and physical tablet actually
+save vector PDF/PPTX plus standalone SVG and raster PDF; independent artifact
+parsing confirms Cyrillic, paths and SVG slide parts. Viewing/laser/slideshow
+pass real native inputs; ADB stylus-source is separated from physical S Pen.
+Review-toggle saves are settled before the no-write baseline. Current phone,
+physical S Pen and opening the package in PowerPoint remain unverified.
+
+
+## Viewing touch pan from a card (2026-10-10, before implementation)
+
+Trace: M1.attachGuards treats every node/selection pointerdown and held
+pointermove as a move edit, prevents the press and selects the node for unlock.
+In review this also prevents native Canvas.onTouchdown from receiving the
+press. Native 1.14.4 onTouchdown already pans/pinches from cards and cancels its
+600 ms long-press timer after a 5 px move; native node mouse dragging checks
+readonly. Element move/resize/text methods retain separate instance guards.
+M1.startSelectionMove also prevents a mixed/collapsed selection press before
+checking its policy, so it must decline viewing gestures without claiming them.
+
+Reproduced in hidden real Windows Obsidian 1.14.4: trusted CDP touch drag
+starting on a selected card in review leaves camera at (300,90,0). Prior board
+was restored. This is actual Obsidian with synthesized touch, not Android input.
+
+Mandatory checks before closing: selected/unselected/locked cards, native mixed
+selection and collapsed group; blank-start pan across cards; review on/off,
+native readonly and slideshow; ordinary selected-card drag remains editable;
+non-default zoom, second-finger pinch, cancel, middle/right/Space pan, tap/link/
+copy and laser ownership. No node/edge/source/unknown-field/history changes
+while viewing. Run focused safety/admission tests and actual hidden Windows
+plus SM-X736B MiroCanvasTest ADB touch gestures. Physical finger/S Pen and phone
+remain unverified unless separately observed. Evidence and any pending checks
+will be recorded in docs/review-pan-checks.md.
+
+Native Windows regression also found the same move guard blocking right-button
+panning after correctly admitting its pointerdown. Native onPriorityPointerdown
+uses right and middle mouse buttons for pan; the plugin move guard exempted
+only middle. Before changing it, require mouse-right move admission without
+exempting a stylus side button or a primary node edit.
+
+The full collapsed-group suite exposed a test-native drag handler that adds an
+empty history step after its node writes are refused. Native 1.14.4
+handleSelectionDrag returns undefined when readonly; retain that contract at
+the instance hook before creating any collapsed or native drag lifecycle.
+Require undefined/no native initialization in viewing and retain existing
+locked-group inert lifecycle tests outside viewing.
+
+Final scope, actual input receipts and pending checks: [viewing pan checks](review-pan-checks.md).
+
+
+## Radius marker visibility while zooming (2026-10-10, before implementation)
+
+Trace: updateShapeRadiusHandle creates the one selected-figure control at every
+positive zoom. Its inverse-scale transform keeps it 44 screen pixels even when
+the figure shrinks. followViewport moves other controls between refreshes but
+does not update this control's zoom. Thus it stays prominent when zooming out.
+The control owns pointer capture and numeric drafts; hiding must cancel a draft
+before DOM removal/blur so it cannot commit a radius or create history.
+
+Show it only on a selected editable rectangular figure at displayed zoom >=2
+(200%, native Canvas's normal maximum), preserving the settings switch and
+existing bidirectional drag/exact input. Keep valid hidden ownership so native
+zoom-in can restore it without scanning all nodes per frame. Follow only the
+selected control's displayed zoom. Export continues excluding the control.
+Required: 50/100/150/199/200% zoom, native wheel/pinch and zoom presets without
+manual refresh, same owner on reappearance, no duplicate marker/selection border,
+selection/lock/review/settings-off, rotated/non-square geometry, drag and numeric
+draft cancellation while zooming out, pointer capture/listener cleanup, no
+file/history changes on hiding/showing, keyboard bounds and vector exclusion.
+Check in hidden native Windows and physical SM-X736B MiroCanvasTest, recording
+trusted CDP vs actual ADB input. Release waits for these source/build checks.
+
+Native visibility/cancellation evidence: [radius zoom checks](radius-zoom-checks.md).
+
+
+## Configurable radius-marker zoom (2026-10-10, before implementation)
+
+The user asks to configure the close-zoom percentage in plugin settings.
+Trace: MiroCanvasSettings normalization/storage is shared across device layouts;
+MiroCanvasSettingTab declares searchable native rows and saves via the live host.
+saveCanvasSettings persists, then rebuilds M1CanvasSession. Its selected-figure
+state and followViewport drive ShapeRadiusHandle, currently fixed at scale2.
+Export settings turn interactive radius controls off independently.
+
+Add one global percentage with default200, bounded0..6400 (the existing maximum
+configurable Canvas zoom), step25 on the slider and exact numeric input; 0 means
+show at any zoom. Pass its converted scale only to the selected control.
+Keep the off switch, owner validation, 44px target and cancellation before removal.
+Required checks: default/malformed/bounded values; storage and layout round trips;
+English/Russian native search indexing; slider and exact numeric persistence;
+custom100/300/0 visibility and reappearance; changing the threshold cancels an
+open draft without history; no board/source/selection/file edits; review/locked/off
+and export exclusion unchanged. Run native settings inputs on hidden Windows and
+physical SM-X736B MiroCanvasTest, reopen settings and inspect saved preference,
+then restore originals. Label ADB/CDP separately; phone remains unverified.
+
+
+Native Windows1.14.4 showed another caller dependency: it reuses the searchable
+SettingDefinitionRender closures across tab reopen. slider captured the original
+value before rendering, so memory/disk changed but reopening displayed200 again.
+Read the live host value inside each render and refresh the rendered description.
+Require a cached-definition rerender regression and actual native reopen on both
+surfaces; keep search labels available without running setting actions. Windows
+QA temporarily selects the native inline-modal branch through an instance-only
+shouldUsePopout hook, restored on close; no OS foreground or persistent setting.

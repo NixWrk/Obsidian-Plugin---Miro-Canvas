@@ -9,6 +9,7 @@
 
 import { pointOnPolyline, resolveAnchor, type AnchorGeometry, type AnchorPoint } from "./anchors";
 import { boardConnectors } from "./board-connectors";
+import { sliceLinkedNoteText } from "./linked-note-search";
 import { threadMessages } from "./comment-thread";
 import type { CommentOrigin, CommentThread } from "./local-comments";
 import type { SourceScene } from "./source-model";
@@ -31,6 +32,10 @@ export interface SearchEntry {
   readonly targetId: string;
   /** Set for comment threads: imported and local threads can share an ID. */
   readonly origin?: CommentOrigin;
+  /** Original text, including Markdown, without lossy literal normalization. */
+  readonly rawText: string;
+  /** Readable text with its case, accents and line breaks preserved. */
+  readonly displayText: string;
   /** The readable text, stripped of Markdown and normalized for matching. */
   readonly haystack: string;
   /** Where it sits on the board; undefined for a comment thread with no pin. */
@@ -44,6 +49,10 @@ export interface SearchIndexInput {
   readonly threads: readonly CommentThread[];
   /** Where a line's label sits when the line does not say, as a share of its length. */
   readonly labelFallback: number;
+  /** Vault-relative Markdown paths mapped to full note text; no I/O in the index. */
+  readonly noteTexts?: ReadonlyMap<string, string>;
+  /** Optional authoritative metadata-cache slice for a subpath; undefined fails closed. */
+  readonly noteTextSlice?: (path: string, text: string, subpath: string) => string | undefined;
 }
 
 export interface SearchViewSize {
@@ -210,9 +219,10 @@ function textKind(scene: SourceScene, id: string): SearchKind {
  */
 export function buildSearchIndex(input: SearchIndexInput): SearchEntry[] {
   const entries: SearchEntry[] = [];
-  const add = (entry: Omit<SearchEntry, "haystack">, text: string): void => {
-    const haystack = searchableText(text);
-    if (haystack !== "") entries.push({ ...entry, haystack });
+  const add = (entry: Omit<SearchEntry, "haystack" | "rawText" | "displayText">, text: string): void => {
+    const displayText = stripMarkdown(text);
+    const haystack = normalizeSearchText(displayText);
+    if (haystack !== "") entries.push({ ...entry, rawText: text, displayText, haystack });
   };
   const document = isRecord(input.document) ? input.document : {};
   const nodes = Array.isArray(document.nodes) ? document.nodes as readonly unknown[] : [];
@@ -231,7 +241,14 @@ export function buildSearchIndex(input: SearchIndexInput): SearchEntry[] {
       add({ key, kind: "frame", targetId: id, rect }, typeof node.label === "string" ? node.label : "");
     } else if (node.type === "file" && typeof node.file === "string") {
       const subpath = typeof node.subpath === "string" ? ` ${node.subpath}` : "";
-      add({ key, kind: "file", targetId: id, rect }, `${fileName(node.file)}${subpath}`);
+      const note = /\.md$/iu.test(node.file) ? input.noteTexts?.get(node.file) : undefined;
+      const noteSubpath = typeof node.subpath === "string" ? node.subpath : "";
+      const content = note === undefined ? ""
+        : input.noteTextSlice !== undefined && noteSubpath !== ""
+          ? input.noteTextSlice(node.file, note, noteSubpath) ?? ""
+          : sliceLinkedNoteText(note, noteSubpath);
+      const title = `${fileName(node.file)}${subpath}`;
+      add({ key, kind: "file", targetId: id, rect }, content === "" ? title : `${title}\n${content}`);
     } else if (node.type === "link" && typeof node.url === "string") {
       add({ key, kind: "link", targetId: id, rect }, node.url);
     }
@@ -285,15 +302,217 @@ function readingOrder(a: SearchEntry, b: SearchEntry): number {
   return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
 }
 
-/** The positions, in the index, of every entry that holds the query. */
-export function findMatches(index: readonly SearchEntry[], query: string): number[] {
-  const needle = normalizeSearchText(query);
-  if (needle === "") return [];
+/** Literal defaults are unchanged; regex runs on display text, without accent folding. */
+export interface SearchOptions {
+  readonly regex?: boolean;
+  readonly caseSensitive?: boolean;
+}
+
+export type SearchErrorCode = "invalid-pattern" | "unsupported-pattern" | "pattern-too-long" | "input-too-large" | "work-limit";
+
+export interface SearchError {
+  readonly code: SearchErrorCode;
+}
+
+export type SearchMatchResult =
+  | { readonly matches: number[]; readonly error?: undefined }
+  | { readonly matches: []; readonly error: SearchError };
+
+export const SEARCH_REGEX_LIMITS = {
+  patternLength: 256,
+  states: 256,
+  entries: 20_000,
+  inputCharacters: 2_000_000,
+  work: 2_000_000,
+} as const;
+
+interface RegexState {
+  readonly atom?: RegExp;
+  readonly next?: number;
+  readonly epsilon?: number;
+}
+
+interface LinearPattern {
+  readonly states: readonly RegexState[];
+  readonly anchoredStart: boolean;
+  readonly anchoredEnd: boolean;
+}
+
+type CompiledPattern = { readonly pattern: LinearPattern; readonly error?: undefined }
+  | { readonly error: SearchError; readonly pattern?: undefined };
+
+/**
+ * Flat regex atoms and repeats form a forward NFA. Native RegExp only tests
+ * one character against one atom; it never executes the person's full pattern.
+ * Groups, alternatives, boundaries and backreferences require a worker later.
+ */
+function compileLinearPattern(query: string, caseSensitive: boolean): CompiledPattern {
+  if (query.length > SEARCH_REGEX_LIMITS.patternLength) return { error: { code: "pattern-too-long" } };
+  const flags = caseSensitive ? "u" : "iu";
+  try {
+    // Parse-only validation distinguishes broken syntax from unsupported syntax.
+    new RegExp(query, flags);
+  } catch {
+    return { error: { code: "invalid-pattern" } };
+  }
+  const states: RegexState[] = [];
+  const anchoredStart = query.startsWith("^");
+  let position = anchoredStart ? 1 : 0;
+  let anchoredEnd = false;
+  while (position < query.length) {
+    if (query[position] === "$" && position === query.length - 1) {
+      anchoredEnd = true;
+      break;
+    }
+    const start = position;
+    const character = query[position];
+    if (character === "[") {
+      position += 1;
+      while (position < query.length && query[position] !== "]") {
+        position += query[position] === "\\" ? 2 : 1;
+      }
+      position += 1;
+    } else if (character === "\\") {
+      const escape = query[position + 1] ?? "";
+      if ("123456789kbB".includes(escape) || escape === "0" || escape === "c") {
+        return { error: { code: "unsupported-pattern" } };
+      }
+      position += 2;
+      if ((escape === "p" || escape === "P" || escape === "u") && query[position] === "{") {
+        while (position < query.length && query[position] !== "}") position += 1;
+        position += 1;
+      } else if (escape === "u") {
+        position += 4;
+        const first = Number.parseInt(query.slice(start + 2, position), 16);
+        const second = Number.parseInt(query.slice(position + 2, position + 6), 16);
+        if (first >= 0xd800 && first <= 0xdbff && query.slice(position, position + 2) === "\\u"
+          && second >= 0xdc00 && second <= 0xdfff) position += 6;
+      }
+      else if (escape === "x") position += 2;
+    } else {
+      if (character !== undefined && "()|^$*+?{}".includes(character)) {
+        return { error: { code: "unsupported-pattern" } };
+      }
+      const codePoint = query.codePointAt(position);
+      position += codePoint !== undefined && codePoint > 0xffff ? 2 : 1;
+    }
+    let atom: RegExp;
+    try {
+      atom = new RegExp(`^(?:${query.slice(start, position)})$`, flags);
+    } catch {
+      return { error: { code: "unsupported-pattern" } };
+    }
+    let minimum = 1;
+    let maximum = 1;
+    const repeat = query[position];
+    if (repeat === "*" || repeat === "+" || repeat === "?") {
+      minimum = repeat === "+" ? 1 : 0;
+      maximum = repeat === "?" ? 1 : Infinity;
+      position += 1;
+    } else if (repeat === "{") {
+      const end = query.indexOf("}", position);
+      const bounds = query.slice(position + 1, end).split(",");
+      minimum = Number(bounds[0]);
+      maximum = bounds.length === 1 ? minimum : bounds[1] === "" ? Infinity : Number(bounds[1]);
+      position = end + 1;
+    }
+    // Greedy/lazy preference cannot change whether an entry contains a match.
+    if (query[position] === "?") position += 1;
+    const requiredStates = maximum === Infinity ? minimum + 1 : maximum;
+    if (states.length + requiredStates >= SEARCH_REGEX_LIMITS.states) {
+      return { error: { code: "unsupported-pattern" } };
+    }
+    for (let count = 0; count < minimum; count += 1) {
+      states.push({ atom, next: states.length + 1 });
+    }
+    if (maximum === Infinity) {
+      states.push({ atom, next: states.length, epsilon: states.length + 1 });
+    } else {
+      for (let count = minimum; count < maximum; count += 1) {
+        states.push({ atom, next: states.length + 1, epsilon: states.length + 1 });
+      }
+    }
+  }
+  states.push({});
+  return { pattern: { states, anchoredStart, anchoredEnd } };
+}
+
+interface WorkBudget {
+  remaining: number;
+}
+
+function linearPatternMatches(pattern: LinearPattern, text: string, budget: WorkBudget): boolean | undefined {
+  const states = pattern.states;
+  const accept = states.length - 1;
+  const close = (active: Set<number>): boolean => {
+    for (const position of active) {
+      budget.remaining -= 1;
+      if (budget.remaining < 0) return false;
+      const epsilon = states[position]?.epsilon;
+      if (epsilon !== undefined) active.add(epsilon);
+    }
+    return true;
+  };
+  let active = new Set([0]);
+  if (!close(active)) return undefined;
+  if (!pattern.anchoredEnd && active.has(accept)) return true;
+  for (const character of text) {
+    const next = new Set<number>();
+    for (const position of active) {
+      budget.remaining -= 1;
+      if (budget.remaining < 0) return undefined;
+      const state = states[position];
+      if (state?.atom?.test(character) === true && state.next !== undefined) next.add(state.next);
+    }
+    if (!pattern.anchoredStart) next.add(0);
+    if (!close(next)) return undefined;
+    active = next;
+    if (pattern.anchoredStart && active.size === 0) return false;
+    if (!pattern.anchoredEnd && active.has(accept)) return true;
+  }
+  return active.has(accept);
+}
+
+/** Structured failures clear all matches; a partial regex result is never presented. */
+export function searchMatches(index: readonly SearchEntry[], query: string, options: SearchOptions = {}): SearchMatchResult {
+  if (options.regex !== true) {
+    const needle = options.caseSensitive === true ? query.normalize("NFC").replace(WHITESPACE, " ").trim() : normalizeSearchText(query);
+    if (needle === "") return { matches: [] };
+    const matches: number[] = [];
+    for (let position = 0; position < index.length; position += 1) {
+      const entry = index[position];
+      const haystack = options.caseSensitive === true
+        ? entry.displayText.normalize("NFC").replace(WHITESPACE, " ").trim()
+        : entry.haystack;
+      if (haystack.includes(needle)) matches.push(position);
+    }
+    return { matches };
+  }
+  if (query === "") return { matches: [] };
+  const compiled = compileLinearPattern(query, options.caseSensitive === true);
+  if (compiled.error !== undefined) return { matches: [], error: compiled.error };
+  if (index.length > SEARCH_REGEX_LIMITS.entries) return { matches: [], error: { code: "input-too-large" } };
+  let characters = 0;
+  for (const entry of index) {
+    characters += entry.displayText.length;
+    if (characters > SEARCH_REGEX_LIMITS.inputCharacters) return { matches: [], error: { code: "input-too-large" } };
+  }
+  const budget = { remaining: SEARCH_REGEX_LIMITS.work };
   const matches: number[] = [];
   for (let position = 0; position < index.length; position += 1) {
-    if (index[position].haystack.includes(needle)) matches.push(position);
+    const found = linearPatternMatches(compiled.pattern, index[position].displayText, budget);
+    if (found === undefined) return { matches: [], error: { code: "work-limit" } };
+    if (found) matches.push(position);
   }
-  return matches;
+  return { matches };
+}
+
+/** Existing two-argument callers keep their array; enhanced callers receive errors. */
+export function findMatches(index: readonly SearchEntry[], query: string): number[];
+export function findMatches(index: readonly SearchEntry[], query: string, options: SearchOptions): SearchMatchResult;
+export function findMatches(index: readonly SearchEntry[], query: string, options?: SearchOptions): number[] | SearchMatchResult {
+  const result = searchMatches(index, query, options);
+  return options === undefined ? result.matches : result;
 }
 
 /** The next or previous match, going round from the last to the first. */

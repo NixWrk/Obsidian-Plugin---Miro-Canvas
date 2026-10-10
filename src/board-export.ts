@@ -11,7 +11,8 @@
  * The working board's camera and selection are never changed by export.
  */
 
-import { createHtmlElement } from "./dom-elements";
+import { createHtmlElement, createSvgElement } from "./dom-elements";
+import { checkExportCanvasFrame, settleExportMarkdown } from "./export-canvas";
 import {
   PAPER_FORMATS, captureTiles, exportPixels, paperLabels, type ExportPageRecord, type ExportQuality, type ExportRect,
   type ExportState, type PaperFormat, type PaperOrientation,
@@ -19,13 +20,16 @@ import {
 import { words } from "./i18n";
 import html2canvas from "html2canvas-pro";
 
-export type ExportKind = "pdf" | "pptx";
+export type ExportRendering = "raster" | "vector";
+export type ExportKind = "pdf" | "pptx" | "svg";
+export { renderVectorExportPages } from "./vector-export";
 
 
 export interface ExportPanelState {
   /** A board's own pages, or a presentation's slides, which set their own size. */
   readonly mode: "board" | "slides";
   readonly title: string;
+  readonly rendering?: ExportRendering;
   readonly state: ExportState;
   /** What the export is doing, while it runs. */
   readonly busy?: string;
@@ -36,6 +40,7 @@ export interface ExportPanelState {
 export interface ExportPanelActions {
   readonly onFormat: (format: PaperFormat, orientation: PaperOrientation) => void;
   readonly onQuality: (quality: ExportQuality) => void;
+  readonly onRendering?: (rendering: ExportRendering) => void;
   readonly onAddPage: () => void;
   readonly onAddFramePages: () => void;
   readonly onRemovePage: (id: string) => void;
@@ -46,7 +51,7 @@ export interface ExportPanelActions {
   readonly onStop?: () => void;
 }
 
-/** The export panel: paper, pages, quality and the two ways out. */
+/** Pages and settings scroll together, with output actions always in reach. */
 export class ExportPanel {
   public readonly element: HTMLElement;
   private readonly listeners: (() => void)[] = [];
@@ -60,21 +65,57 @@ export class ExportPanel {
 
   public update(view: ExportPanelState): void {
     const root = this.element;
+    const text = words().export;
     for (const remove of this.listeners.splice(0)) remove();
     while (root.firstChild !== null) root.removeChild(root.firstChild);
+    root.setAttribute("data-mode", view.mode);
     const header = this.add(root, "div", "miro-canvas-export__header");
-    this.add(header, "div", "miro-canvas-export__title", view.title);
-    const close = this.button(header, "×", words().export.close, "miro-canvas-export__close clickable-icon");
+    this.add(header, "h2", "miro-canvas-export__title", view.title);
+    const close = this.iconButton(header, "M18 6L6 18M6 6l12 12", text.close, "miro-canvas-export__close clickable-icon");
     this.on(close, "click", () => this.actions.onClose());
     const busy = view.busy !== undefined;
-    if (busy && this.actions.onStop !== undefined) {
-      const stop = this.button(header, words().export.stop, words().export.stop, "miro-canvas-export__stop");
-      this.on(stop, "click", () => this.actions.onStop?.());
+    const body = this.add(root, "div", "miro-canvas-export__body");
+    const pages = this.add(body, "div", "miro-canvas-export__pages");
+    const heading = this.add(pages, "div", "miro-canvas-export__section-header");
+    this.add(heading, "div", "miro-canvas-export__label", view.mode === "slides" ? text.slidesLabel : text.pagesLabel);
+    this.add(heading, "span", "miro-canvas-export__page-count", String(view.state.pages.length));
+    const list = this.add(pages, "div", "miro-canvas-export__page-list");
+    list.setAttribute("role", "list");
+    if (view.state.pages.length === 0) this.add(list, "div", "miro-canvas-export__empty", text.noPages);
+    view.state.pages.forEach((page, index) => {
+      const item = this.add(list, "div", "miro-canvas-export__page");
+      item.setAttribute("role", "listitem");
+      const name = this.button(item, `${index + 1}. ${page.name ?? text.pageFallback(index + 1)}`, text.showPage, "miro-canvas-export__page-name");
+      this.on(name, "click", () => this.actions.onShowPage(page.id));
+      if (view.mode !== "board") return;
+      for (const [path, label, step] of [
+        ["M12 19V5M5 12l7-7 7 7", text.earlier, -1],
+        ["M12 5v14M5 12l7 7 7-7", text.later, 1],
+      ] as const) {
+        const move = this.iconButton(item, path, label, "miro-canvas-export__page-action clickable-icon");
+        move.disabled = busy || (step === -1 ? index === 0 : index === view.state.pages.length - 1);
+        this.on(move, "click", () => this.actions.onMovePage(page.id, step));
+      }
+      const remove = this.iconButton(item, "M3 6h18M9 6V4h6v2M19 6l-1 14H6L5 6M10 10v6M14 10v6", text.removePage, "miro-canvas-export__page-action clickable-icon");
+      remove.disabled = busy;
+      this.on(remove, "click", () => this.actions.onRemovePage(page.id));
+    });
+    if (view.mode === "board") {
+      this.add(pages, "p", "miro-canvas-export__layout-hint", text.layoutHint);
+      const adding = this.add(pages, "div", "miro-canvas-export__actions miro-canvas-export__add");
+      const add = this.button(adding, text.addPage, text.addPageHint, "miro-canvas-export__add-button");
+      add.disabled = busy;
+      this.on(add, "click", () => this.actions.onAddPage());
+      const frames = this.button(adding, text.addFramePages, text.addFramePagesHint, "miro-canvas-export__add-button");
+      frames.disabled = busy;
+      this.on(frames, "click", () => this.actions.onAddFramePages());
     }
 
+    const settings = this.add(body, "div", "miro-canvas-export__settings");
     if (view.mode === "board") {
-      const paper = this.row(root, words().export.paperLabel);
-      const format = this.add(paper, "select", "dropdown") as HTMLSelectElement;
+      const paper = this.row(settings, text.paperLabel);
+      const format = this.add(paper, "select", "dropdown miro-canvas-export__format") as HTMLSelectElement;
+      format.setAttribute("aria-label", text.paperLabel);
       for (const value of PAPER_FORMATS) {
         const option = this.add(format, "option", "", paperLabels()[value]) as HTMLOptionElement;
         option.value = value;
@@ -84,7 +125,9 @@ export class ExportPanel {
       this.on(format, "change", () => this.actions.onFormat(format.value as PaperFormat, view.state.orientation));
       if (view.state.format !== "free") {
         const turns = this.add(paper, "div", "miro-canvas-export__segments");
-        for (const [value, label] of [["landscape", words().export.landscape], ["portrait", words().export.portrait]] as const) {
+        turns.setAttribute("role", "group");
+        turns.setAttribute("aria-label", text.paperLabel);
+        for (const [value, label] of [["landscape", text.landscape], ["portrait", text.portrait]] as const) {
           const choice = this.button(turns, label, label, "miro-canvas-export__segment");
           choice.setAttribute("aria-pressed", String(view.state.orientation === value));
           choice.disabled = busy;
@@ -92,41 +135,24 @@ export class ExportPanel {
         }
       }
     }
-
-    if (view.mode === "board") this.add(root, "p", "miro-canvas-export__layout-hint", words().export.layoutHint);
-    const pages = this.add(root, "div", "miro-canvas-export__pages");
-    this.add(pages, "div", "miro-canvas-export__label", view.mode === "slides" ? words().export.slidesLabel : words().export.pagesLabel);
-    if (view.state.pages.length === 0) {
-      this.add(pages, "div", "miro-canvas-export__empty", words().export.noPages);
+    const rendering = this.row(settings, text.renderingLabel);
+    const modes = this.add(rendering, "div", "miro-canvas-export__segments");
+    modes.setAttribute("role", "group");
+    modes.setAttribute("aria-label", text.renderingLabel);
+    for (const [value, label] of [["raster", text.raster], ["vector", text.vector]] as const) {
+      const mode = this.button(modes, label, label, "miro-canvas-export__segment");
+      mode.setAttribute("aria-pressed", String((view.rendering ?? "raster") === value));
+      mode.disabled = busy;
+      this.on(mode, "click", () => this.actions.onRendering?.(value));
     }
-    view.state.pages.forEach((page, index) => {
-      const item = this.add(pages, "div", "miro-canvas-export__page");
-      const name = this.button(item, `${index + 1}. ${page.name ?? words().export.pageFallback(index + 1)}`, words().export.showPage, "miro-canvas-export__page-name");
-      this.on(name, "click", () => this.actions.onShowPage(page.id));
-      if (view.mode !== "board") return;
-      for (const [glyph, label, step] of [["↑", words().export.earlier, -1], ["↓", words().export.later, 1]] as const) {
-        const move = this.button(item, glyph, label, "miro-canvas-export__page-action clickable-icon");
-        move.disabled = busy || (step === -1 ? index === 0 : index === view.state.pages.length - 1);
-        this.on(move, "click", () => this.actions.onMovePage(page.id, step));
-      }
-      const remove = this.button(item, "✕", words().export.removePage, "miro-canvas-export__page-action clickable-icon");
-      remove.disabled = busy;
-      this.on(remove, "click", () => this.actions.onRemovePage(page.id));
-    });
-    if (view.mode === "board") {
-      const adding = this.add(pages, "div", "miro-canvas-export__actions");
-      const add = this.button(adding, words().export.addPage, words().export.addPageHint);
-      add.disabled = busy;
-      this.on(add, "click", () => this.actions.onAddPage());
-      const frames = this.button(adding, words().export.addFramePages, words().export.addFramePagesHint);
-      frames.disabled = busy;
-      this.on(frames, "click", () => this.actions.onAddFramePages());
-    }
-
-    const quality = this.row(root, words().export.qualityLabel);
+    this.add(settings, "p", "miro-canvas-export__render-hint", text.renderingHint);
+    const quality = this.row(settings, text.qualityLabel);
+    quality.hidden = view.rendering === "vector";
     const levels = this.add(quality, "div", "miro-canvas-export__segments");
+    levels.setAttribute("role", "group");
+    levels.setAttribute("aria-label", text.qualityLabel);
     for (const [value, label, hint] of [
-      ["standard", words().export.standard, words().export.standardHint], ["high", words().export.high, words().export.highHint],
+      ["standard", text.standard, text.standardHint], ["high", text.high, text.highHint],
     ] as const) {
       const choice = this.button(levels, label, hint, "miro-canvas-export__segment");
       choice.setAttribute("aria-pressed", String(view.state.quality === value));
@@ -134,14 +160,26 @@ export class ExportPanel {
       this.on(choice, "click", () => this.actions.onQuality(value));
     }
 
-    const out = this.add(root, "div", "miro-canvas-export__actions miro-canvas-export__out");
-    for (const [kind, label] of [["pdf", words().export.exportPdf], ["pptx", words().export.exportPptx]] as const) {
-      const run = this.button(out, label, label, kind === "pdf" ? "mod-cta" : "");
+    const footer = this.add(root, "div", "miro-canvas-export__footer");
+    const status = view.busy ?? view.unavailable;
+    if (status !== undefined) {
+      const progress = this.add(footer, "div", "miro-canvas-export__status-row");
+      this.add(progress, "div", "miro-canvas-export__status", status).setAttribute("role", "status");
+      if (busy && this.actions.onStop !== undefined) {
+        const stop = this.button(progress, text.stop, text.stop, "miro-canvas-export__stop");
+        this.on(stop, "click", () => this.actions.onStop?.());
+      }
+    }
+    const out = this.add(footer, "div", "miro-canvas-export__actions miro-canvas-export__out");
+    out.setAttribute("role", "group");
+    out.setAttribute("aria-label", text.dialogLabel);
+    for (const [kind, caption, label] of [
+      ["pdf", text.pdfCaption, text.exportPdf], ["pptx", text.pptxCaption, text.exportPptx], ["svg", text.svgCaption, text.exportSvg],
+    ] as const) {
+      const run = this.button(out, caption, label, kind === "pdf" ? "miro-canvas-export__output mod-cta" : "miro-canvas-export__output");
       run.disabled = busy || view.unavailable !== undefined || view.state.pages.length === 0;
       this.on(run, "click", () => this.actions.onExport(kind));
     }
-    const status = view.busy ?? view.unavailable;
-    if (status !== undefined) this.add(root, "div", "miro-canvas-export__status", status).setAttribute("role", "status");
   }
 
   public dispose(): void {
@@ -167,6 +205,25 @@ export class ExportPanel {
     const button = this.add(parent, "button", className, text) as HTMLButtonElement;
     button.type = "button";
     button.setAttribute("aria-label", label);
+    return button;
+  }
+
+  private iconButton(parent: Element, path: string, label: string, className: string): HTMLButtonElement {
+    const button = this.button(parent, "", label, className);
+    const icon = createSvgElement(this.document, "svg");
+    icon.setAttribute("class", "svg-icon");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.75");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("focusable", "false");
+    const line = createSvgElement(this.document, "path");
+    line.setAttribute("d", path);
+    icon.appendChild(line);
+    button.appendChild(icon);
     return button;
   }
 
@@ -365,7 +422,7 @@ export function planCapture(
 }
 
 /** Camera and pixels belonging exclusively to the background renderer. */
-interface CaptureCanvas {
+export interface CaptureCanvas {
   x: number; y: number; tx: number; ty: number; zoom: number; tZoom: number;
   screenshotting?: boolean;
   viewportChanged?: boolean;
@@ -376,7 +433,7 @@ interface CaptureCanvas {
   setViewport?(x: number, y: number, zoom: number): void;
 }
 
-function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+export function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const abort = (): void => reject(new Error(words().export.exportStopped));
     if (signal.aborted) {
@@ -391,6 +448,37 @@ function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
       signal.removeEventListener("abort", abort);
       reject(error instanceof Error ? error : new Error(words().export.exportFailed));
     });
+  });
+}
+
+/** Hidden desktop windows may suspend RAF; Stop and the timer both release it. */
+export function exportFrame(view: Window, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let frame: number | undefined;
+    let timer: number | undefined;
+    let settled = false;
+    const finish = (error?: Error): void => {
+      if (settled) return;
+      settled = true;
+      if (frame !== undefined) view.cancelAnimationFrame(frame);
+      if (timer !== undefined) view.clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      if (error === undefined) resolve();
+      else reject(error);
+    };
+    const abort = (): void => finish(new Error(words().export.exportStopped));
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      timer = view.setTimeout(() => finish(), 150);
+      if (!settled) frame = view.requestAnimationFrame(() => finish());
+      if (settled) {
+        if (timer !== undefined) view.clearTimeout(timer);
+        if (frame !== undefined) view.cancelAnimationFrame(frame);
+      }
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error(words().export.pageNotDrawn));
+    }
   });
 }
 
@@ -443,8 +531,12 @@ export async function renderExportPages(
         canvas.viewportChanged = true;
         canvas.requestFrame();
         await abortable(pause(120), controller.signal);
-        await abortable(new Promise<void>(resolve => view.requestAnimationFrame(() => resolve())), controller.signal);
+        await exportFrame(view, controller.signal);
+        checkExportCanvasFrame(canvas);
+        await settleExportMarkdown(canvas, controller.signal);
         prepare?.();
+        // Let scoped style observers reassert paint before the rasterizer clones it.
+        await abortable(Promise.resolve(), controller.signal);
         const picture = await html2canvas(wrapper, {
           signal: controller.signal,
           scale: 1, logging: false, backgroundColor: view.getComputedStyle(wrapper).backgroundColor,
@@ -497,12 +589,14 @@ function prepareExportSvgs(source: HTMLElement, cloned: HTMLElement): void {
     if (copy === undefined || original.getBoundingClientRect().width === 0) continue;
     const elements = [original, ...Array.from(original.querySelectorAll("*"))];
     const targets = [copy, ...Array.from(copy.querySelectorAll("*"))];
+    const hiddenByGroup = original.closest(".miro-canvas-group-hidden") !== null;
     elements.forEach((element, at) => {
       const target = targets[at] as SVGElement | undefined;
       if (target === undefined) return;
       const computed = view.getComputedStyle(element);
-      for (const property of ["color", "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity", "font-family", "font-size"]) {
-        target.style.setProperty(property, computed.getPropertyValue(property));
+      for (const property of ["visibility", "display", "color", "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity", "font-family", "font-size", "font-weight", "font-style", "font-variant", "letter-spacing", "word-spacing", "text-decoration", "text-anchor", "dominant-baseline"]) {
+        // Native screenshot content may reveal descendants of a collapsed group.
+        target.style.setProperty(property, hiddenByGroup && property === "visibility" ? "hidden" : computed.getPropertyValue(property));
       }
     });
     if (!original.classList.contains("canvas-edges")) continue;

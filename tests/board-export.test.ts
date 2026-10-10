@@ -114,6 +114,7 @@ class FakeWindow {
 class FakeDocument {
   public readonly defaultView = new FakeWindow();
   public createElement(tagName: string): FakeElement { return new FakeElement(tagName); }
+  public createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName); }
 }
 
 function descendants(root: FakeElement): FakeElement[] {
@@ -152,11 +153,12 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
   readonly render: (patch?: Partial<ExportPanelState>) => void;
 } {
   const calls: Record<string, unknown[]> = {
-    format: [], quality: [], addPage: [], addFramePages: [], removePage: [], movePage: [], showPage: [], exportKind: [], close: [], stop: [],
+    format: [], quality: [], rendering: [], addPage: [], addFramePages: [], removePage: [], movePage: [], showPage: [], exportKind: [], close: [], stop: [],
   };
   const actions: ExportPanelActions = {
     onFormat: (format, orientation) => calls.format.push([format, orientation]),
     onQuality: (quality) => calls.quality.push(quality),
+    onRendering: (rendering) => calls.rendering.push(rendering),
     onAddPage: () => calls.addPage.push(true),
     onAddFramePages: () => calls.addFramePages.push(true),
     onRemovePage: (id) => calls.removePage.push(id),
@@ -175,6 +177,56 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
 }
 
 describe("ExportPanel", () => {
+  it("changes PDF/PowerPoint rendering while SVG remains an independent format", () => {
+    const { root, calls, render } = buildPanel();
+    const text = words().export;
+    expect(byLabel(root, text.raster).getAttribute("aria-pressed")).toBe("true");
+    byLabel(root, text.vector).dispatch("click");
+    expect(calls.rendering).toEqual(["vector"]);
+    render({ rendering: "vector" });
+    expect(byLabel(root, text.vector).getAttribute("aria-pressed")).toBe("true");
+    expect(byLabel(root, text.standardHint).parentNode!.parentNode!.hidden).toBe(true);
+    byLabel(root, text.exportSvg).dispatch("click");
+    expect(calls.exportKind).toEqual(["svg"]);
+    render({ busy: "Writing" });
+    expect(byLabel(root, text.vector).disabled).toBe(true);
+  });
+
+  it("retains named output actions when their visible captions are shortened", () => {
+    const { root, calls } = buildPanel();
+    const text = words().export;
+    for (const [label, caption] of [[text.exportPdf, text.pdfCaption], [text.exportPptx, text.pptxCaption], [text.exportSvg, text.svgCaption]]) {
+      const button = byLabel(root, label!);
+      expect(button.textContent).toBe(caption);
+      button.dispatch("click");
+    }
+    expect(calls.exportKind).toEqual(["pdf", "pptx", "svg"]);
+  });
+
+  it("gives the paper dropdown a name and preserves the selected orientation on change", () => {
+    const { root, calls, render } = buildPanel();
+    const select = descendants(root).find(item => item.tagName === "select")!;
+    expect(select.getAttribute("aria-label")).toBe(words().export.paperLabel);
+    select.value = "letter";
+    select.dispatch("change");
+    expect(calls.format).toEqual([["letter", "landscape"]]);
+    render({ busy: "Rendering" });
+    expect(descendants(root).find(item => item.tagName === "select")!.disabled).toBe(true);
+  });
+
+  it("removes replaced controls' listeners and keeps Stop beside progress", () => {
+    const { root, calls, render } = buildPanel({ busy: "Rendering" });
+    const oldStop = byLabel(root, words().export.stop);
+    const status = descendants(root).find(item => item.className === "miro-canvas-export__status")!;
+    expect(oldStop.parentNode).toBe(status.parentNode);
+    expect(status.getAttribute("role")).toBe("status");
+    render({ busy: undefined });
+    oldStop.dispatch("click");
+    expect(calls.stop).toEqual([]);
+    const close = byLabel(root, words().export.close);
+    expect(close.children[0]!.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("keeps Stop and Close available in the existing panel while export runs", () => {
     const { root, calls, render } = buildPanel({ busy: "Rendering pages" });
     const stop = byLabel(root, words().export.stop);
@@ -246,6 +298,14 @@ describe("ExportPanel", () => {
     byLabel(root, words().export.highHint).dispatch("click");
     expect(calls.format[0]).toEqual(["a4", "portrait"]);
     expect(calls.quality[0]).toBe("high");
+  });
+
+  it("runs SVG from the incumbent export panel without adding a new dialog", () => {
+    const { root, calls, render } = buildPanel();
+    byLabel(root, words().export.exportSvg).dispatch("click");
+    expect(calls.exportKind).toEqual(["svg"]);
+    render({ busy: "Exporting" });
+    expect(byLabel(root, words().export.exportSvg).disabled).toBe(true);
   });
 
   it("runs pdf or pptx export and closes from its own buttons", () => {

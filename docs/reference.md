@@ -39,6 +39,10 @@ so nothing is taken from Obsidian or other plugins.
   up / down
 - Arrange panels
 - Search on the board (Ctrl+F already opens it while the board has focus)
+- Reverse connection direction; select connected, incoming or outgoing lines
+- Collapse/expand a group; move selection to a new board
+- Board properties; copy a link or embed for the selected card
+- Permanent board palette; named custom CSS styles
 - Toggle attachment names
 - Open Miro Canvas controls, open source and provenance inspector
 - Local shapes, comments, anchors and documents
@@ -62,6 +66,9 @@ so nothing is taken from Obsidian or other plugins.
 - **Keyboard** - where to give the commands hotkeys, and whether Ctrl+F
   searches the board.
 - **Interface** - the minimap by default, the selection toolbar.
+- **Canvas enhancements** - content thresholds by card type, connected-line
+  highlighting, persistent colors, named CSS, metadata integration and optional
+  note-property connections. Zero thresholds retain native content rendering.
 - **Getting started** - the welcome board and the Miro import guide.
 - **Updates** - the daily check for a new version, and a button to check now.
 - **Fonts** - font packs, your own font files, the font list.

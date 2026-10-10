@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { App, Plugin, SettingDefinitionItem, SettingDefinitionRender } from "obsidian";
+import type { App, Plugin, Setting, SettingGroup, SettingDefinitionItem, SettingDefinitionRender } from "obsidian";
 import { build } from "esbuild";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath } from "node:url";
@@ -53,6 +53,7 @@ const native = vi.hoisted(() => {
     limits: unknown[] = [];
     options = new Map<string, string>();
     selectEl = new Element();
+    inputEl = new Element();
     change?: (value: unknown) => unknown;
     click?: () => unknown;
     constructor(kind: string) { this.kind = kind; }
@@ -154,10 +155,11 @@ const { MiroCanvasSettingTab } = compiled.exports;
 
 afterEach(() => setLocale("en"));
 
-function rig() {
+function rig(cssSnippets: readonly string[] = []) {
   let settings = normalizeSettings({ fontPacks: [FONT_PACK_CATALOGUE[0].id], customFonts: [{ file: "custom.woff", family: "My font" }], commentAuthorColors: { Inter: "#123456" } });
   const saveSettings = vi.fn(async (patch) => { settings = mergeSettings(settings, patch); });
   const host: SettingsTabHost = {
+    cssSnippets: () => cssSnippets,
     get settings() { return settings; },
     saveSettings,
     commentAuthors: () => ["Anna", "Inter"],
@@ -243,6 +245,75 @@ describe("native searchable settings definitions", () => {
     expect(r.row(labels.zoomStepName).descEl.textContent).toContain("50%");
     expect(r.app.vault.setConfig).not.toHaveBeenCalled();
     expect(r.plugin.saveData).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "ru"] as const)("indexes corner radius and individual snippet controls in %s", async locale => {
+    setLocale(locale);
+    const r = rig(["Red line", "Wide paragraphs"]);
+    const entries = rows(r.tab.getSettingDefinitions());
+    expect(entries.some(item => item.name === words().enhancements.cardCornerRadius)).toBe(true);
+    expect(entries.some(item => item.name === "Red line")).toBe(true);
+    r.tab.update();
+    await r.row(words().enhancements.cardCornerRadius).controls[0].change?.(20);
+    const numeric = r.row(words().enhancements.cardCornerRadius).controls[1];
+    expect(numeric.value).toBe("20");
+    await numeric.change?.("invalid");
+    expect(r.host.settings.cardCornerRadius).toBe(20);
+    await numeric.change?.("99");
+    expect(r.host.settings.cardCornerRadius).toBe(48);
+    expect(numeric.value).toBe("48");
+    expect(r.row(words().enhancements.cardCornerRadius).controls[0].value).toBe(48);
+    await numeric.change?.("20");
+    await r.row("Red line").controls[0].change?.(true);
+    await r.row("Wide paragraphs").controls[0].change?.(true);
+    await r.row("Red line").controls[0].change?.(false);
+    expect(r.host.settings).toMatchObject({ cardCornerRadius: 20, allowedCanvasSnippets: ["Wide paragraphs"] });
+    expect(r.app.vault.setConfig).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "ru"] as const)("indexes and saves the radius zoom percentage with slider and exact input in %s", async locale => {
+    setLocale(locale);
+    const r = rig();
+    const label = words().enhancements.shapeRadiusControlMinZoom;
+    const entries = rows(r.tab.getSettingDefinitions());
+    expect(entries.find(item => item.name === label)?.desc).toContain("200%");
+    expect(r.host.saveSettings).not.toHaveBeenCalled();
+    r.tab.update();
+    const row = r.row(label);
+    const [slider, input] = row.controls;
+    expect(slider.limits).toEqual([0, 6400, 25]);
+    expect(input.inputEl.attributes.get("aria-label")).toBe(label);
+    await slider.change?.(300);
+    expect(input.value).toBe("300");
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(300);
+    await input.change?.("125");
+    expect(slider.value).toBe(125);
+    expect(row.descEl.textContent).toContain("125%");
+    for (const invalid of ["", "NaN", "Infinity"]) await input.change?.(invalid);
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(125);
+    await input.change?.("-1");
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(0);
+    expect(input.value).toBe("0");
+    await input.change?.("9000");
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(6400);
+    expect(input.value).toBe("6400");
+    expect(r.host.settings.shapeRadiusControlEnabled).toBe(true);
+    expect(r.app.vault.setConfig).not.toHaveBeenCalled();
+    expect(r.plugin.saveData).not.toHaveBeenCalled();
+  });
+
+  it("reads live values when native Obsidian reuses cached slider definitions after reopening", async () => {
+    const r = rig();
+    const entries = rows(r.tab.getSettingDefinitions());
+    await r.host.saveSettings({ shapeRadiusControlMinZoomPercent: 125, cardCornerRadius: 17 });
+    for (const [name, value] of [[words().enhancements.shapeRadiusControlMinZoom, 125], [words().enhancements.cardCornerRadius, 17]] as const) {
+      const definition = entries.find(item => item.name === name)!;
+      const setting = new native.Setting(new native.Element()).setName(name).setDesc(typeof definition.desc === "string" ? definition.desc : "");
+      definition.render?.(setting as unknown as Setting, {} as SettingGroup);
+      expect(setting.controls[0].value).toBe(value);
+      expect(setting.controls[1].value).toBe(String(value));
+      expect(setting.descEl.textContent).toContain(String(value));
+    }
   });
 
   it("keeps toolbar ordering and scroll when definitions are updated", async () => {

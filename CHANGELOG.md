@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-10-10
+
+- Add a global minimum zoom percentage for the figure radius marker in plugin settings, with slider and exact input; default 200%, or 0 for any zoom. Follow native displayed zoom, remove the marker while zooming out and cancel unfinished radius drafts without a history entry; retain drag/exact input and the settings switch.
+
+- Restore native Canvas pan/pinch for finger drags from selected, unselected or locked native cards and native mixed/collapsed selection areas in review, native readonly and slideshow; board navigation leaves node positions and history unchanged. Preserve native right-button mouse panning through the move guard.
+- Add Raster/Vector PDF and PowerPoint export while retaining standalone SVG. Vector PDF embeds licensed Noto Sans in four styles and preserves real paths/text/clipping; vector PPTX embeds SVG per slide with a JPEG compatibility fallback. Keep independent snapshots, Stop and guarded saves; load the bundled PDF libraries only when requested.
+- Hide editing and creation menus in review, restoring them on exit and retaining direct selected-link opening. Add a temporary laser pointer to review and slideshow controls; its bounded fading trail never changes board data/history or enters exports. Present ordinary native frames in file order, with export pages as a fallback, and restore readonly on exit.
+
+- Refine the export panel with grouped page actions, compact paper/quality controls, native SVG action icons, a scrolling body and persistent Close/output actions; account for tablet safe areas and the real Android keyboard. Keep PDF/PowerPoint/SVG callbacks and independent rendering unchanged.
+
+- Use a bidirectional radius arrow and restore the earlier marker movement with the live radius. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.
+
+- Replace the small circular shape-radius marker with a rounded-corner/drag-arrow icon and show the current radius above the held control during finger, pen or mouse movement; retain exact numeric input.
+
+- Make the inherited board theme follow the owning Obsidian window rather than a conflicting OS preference; label it “Obsidian” / «Как в Obsidian». Follow live host changes and retain explicit board themes. Wrap long board-menu labels without displacing switches. Correct selected attachment-name checkbox state for native runtime nodes so repeated toggling and Undo/Redo work.
+
+- Replace the selection More popover’s scattered icon grid with labelled action rows, consistent native controls, touch targets and Delete last. Keep the action list inside the available board area while Android’s keyboard is open.
+
+- Keep rectangular shape corners circular at any width/height. Add a drag handle and exact input directly on the selected figure, plus a plugin-settings switch; remember the last radius for new rounded rectangles. Use wide/tall/square catalogue proportions for click/drop creation instead of making every figure a square.
+
+- Add adjustable card corner radius (0–48 board pixels; square by default), preserving diagram and drawing geometry.
+- Exclude supported CSS snippets from Canvas by default, with individual permissions in searchable settings. Preserve ordinary note styling and native/theme/plugin CSS; diagnose unsupported global rules and popout ownership instead of claiming complete isolation.
+- Add independent SVG export with actual vector geometry/text and vertically stacked clipped pages. Preserve computed card typography/radius and native arrow transforms; embed only intrinsic raster attachments. Unsupported rich content reports a refusal; fonts remain references and cosmetic shadows are omitted.
+
+- Expand board search to linked Markdown note contents and heading/block slices, with match-case, bounded regular expressions and explicit invalid/unsupported-pattern feedback.
+- Add Flip for native and independent connections, connected/incoming/outgoing selection and optional highlighting. Add reversible group collapse as a view projection, retaining native cards, lines and stored geometry.
+- Move a selection into a new board with preserved card IDs, styling, unknown fields and Miro source evidence; redirect crossing lines to the new file card and retain old card links through redirects. Undo restores the source selection but deliberately retains the target board.
+- Add board properties, tags/aliases and individual-card links/embeds. Use guarded transient metadata caches plus graph/outgoing/backlink integration; discover property-only backlinks outside native results with genuine board navigation, supported only with an empty backlink filter.
+- Add a separate board-property/tag file-result supplement for positive conjunctions, including typed searches. Unsupported OR, negation, regex, comparisons, typed operands and mixed content/file/path syntax fail closed for the supplement; native search remains unchanged.
+- Add optional note-property-derived connections between file cards, reconciling only marked generated edges and preserving manual connections. Maintain property links and moved-card redirects across renames through checked writers.
+- Prefer a permanent palette for new or uncustomized boards while preserving customized local palettes. Add named scoped CSS declarations from a restricted subset and zoom content thresholds with selection/editing exemptions.
+- Wait for native Markdown rendering before independent PDF/PowerPoint capture so card text remains in background exports under default throttling.
+
+Verification, supported behavior and remaining coverage follow-ups are
+tracked in the [feature plan](docs/canvas-enhancement-plan.md) and
+[release checks](docs/release-0.3.0-checks.md).
+
 - Refresh all 58 English/Russian guide GIFs with readable step captions, simpler workflows and clear final states. Add one board-theme switch example per language; keep card colors and content visible across both themes. Place panels beside the work, select cards before following links, and verify actual drawing/erasure and reachable controls.
 - Simplify the English and Russian READMEs with a feature overview, quick installation and first steps. Keep all detailed instructions and existing GIFs in linked user guides; move CLI examples and source-warning notes to the contributor guides.
 - Update development ESLint to 10.12.0 and Node 22 declarations to 22.20.5; development now requires Node 22.13+ on supported lines. Keep the three plugin runtime files unchanged and CLI/MCP downloads on Node 20+; rebuilding the standalone tools changes only unused package metadata. Pin html2canvas-pro 2.5.0: the next two patches declare Node 24 and are deferred.

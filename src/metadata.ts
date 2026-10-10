@@ -120,6 +120,8 @@ export interface MiroCanvasColorOverride {
 }
 
 export interface MiroCanvasLocalOverride {
+  readonly customStyles?: readonly string[];
+  readonly groupCollapse?: { readonly width: number; readonly height: number; readonly children: readonly string[]; readonly [key: string]: unknown };
   readonly typography?: MiroCanvasTypographyOverride;
   readonly colors?: MiroCanvasColorOverride;
   readonly locked?: boolean;
@@ -196,6 +198,8 @@ export interface MiroCanvasFreeAnchor {
 
 export interface MiroCanvasMetadata {
   readonly schemaVersion: MiroCanvasSchemaVersion;
+  readonly properties?: Readonly<Record<string, unknown>>;
+  readonly nodeRedirects?: Readonly<Record<string, { readonly file: string; readonly nodeId: string; readonly [key: string]: unknown }>>;
   readonly settings?: MiroCanvasSettings;
   readonly transform?: MiroCanvasTransform;
   readonly bindings?: Readonly<Record<string, MiroCanvasBinding>>;
@@ -255,6 +259,8 @@ type PropertyRead =
 
 const METADATA_FIELDS = new Set([
   "schemaVersion",
+  "properties",
+  "nodeRedirects",
   "settings",
   "transform",
   "bindings",
@@ -300,7 +306,7 @@ const SETTINGS_FIELDS = new Set([
  */
 const OVERRIDE_FIELDS = new Set([
   "typography", "colors", "locked", "showAttachmentName", "rotation", "item",
-  "shape", "borderStyle", "borderWidth", "connector", "connectorAnchors",
+  "shape", "borderStyle", "borderWidth", "cornerRadius", "connector", "connectorAnchors", "customStyles", "groupCollapse",
 ]);
 export const KNOWN_OVERRIDE_FIELDS: ReadonlySet<string> = OVERRIDE_FIELDS;
 const TYPOGRAPHY_FIELDS = new Set([
@@ -1013,6 +1019,30 @@ function validateLocalOverrides(
     }
 
     warnUnknownFields(property.value, OVERRIDE_FIELDS, overridePath, diagnostics);
+    const styles = readOwn(property.value, "customStyles");
+    if (styles.state === "error") {
+      addError(diagnostics, "property-read-failed", pathFor(overridePath, "customStyles"), "Custom styles could not be read safely.");
+    } else if (styles.state === "present") {
+      validateFeatureIds(styles.value, pathFor(overridePath, "customStyles"), 32, diagnostics, /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u);
+    }
+    const collapse = readOwn(property.value, "groupCollapse");
+    if (collapse.state === "error") {
+      addError(diagnostics, "property-read-failed", pathFor(overridePath, "groupCollapse"), "Group state could not be read safely.");
+    } else if (collapse.state === "present") {
+      const at = pathFor(overridePath, "groupCollapse");
+      if (!isRecord(collapse.value)) addError(diagnostics, "group-collapse-invalid", at, "Collapsed group state must be an object.");
+      else {
+        for (const field of ["width", "height"]) {
+          const size = readOwn(collapse.value, field);
+          if (size.state !== "present" || typeof size.value !== "number" || !Number.isFinite(size.value) || size.value < 1) {
+            addError(diagnostics, "group-size-invalid", pathFor(at, field), "Expanded group dimensions must be finite positive numbers.");
+          }
+        }
+        const children = readOwn(collapse.value, "children");
+        if (children.state !== "present") addError(diagnostics, "group-members-invalid", pathFor(at, "children"), "Collapsed group members are required.");
+        else validateFeatureIds(children.value, pathFor(at, "children"), 100000, diagnostics);
+      }
+    }
     const typography = readOwn(property.value, "typography");
     if (typography.state === "error") {
       addError(diagnostics, "property-read-failed", pathFor(overridePath, "typography"), "The property could not be read safely.");
@@ -1027,6 +1057,12 @@ function validateLocalOverrides(
     }
     validateBooleanIfPresent(property.value, "locked", overridePath, diagnostics);
     validateBooleanIfPresent(property.value, "showAttachmentName", overridePath, diagnostics);
+    const radius = readOwn(property.value, "cornerRadius");
+    if (radius.state === "error") {
+      addError(diagnostics, "property-read-failed", pathFor(overridePath, "cornerRadius"), "Corner radius could not be read safely.");
+    } else if (radius.state === "present" && (typeof radius.value !== "number" || !Number.isFinite(radius.value) || radius.value < 0 || radius.value > 1000)) {
+      addError(diagnostics, "corner-radius-invalid", pathFor(overridePath, "cornerRadius"), "Corner radius must be a finite number between 0 and 1000.");
+    }
     const rotation = readOwn(property.value, "rotation");
     if (rotation.state === "error") {
       addError(diagnostics, "property-read-failed", pathFor(overridePath, "rotation"), "The rotation could not be read safely.");
@@ -1196,6 +1232,25 @@ function validateFreeAnchors(
   }
 }
 
+function validateFeatureIds(value: unknown, path: string, maximum: number, diagnostics: MiroCanvasDiagnostic[], pattern?: RegExp): void {
+  if (!isArray(value)) {
+    addError(diagnostics, "array-expected", path, "Feature IDs must be an array.");
+    return;
+  }
+  const length = readOwn(value as unknown as UnknownRecord, "length");
+  if (length.state !== "present" || typeof length.value !== "number" || length.value > maximum) {
+    addError(diagnostics, "feature-id-limit", path, "The feature ID collection exceeds its supported limit or cannot be read.");
+    return;
+  }
+  const seen = new Set<string>();
+  forEachArrayIndex(value, path, diagnostics, (id, index) => {
+    const at = `${path}[${index}]`;
+    if (!requireNonEmptyString(id, at, diagnostics)) return;
+    if (seen.has(id) || (pattern !== undefined && !pattern.test(id))) addError(diagnostics, "feature-id-invalid", at, "Feature IDs must be valid and unique.");
+    seen.add(id);
+  });
+}
+
 function validateMetadataObject(value: unknown): MiroCanvasMetadataValidationResult {
   const diagnostics: MiroCanvasDiagnostic[] = [];
   if (!isRecord(value)) {
@@ -1247,6 +1302,34 @@ function validateMetadataObject(value: unknown): MiroCanvasMetadataValidationRes
     };
   }
 
+  const redirects = readOwn(value, "nodeRedirects");
+  if (redirects.state === "error") addError(diagnostics, "property-read-failed", "miroCanvas.nodeRedirects", "Card redirects could not be read safely.");
+  else if (redirects.state === "present") {
+    if (!isRecord(redirects.value)) addError(diagnostics, "node-redirect-invalid", "miroCanvas.nodeRedirects", "Card redirects must be an object map.");
+    else for (const id of Object.keys(redirects.value)) {
+      const target = readOwn(redirects.value, id);
+      const at = pathFor("miroCanvas.nodeRedirects", id);
+      if (target.state !== "present" || !isRecord(target.value)) addError(diagnostics, "node-redirect-invalid", at, "A card redirect must be an object.");
+      else for (const field of ["file", "nodeId"]) {
+        const item = readOwn(target.value, field);
+        if (item.state !== "present" || !requireNonEmptyString(item.value, pathFor(at, field), diagnostics)) addError(diagnostics, "node-redirect-invalid", at, "A card redirect needs a destination file and node ID.");
+      }
+    }
+  }
+  const properties = readOwn(value, "properties");
+  if (properties.state === "error") {
+    addError(diagnostics, "property-read-failed", "miroCanvas.properties", "Board properties could not be read safely.");
+  } else if (properties.state === "present") {
+    if (!isRecord(properties.value)) addError(diagnostics, "board-properties-invalid", "miroCanvas.properties", "Board properties must be an object.");
+    else {
+      try {
+        if (Object.keys(properties.value).length > 256) throw new Error("Property limit exceeded.");
+        cloneForMigration(properties.value);
+      } catch {
+        addError(diagnostics, "board-properties-invalid", "miroCanvas.properties", "Board properties must contain safe plain JSON and at most 256 entries.");
+      }
+    }
+  }
   const settings = readOwn(value, "settings");
   if (settings.state === "error") {
     addError(diagnostics, "property-read-failed", "miroCanvas.settings", "The property could not be read safely.");

@@ -1,6 +1,6 @@
 import type { ExportInfo, ExportPage } from "./export-files";
 
-export type ExportWorkerKind = "pdf" | "pptx";
+export type ExportWorkerKind = "pdf" | "pptx" | "pptx-vector";
 
 export const MAX_EXPORT_WORKER_PAGES = 200;
 export const MAX_EXPORT_WORKER_INPUT_BYTES = 128 * 1024 * 1024;
@@ -26,6 +26,7 @@ export class ExportWorkerProtocolError extends Error {
 
 export interface ExportWorkerPage extends Omit<ExportPage, "image"> {
   readonly image: ArrayBuffer;
+  readonly svg?: string;
 }
 
 export interface ExportWorkerRequest {
@@ -91,7 +92,7 @@ function validateInfo(info: unknown): asserts info is ExportInfo {
   }
 }
 
-function validatePages(pages: unknown, transferred: boolean, inputBudget = MAX_EXPORT_WORKER_INPUT_BYTES): void {
+function validatePages(pages: unknown, transferred: boolean, inputBudget = MAX_EXPORT_WORKER_INPUT_BYTES, vector = false): void {
   if (!Array.isArray(pages) || pages.length === 0 || pages.length > MAX_EXPORT_WORKER_PAGES) {
     throw new ExportWorkerProtocolError("invalid-pages");
   }
@@ -105,7 +106,8 @@ function validatePages(pages: unknown, transferred: boolean, inputBudget = MAX_E
     if (!valid) throw new ExportWorkerProtocolError("invalid-page");
     const length = transferred ? (image as ArrayBuffer).byteLength : (image as Uint8Array).byteLength;
     if (length === 0) throw new ExportWorkerProtocolError("invalid-page");
-    total += length;
+    if (vector && (typeof candidate.svg !== "string" || candidate.svg.length === 0 || candidate.svg.length > 32 * 1024 * 1024)) throw new ExportWorkerProtocolError("invalid-page");
+    total += length + (vector ? new TextEncoder().encode(candidate.svg as string).byteLength : 0);
     if (total > inputBudget) {
       throw new ExportWorkerProtocolError("input-budget-exceeded");
     }
@@ -114,29 +116,29 @@ function validatePages(pages: unknown, transferred: boolean, inputBudget = MAX_E
 
 export function validateExportWorkerRequest(value: unknown): asserts value is ExportWorkerRequest {
   if (!record(value) || value.type !== "pack" || !Number.isSafeInteger(value.jobId)
-    || (value.jobId as number) < 1 || (value.kind !== "pdf" && value.kind !== "pptx")) {
+    || (value.jobId as number) < 1 || (value.kind !== "pdf" && value.kind !== "pptx" && value.kind !== "pptx-vector")) {
     throw new ExportWorkerProtocolError("invalid-request");
   }
   validateInfo(value.info);
-  validatePages(value.pages, true);
+  validatePages(value.pages, true, MAX_EXPORT_WORKER_INPUT_BYTES, value.kind === "pptx-vector");
 }
 
 /** Check the whole input before allocating or detaching any page bytes. */
 export function prepareExportWorkerRequest(
   jobId: number,
   kind: ExportWorkerKind,
-  pages: readonly ExportPage[],
+  pages: readonly (ExportPage & { readonly svg?: string })[],
   info: ExportInfo,
   inputBudget = MAX_EXPORT_WORKER_INPUT_BYTES,
 ): ExportWorkerRequest {
-  if (!Number.isSafeInteger(jobId) || jobId < 1 || (kind !== "pdf" && kind !== "pptx")) {
+  if (!Number.isSafeInteger(jobId) || jobId < 1 || (kind !== "pdf" && kind !== "pptx" && kind !== "pptx-vector")) {
     throw new ExportWorkerProtocolError("invalid-request");
   }
   validateInfo(info);
   if (!Number.isSafeInteger(inputBudget) || inputBudget <= 0 || inputBudget > MAX_EXPORT_WORKER_INPUT_BYTES) {
     throw new ExportWorkerProtocolError("invalid-request");
   }
-  validatePages(pages, false, inputBudget);
+  validatePages(pages, false, inputBudget, kind === "pptx-vector");
   const copied = pages.map((page): ExportWorkerPage => {
     // Copy only this view. Shared or overlapping input buffers stay with their owner.
     const bytes = new Uint8Array(page.image.byteLength);
@@ -147,6 +149,7 @@ export function prepareExportWorkerRequest(
       pixelWidth: page.pixelWidth,
       pixelHeight: page.pixelHeight,
       image: bytes.buffer,
+      ...(kind === "pptx-vector" ? { svg: page.svg } : {}),
       ...(page.title === undefined ? {} : { title: page.title }),
       ...(page.placement === undefined ? {} : { placement: { ...page.placement } }),
     };

@@ -655,7 +655,7 @@ describe("presentations, groups and ink", () => {
     expect(bar.parentNode?.parentNode).toBe(deck);
     const buttons = created.filter((element) => element.classes.has("miro-source-deck-button"));
     expect(buttons.map((button) => button.getAttribute("aria-label")))
-      .toEqual(["Present slides", "Show all slides", "Export slides as PDF or PowerPoint"]);
+      .toEqual(["Present slides", "Show all slides", "Export slides as PDF, PowerPoint or SVG"]);
     const stopped: string[] = [];
     const fire = (button: Element, type: string) => handlers.get(button)?.get(type)?.({ type, stopPropagation: () => stopped.push(type) });
     fire(buttons[0]!, "pointerdown");
@@ -689,6 +689,25 @@ describe("presentations, groups and ink", () => {
     f.renderer.dispose();
     expect(f.el("t").nodeEl.style.getPropertyValue("--miro-ink")).toBe("");
     expect(f.el("dark").contentEl.style.getPropertyValue("text-align")).toBe("");
+  });
+  it("removes expanded frame paint for a collapsed native header and restores it on expand", () => {
+    const node = { id: "frame", type: "group", x: 0, y: 0, width: 900, height: 500, label: "Frame" };
+    let data: any = { nodes: [node], edges: [], miroCanvas: { schemaVersion: 1 },
+      miroSource: { items: [{ id: "frame", type: "frame", style: { fillColor: "#ffffff" } }] }, future: { keep: true } };
+    const nodeEl = new Element("div"), containerEl = new Element("div"), contentEl = new Element("div");
+    nodeEl.appendChild(containerEl);
+    containerEl.appendChild(contentEl);
+    const renderer = new SourceRenderer({ getDocument: () => data, getNodes: () => [{ id: "frame", nodeEl, containerEl, contentEl }], getEdges: () => [] }, dom);
+    renderer.refresh();
+    expect(nodeEl.getAttribute("data-miro-source-kind")).toBe("frame");
+    data = { ...data, miroCanvas: { schemaVersion: 1, localOverrides: { frame: { groupCollapse: { width: 900, height: 500, children: [] } } } } };
+    renderer.refresh();
+    expect(nodeEl.getAttribute("data-miro-source-kind")).toBeNull();
+    expect(data.nodes).toEqual([node]);
+    data = { ...data, miroCanvas: { schemaVersion: 1 } };
+    renderer.refresh();
+    expect(nodeEl.getAttribute("data-miro-source-kind")).toBe("frame");
+    renderer.dispose();
   });
 });
 
@@ -1736,5 +1755,19 @@ describe("source renderer document ownership", () => {
       expect(renderer.refresh()).toEqual([]);
       renderer.dispose();
     } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+
+describe("rectangular corner appearance", () => {
+  it("uses a sharp border join with zero corner radius, including thick borders", () => {
+    const f = fixture("round_rectangle");
+    f.data.miroCanvas.localOverrides.a = { cornerRadius: 0, borderWidth: 20 };
+    f.renderer.refresh();
+    const path = f.nodeEl.querySelectorAll("svg")[0].querySelectorAll("path")[0];
+    expect(path.getAttribute("d")).toBe("M0 0H100V100H0Z");
+    expect(path.getAttribute("stroke-linejoin")).toBe("miter");
+    expect(path.getAttribute("stroke-width")).toBe("20");
+    f.renderer.dispose();
   });
 });

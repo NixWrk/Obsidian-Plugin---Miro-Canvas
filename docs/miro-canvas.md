@@ -13,6 +13,195 @@ This document defines the architecture and implementation order. Miro export,
 the canonical REST/Web SDK union, and JSON-to-Canvas conversion remain separate
 from the plugin.
 
+## Canvas expansion — 0.3.0
+
+The 2026-10-09 card appearance work adds a global 0–48px corner radius
+(slider and numeric field, zero by default), without changing diagram geometry.
+Native CSS snippets are excluded from owned Canvas scopes by default, with a
+per-snippet allowlist in searchable definitions. Native/theme/plugin styles and
+ordinary notes remain outside that policy; unsupported stylesheet/window shapes
+report an explicit notice. See [card checks](card-appearance-checks.md) and
+[snippet boundaries](canvas-snippet-checks.md).
+
+Independent SVG export serializes real rect/path/text geometry and computed
+native arrow transforms. Pages stack vertically with clipping; intrinsic raster
+attachments remain images. Fonts remain references, shadows are omitted and
+unsupported rich layout fails explicitly. See [vector checks](vector-export-checks.md).
+
+The 2026-10-07/08 feature modules are present and wired from main/session.
+The native-discovered search, keyboard and held-group defects are repaired.
+Representative Windows, supported-tablet and legacy-phone checks pass; advanced
+matrix cases and supported-version phone evidence remain pending.
+The [execution plan](canvas-enhancement-plan.md) and
+feature check documents distinguish source inspection, pure/unit/synthetic
+results and actual app input. This section describes implemented behavior and
+its limits; individual native receipts and remaining coverage are recorded
+separately. [Release checks](release-0.3.0-checks.md).
+
+### Search and connections
+
+Board search includes the contents of linked Markdown file cards. A card with
+a heading or block subpath searches the readable slice, using native metadata
+bounds when available; an unresolved subpath does not silently search the whole
+note. Match-case and a bounded regular-expression mode report malformed,
+unsupported or over-budget patterns instead of reporting a successful empty
+search. Note edit/rename/delete and view disposal invalidate pending reads;
+reads are cached and bounded, never performed per frame.
+
+**Reverse connection direction** (Flip) swaps native and independent connection
+ends with their associated caps, anchors and route data. Label positions and
+dependent connector/comment anchors follow the checked plan. Connected,
+incoming and outgoing actions select related lines and retain the seed selection;
+optional highlighting shows attached lines without selecting them. The parent
+applies changes through the guarded native history boundary; locks, review mode,
+busy gestures and stale documents can refuse an action. See
+[search checks](search-enhancement-checks.md) and
+[connection/group/transfer checks](edge-enhancement-checks.md).
+
+### Properties, links and native consumers
+
+**Board properties** accepts a plain YAML object, stored as JSON at
+`miroCanvas.properties`. Tags, aliases and cssclasses are normalized in the
+transient cache projection. Markdown references in root properties, text cards
+and native file cards contribute link data; text ranges are local UTF-16 offsets
+with a real `nodeId`. Root property references have property keys, not invented
+Markdown offsets. No new root frontmatter field is persisted.
+
+The index integrates supported native cache/resolved-link consumers for graph,
+backlinks and outgoing links. Reversible pane sidecars cover the installed
+outgoing Canvas gate and Canvas backlink counts. When native backlinks omits a
+property-only source, a separate HTML group opens its real board file, outside
+the native result tree. Those missing-source rows require an empty backlink
+filter; active or unknown filters fail closed. Card rows retain native node
+navigation. Default property navigation opens the board, without pretending to
+select a textual range or automatically focus its property editor.
+
+Copy a card link or embed as `[[Board.canvas#node-ID]]` or
+`![[Board.canvas#node-ID]]`. Resolution uses actual board/card identities and
+bounded reads; moved-card redirects under `miroCanvas.nodeRedirects` preserve
+older links after a selection transfer. Unsupported card kinds produce an
+open-card fallback rather than a fabricated text preview. Card navigation and
+embeds require the plugin's supported runtime hooks.
+
+Rename plans use detached pre-rename resolved paths, including folder moves,
+to avoid rewriting a different note with the same filename. Closed-board
+maintenance changes only properties/redirect metadata through MetadataWriter
+validation and exact-source Vault.process comparison; native Canvas remains
+responsible for its own closed-board text/file updates. Index events are
+debounced, parsing/reads are bounded and stale generations are rejected. The
+index retains metadata/text projections, not every board's full imported
+source. Unsupported private shapes fail closed; unload restores only owned
+cache fields, entries, descriptors and listeners. See
+[integration evidence and limits](obsidian-integration-checks.md) and
+[card-link checks](card-link-checks.md).
+
+Immediate publication uses `notifyCommittedBoardDocument` after successful
+feature apply, outermost Undo/Redo and an exact-owner `vault.modify` event.
+Main passes the captured TFile, view owner and settled document identity to
+`ingestLiveDocument`. Coalesced microtasks suppress held gestures/native dragging;
+session disposal releases that owner's live projection. There is no requestSave
+wrapper and no publication from per-frame/refresh callbacks.
+
+### Board-property search
+
+Native global search does not consume Canvas root properties just because the
+cache exposes them: the inspected renderer parses Canvas text nodes and supplies
+per-card caches to its matcher. The implemented supplement adds a separate
+**Board properties** file-result section beside normal native search results.
+It uses indexed root properties and opens genuine board files with no fake
+cards, search offsets or eState.
+
+Windows native verification now passes a typed property query, genuine Canvas
+result click, property-only outgoing destination and actual note click. The
+guarded root renderSearchInfo hook covers the captured native startSearch callback
+that previously bypassed the instance wrapper; 48 focused tests also pass.
+Tablet verification and additional query/lifecycle cases remain pending.
+Cache/graph/backlink successes alone do not establish global-search behavior;
+the failed checks and resolved native proof stay in the property-results register.
+
+Supported syntax is a positive conjunction of tag/property predicates, using
+whitespace and optional parentheses: `[status]`, `[status:"active"]`,
+`tag:project [status:"active"]`. Property keys are literal; unquoted scalar
+values use substring matching, quoted values exact scalar matching. Tags are
+case-insensitive and include nested tags. Values and unquoted property keys
+follow the query's case option; quoted property keys are case-insensitive.
+OR, negation, literal AND/NOT, regex, comparisons, typed
+TRUE/FALSE/EMPTY operands and mixed content/file/path operators are unsupported
+by the supplement. It adds no rows for those queries while native search runs
+normally. Bounded scans show a limit message when truncated. See the
+[implemented result supplement](canvas-property-results-checks.md); the earlier
+[search-boundary inspector](canvas-property-search-checks.md) remains a refusal
+of unsafe reader/virtual-node projection, not an alternative search installer.
+
+### Presentation, groups and transfer
+
+The **Permanent board palette** is a plugin-wide preference. New boards and
+untouched built-in palette snapshots inherit it; customized local colors,
+names and order keep their local palette. Restyling a card does not write the
+displayed global palette back as a new local override.
+
+**Custom CSS styles** stores named declaration sets in plugin settings and
+assigns IDs to selected cards/lines through local overrides. Use declarations
+such as `color: #263238; background-color: #fff8dc;`, not selectors or a whole
+stylesheet. Browser-supported paint/text declarations are scoped to actual
+board targets. Selectors, at-rules, URLs/external resources, scripts,
+`!important`, custom-property definitions and controls of geometry/gestures are
+rejected. Native layout and hit paths remain authoritative; owned styles restore
+on removal/unload. The registered observer reasserts owned paint after native
+redraws without a whole-board or per-frame style pass.
+
+Content thresholds cover text, file, web and Miro card content. They hide the
+content below the chosen zoom while retaining the shell/selection controls;
+selected, focused or edited cards stay readable. Zero leaves native behavior.
+Group collapse persists reversible state but only projects compact viewing
+geometry: it does not delete children or rewrite their stored coordinates.
+Internal lines/pins hide with the group; external connections follow its visible
+proxy. Expand and native Undo must restore the same underlying document.
+
+**Move selection to a new board** preserves moved card IDs, local metadata,
+unknown fields and Miro source evidence, replacing the selection with a native
+file card and rerouting crossing lines to it. Target creation/source publication
+are checked against live file identity, bytes and native history. A collision or
+stale source refuses the move; an uncertain partial failure retains the target
+for inspection. **Undo restores the source selection; it does not delete the
+new board file.** See [presentation checks](presentation-enhancement-checks.md)
+and [transfer/group checks](edge-enhancement-checks.md).
+
+Optional **Connections from note properties** generates native edges between
+file cards from configured note-property links; an empty property list uses all
+link-valued properties. It is off by default. Reconciliation runs for the active
+board/on opening or the explicit update action, preserves manual edges, removes
+only recognized stale generated edges and defers removal when note caches are
+missing. Closed-board background maintenance does not generate connections.
+
+Export continues to render an independent data snapshot and pack PDF/PowerPoint
+in the bundled worker, without screen capture, foreground activation or an extra
+window. Switching boards retains a running job; Stop/unload cancels it. Slides
+are images, and Android may suspend Obsidian itself while backgrounded.
+
+### Verification and remaining checks
+
+The final suite passes 3,004 tests with one pre-existing skip in 158 files;
+types, build, CSS, pinned schema, submission, MCP/CLI and all three synthetic
+UI smoke modes pass. Source lint retains one compatibility command-ID warning.
+
+Real Windows Obsidian and SM-X736B / Obsidian 1.13.8 verify properties, graph,
+backlinks, typed property search and navigation, outgoing links and independent
+PDF/PPTX text. Held collapsed-group previews, chained routes, exact commits,
+Escape cancellation and Undo pass at 50% and 125% zoom on both. Windows uses
+trusted CDP input in an invisible owned instance; tablet actions use real ADB
+input with CDP text and fixture preparation. No screen capture is used.
+
+The reconnected SM-A336E passes the latest build's feature, property-pane,
+eight-theme and independent PDF/PPTX checks. Its Obsidian 1.12.7 is below the
+minimum 1.13.7. ADB Escape returns to the previous board; same-board cancellation
+uses CDP Escape followed by real ADB release. The [phone receipt](smartphone-enhancement-checks.md)
+records these input distinctions. Advanced matrix cases and supported-version
+phone evidence remain pending.
+The [execution plan](canvas-enhancement-plan.md) preserves earlier failures,
+current receipts and the exact limits of each check. These results do not
+claim complete coverage of every query, gesture or private-API version.
+
 ## Current implementation status
 
 Opposite board/application color schemes use a scoped neutral palette for
@@ -2259,3 +2448,83 @@ The coordinated builder/test/browser/Actions updates, development SDK Moment
 override and TypeScript 7 / Node 26 declaration deferrals are recorded in
 [the maintenance report](dependency-maintenance.md). Development requires
 Node 22.13+; standalone CLI/MCP retain their Node 20+ target.
+
+
+## Shape corners — 2026-10-10
+
+Rectangular figures now use equal physical corner radii. The selected figure owns a radius handle and inline exact input; a global toggle hides these controls while retaining saved geometry. New rounded rectangles remember the last radius, and click/drop creation respects each catalogue aspect. Free drag dimensions stay unchanged.
+
+[Checks](shape-radius-acceptance.md).
+
+### Selection More actions (2026-10-10)
+
+More uses labelled full-width rows, preserving adopted native buttons and their handlers. Native captions follow aria-label; an owned watcher removes captions/attributes and restores native ordering on disposal. Delete is last in DOM and visual order. Coarse-pointer sizing is independent of Obsidian device classes. With the keyboard open, More chooses the side with more board room; formatting pickers keep their existing placement. See [selection menu checks](selection-menu-checks.md) for native receipts and pending cases.
+
+### Owning Obsidian appearance and board-menu labels (2026-10-10)
+
+The stored displayTheme=system now resolves from the owning document’s Obsidian theme classes before OS media. A small body-class/media watcher follows appearance changes, ignores unrelated classes and disposes with the session. Explicit board light/dark remain independent; exports freeze the resolved theme at launch. Board-menu labels shrink/wrap without displacing icons or switches. Selected attachment-name state uses the existing checked native-to-JSON projection. [Checks](host-theme-menu-checks.md).
+
+
+Shape-radius discoverability follow-up (2026-10-10): the marker is a decorative
+rounded-corner SVG with an inward drag arrow, distinct from native connection
+points. The existing 44px pointer target remains constant at different zooms.
+A localized, non-interactive value badge appears above/right while held and
+updates synchronously with the transient preview; release/cancel hides it. Tap
+still opens exact input. Icon creation is lazy, only for a verified editable
+selected rectangular figure. No metadata or history semantics changed.
+[Checks](radius-feedback-checks.md).
+
+
+Radius feedback follow-up (2026-10-10): the bidirectional arrow remains, but
+at the user's request the earlier marker movement with radius is restored.
+Clamped radius-relative placement keeps the 44px screen target reachable;
+inverse-CTM pointer capture continues the gesture while the marker moves.
+The live number and exact input remain. The corner-morph/tilt experiment is
+superseded; its receipts are historical. The four connection buttons retain
+their scoped 2px accent outline and theme fill, without routing changes.
+[Current and historical checks](radius-marker-motion-checks.md).
+
+### Export-panel composition (2026-10-10)
+
+ExportPanel groups page ordering/help/add actions above the paper/orientation
+and quality controls. Header/Close and output/Stop footer stay outside the one
+scrolling body. Scoped SVG-icon controls retain accessible names and tablet
+padding variables. The panel respects owner-document safe areas and Obsidian's
+reported keyboard height. Output format captions are localized separately from
+full action names. Independent render/worker/save contracts are unchanged.
+[Native and synthetic checks](export-panel-design-checks.md).
+
+
+### Vector document modes and viewing tools — 2026-10-10
+
+The Export panel chooses Raster/Vector for PDF/PPTX as session UI state, without
+new Canvas metadata. SVG always stays vector. The existing independent renderer
+produces per-page SVG; PDF converts curated detached SVG with bundled jsPDF /
+svg2pdf and licensed Noto Sans (normal/bold/italic/bolditalic), substituting
+source fonts explicitly. Converter dependencies initialize only in that branch.
+Vector PPTX packs SVG per slide off the UI thread and retains a JPEG fallback
+for older readers. Unsupported vector material fails rather than turning the
+page into a raster result. Export Stop/source snapshot/save boundaries remain.
+
+Effective viewing includes stored review, original native readonly and an
+active SlideShow. Native menus, creation tools and styling controls are hidden,
+with ownership restored on exit; selected web links have a direct Open action.
+Finger drags from selected, unselected or locked native cards and native mixed
+or collapsed selection areas pass to native Canvas pan/pinch in all three
+viewing states, without changing node positions or history. In `m1-session.ts`,
+`startSelectionMove` returns `false` in `isViewing` before preventing the
+event; the root `pointerdown` and `pointermove` guards pass through touch
+events in `isViewing`. Content scrolling, links, controls and laser ownership
+keep their existing handling.
+The dock exposes a temporary laser. SlideShow owns its own laser toggle and
+starts from native group frames in document order; export-page rectangles are
+a fallback. Its readonly overlay is not persisted. Starting presentation closes
+the export UI without cancelling an already independent job. Laser uses owner
+capture, a fixed64-point pool and600ms expiry, with no child-list work per frame
+and no board/history mutation. It is excluded from vector serialization.
+[Native acceptance and limitations](vector-viewing-acceptance.md).
+
+Native drag admission preserves the readonly undefined lifecycle, and pure right-button mouse moves pass the pan guard. See [acceptance and limits](review-pan-checks.md).
+
+
+Radius controls in0.3.0 appear from the configured global minimum displayed zoom (default200%; 0 shows at any zoom), with a slider and exact percentage input in plugin settings; zoom-out removes them and cancels any unfinished draft without history. [Checks](radius-zoom-checks.md).

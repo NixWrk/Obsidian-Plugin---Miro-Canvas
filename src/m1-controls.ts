@@ -47,6 +47,7 @@ export interface M1ControlsState {
 	readonly appearance: AppearanceState;
 	readonly selectedIds: readonly string[];
 	readonly reviewMode: boolean;
+	readonly laserEnabled?: boolean;
 	readonly lockedSelection: boolean;
 	readonly showAttachmentNames: boolean;
 	readonly selectedAttachmentNames?: boolean;
@@ -77,6 +78,8 @@ export interface M1ControlsActions {
 	readonly onArrangePanels?: () => void;
 	/** Open the search bar at the board's top right. */
 	readonly onSearch?: () => void;
+	readonly onToggleLaser?: () => void;
+	readonly onPresent?: () => void;
 }
 
 export interface M1ControlsOptions {
@@ -147,6 +150,8 @@ interface ControlRefs {
 	readonly bar: HTMLElement;
 	readonly minimapToggle: HTMLButtonElement;
 	readonly zoomLabel: HTMLButtonElement;
+	readonly history: HTMLElement;
+	readonly laser?: HTMLButtonElement;
 	readonly menus: Readonly<Record<MenuName, Menu>>;
 	readonly switches: Readonly<Record<"minimap" | "snapGrid" | "snapObjects" | "review" | "attachments" | "selectionNames", HTMLButtonElement>>;
 	readonly themes: readonly HTMLButtonElement[];
@@ -412,6 +417,12 @@ export class M1Controls {
 		this.listen(zoomOut, "click", () => this.actions.onNavigation("zoom-out"));
 		this.listen(zoomIn, "click", () => this.actions.onNavigation("zoom-in"));
 		const boardGroup = append(bar, makeElement(document, "span", "miro-canvas-dock__group"));
+		const laser = this.actions.onToggleLaser === undefined ? undefined : this.iconButton(boardGroup, "scan-line", "◎", words().slideShow.laserPointer);
+		if (laser !== undefined) {
+			laser.hidden = true;
+			laser.setAttribute("aria-pressed", "false");
+			this.listen(laser, "click", () => this.actions.onToggleLaser?.());
+		}
 		const onSearch = this.actions.onSearch;
 		if (onSearch !== undefined) {
 			const searchButton = this.iconButton(boardGroup, "search", "⌕", dock.search);
@@ -457,6 +468,7 @@ export class M1Controls {
 			this.item(board.panel, "file-output", "⇩", words().export.boardMenuLabel, { run: () => this.close(() => openExport()) });
 			this.separator(board.panel);
 		}
+		if (this.actions.onPresent !== undefined) this.item(board.panel, "presentation", "▣", words().deck.present, { run: () => this.close(() => this.actions.onPresent?.()) });
 		const review = this.item(board.panel, "eye", "◉", dock.reviewMode, {
 			toggle: true,
 			run: () => this.actions.onInteraction({ type: "set-review-mode", enabled: this.lastState?.reviewMode !== true }),
@@ -510,6 +522,8 @@ export class M1Controls {
 			bar,
 			minimapToggle,
 			zoomLabel,
+			history,
+			...(laser === undefined ? {} : { laser }),
 			menus: { view, board, diagnostics: diagnosticsMenu },
 			switches: {
 				minimap: minimapSwitch, snapGrid, snapObjects, review, attachments, selectionNames,
@@ -540,6 +554,11 @@ export class M1Controls {
 		}
 		const refs = this.refs;
 		const dock = words().dock;
+		refs.history.hidden = state.reviewMode;
+		if (refs.laser !== undefined) {
+			refs.laser.hidden = !state.reviewMode;
+			refs.laser.setAttribute("aria-pressed", String(state.laserEnabled === true));
+		}
 		this.element.setAttribute("data-miro-canvas-has-selection", state.selectedIds.length > 0 ? "true" : "false");
 		const check = (row: HTMLButtonElement, on: boolean | undefined): void => {
 			row.setAttribute("aria-checked", on === true ? "true" : "false");

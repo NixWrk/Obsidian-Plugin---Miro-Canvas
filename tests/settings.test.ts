@@ -32,6 +32,29 @@ import {
 afterEach(() => setLocale("en"));
 
 describe("plugin settings", () => {
+  it("bounds the global radius-handle percentage and preserves it across layouts and storage", () => {
+    expect(DEFAULT_SETTINGS.shapeRadiusControlMinZoomPercent).toBe(200);
+    for (const value of [undefined, "invalid", NaN, Infinity]) {
+      expect(normalizeSettings({ shapeRadiusControlMinZoomPercent: value }).shapeRadiusControlMinZoomPercent).toBe(200);
+    }
+    expect(normalizeSettings({ shapeRadiusControlMinZoomPercent: -1 }).shapeRadiusControlMinZoomPercent).toBe(0);
+    expect(normalizeSettings({ shapeRadiusControlMinZoomPercent: 9000 }).shapeRadiusControlMinZoomPercent).toBe(6400);
+    const settings = normalizeSettings({ shapeRadiusControlMinZoomPercent: 125 });
+    for (const kind of LAYOUT_KINDS) {
+      expect(useLayoutKind(settings, kind).shapeRadiusControlMinZoomPercent).toBe(125);
+    }
+    expect(normalizeSettings(settingsForStorage(settings)).shapeRadiusControlMinZoomPercent).toBe(125);
+  });
+  it("bounds card corners and preserves the selected snippet names across devices", () => {
+    expect(normalizeSettings({ cardCornerRadius: -3 }).cardCornerRadius).toBe(0);
+    expect(normalizeSettings({ cardCornerRadius: 99 }).cardCornerRadius).toBe(48);
+    expect(normalizeSettings({ cardCornerRadius: NaN }).cardCornerRadius).toBe(0);
+    expect(DEFAULT_SETTINGS.allowedCanvasSnippets).toEqual([]);
+    const settings = normalizeSettings({ cardCornerRadius: 17, allowedCanvasSnippets: ["Red line", "Red line", 1, ""] });
+    expect(settings.allowedCanvasSnippets).toEqual(["Red line"]);
+    expect(useLayoutKind(settings, "tablet")).toMatchObject({ cardCornerRadius: 17, allowedCanvasSnippets: ["Red line"] });
+    expect(normalizeSettings(settingsForStorage(settings))).toMatchObject({ cardCornerRadius: 17, allowedCanvasSnippets: ["Red line"] });
+  });
   it("attaches to nodes and allows free ends by default; chaining lines is an opt-in", () => {
     expect(normalizeSettings({})).toMatchObject({ connectorAttachNodes: true, connectorAllowFree: true, connectorAttachConnectors: false });
     expect(normalizeSettings({ connectorAttachNodes: false, connectorAllowFree: true, connectorAttachConnectors: true }))

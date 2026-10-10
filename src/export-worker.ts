@@ -1,4 +1,4 @@
-import { makePdf, makePptx } from "./export-files";
+import { makePdf, makePptx, makeVectorPptx } from "./export-files";
 import {
   ExportWorkerProtocolError,
   isExportBuffer,
@@ -16,7 +16,7 @@ export function packExportWorkerRequest(value: unknown): ExportWorkerResponse {
   try {
     validateExportWorkerRequest(value);
     const pages = value.pages.map((page) => ({ ...page, image: new Uint8Array(page.image) }));
-    const bytes = value.kind === "pdf" ? makePdf(pages, value.info) : makePptx(pages, value.info);
+    const bytes = value.kind === "pdf" ? makePdf(pages, value.info) : value.kind === "pptx-vector" ? makeVectorPptx(pages.map(page => ({ ...page, svg: page.svg! })), value.info) : makePptx(pages, value.info);
     const buffer = bytes.buffer;
     if (!isExportBuffer(buffer)) throw new ExportWorkerProtocolError("packing-failed");
     return { type: "result", jobId: value.jobId, bytes: buffer };

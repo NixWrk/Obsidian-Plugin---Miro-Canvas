@@ -24,6 +24,7 @@ import {
 	type UpdateConnectorEndpointInput,
 } from "./connector-endpoints";
 import type { CanvasAnchor } from "./anchors";
+import { hasShapeCorners } from "./shape-geometry";
 import { selectedComment, translateBoardSelection, type SelectedRouteEnds } from "./board-selection";
 import { migrateLineNodes, boardConnectors, readBoardConnector, type BoardConnector } from "./board-connectors";
 import { readLocalItem, type LocalItem } from "./local-items";
@@ -31,6 +32,7 @@ import { listCommentThreads } from "./local-comments";
 import { reorderCards, type LayerCard, type LayerDirection } from "./layer-order";
 import { nativeOmits, nativeRounds } from "./native-graph";
 import { newCanvasId } from "./canvas-ids";
+import { captureNativeHistory, type NativeHistoryFence } from "./native-history-fence";
 import { isSafeColor, normalizeColor } from "./appearance";
 import {
 	LOCAL_SHAPE_KINDS, CONNECTOR_CAPS, CONNECTOR_ROUTES, CONNECTOR_STROKES,
@@ -60,6 +62,7 @@ export interface CanvasShapeAction {
 	readonly typography?: unknown;
 	readonly borderStyle?: unknown;
 	readonly borderWidth?: unknown;
+	readonly cornerRadius?: unknown;
 }
 
 /** ID is supplied by the caller's selection; absent fields retain their source/local values. */
@@ -177,6 +180,7 @@ export interface UpdateElementStyleInput {
 	readonly typography?: Readonly<Record<string, unknown>>;
 	readonly borderStyle?: "solid" | "dashed" | "dotted" | "none";
 	readonly borderWidth?: number;
+	readonly cornerRadius?: number;
 	readonly connector?: LocalConnectorSettings;
 }
 
@@ -967,7 +971,8 @@ function nativeGraphMismatch(observed: UnknownRecord, requested: UnknownRecord, 
 		const wanted = safeRead(requested, key);
 		if (!actual.ok || !wanted.ok) return `${key} unreadable`;
 		if (key === "nodes" || key === "edges") {
-			const reason = graphItemsNativeMismatch(actual.value, wanted.value, key, allowReorder && key === "nodes");
+			// Native imports retain existing edge Map order; every line is verified by ID.
+			const reason = graphItemsNativeMismatch(actual.value, wanted.value, key, key === "edges" || allowReorder);
 			if (reason !== undefined) return reason;
 		} else if (!structurallyEqual(actual.value, wanted.value)) {
 			return `${key} changed`;
@@ -1000,7 +1005,7 @@ function restoreDiscardedRootMetadata(
 	const requestedSnapshot = makeSnapshot(requested, diagnostics);
 	if (requestedSnapshot === undefined
 		|| graphItemsNativeMismatch(imported.nodes, requestedSnapshot.nodes, "nodes", allowReorder) !== undefined
-		|| graphItemsNativeMismatch(imported.edges, requestedSnapshot.edges, "edges") !== undefined) {
+		|| graphItemsNativeMismatch(imported.edges, requestedSnapshot.edges, "edges", true) !== undefined) {
 		return imported;
 	}
 	let candidate: UnknownRecord;
@@ -1094,7 +1099,7 @@ function readStylePatch(action: unknown, diagnostics: CanvasAuthoringDiagnostic[
 	const patch: UnknownRecord = {};
 	try {
 		if (!isPlainObject(action)) throw new SnapshotError("style action expected");
-		for (const key of ["colors", "typography", "borderStyle", "borderWidth", "connector"]) {
+		for (const key of ["colors", "typography", "borderStyle", "borderWidth", "cornerRadius", "connector"]) {
 			const property = Object.getOwnPropertyDescriptor(action, key);
 			if (property === undefined) continue;
 			if (!("value" in property)) throw new SnapshotError("style accessor refused");
@@ -1121,6 +1126,7 @@ function readStylePatch(action: unknown, diagnostics: CanvasAuthoringDiagnostic[
 			}
 		}
 		if (patch.borderStyle !== undefined && !["solid", "dashed", "dotted", "none"].includes(patch.borderStyle as string)) throw new SnapshotError("invalid border style");
+		if (patch.cornerRadius !== undefined && (!isFiniteNumber(patch.cornerRadius) || patch.cornerRadius < 0 || patch.cornerRadius > 1000)) throw new SnapshotError("invalid corner radius");
 		if (patch.borderWidth !== undefined && (!isFiniteNumber(patch.borderWidth) || patch.borderWidth < 0 || patch.borderWidth > 100)) throw new SnapshotError("invalid border width");
 		if (patch.connector !== undefined) {
 			const connector = only(patch.connector, ["route", "strokeStyle", "startCap", "endCap", "width", "headSize", "labelT", "color", "waypoints", "block"]);
@@ -1177,6 +1183,7 @@ function readShapeAction(action: unknown, diagnostics: CanvasAuthoringDiagnostic
 	readonly typography?: unknown;
 	readonly borderStyle?: unknown;
 	readonly borderWidth?: unknown;
+	readonly cornerRadius?: unknown;
 } | undefined {
 	if (!isPlainObject(action)) {
 		addDiagnostic(diagnostics, "shape-action-invalid", "error", "A shape action must be a plain object.");
@@ -1938,6 +1945,7 @@ function resultWithDiagnostics(
 }
 
 export class CanvasAuthoring {
+ private lastFeature: { before: InternalSnapshot; after: InternalSnapshot; history: NativeHistoryFence } | undefined;
 	public readonly kind = "canvas-authoring" as const;
 	private readonly inspection: HostInspection;
 	private readonly host: NativeHost | undefined;
@@ -2944,7 +2952,7 @@ export class CanvasAuthoring {
 			let changed = false;
 			for (const input of inputs) {
 				const action = copyStyleData(input) as UnknownRecord;
-				if (!isPlainObject(action) || Object.keys(action).some((key) => !["id", "shape", "colors", "typography", "borderStyle", "borderWidth", "connector"].includes(key))) throw new SnapshotError("invalid action");
+				if (!isPlainObject(action) || Object.keys(action).some((key) => !["id", "shape", "colors", "typography", "borderStyle", "borderWidth", "cornerRadius", "connector"].includes(key))) throw new SnapshotError("invalid action");
 				const id = readGraphActionId(action, diagnostics, "element-style");
 				if (id === undefined) return reject();
 				const node = before.nodes.find((item) => item.id === id);
@@ -2962,6 +2970,10 @@ export class CanvasAuthoring {
 						return reject();
 					}
 					patch.shape = { kind: action.shape, fallback: "text" };
+				}
+				if (hasOwn(patch, "cornerRadius") && (edge !== undefined || !hasShapeCorners(typeof action.shape === "string" ? action.shape : scene.items.get(id)?.shape))) {
+					addDiagnostic(diagnostics, "element-style-invalid", "error", "Corner radius applies only to rectangular shapes.");
+					return reject();
 				}
 				if (edge !== undefined && (hasOwn(patch, "borderStyle") || hasOwn(patch, "borderWidth"))) {
 					addDiagnostic(diagnostics, "element-style-invalid", "error", "Use connector settings for an edge stroke.");
@@ -3177,6 +3189,112 @@ export class CanvasAuthoring {
 			return undefined;
 		}
 		return verified;
+	}
+
+	/** Apply a checked feature plan through the same native history boundary. */
+	public applyDocument(document: unknown, expected: CanvasAuthoringExpected): CanvasGraphResult {
+		const diagnostics: CanvasAuthoringDiagnostic[] = [];
+		const reject = (): CanvasGraphResult => ({ ok: false, status: "rejected", diagnostics });
+		if (this.disposed || this.host === undefined) return reject();
+		const before = readSnapshotFromHost(this.host, diagnostics);
+		const supplied = makeSnapshot(extractExpectedDocument(expected), diagnostics);
+		const planned = makeSnapshot(document, diagnostics);
+		if (before === undefined || supplied === undefined || planned === undefined) return reject();
+		if (!sameBoardInAnyCardOrder(before.document, supplied.document)) {
+			addDiagnostic(diagnostics, "stale-feature-plan", "error", "The board changed before the feature plan was applied.");
+			return reject();
+		}
+		for (const key of new Set([...Object.keys(before.document), ...Object.keys(planned.document)])) {
+			if (["nodes", "edges", "miroCanvas"].includes(key)) continue;
+			if (!structurallyEqual(before.document[key], planned.document[key])) {
+				addDiagnostic(diagnostics, "feature-root-changed", "error", "Feature plans must preserve source evidence and unknown root fields.");
+				return reject();
+			}
+		}
+		if (structurallyEqual(before.document, planned.document)) {
+			return { ok: true, status: "applied", document: before.document, diagnostics };
+		}
+		if (policyAllowsCreate(before.document, diagnostics) === undefined) return reject();
+		const records = (value: Record<string, unknown>): Map<string, unknown> => {
+			const entries: readonly unknown[] = [...(Array.isArray(value.nodes) ? value.nodes as unknown[] : []), ...(Array.isArray(value.edges) ? value.edges as unknown[] : []), ...boardConnectors(value)];
+			const own = isObject(value.miroCanvas) ? value.miroCanvas as Record<string, unknown> : {};
+			const overrides = isObject(own.localOverrides) ? own.localOverrides as Record<string, unknown> : {};
+			return new Map(entries.flatMap((entry: unknown) => {
+				if (!isObject(entry) || typeof (entry as Record<string, unknown>).id !== "string") return [];
+				const id = (entry as Record<string, unknown>).id as string;
+				return [[id, { graph: entry, override: overrides[id] }] as const];
+			}));
+		};
+		const previous = records(before.document);
+		const next = records(planned.document);
+		const policy = createInteractionPolicy(before.document);
+		for (const [id, value] of previous) {
+			if (structurallyEqual(value, next.get(id))) continue;
+			const operation = next.has(id) ? "edit" : "delete";
+			const decision = decideEditOperation(policy, operation, id);
+			if (!decision.valid || !decision.allowed) {
+				addDiagnostic(diagnostics, "feature-plan-blocked", "warning", "A locked item or review mode blocks this feature plan.");
+				return reject();
+			}
+		}
+		const metadata = (value: UnknownRecord): UnknownRecord => isObject(value.miroCanvas) ? value.miroCanvas : {};
+		const priorMetadata = metadata(before.document);
+		const nextMetadata = metadata(planned.document);
+		const field = (value: UnknownRecord, name: string): UnknownRecord => isObject(value[name]) ? value[name] : {};
+		const priorThreads = new Map(listCommentThreads(before.document).map((thread) => [`${thread.origin}:${thread.id}`, thread]));
+		const nextThreads = new Map(listCommentThreads(planned.document).map((thread) => [`${thread.origin}:${thread.id}`, thread]));
+		const commentState = (value: UnknownRecord, threads: typeof priorThreads, key: string): unknown => ({
+			thread: threads.get(key),
+			place: field(value, "commentPlaces")[key],
+			decoration: field(value, "commentDecorations")[key],
+			author: field(value, "commentAuthorNames")[key],
+		});
+		for (const key of new Set([...priorThreads.keys(), ...Object.keys(field(priorMetadata, "commentDecorations"))])) {
+			const decoration = field(priorMetadata, "commentDecorations")[key];
+			const locked = priorThreads.get(key)?.locked === true || (isObject(decoration) && decoration.locked === true);
+			if (locked && !structurallyEqual(commentState(priorMetadata, priorThreads, key), commentState(nextMetadata, nextThreads, key))) {
+				addDiagnostic(diagnostics, "feature-comment-locked", "warning", "A locked comment blocks this feature plan.");
+				return reject();
+			}
+		}
+		for (const [id, anchor] of Object.entries(field(priorMetadata, "freeAnchors"))) {
+			const override = field(priorMetadata, "localOverrides")[id];
+			if (isObject(override) && override.locked === true && !structurallyEqual(
+				{ anchor, override }, { anchor: field(nextMetadata, "freeAnchors")[id], override: field(nextMetadata, "localOverrides")[id] },
+			)) {
+				addDiagnostic(diagnostics, "feature-anchor-locked", "warning", "A locked free anchor blocks this feature plan.");
+				return reject();
+			}
+		}
+		const history = captureNativeHistory(this.host.runtime);
+		if (history === undefined) {
+			addDiagnostic(diagnostics, "feature-history-unavailable", "warning", "The native history boundary could not be captured safely.");
+			return reject();
+		}
+		const live = readSnapshotFromHost(this.host, diagnostics);
+		if (live === undefined || !sameBoardInAnyCardOrder(live.document, before.document)) return reject();
+		const verified = this.commitDocument(before, planned.document, diagnostics);
+		if (verified === undefined || !history.flush()) {
+			if (verified !== undefined) restoreGraph(this.host, before, diagnostics, verified.document);
+			history.restore();
+			return reject();
+		}
+		this.lastFeature = { before, after: verified, history };
+		return { ok: true, status: "applied", document: verified.document, diagnostics };
+	}
+
+	/** Compensate only our unchanged last feature after an asynchronous save failure. */
+	public rollbackLastFeatureDocument(): boolean {
+		const receipt = this.lastFeature;
+		this.lastFeature = undefined;
+		if (receipt === undefined || this.disposed || this.host === undefined) return false;
+		const diagnostics: CanvasAuthoringDiagnostic[] = [];
+		const live = readSnapshotFromHost(this.host, diagnostics);
+		if (live === undefined || !sameBoardInAnyCardOrder(live.document, receipt.after.document)) return false;
+		if (!receipt.history.restore(true)) return false;
+		restoreGraph(this.host, receipt.before, diagnostics, receipt.after.document);
+		const restored = readSnapshotFromHost(this.host, diagnostics);
+		return restored !== undefined && sameBoardInAnyCardOrder(restored.document, receipt.before.document);
 	}
 
 	public dispose(): void {

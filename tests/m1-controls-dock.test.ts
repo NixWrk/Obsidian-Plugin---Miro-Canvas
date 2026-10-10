@@ -89,7 +89,7 @@ const STATE: M1ControlsState = {
   snapToObjects: false,
 };
 
-function build(options: { withSettings?: boolean; withSearch?: boolean; setIcon?: (element: HTMLElement, icon: string) => void } = {}) {
+function build(options: { withSettings?: boolean; withSearch?: boolean; withLaser?: boolean; setIcon?: (element: HTMLElement, icon: string) => void } = {}) {
   const calls: { navigation: M1NavigationAction[]; appearance: unknown[]; interaction: unknown[]; attachment: unknown[]; opened: string[] } = {
     navigation: [], appearance: [], interaction: [], attachment: [], opened: [],
   };
@@ -101,6 +101,7 @@ function build(options: { withSettings?: boolean; withSearch?: boolean; setIcon?
     openCommandModal: () => { calls.opened.push("commands"); },
     openSourceInspector: () => { calls.opened.push("source"); },
     openExport: () => { calls.opened.push("export"); },
+    ...(options.withLaser ? { onToggleLaser: () => { calls.opened.push("laser"); } } : {}),
     ...(options.withSettings === false ? {} : { openSettings: () => { calls.opened.push("settings"); } }),
     ...(options.withSearch === true ? { onSearch: () => { calls.opened.push("search"); } } : {}),
   };
@@ -118,6 +119,21 @@ function build(options: { withSettings?: boolean; withSearch?: boolean; setIcon?
 afterEach(() => setLocale("en"));
 
 describe("corner dock", () => {
+  it("shows the temporary pointer in review and restores history controls after exit", () => {
+    const { root, calls, update } = build({ withLaser: true });
+    expect(shown(byLabel(root, "Laser pointer"))).toBe(false);
+    update({ reviewMode: true, laserEnabled: true });
+    expect(shown(byLabel(root, "Undo"))).toBe(false);
+    const laser = byLabel(root, "Laser pointer");
+    expect(shown(laser)).toBe(true);
+    expect(laser.getAttribute("aria-pressed")).toBe("true");
+    laser.dispatch("click");
+    expect(calls.opened).toEqual(["laser"]);
+    update({ reviewMode: false, laserEnabled: false });
+    expect(shown(byLabel(root, "Undo"))).toBe(true);
+    expect(shown(laser)).toBe(false);
+  });
+
   it("reads its labels lazily, in the language set when the dock is built", () => {
     setLocale("ru");
     const { root } = build();
@@ -246,7 +262,7 @@ describe("corner dock", () => {
   it("offers exporting to PDF or PowerPoint from the board menu", () => {
     const { root, calls } = build();
     byLabel(root, "Board settings").dispatch("click");
-    row(root, "Export to PDF or PowerPoint").dispatch("click");
+    row(root, "Export to PDF, PowerPoint or SVG").dispatch("click");
     expect(menu(root, "board").hidden).toBe(true);
     expect(calls.opened).toEqual(["export"]);
   });

@@ -91,6 +91,14 @@ export function shapeCatalogEntry(kind: string | undefined): ShapeCatalogEntry |
   return kind === undefined ? undefined : BY_KIND.get(kind);
 }
 
+/** The board size of a shape placed by a click or a drop from the bar. */
+export function shapeDefaultSize(kind: string | undefined): { width: number; height: number } {
+  const aspect = shapeCatalogEntry(kind)?.aspect;
+  if (aspect === "wide") return { width: 240, height: 160 };
+  if (aspect === "tall") return { width: 160, height: 240 };
+  return { width: 200, height: 200 };
+}
+
 /**
  * The hover text of an entry, in the language in use: its name, then its
  * flowchart meaning.  `item.name`/`item.meaning` stay in English - they also

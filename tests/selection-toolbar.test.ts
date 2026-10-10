@@ -278,6 +278,26 @@ describe("selection toolbar", () => {
     expect(panel.children.indexOf(slot)).toBe(panel.children.length - 1);
   });
 
+  it("names More actions visibly in both languages without an empty link row", () => {
+    for (const locale of ["en", "ru"] as const) {
+      setLocale(locale);
+      const toolbar = new SelectionToolbar({
+        onAppearance: () => undefined, onStyle: () => undefined, onLock: () => undefined,
+        onLayer: () => undefined, onMoreActions: () => undefined,
+      }, { document: new FakeDocument() as unknown as Document });
+      const root = toolbar.element as unknown as FakeElement;
+      const more = descendants(root).find((item) => item.getAttribute("data-icon") === "more-vertical")!;
+      const panel = more.parentElement!.children.find((item) => item.className.includes("__panel"))!;
+      const buttons = descendants(panel).filter((item) => item.tagName === "button");
+      for (const button of buttons) {
+        const label = button.children.find((item) => item.className === "miro-canvas-toolbar__menu-label");
+        expect(label?.textContent).toBe(button.getAttribute("aria-label"));
+      }
+      expect(panel.children.some((item) => item.className === "miro-canvas-toolbar__row")).toBe(false);
+    }
+    setLocale("en");
+  });
+
   it("draws interface icons through the host and falls back to glyphs", () => {
     const drawn: string[] = [];
     const { root } = build({}, {
@@ -581,7 +601,57 @@ describe("selection toolbar", () => {
     expect(status.hidden).toBe(false);
     expect(status.textContent).toBe("This selection is locked.");
     update({ editable: false, locked: false, reviewMode: true, blockedReason: "Review mode is on." });
-    expect(byLabel(root, "Lock selection").disabled).toBe(true);
+    expect(root.hidden).toBe(true);
+    expect(shown(lock)).toBe(false);
+    lock.dispatch("click");
+    expect(locks).toEqual([false]);
+  });
+
+  it.each<Partial<SelectionToolbarState>>([
+    { kinds: ["shape"] }, { kinds: ["text"] }, { kinds: ["sticky"] },
+    { kinds: ["edge"], selectedIds: ["e1"] }, { kinds: ["frame"] },
+    { kinds: ["media"] }, { kinds: ["shape", "edge"], selectedIds: ["n1", "e1"] },
+    { kinds: ["edge"], independentOnly: true }, { kinds: [], selectedIds: [] },
+  ])("hides editing groups and closes a stale popover for review selection %j", selection => {
+    const { toolbar, root, update, comments, locks, styles, appearance } = build();
+    const more = byLabel(root, "More");
+    more.dispatch("click");
+    expect(panelOf(root, "More").hidden).toBe(false);
+    const nativeSlot = toolbar.nativeSlot as unknown as FakeElement;
+    const native = nativeSlot.appendChild(new FakeElement("div"));
+    const snapshot = nativeSlot.appendChild(new FakeElement("div"));
+    const nativeClick = vi.fn();
+    native.addEventListener("click", nativeClick);
+    snapshot.hidden = false;
+    update({ ...selection, reviewMode: true, editable: false });
+    expect(root.hidden).toBe(true);
+    expect(shown(native)).toBe(false);
+    expect(shown(snapshot)).toBe(false);
+    expect(panelOf(root, "More").hidden).toBe(true);
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    more.dispatch("click");
+    byLabel(root, "Comment").dispatch("click");
+    byLabel(root, "Lock selection").dispatch("click");
+    shapeOption(root, "rhombus").dispatch("click");
+    byLabel(root, "Increase font size").dispatch("click");
+    expect(panelOf(root, "More").hidden).toBe(true);
+    expect([comments, locks, styles, appearance]).toEqual([[], [], [], []]);
+    update();
+    expect(root.hidden).toBe(false);
+    expect(shown(byLabel(root, "Shape"))).toBe(true);
+    expect(shown(byLabel(root, "Font"))).toBe(true);
+    expect(shown(byLabel(root, "Fill color"))).toBe(true);
+    expect(shown(byLabel(root, "Comment"))).toBe(true);
+    more.dispatch("click");
+    expect(shown(native)).toBe(true);
+    expect(nativeSlot.children).toContain(snapshot);
+    native.dispatch("click");
+    expect(nativeClick).toHaveBeenCalledOnce();
+  });
+
+  it("hides a review link when there is no usable open handler", () => {
+    const { root } = build({ reviewMode: true, editable: false, link: "https://example.test" });
+    expect(root.hidden).toBe(true);
   });
 
   it("shows the palette and recent colors inside the color popover", () => {
@@ -628,7 +698,7 @@ describe("selection toolbar", () => {
     expect(picker.value).toBe("#6cbf8f");
   });
 
-  it("opens a selected link from inside More, even in review mode", () => {
+  it("opens a selected link directly in review and restores More on exit", () => {
     const opened: number[] = [];
     const toolbar = new SelectionToolbar({
       onAppearance: () => undefined,
@@ -643,7 +713,7 @@ describe("selection toolbar", () => {
     };
     toolbar.update(state);
     byLabel(root, "More").dispatch("click");
-    const open = descendants(root).find((item) => item.className.includes("--open-link"))!;
+    const open = descendants(root).find((item) => item.className.includes("--review-link"))!;
     expect(shown(open)).toBe(false);
     toolbar.update({ ...state, link: "https://example.test/page" });
     expect(shown(open)).toBe(true);
@@ -651,8 +721,16 @@ describe("selection toolbar", () => {
     expect(open.disabled).toBe(false);
     open.dispatch("click");
     expect(opened).toEqual([1]);
-    // A link has no text of its own to format.
-    expect(shown(byLabel(root, "Font"))).toBe(false);
+    expect(shown(byLabel(root, "More"))).toBe(false);
+    expect(panelOf(root, "More").hidden).toBe(true);
+    expect(descendants(root).filter(item => item.tagName === "button" && shown(item))).toEqual([open]);
+    toolbar.update({ ...state, reviewMode: false, editable: true, link: "https://example.test/page" });
+    expect(shown(open)).toBe(false);
+    byLabel(root, "More").dispatch("click");
+    const normalLink = descendants(root).find(item => item.className.includes("--open-link"))!;
+    expect(shown(normalLink)).toBe(true);
+    normalLink.dispatch("click");
+    expect(opened).toEqual([1, 1]);
   });
 
   it("shows the layer items inside More only when onLayer is given and a card is selected", () => {
@@ -902,6 +980,42 @@ describe("keepPanelInView", () => {
     panelBottom = 168.8;
     keepPanelInView(panel as unknown as HTMLElement);
     expect(style.get("max-height")).toBe("80px");
+    keyboard = false;
+    keepPanelInView(panel as unknown as HTMLElement);
+    expect(style.has("top")).toBe(false);
+    expect(style.has("bottom")).toBe(false);
+    expect(attributes.has("data-keyboard-popover")).toBe(false);
+  });
+
+  it.each([140, 720])("keeps keyboard action menus inside the side with more room (bar %s)", (barTop) => {
+    const style = new Map<string, string>();
+    const attributes = new Map([["data-miro-action-menu", "true"]]);
+    let keyboard = true;
+    const board = {
+      getAttribute: () => keyboard ? "open" : null,
+      getBoundingClientRect: () => ({ left: 0, top: 122, right: 753, bottom: 804 }),
+    };
+    const toolbar = { getAttribute: () => "true", getBoundingClientRect: () => ({ top: barTop, bottom: barTop + 40 }) };
+    const panel = {
+      style: { setProperty: (name: string, value: string) => style.set(name, value), removeProperty: (name: string) => style.delete(name) },
+      getAttribute: (name: string) => attributes.get(name) ?? null,
+      setAttribute: (name: string, value: string) => attributes.set(name, value),
+      removeAttribute: (name: string) => attributes.delete(name),
+      parentElement: { getBoundingClientRect: () => ({ top: barTop, bottom: barTop + 40 }) },
+      closest: (selector: string) => selector === ".miro-canvas-root" ? board : toolbar,
+      getBoundingClientRect: () => {
+        const height = Math.min(440, Number.parseFloat(style.get("max-height") ?? "440"));
+        const top = style.get("top") !== "auto" && style.has("top")
+          ? barTop + Number.parseFloat(style.get("top")!)
+          : barTop + 40 - Number.parseFloat(style.get("bottom") ?? "0") - height;
+        return { left: 460, right: 740, top, bottom: top + height };
+      },
+    };
+    keepPanelInView(panel as unknown as HTMLElement);
+    const rect = panel.getBoundingClientRect();
+    expect(rect.top).toBeGreaterThanOrEqual(130);
+    expect(rect.bottom).toBeLessThanOrEqual(796);
+    expect(style.get(barTop === 140 ? "bottom" : "top")).toBe("auto");
     keyboard = false;
     keepPanelInView(panel as unknown as HTMLElement);
     expect(style.has("top")).toBe(false);

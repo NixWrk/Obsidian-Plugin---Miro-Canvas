@@ -252,11 +252,30 @@ function rebuildGraph(data: Record<string, unknown>, keepSelection = selectedIds
 }
 
 rebuildGraph(initial as unknown as Record<string, unknown>, ["n1"]);
-const history = [clone(initial) as unknown as Record<string, unknown>];
-let historyIndex = 0;
+// Inspected 1.14.4 history owns data/current/max; pushes retain the same array.
+const history = { data: [clone(initial) as unknown as Record<string, unknown>], current: 0, max: 100 };
+let pendingHistory: Record<string, unknown> | undefined;
+let deferHistory = false;
+type HistoryRequest = ((document: Record<string, unknown>) => HistoryRequest) & { run(): void; cancel(): HistoryRequest };
+const requestPushHistory: HistoryRequest = Object.assign((document: Record<string, unknown>): HistoryRequest => {
+  pendingHistory = clone(document);
+  return requestPushHistory;
+}, {
+  run(): void {
+    if (pendingHistory === undefined) return;
+    const document = pendingHistory;
+    pendingHistory = undefined;
+    history.data.length = history.current + 1;
+    history.data.push(document);
+    if (history.data.length >= history.max) history.data.shift();
+    history.current = history.data.length - 1;
+  },
+  cancel(): HistoryRequest { pendingHistory = undefined; return requestPushHistory; },
+});
 let saves = 0;
 let nativeCards = 0;
 const runtime = {
+  history, requestPushHistory,
   wrapperEl: root, canvasEl, nodes, edges, selection,
   menu: { menuEl: nativeMenu, containerEl: nativeMenuContainer },
   cardMenuEl: nativeCardMenu,
@@ -279,13 +298,14 @@ const runtime = {
     this.data = next;
     rebuildGraph(next);
   },
-  requestSave(addHistory: boolean) {
+  requestSave(addHistory = true) {
     saves += 1;
     this.data = this.getData();
     if (addHistory) {
-      history.splice(historyIndex + 1);
-      history.push(clone(this.data));
-      historyIndex += 1;
+      this.requestPushHistory(this.data);
+      // Synthetic clock drains ordinary saves; deferred checks exercise run/cancel.
+      // Native Canvas debounces for 250ms, which this deterministic host does not model.
+      if (!deferHistory) this.requestPushHistory.run();
     }
   },
   setReadonly(value: boolean) { this.readonly = value; },
@@ -320,8 +340,8 @@ const runtime = {
     this.importData(next);
     this.requestSave(true);
   },
-  undo() { if (historyIndex > 0) this.importData(history[--historyIndex]); },
-  redo() { if (historyIndex + 1 < history.length) this.importData(history[++historyIndex]); },
+  undo() { if (history.current > 0) this.importData(history.data[--history.current]); },
+  redo() { if (history.current + 1 < history.data.length) this.importData(history.data[++history.current]); },
 };
 const nativeCanvas = runtime;
 const view = { canvas: runtime, getViewType: () => "canvas" };
@@ -427,11 +447,13 @@ const mountFullBar = () => {
 const browser: Record<string, unknown> = {
   session, runtime, root, mounted, initial, select, openCalls, mountM2, mountFullBar,
   getSaves: () => saves,
-  getHistoryLength: () => history.length,
-  getHistoryIndex: () => historyIndex,
+  getHistoryLength: () => history.data.length,
+  getHistoryIndex: () => history.current,
+  setHistoryDeferred: (value: boolean) => { requestPushHistory.run(); deferHistory = value; },
+  historyPending: () => pendingHistory !== undefined,
   sourceUnchanged: () => JSON.stringify(runtime.data.miroSource) === JSON.stringify(initial.miroSource),
   unknownsPreserved,
-  dispose: () => { m2?.dispose(); penTooltips.dispose(); session.dispose(); },
+  dispose: () => { requestPushHistory.cancel(); m2?.dispose(); penTooltips.dispose(); session.dispose(); },
   checkPreexistingReadonly: () => {
     runtime.readonly = true;
     const before = saves;

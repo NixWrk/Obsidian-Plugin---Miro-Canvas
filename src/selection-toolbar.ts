@@ -82,6 +82,7 @@ export interface SelectionToolbarStyle {
   readonly shape?: ShapeKind;
   readonly borderStyle?: BorderStyle;
   readonly borderWidth?: number;
+  readonly cornerRadius?: number;
   readonly connector?: LocalConnectorSettings & { readonly headSize?: number };
 }
 
@@ -92,7 +93,7 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
   readonly canEditConnectorLabel?: boolean;
   readonly selectedIds: readonly string[];
   readonly kinds: readonly SelectionKind[];
-  /** False in review mode or on a locked selection; the lock toggle stays live. */
+  /** False in review mode or on a locked selection; unlocking remains available outside review. */
   readonly editable: boolean;
   readonly locked: boolean;
   readonly reviewMode: boolean;
@@ -114,6 +115,8 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
 export type SelectionStylePatch = SelectionToolbarStyle;
 
 export interface SelectionToolbarActions {
+  readonly onFlipEdges?: () => void;
+  readonly onMoreActions?: (button: HTMLElement) => void;
   readonly onTextSelectionWanted?: () => void;
   readonly onDelete?: () => void;
   readonly onEditConnectorLabel?: () => void;
@@ -301,10 +304,18 @@ export function keepPanelInView(panel: HTMLElement): void {
     && panel.parentElement != null) {
     const bar = toolbar.getBoundingClientRect();
     const host = panel.parentElement.getBoundingClientRect();
-    // Android's text-selection menu sits below the bar. Keep formatting above it.
-    setElementStyles(panel, { "top": "auto" });
-    panel.style.setProperty("bottom", `${Math.round(host.bottom - bar.top + 10)}px`);
-    panel.style.setProperty("max-height", `${Math.round(Math.max(44, bar.top - bounds.top - 18))}px`);
+    const above = Math.max(44, bar.top - bounds.top - 18);
+    const below = Math.max(44, bounds.bottom - bar.bottom - 18);
+    if (panel.getAttribute?.("data-miro-action-menu") === "true" && below > above) {
+      setElementStyles(panel, { "bottom": "auto" });
+      panel.style.setProperty("top", `${Math.round(bar.bottom - host.top + 10)}px`);
+      panel.style.setProperty("max-height", `${Math.round(below)}px`);
+    } else {
+      // Formatting stays above Android's text-selection menu.
+      setElementStyles(panel, { "top": "auto" });
+      panel.style.setProperty("bottom", `${Math.round(host.bottom - bar.top + 10)}px`);
+      panel.style.setProperty("max-height", `${Math.round(above)}px`);
+    }
     panel.setAttribute("data-keyboard-popover", "true");
   }
   const rect = panel.getBoundingClientRect();
@@ -566,6 +577,9 @@ interface ToolbarRefs {
   readonly lineWidthValue: HTMLElement;
   readonly headSize: HTMLInputElement;
   readonly colors: Readonly<Record<string, ColorRefs>>;
+  readonly colorGroup: HTMLElement;
+  readonly lastGroup: HTMLElement;
+  readonly reviewLink: HTMLButtonElement;
   readonly borderStyles: readonly HTMLButtonElement[];
   readonly borderWidth: HTMLInputElement;
   readonly borderWidthValue: HTMLElement;
@@ -612,7 +626,7 @@ export class SelectionToolbar {
     this.element = root;
     this.refs = this.build(root);
     this.listen(root, "pointerdown", (event) => {
-      this.actions.onTextSelectionWanted?.();
+      if (!this.state?.reviewMode) this.actions.onTextSelectionWanted?.();
       const target = event.target as HTMLElement | null;
       if (target?.closest?.("button") != null) event.preventDefault();
     });
@@ -654,6 +668,7 @@ export class SelectionToolbar {
     panel.hidden = true;
     const popover: Popover = { host, button, panel };
     this.listen(button, "click", () => {
+      if (this.state?.reviewMode) return;
       if (popover.panel.hidden && onOpen !== undefined) onOpen();
       this.togglePopover(popover);
     });
@@ -885,27 +900,48 @@ export class SelectionToolbar {
     // delete - kept as the native elements the host moves in here.
     const more = this.makePopover(lastGroup, words().toolbar.more, "miro-canvas-toolbar__button--more");
     this.icon(more.button, "more-vertical", "⋮");
-    const layerSection = append(more.panel, make(document, "div"));
-    const layerRow = this.block(layerSection, words().layer.menu, "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--layer");
+    more.panel.className += " miro-canvas-toolbar__panel--actions";
+    more.panel.setAttribute("data-miro-action-menu", "true");
+    const layerSection = append(more.panel, make(document, "div", "miro-canvas-toolbar__menu-section"));
+    const layerRow = this.block(layerSection, words().layer.menu, "miro-canvas-toolbar__menu-list");
     const layerOptions = layerActions().map(({ direction, label, icon }) => {
       // A command, not a choice that stays pressed.
       const option = append(layerRow, makeButton(document, label));
       option.setAttribute("data-value", direction);
       this.icon(option, icon, label.charAt(0));
+      append(option, make(document, "span", "miro-canvas-toolbar__menu-label", label));
       return option;
     });
     // A link card no longer loads its page, so it is opened from here.
-    const openLinkRow = this.block(more.panel, undefined, "miro-canvas-toolbar__row");
-    const openLink = append(openLinkRow, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--open-link"));
+    const openLink = append(more.panel, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--open-link"));
     this.icon(openLink, "external-link", "↗");
+    append(openLink, make(document, "span", "miro-canvas-toolbar__menu-label", words().toolbar.openLink));
     openLink.hidden = true;
     // Delete stays last, a danger item; the native elements the host puts
     // here keep their own order and behaviour, ahead of it.
+    if (this.actions.onMoreActions !== undefined) {
+      const actionsButton = append(more.panel, makeButton(document, words().enhancements.selectionActions));
+      this.icon(actionsButton, "workflow", "⋯");
+      append(actionsButton, make(document, "span", "miro-canvas-toolbar__menu-label", words().enhancements.selectionActions));
+      this.listen(actionsButton, "click", () => {
+        if (this.state?.reviewMode) return;
+        this.closePopovers();
+        this.actions.onMoreActions?.(more.button);
+      });
+    }
     const nativeSlot = append(more.panel, make(document, "span", "miro-canvas-toolbar__native"));
     const deleteSelection = append(nativeSlot, makeButton(document,words().toolbar.deleteSelection,"miro-canvas-toolbar__button--delete"));
     this.icon(deleteSelection,"trash-2","⌫");
-    this.listen(deleteSelection,"click",()=>this.actions.onDelete?.());
+    append(deleteSelection, make(document, "span", "miro-canvas-toolbar__menu-label", words().toolbar.deleteSelection));
+    this.listen(deleteSelection, "click", () => {
+      if (this.state?.editable && !this.state.reviewMode) this.actions.onDelete?.();
+    });
     deleteSelection.hidden=true;
+
+    const reviewLink = append(bar, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--review-link"));
+    this.icon(reviewLink, "external-link", "↗");
+    reviewLink.hidden = true;
+    this.listen(reviewLink, "click", () => this.openSelectedLink());
 
     const status = append(root, make(document, "p", "miro-canvas-toolbar__status"));
     status.setAttribute("role", "status");
@@ -917,7 +953,7 @@ export class SelectionToolbar {
       styleGroup, format, formats, align, alignments, verticalAlignments, lineHeight,
       list, link: { popover: link, input: linkInput, apply: linkApply },
       edgeGroup, editConnectorLabel, startCap, endCap, startCaps, endCaps, swapEnds, line, routes, strokes, lineWidth, lineWidthValue, headSize,
-      colors, borderStyles, borderWidth, borderWidthValue,
+      colors, colorGroup, lastGroup, reviewLink, borderStyles, borderWidth, borderWidthValue,
       comment, lock, more, layerSection, layerOptions,
       deleteSelection, openLink, nativeSlot, status,
     };
@@ -926,7 +962,9 @@ export class SelectionToolbar {
   }
 
   private wire(refs: ToolbarRefs): void {
-    this.listen(refs.editConnectorLabel, "click", () => this.actions.onEditConnectorLabel?.());
+    this.listen(refs.editConnectorLabel, "click", () => {
+      if (this.state?.editable && !this.state.reviewMode) this.actions.onEditConnectorLabel?.();
+    });
     const valueOf = (option: HTMLElement): string => option.getAttribute("data-value") ?? "";
     for (const item of SHAPE_CATALOG) {
       this.listen(refs.shapeOptions[item.kind], "click", () => {
@@ -980,6 +1018,10 @@ export class SelectionToolbar {
       }
     }
     this.listen(refs.swapEnds, "click", () => {
+      if (this.actions.onFlipEdges !== undefined) {
+        if (this.state?.editable === true && !this.state.reviewMode) this.actions.onFlipEdges();
+        return;
+      }
       const { start, end } = this.caps();
       if (start !== end) this.style({ connector: { startCap: end, endCap: start } });
     });
@@ -1023,17 +1065,22 @@ export class SelectionToolbar {
       this.actions.onLock(!this.state.locked);
     });
     // Opening a link changes nothing on the board, so review mode allows it.
-    this.listen(refs.openLink, "click", () => {
-      if (this.state?.link !== undefined) this.actions.onOpenLink?.();
+    this.listen(refs.openLink, "click", () => this.openSelectedLink());
+    this.listen(refs.comment, "click", () => {
+      if (this.state !== undefined && !this.state.reviewMode) this.actions.onComment?.();
     });
-    // Commenting is an annotation, not a board edit, so it stays live throughout.
-    this.listen(refs.comment, "click", () => this.actions.onComment?.());
     for (const option of refs.layerOptions) {
       this.listen(option, "click", () => this.layer(valueOf(option) as LayerDirection));
     }
     this.listen(this.element, "keydown", (event) => {
       if ((event as KeyboardEvent).key === "Escape") this.closePopovers();
     });
+  }
+
+  private openSelectedLink(): void {
+    if (this.state?.selectedIds.length && this.state.placement !== undefined && this.state.link !== undefined) {
+      this.actions.onOpenLink?.();
+    }
   }
 
   private listen(target: EventTarget, type: string, handler: EventListener): void {
@@ -1060,31 +1107,31 @@ export class SelectionToolbar {
 
   /** Every emitter funnels through these two guards so an inert toolbar stays inert. */
   private appearance(action: AppearanceAction): void {
-    if (this.state?.editable !== true) return;
+    if (this.state?.editable !== true || this.state.reviewMode) return;
     this.actions.onAppearance(action);
   }
 
   private style(patch: SelectionStylePatch): void {
-    if (this.state?.editable !== true) return;
+    if (this.state?.editable !== true || this.state.reviewMode) return;
     this.actions.onStyle(patch);
   }
 
   /** A layer command closes its popover once chosen, unlike the style pickers. */
   private layer(direction: LayerDirection): void {
-    if (this.state?.editable !== true) return;
+    if (this.state?.editable !== true || this.state.reviewMode) return;
     this.actions.onLayer?.(direction);
     this.closePopovers();
   }
 
   private list(): void {
-    if (this.state?.editable !== true) return;
+    if (this.state?.editable !== true || this.state.reviewMode) return;
     this.actions.onToggleList?.();
   }
 
   /** An empty field takes the link off; anything unsafe is refused quietly. */
   private commitLink(): void {
     const refs = this.refs;
-    if (this.state?.editable !== true || refs === undefined) return;
+    if (this.state?.editable !== true || this.state.reviewMode || refs === undefined) return;
     const raw = refs.link.input.value.trim();
     if (raw === "") {
       this.actions.onSetLink?.(undefined);
@@ -1102,7 +1149,21 @@ export class SelectionToolbar {
     if (refs === undefined) return;
     const document = this.document!;
     const root = this.element;
-    const visible = state.selectedIds.length > 0 && state.placement !== undefined;
+    const canOpenLink = state.link !== undefined && this.actions.onOpenLink !== undefined;
+    const visible = state.selectedIds.length > 0 && state.placement !== undefined
+      && (!state.reviewMode || canOpenLink);
+    refs.reviewLink.hidden = !state.reviewMode || !canOpenLink;
+    refs.reviewLink.setAttribute("aria-label", state.link === undefined
+      ? words().toolbar.openLink : words().toolbar.openLinkWithUrl(state.link));
+    refs.colorGroup.hidden = state.reviewMode;
+    refs.lastGroup.hidden = state.reviewMode;
+    refs.nativeSlot.hidden = state.reviewMode;
+    if (state.reviewMode) {
+      for (const group of [refs.shape.host, refs.sizeGroup, refs.styleGroup, refs.edgeGroup, refs.layerSection]) group.hidden = true;
+      refs.deleteSelection.hidden = true;
+      refs.status.hidden = true;
+      this.closePopovers();
+    }
     root.hidden = !visible;
     // A popover must never outlive the selection it was opened for.
     const selectionKey = state.selectedIds.join("\u0000");
@@ -1117,6 +1178,7 @@ export class SelectionToolbar {
     root.setAttribute("data-miro-canvas-placement", state.placement.below === true ? "below" : "above");
     root.setAttribute("data-miro-canvas-editable", state.editable ? "true" : "false");
     root.setAttribute("data-miro-independent-only",state.independentOnly?"true":"false");
+    if (state.reviewMode) return;
 
     const hasEdge = state.kinds.includes("edge");
     // Native Canvas's own delete takes the board's connectors with it; this one

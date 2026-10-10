@@ -19,6 +19,15 @@ This section is written so that a task can be handed to an AI coding agent
 
 ### While working
 
+Settings use the native `getSettingDefinitions()` API available since Obsidian
+1.13, so new radius/snippet rows participate in settings indexing. The plugin
+keeps its normalized immutable settings host and explicit save callbacks for
+custom rendered controls; it does not assume `plugin.settings` owns storage.
+See the [official migration guide](https://docs.obsidian.md/plugins/guides/migrate-declarative-settings).
+The plugin currently stores no API keys or passwords. If a future feature needs
+one, use [SecretStorage/SecretComponent](https://docs.obsidian.md/plugins/guides/secret-storage)
+and save only the secret's name in plugin settings, never its value.
+
 Before each lint fix, trace the code's callers and affected user actions, then
 record mandatory regressions in [the register](lint-remediation-checks.md)
 before editing the implementation. Run those checks and distinguish real-app,

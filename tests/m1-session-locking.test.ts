@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { M1CanvasSession } from "../src/m1-session";
+import { M1CanvasSession, type M1SessionOptions } from "../src/m1-session";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
 import type { M1ControlsActions } from "../src/m1-controls";
@@ -58,7 +58,7 @@ const sessions: M1CanvasSession[] = [];
 afterEach(() => { sessions.splice(0).forEach((session) => session.dispose()); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 /** A board with a locked card, a free one and, for a large selection, as many more free cards as asked. */
-function fixture(moreCards = 0) {
+function fixture(moreCards = 0, options: M1SessionOptions = {}) {
 	const root = new HostElement("canvas-wrapper");
 	const nodeData = (id: string) => ({ id, type: "text", text: id, x: 0, y: 0, width: 100, height: 80, futureNode: { keep: id } });
 	const more = Array.from({ length: moreCards }, (_, index) => nodeData(`card-${index}`));
@@ -112,7 +112,7 @@ function fixture(moreCards = 0) {
 	const view = { canvas };
 	const store = createObsidianMetadataStore(view).store;
 	expect(store).toBeDefined();
-	const session = new M1CanvasSession(view, new MetadataWriter(store!));
+	const session = new M1CanvasSession(view, new MetadataWriter(store!), options);
 	sessions.push(session);
 	expect(session.mount()).toBe(true);
 	const locked = nodes.get("locked")!;
@@ -120,6 +120,43 @@ function fixture(moreCards = 0) {
 	const actions = (session.controls as unknown as { actions: M1ControlsActions }).actions;
 	return { root, canvas, session, locked, free, selection, initial, history, actions };
 }
+
+describe("committed knowledge publication", () => {
+	it("coalesces action saves and never publishes from render refreshes", async () => {
+		const publish = vi.fn();
+		const { canvas, session, free } = fixture(0, { onCommittedBoardDocument: publish });
+		free.setText("[[New link]]");canvas.data = canvas.getData();canvas.requestSave(true);canvas.requestSave(false);
+		session.notifyCommittedBoardDocument();session.notifyCommittedBoardDocument();
+		session.refresh();session.refresh();expect(publish).not.toHaveBeenCalled();await Promise.resolve();
+		expect(publish).toHaveBeenCalledTimes(1);
+		expect((publish.mock.calls[0]![0] as Data).nodes.find((node: Data) => node.id === "free").text).toBe("[[New link]]");
+		expect(publish.mock.calls[0]![0]).toBe(publish.mock.calls[0]![1]);
+		session.refresh();await Promise.resolve();expect(publish).toHaveBeenCalledTimes(1);
+	});
+	it("publishes native Undo and Redo only at the outer history boundary", async () => {
+		const publish = vi.fn();
+		const { canvas, free, session } = fixture(0, { onCommittedBoardDocument: publish });
+		free.setText("Changed link");canvas.data = canvas.getData();canvas.requestSave(true);session.notifyCommittedBoardDocument();await Promise.resolve();publish.mockClear();
+		canvas.undo();await Promise.resolve();
+		expect((publish.mock.calls[0]![0] as Data).nodes.find((node: Data) => node.id === "free").text).toBe("free");
+		canvas.redo();await Promise.resolve();expect(publish).toHaveBeenCalledTimes(2);
+		expect((publish.mock.calls[1]![0] as Data).nodes.find((node: Data) => node.id === "free").text).toBe("Changed link");
+	});
+	it("suppresses a held preview until a subsequent settled commit", async () => {
+		const publish = vi.fn();
+		const { canvas, session } = fixture(0, { onCommittedBoardDocument: publish });
+		const internal = session as unknown as { pointerHeld: boolean };
+		internal.pointerHeld = true;canvas.requestSave(false);session.notifyCommittedBoardDocument();await Promise.resolve();expect(publish).not.toHaveBeenCalled();
+		internal.pointerHeld = false;session.refresh();await Promise.resolve();expect(publish).not.toHaveBeenCalled();
+		canvas.requestSave(true);session.notifyCommittedBoardDocument();await Promise.resolve();expect(publish).toHaveBeenCalledTimes(1);
+	});
+	it("drops queued publication and releases its owner once on unload", async () => {
+		const publish = vi.fn(), release = vi.fn();
+		const { canvas, session } = fixture(0, { onCommittedBoardDocument: publish, onReleaseBoardDocument: release });
+		canvas.requestSave(true);session.notifyCommittedBoardDocument();session.dispose();session.dispose();await Promise.resolve();
+		expect(publish).not.toHaveBeenCalled();expect(release).toHaveBeenCalledTimes(1);
+	});
+});
 
 describe("selection frame follows the displayed card", () => {
 	it("uses live size and displayed zoom while native resize and camera animation have not committed", () => {
@@ -135,7 +172,52 @@ describe("selection frame follows the displayed card", () => {
 	});
 });
 
+describe("radius marker follows the displayed camera", () => {
+	it("passes the global percentage as a scale only to the selected shape", () => {
+		vi.stubGlobal("HTMLElement", HostElement);
+		const { session, free } = fixture();
+		const internal = session as any;
+		internal.settings = { ...internal.settings, shapeRadiusControlMinZoomPercent: 125 };
+		internal.selectedIds = ["free"];
+		internal.shapeRadiusHandle = { update: vi.fn(), updateZoom: vi.fn(), dispose: vi.fn() };
+		vi.spyOn(internal, "landingGeometry").mockReturnValue({ scene: { items: new Map([
+			["free", { shape: "round_rectangle", cornerRadius: 16 }],
+		]) } });
+		vi.spyOn(internal, "nodeRect").mockReturnValue({ x: 0, y: 0, width: 250, height: 60 });
+		vi.spyOn(internal, "displayViewport").mockReturnValue({ x: 0, y: 0, zoom: 1.5 });
+		internal.updateShapeRadiusHandle(true);
+		expect(internal.shapeRadiusHandle.update).toHaveBeenLastCalledWith(expect.objectContaining({
+			id: "free", nodeEl: free.nodeEl, zoom: 1.5, minimumZoom: 1.25,
+		}));
+	});
+	it("updates zoom between session refreshes without walking the board nodes", () => {
+		const { session } = fixture();
+		const internal = session as any;
+		const updateZoom = vi.fn();
+		internal.shapeRadiusHandle = { updateZoom, update: vi.fn(), dispose: vi.fn() };
+		const displayed = vi.spyOn(internal, "displayViewport");
+		for (const zoom of [0.5, 1, 1.99, 2]) {
+			displayed.mockReturnValue({ x: 0, y: 0, zoom });
+			internal.followViewport();
+			expect(updateZoom).toHaveBeenLastCalledWith(zoom);
+		}
+	});
+});
+
 describe("resize history", () => {
+  it("repaints metadata after native Undo and Redo without another board input", () => {
+    const { canvas, session, initial } = fixture();
+    canvas.data.miroCanvas = { ...canvas.data.miroCanvas, settings: { reviewMode: true } };
+    canvas.requestSave(true);
+    session.refresh();
+    expect(session.snapshot.reviewMode).toBe(true);
+    canvas.undo();
+    expect(session.snapshot.reviewMode).toBe(false);
+    expect((canvas.getData() as Data).miroSource).toEqual(initial.miroSource);
+    canvas.redo();
+    expect(session.snapshot.reviewMode).toBe(true);
+    expect((canvas.getData() as Data).miroSource).toEqual(initial.miroSource);
+  });
 	it("restores a cancelled preview without saving, then commits a later resize once", () => {
 		const { canvas, free, session } = fixture();
 		canvas.selectOnly(free);
@@ -448,6 +530,65 @@ describe("M1 session lock enforcement", () => {
 		Object.defineProperty(canvas, "selection", { get: () => { throw new Error("unavailable"); } });
 		free.moveTo({ x: 4 });
 		expect(free.data.x).toBe(0);
+	});
+
+	it.each(["review", "native", "presentation"])("leaves %s touch pan/pinch to native Canvas while guarding edits", (mode) => {
+		const { root, free, locked, selection, session, canvas, history } = fixture();
+		if (mode === "review") session.toggleReviewMode();
+		if (mode === "native") Reflect.set(session, "readonlyOriginal", true);
+		if (mode === "presentation") Reflect.set(session, "slideShow", { active: true, stop() {}, dispose() {} });
+		session.refresh();
+		selection.add(free);
+		selection.add(locked);
+		const initial = canvas.getData();
+		const initialHistory = history.length;
+		const frame = root.appendChild(new HostElement("canvas-selection"));
+		const pan = vi.fn();
+		root.addEventListener("pointerdown", pan);
+		root.addEventListener("pointermove", pan);
+		for (const target of [free.nodeEl, locked.nodeEl, frame, root]) {
+			for (const isPrimary of [true, false]) {
+				expect(root.emit("pointerdown", target, { button: 0, buttons: 1, pointerType: "touch", isPrimary }).defaultPrevented).toBe(false);
+				expect(root.emit("pointermove", target, { button: -1, buttons: 1, pointerType: "touch", isPrimary }).defaultPrevented).toBe(false);
+			}
+		}
+		expect(pan).toHaveBeenCalledTimes(16);
+		free.moveTo({ x: 30 });
+		free.resize({ width: 800 });
+		free.setText("changed");
+		expect(root.emit("pointerdown", free.nodeEl, { button: 0, pointerType: "mouse" }).defaultPrevented).toBe(true);
+		expect(root.emit("pointerdown", free.nodeEl, { button: 0, pointerType: "pen" }).defaultPrevented).toBe(true);
+		expect(canvas.getData()).toEqual(initial);
+		expect(history).toHaveLength(initialHistory);
+	});
+
+	it("admits right/middle/Space mouse pan moves without admitting a stylus side-button edit", () => {
+		const { root, free, session } = fixture();
+		session.toggleReviewMode();
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 2, pointerType: "mouse" }).defaultPrevented).toBe(false);
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 4, pointerType: "mouse" }).defaultPrevented).toBe(false);
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 2, pointerType: "pen" }).defaultPrevented).toBe(true);
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 1, pointerType: "mouse" }).defaultPrevented).toBe(true);
+		root.emit("keydown", root, { key: " " });
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 1, pointerType: "mouse" }).defaultPrevented).toBe(false);
+	});
+
+	it("declines a viewing mixed-selection move before claiming the touch, then restores editing", () => {
+		const { root, free, locked, selection, session } = fixture();
+		selection.add(free);
+		selection.add(locked);
+		session.toggleReviewMode();
+		const event = new Event("pointerdown", { cancelable: true });
+		Object.defineProperty(event, "target", { value: free.nodeEl });
+		Object.defineProperty(event, "button", { value: 0 });
+		const internal = session as unknown as { startSelectionMove(event: PointerEvent): boolean };
+		expect(internal.startSelectionMove(event as PointerEvent)).toBe(false);
+		expect(event.defaultPrevented).toBe(false);
+		session.toggleReviewMode();
+		expect(root.emit("pointerdown", locked.nodeEl, { button: 0, pointerType: "touch" }).defaultPrevented).toBe(true);
+		selection.clear();
+		expect(root.emit("pointerdown", free.nodeEl, { button: 0, pointerType: "touch" }).defaultPrevented).toBe(false);
+		expect(free.moveTo({ x: 20 })).toBe("moved");
 	});
 
 	it("allows blank pan, middle/space pan, copy and plugin controls while locked", () => {

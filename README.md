@@ -62,10 +62,70 @@ drawing. The interface is available in English and Russian.
 
 Open the GIF at full size for small controls.
 
-Export runs in the background, so you can keep editing or open another board.
-Files are saved as new vault attachments. **Each page or slide is an image of
-the board**; PowerPoint text and shapes are not separate editable objects.
-Live web embeds and video are omitted.
+Export renders an independent board snapshot without screen capture, so you can
+keep editing or open another board.
+Files are saved as new vault attachments. Raster PDF/PPTX store a picture per
+page. The development build adds a **Raster / Vector** choice for PDF and
+PowerPoint, while SVG remains a separate, always-vector format. Vector PDF
+embeds Noto Sans in four styles; source fonts are substituted. Vector PowerPoint
+stores one SVG per slide with a JPEG fallback for older readers; its text and
+shapes are not separate native PowerPoint objects. Live web embeds and video
+are omitted. [Modes and checks](docs/vector-viewing-acceptance.md).
+
+## Canvas expansion in 0.3.0
+
+**Board appearance:** “Obsidian” follows the current Obsidian light/dark theme, even when the device uses another theme. Explicit board Light/Dark choices stay independent. Long board-menu labels wrap inside the menu.
+
+
+The selection toolbar’s **More** menu lists labelled actions: layer order, board actions and native Canvas commands, with Delete last.
+
+The **Export** panel groups page ordering and paper/quality controls, with a scrolling body and persistent Close/output actions. Touch controls and safe-area/keyboard bounds are checked in native Obsidian. [Panel checks](docs/export-panel-design-checks.md).
+
+Version 0.3.0 adds the following board workflows. Verification and remaining
+coverage follow-ups are tracked in the
+[feature plan](docs/canvas-enhancement-plan.md) and
+[integration checks](docs/obsidian-integration-checks.md).
+
+| Feature | Behavior and limits |
+| --- | --- |
+| **Search linked notes** | Board search includes Markdown file-card contents and heading/block slices, with match-case and a bounded regular-expression mode. |
+| **Connections** | Reverse direction with **Reverse connection direction** (Flip), select incoming/outgoing/connected lines, or highlight them without changing selection. |
+| **Compact groups** | Collapse a group for viewing; its real cards, connections and stored positions remain in the file. |
+| **Move a selection** | Move cards and internal lines to a new board; crossing lines attach to its file card. Undo restores the source selection and retains the new board file. |
+| **Board properties and card links** | Edit properties, tags and aliases; copy a link or embed for an individual card. Supported metadata integration adds graph, outgoing and backlink data through temporary caches and reversible pane hooks. |
+| **Note-property connections** | Optionally generate connections between file cards from note-property links, preserving manual connections. |
+| **Shared colors and styles** | Prefer a permanent palette across boards while retaining customized local palettes. Apply named, scoped CSS declarations from a restricted subset. |
+| **Zoom content** | Set content thresholds for text, file, web and Miro cards; selected or edited cards stay readable. |
+| **Card corners** | Set a radius from 0 to 48 board pixels using a slider or a precise value; zero gives square cards. Diagram geometry stays unchanged. |
+| **Shape corners** | Rectangular figures have equal horizontal/vertical radii in board units. At the minimum zoom configured in plugin settings (200% by default; 0 means any zoom), drag the corner marker with its bidirectional arrow using a finger, pen or mouse; the marker moves with the radius and the live value appears above the held control. Click it for an exact value; disable the controls in plugin settings. New click/drop shapes use the catalogue proportions, while free drawing keeps your dimensions. |
+| **CSS snippets** | Supported Obsidian snippets are excluded from boards by default. Allow individual installed snippets in searchable settings; normal notes and the selected theme retain their styling. |
+| **Viewing and slides** | Review hides editing/creation menus; selected web links retain a direct Open link action. Toggle a temporary laser from the viewing dock or slideshow bar. **Present slides** uses native frames in file order, or export pages when there are no frames. In viewing mode, a finger drag can start on a card or selection to pan the board without changing card positions or history. |
+| **Vector PDF/PowerPoint** | Choose Raster or Vector in Export. PDF uses embedded Noto Sans; PowerPoint embeds SVG per slide with an older-reader picture fallback. |
+| **Vector export** | Export actual shapes, lines and text to SVG, with clipped pages stacked vertically. Intrinsic raster attachments remain images. |
+
+SVG references installed fonts and omits cosmetic shadows. Unsupported rich
+content is refused explicitly, including live/PDF embeds, list markers and
+complex or rotated HTML text. [SVG scope and checks](docs/vector-export-checks.md).
+Snippet isolation supports ordinary selectors and conditional rules, including
+inheritance and `!important`. Imports, font-face/keyframe/property definitions,
+unverified popout styles and layout effects on ancestors outside the board are
+not fully isolated; unsupported sheets produce a notice and may still apply.
+[Snippet scope and checks](docs/canvas-snippet-checks.md).
+
+Board-property/tag search supplements native results for positive
+conjunctions, such as `tag:project [status:"active"]`. OR, negation, regex and
+mixed content/path queries are not supplemented; native search still runs.
+Property-only backlink rows require an empty backlink filter and open the real
+board without invented text offsets. Private API shapes, scan limits and
+unsupported syntax can prevent supplementation. These additions do not make
+Canvas root properties native Markdown frontmatter.
+
+Windows, tablet and legacy-phone checks cover typed property search and genuine
+board/note navigation. The SM-A336E/Obsidian 1.12.7 checks also cover gestures,
+themes and independent exports; that app is below the supported minimum.
+[Phone input distinctions and results](docs/smartphone-enhancement-checks.md).
+
+[Behavior, persistence and remaining checks](docs/miro-canvas.md#canvas-expansion--030)
 
 ## Installing
 

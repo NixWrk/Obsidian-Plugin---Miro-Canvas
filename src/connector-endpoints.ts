@@ -13,6 +13,7 @@ import type {
 } from "./anchors";
 import { buildSourceScene, type SourceScene } from "./source-model";
 import { boardConnectors } from "./board-connectors";
+import { groupCollapse, compactGroupRect } from "./board-groups";
 import { listCommentThreads } from "./local-comments";
 import { planRoute, type RouteEnd } from "./connector-route";
 import { closestContourPoint, contourPoint, shapeOutline, type ShapePoint } from "./shape-geometry";
@@ -393,6 +394,8 @@ export function buildCanvasAnchorGeometry(
    * ends hold on only to cards that have not moved since is kept as it was.
    */
   previous?: AnchorGeometry,
+  /** Hidden child IDs use their visible collapsed group's geometry. */
+  nodeOwners?: ReadonlyMap<string, string>,
 ): AnchorGeometry {
   if (!isRecord(document)) {
     return {};
@@ -408,7 +411,9 @@ export function buildCanvasAnchorGeometry(
     const measured = measurements === undefined ? undefined : readOwn(measurements, id);
     const observed = isRecord(measured) ? measured as MeasuredNodeRect : undefined;
     const documentRect = rectFromNode(node);
-    const base = documentRect === undefined ? undefined : measuredRect(documentRect, observed);
+    const normalBase = documentRect === undefined ? undefined : measuredRect(documentRect, observed);
+    const compact = groupCollapse(document, id) === undefined ? undefined : compactGroupRect(node);
+    const base = compact === undefined || normalBase === undefined ? normalBase : { ...normalBase, width: compact.width, height: compact.height };
     const rotation = finite(observed?.rotation)
       ? observed.rotation
       : sourceScene.items.get(id)?.rotation ?? 0;
@@ -431,8 +436,29 @@ export function buildCanvasAnchorGeometry(
     }
   }
 
+  for (const [id, owner] of nodeOwners ?? []) {
+    if (nodes[owner] === undefined || nodes[id] === undefined) continue;
+    nodes[id] = nodes[owner];
+    if (images[id] !== undefined) images[id] = nodes[owner];
+  }
+  const nodeOutline = (id: string) => {
+    const item = sourceScene.items.get(id);
+    const rect = nodes[id];
+    return shapeOutline(nodeOwners?.has(id) ? "rectangle" : item?.shape,
+      rect === undefined ? undefined : { ...rect, cornerRadius: item?.cornerRadius });
+  };
   const edges = Object.create(null) as Record<string, AnchorEdgeGeometry>;
   const comments = Object.create(null) as Record<string, AnchorPoint>;
+  const projectedPoint = (id: string, point: AnchorPoint): AnchorPoint => {
+    const owner = nodeOwners?.get(id);
+    const originalNode = owner === undefined ? undefined : graph.nodes.get(owner);
+    const original = originalNode === undefined ? undefined : rectFromNode(originalNode);
+    const compact = owner === undefined ? undefined : nodes[owner];
+    return original === undefined || compact === undefined ? point : {
+      x: compact.x + Math.max(0, Math.min(1, (point.x - original.x) / original.width)) * compact.width,
+      y: compact.y + Math.max(0, Math.min(1, (point.y - original.y) / original.height)) * compact.height,
+    };
+  };
   const threads = new Map(listCommentThreads(document).map((thread) => [`${thread.origin}:${thread.id}`, thread]));
   // A comment pin is where it was put, else on what its thread is anchored to.
   const resolvingComments = new Set<string>();
@@ -443,7 +469,8 @@ export function buildCanvasAnchorGeometry(
     resolvingComments.add(key);
     const metadata = isRecord(document.miroCanvas) ? document.miroCanvas : {};
     const place = isRecord(metadata.commentPlaces) ? metadata.commentPlaces[key] : undefined;
-    const anchor = normalizeAnchor(place ?? thread.anchor).anchor;
+    const stored = normalizeAnchor(place ?? thread.anchor).anchor;
+    const anchor = stored?.type === "free" ? { ...stored, ...projectedPoint(`miro-comment:${key}`, stored) } : stored;
     if (anchor?.type === "edge") resolveEdge(anchor.edgeId);
     if (anchor?.type === "comment") resolveComment(`${anchor.origin}:${anchor.commentId}`);
     const point = resolveAnchor(anchor, { nodes, images, edges, comments }).point;
@@ -468,6 +495,8 @@ export function buildCanvasAnchorGeometry(
     return anchor !== undefined && (anchor.type === "free" || ((anchor.type === "node" || anchor.type === "image") && !moved(anchor.nodeId)));
   };
   const unchanged = (edgeId: string, edge: UnknownRecord | undefined): boolean => {
+    const owner = nodeOwners?.get(edgeId);
+    if (owner !== undefined && moved(owner)) return false;
     if (edge === undefined) {
       const connector = independent.get(edgeId);
       return connector !== undefined && stillAnchor(connector.from) && stillAnchor(connector.to);
@@ -494,21 +523,22 @@ export function buildCanvasAnchorGeometry(
       const connector = independent.get(edgeId);
       if (connector === undefined) return undefined;
       resolving.add(edgeId);
-      const connectorEnd = (anchor: CanvasAnchor): RouteEnd | undefined => {
+      const connectorEnd = (stored: CanvasAnchor): RouteEnd | undefined => {
+        const anchor = stored.type === "free" ? { ...stored, ...projectedPoint(edgeId, stored) } : stored;
         resolveDependency(anchor);
         const point = resolveAnchor(anchor, { nodes, images, edges, comments }).point;
         if (point === undefined) return undefined;
         const rect = anchor.type === "node" ? nodes[anchor.nodeId] : undefined;
         const facing = rect === undefined || anchor.type !== "node"
           ? undefined
-          : nativeAnchorEnd(rect, anchor.u, anchor.v, shapeOutline(sourceScene.items.get(anchor.nodeId)?.shape));
+          : nativeAnchorEnd(rect, anchor.u, anchor.v, nodeOutline(anchor.nodeId));
         return { point: { x: point.x, y: point.y }, ...(facing === undefined ? {} : { normal: facing.normal }) };
       };
       const from = connectorEnd(connector.from), to = connectorEnd(connector.to);
       resolving.delete(edgeId);
       if (from === undefined || to === undefined) return undefined;
       return edges[edgeId] = {
-        ...planRoute(from, to, connector.route, connector.waypoints ?? []),
+        ...planRoute(from, to, connector.route, (connector.waypoints ?? []).map((point) => projectedPoint(edgeId, point))),
         ends: { from, to },
         imported: false,
       };
@@ -525,7 +555,8 @@ export function buildCanvasAnchorGeometry(
         if (!normalized.valid || normalized.anchor === undefined) {
           return undefined;
         }
-        const anchor = normalized.anchor;
+        const stored = normalized.anchor;
+        const anchor = stored.type === "free" ? { ...stored, ...projectedPoint(edgeId, stored) } : stored;
         if (anchor.type === "edge") {
           const target = resolveEdge(anchor.edgeId);
           if (target === undefined) {
@@ -541,7 +572,7 @@ export function buildCanvasAnchorGeometry(
         if (point === undefined) return undefined;
         const rect = anchor.type === "node" ? nodes[anchor.nodeId] : undefined;
         const facing = local && rect !== undefined && anchor.type === "node"
-          ? nativeAnchorEnd(rect, anchor.u, anchor.v, shapeOutline(sourceScene.items.get(anchor.nodeId)?.shape))
+          ? nativeAnchorEnd(rect, anchor.u, anchor.v, nodeOutline(anchor.nodeId))
           : undefined;
         return { point: { x: point.x, y: point.y }, ...(facing === undefined ? {} : { normal: facing.normal }) };
       }
@@ -552,7 +583,7 @@ export function buildCanvasAnchorGeometry(
       }
       const rect = nodes[nodeId];
       if (rect === undefined) return undefined;
-      const outline = shapeOutline(sourceScene.items.get(nodeId)?.shape);
+      const outline = nodeOutline(nodeId);
       const point = sidePoint(rect, side, outline);
       if (point === undefined) return undefined;
       const facing = local ? nativeEdgeEnd(rect, side, outline) : undefined;
@@ -567,7 +598,7 @@ export function buildCanvasAnchorGeometry(
     const route = descriptor?.connector?.shape ?? (local ? "curved" : "straight");
     // The ends and the import flag travel with the route, so a drag can plan it again.
     const geometry = {
-      ...planRoute(start, end, route, descriptor?.connector?.waypoints ?? [], { imported: !local }),
+      ...planRoute(start, end, route, (descriptor?.connector?.waypoints ?? []).map((point) => projectedPoint(edgeId, point)), { imported: !local }),
       ends: { from: start, to: end },
       imported: !local,
     };
