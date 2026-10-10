@@ -2411,3 +2411,44 @@ parsing confirms Cyrillic, paths and SVG slide parts. Viewing/laser/slideshow
 pass real native inputs; ADB stylus-source is separated from physical S Pen.
 Review-toggle saves are settled before the no-write baseline. Current phone,
 physical S Pen and opening the package in PowerPoint remain unverified.
+
+
+## Viewing touch pan from a card (2026-10-10, before implementation)
+
+Trace: M1.attachGuards treats every node/selection pointerdown and held
+pointermove as a move edit, prevents the press and selects the node for unlock.
+In review this also prevents native Canvas.onTouchdown from receiving the
+press. Native 1.14.4 onTouchdown already pans/pinches from cards and cancels its
+600 ms long-press timer after a 5 px move; native node mouse dragging checks
+readonly. Element move/resize/text methods retain separate instance guards.
+M1.startSelectionMove also prevents a mixed/collapsed selection press before
+checking its policy, so it must decline viewing gestures without claiming them.
+
+Reproduced in hidden real Windows Obsidian 1.14.4: trusted CDP touch drag
+starting on a selected card in review leaves camera at (300,90,0). Prior board
+was restored. This is actual Obsidian with synthesized touch, not Android input.
+
+Mandatory checks before closing: selected/unselected/locked cards, native mixed
+selection and collapsed group; blank-start pan across cards; review on/off,
+native readonly and slideshow; ordinary selected-card drag remains editable;
+non-default zoom, second-finger pinch, cancel, middle/right/Space pan, tap/link/
+copy and laser ownership. No node/edge/source/unknown-field/history changes
+while viewing. Run focused safety/admission tests and actual hidden Windows
+plus SM-X736B MiroCanvasTest ADB touch gestures. Physical finger/S Pen and phone
+remain unverified unless separately observed. Evidence and any pending checks
+will be recorded in docs/review-pan-checks.md.
+
+Native Windows regression also found the same move guard blocking right-button
+panning after correctly admitting its pointerdown. Native onPriorityPointerdown
+uses right and middle mouse buttons for pan; the plugin move guard exempted
+only middle. Before changing it, require mouse-right move admission without
+exempting a stylus side button or a primary node edit.
+
+The full collapsed-group suite exposed a test-native drag handler that adds an
+empty history step after its node writes are refused. Native 1.14.4
+handleSelectionDrag returns undefined when readonly; retain that contract at
+the instance hook before creating any collapsed or native drag lifecycle.
+Require undefined/no native initialization in viewing and retain existing
+locked-group inert lifecycle tests outside viewing.
+
+Final scope, actual input receipts and pending checks: [viewing pan checks](review-pan-checks.md).

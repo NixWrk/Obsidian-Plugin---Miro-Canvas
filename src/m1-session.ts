@@ -8255,6 +8255,8 @@ export class M1CanvasSession {
 	 */
 	private startSelectionMove(event: PointerEvent, options: { readonly single?: boolean } = {}): boolean {
 		this.readInteractionState();
+		// Viewing leaves a finger to native Canvas for pan and pinch.
+		if (this.isViewing()) return false;
 		const pressedId = this.eventElementId(event.target);
 		const collapsedPress = pressedId !== undefined && groupCollapse(this.currentRawDocument, pressedId) !== undefined;
 		if (collapsedPress && event.button === 0 && !event.shiftKey && !this.closestTarget(event, "input,textarea,[contenteditable=true],.cm-editor")
@@ -9855,6 +9857,8 @@ export class M1CanvasSession {
 		// the order set by hand; the lift happens as the drag starts, so the
 		// layers are put back as soon as it has.
 		this.guardNativeMethod(canvas, "handleSelectionDrag", (original, receiver, args) => {
+			this.readInteractionState();
+			if (this.isViewing()) return undefined;
 			const collapsed = this.startCollapsedGroupDrag(args);
 			if (collapsed !== undefined) return collapsed;
 			const layers = new Map<unknown, unknown>();
@@ -10135,6 +10139,8 @@ export class M1CanvasSession {
 		for (const type of ["pointerdown", "mousedown"]) {
 			listen(type, (event) => {
 				this.pointerEditIds = undefined;
+				// Native touch pans from cards; readonly and method guards still protect edits.
+				if (this.isViewing() && readRuntime(event, "pointerType") === "touch") return;
 				if (readRuntime(event, "button") === 1 || readRuntime(event, "button") === 2 || this.isSpacePanHeld()) return;
 				const id = this.eventElementId(eventTarget(event));
 				if (id === undefined && !this.closestTarget(event, ".canvas-node, .canvas-edge, .canvas-selection, .canvas-node-resizer")) return;
@@ -10184,10 +10190,13 @@ export class M1CanvasSession {
 		listen("paste", (event) => this.blockIfNeeded(event, "paste", this.eventIds(event)));
 		listen("cut", (event) => this.blockIfNeeded(event, "delete", this.eventIds(event)));
 		listen("pointermove", (event) => {
+			// Do not block the native pan when its finger crosses another card.
+			if (this.isViewing() && readRuntime(event, "pointerType") === "touch") return;
 			// A selection move was checked against the locks as it began.
 			if (this.selectionMoveEnd !== undefined) return;
 			const buttons = readRuntime(event, "buttons");
-			if (buttons === 0 || (typeof buttons === "number" && (buttons & 4) !== 0) || this.isSpacePanHeld()) {
+			if (buttons === 0 || (typeof buttons === "number" && (buttons & 4) !== 0)
+				|| (buttons === 2 && readRuntime(event, "pointerType") === "mouse") || this.isSpacePanHeld()) {
 				return;
 			}
 			// A pen hovering with its side button held reports that button

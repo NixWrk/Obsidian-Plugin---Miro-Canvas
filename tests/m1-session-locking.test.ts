@@ -500,6 +500,65 @@ describe("M1 session lock enforcement", () => {
 		expect(free.data.x).toBe(0);
 	});
 
+	it.each(["review", "native", "presentation"])("leaves %s touch pan/pinch to native Canvas while guarding edits", (mode) => {
+		const { root, free, locked, selection, session, canvas, history } = fixture();
+		if (mode === "review") session.toggleReviewMode();
+		if (mode === "native") Reflect.set(session, "readonlyOriginal", true);
+		if (mode === "presentation") Reflect.set(session, "slideShow", { active: true, stop() {}, dispose() {} });
+		session.refresh();
+		selection.add(free);
+		selection.add(locked);
+		const initial = canvas.getData();
+		const initialHistory = history.length;
+		const frame = root.appendChild(new HostElement("canvas-selection"));
+		const pan = vi.fn();
+		root.addEventListener("pointerdown", pan);
+		root.addEventListener("pointermove", pan);
+		for (const target of [free.nodeEl, locked.nodeEl, frame, root]) {
+			for (const isPrimary of [true, false]) {
+				expect(root.emit("pointerdown", target, { button: 0, buttons: 1, pointerType: "touch", isPrimary }).defaultPrevented).toBe(false);
+				expect(root.emit("pointermove", target, { button: -1, buttons: 1, pointerType: "touch", isPrimary }).defaultPrevented).toBe(false);
+			}
+		}
+		expect(pan).toHaveBeenCalledTimes(16);
+		free.moveTo({ x: 30 });
+		free.resize({ width: 800 });
+		free.setText("changed");
+		expect(root.emit("pointerdown", free.nodeEl, { button: 0, pointerType: "mouse" }).defaultPrevented).toBe(true);
+		expect(root.emit("pointerdown", free.nodeEl, { button: 0, pointerType: "pen" }).defaultPrevented).toBe(true);
+		expect(canvas.getData()).toEqual(initial);
+		expect(history).toHaveLength(initialHistory);
+	});
+
+	it("admits right/middle/Space mouse pan moves without admitting a stylus side-button edit", () => {
+		const { root, free, session } = fixture();
+		session.toggleReviewMode();
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 2, pointerType: "mouse" }).defaultPrevented).toBe(false);
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 4, pointerType: "mouse" }).defaultPrevented).toBe(false);
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 2, pointerType: "pen" }).defaultPrevented).toBe(true);
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 1, pointerType: "mouse" }).defaultPrevented).toBe(true);
+		root.emit("keydown", root, { key: " " });
+		expect(root.emit("pointermove", free.nodeEl, { buttons: 1, pointerType: "mouse" }).defaultPrevented).toBe(false);
+	});
+
+	it("declines a viewing mixed-selection move before claiming the touch, then restores editing", () => {
+		const { root, free, locked, selection, session } = fixture();
+		selection.add(free);
+		selection.add(locked);
+		session.toggleReviewMode();
+		const event = new Event("pointerdown", { cancelable: true });
+		Object.defineProperty(event, "target", { value: free.nodeEl });
+		Object.defineProperty(event, "button", { value: 0 });
+		const internal = session as unknown as { startSelectionMove(event: PointerEvent): boolean };
+		expect(internal.startSelectionMove(event as PointerEvent)).toBe(false);
+		expect(event.defaultPrevented).toBe(false);
+		session.toggleReviewMode();
+		expect(root.emit("pointerdown", locked.nodeEl, { button: 0, pointerType: "touch" }).defaultPrevented).toBe(true);
+		selection.clear();
+		expect(root.emit("pointerdown", free.nodeEl, { button: 0, pointerType: "touch" }).defaultPrevented).toBe(false);
+		expect(free.moveTo({ x: 20 })).toBe("moved");
+	});
+
 	it("allows blank pan, middle/space pan, copy and plugin controls while locked", () => {
 		const { root, locked, selection, session } = fixture();
 		selection.add(locked);

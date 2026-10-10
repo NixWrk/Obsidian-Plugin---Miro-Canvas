@@ -2508,6 +2508,13 @@ page into a raster result. Export Stop/source snapshot/save boundaries remain.
 Effective viewing includes stored review, original native readonly and an
 active SlideShow. Native menus, creation tools and styling controls are hidden,
 with ownership restored on exit; selected web links have a direct Open action.
+Finger drags from selected, unselected or locked native cards and native mixed
+or collapsed selection areas pass to native Canvas pan/pinch in all three
+viewing states, without changing node positions or history. In `m1-session.ts`,
+`startSelectionMove` returns `false` in `isViewing` before preventing the
+event; the root `pointerdown` and `pointermove` guards pass through touch
+events in `isViewing`. Content scrolling, links, controls and laser ownership
+keep their existing handling.
 The dock exposes a temporary laser. SlideShow owns its own laser toggle and
 starts from native group frames in document order; export-page rectangles are
 a fallback. Its readonly overlay is not persisted. Starting presentation closes
@@ -2515,3 +2522,5 @@ the export UI without cancelling an already independent job. Laser uses owner
 capture, a fixed64-point pool and600ms expiry, with no child-list work per frame
 and no board/history mutation. It is excluded from vector serialization.
 [Native acceptance and limitations](vector-viewing-acceptance.md).
+
+Native drag admission preserves the readonly undefined lifecycle, and pure right-button mouse moves pass the pan guard. See [acceptance and limits](review-pan-checks.md).

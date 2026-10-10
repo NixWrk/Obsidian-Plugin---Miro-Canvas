@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restore native Canvas pan/pinch for finger drags from selected, unselected or locked native cards and native mixed/collapsed selection areas in review, native readonly and slideshow; board navigation leaves node positions and history unchanged. Preserve native right-button mouse panning through the move guard.
 - Add Raster/Vector PDF and PowerPoint export while retaining standalone SVG. Vector PDF embeds licensed Noto Sans in four styles and preserves real paths/text/clipping; vector PPTX embeds SVG per slide with a JPEG compatibility fallback. Keep independent snapshots, Stop and guarded saves; load the bundled PDF libraries only when requested.
 - Hide editing and creation menus in review, restoring them on exit and retaining direct selected-link opening. Add a temporary laser pointer to review and slideshow controls; its bounded fading trail never changes board data/history or enters exports. Present ordinary native frames in file order, with export pages as a fallback, and restore readonly on exit.
 

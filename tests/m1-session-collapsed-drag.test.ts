@@ -206,6 +206,13 @@ describe('collapsed group drag through the native gesture entry',()=>{
   it.each(['group','a','inner','pin','review'])('refuses the whole collapsed drag when %s is locked/reviewed',locked=>{
     const f=fixture(0.5,locked),before=f.canvas.getData();
     const gesture=f.canvas.handleSelectionDrag(f.gesture(),f.label,f.nodes.get('group')) as any;
+    if(locked==='review'){
+      expect(gesture).toBeUndefined();
+      expect(f.canvas.getData()).toEqual(before);
+      expect(f.history).toHaveLength(1);
+      expect(f.nativeDrag).not.toHaveBeenCalled();
+      return;
+    }
     f.dispatch('pointermove',120,80);gesture.move?.({clientX:120,clientY:80});
     f.dispatch('pointerup',120,80);gesture.end?.();
     expect(f.canvas.getData()).toEqual(before);expect(f.history).toHaveLength(1);
