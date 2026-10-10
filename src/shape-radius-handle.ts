@@ -25,6 +25,7 @@ interface RadiusDrag {
   readonly clientY: number;
   readonly original: number;
   moved: boolean;
+  direction: "steady" | "increase" | "decrease";
 }
 
 /** One corner control on the selected figure; the caller owns geometry and history. */
@@ -119,7 +120,7 @@ export class ShapeRadiusHandle {
     const corner = createSvgElement(document, "path");
     corner.setAttribute("d", "M5 19V11a6 6 0 0 1 6-6h8");
     const direction = createSvgElement(document, "path");
-    direction.setAttribute("d", "M12 12l7 7M15 19h4v-4");
+    direction.setAttribute("d", "M12 12l7 7M12 16v-4h4M15 19h4v-4");
     this.cornerPath = corner;
     icon.appendChild(corner);
     icon.appendChild(direction);
@@ -189,6 +190,7 @@ export class ShapeRadiusHandle {
     this.button.setAttribute("aria-label", this.button.title);
     this.input.max = String(Math.min(1000, state.width / 2, state.height / 2));
     this.host.setAttribute("data-dragging", String(this.drag !== undefined));
+    this.host.setAttribute("data-radius-direction", this.drag?.direction ?? "steady");
     this.value.textContent = words().enhancements.shapeRadiusLiveValue(this.radius);
     this.value.hidden = this.drag === undefined;
   }
@@ -206,7 +208,7 @@ export class ShapeRadiusHandle {
     const start = this.localPoint(event);
     if (start === undefined) return;
     this.suppressClick = false;
-    this.drag = { pointerId: event.pointerId, start, clientX: event.clientX, clientY: event.clientY, original: this.radius, moved: false };
+    this.drag = { pointerId: event.pointerId, start, clientX: event.clientX, clientY: event.clientY, original: this.radius, moved: false, direction: "steady" };
     this.listen(true);
     this.render();
     try {
@@ -339,6 +341,7 @@ export class ShapeRadiusHandle {
   private preview(radius: number): void {
     if (this.state === undefined || radius === this.radius) return;
     const id = this.state.id;
+    if (this.drag !== undefined) this.drag.direction = radius > this.radius ? "increase" : "decrease";
     this.radius = radius;
     this.render();
     this.options.onPreview(id, radius);

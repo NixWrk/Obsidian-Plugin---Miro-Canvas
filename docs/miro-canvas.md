@@ -2482,3 +2482,10 @@ four SelectionHandles connection buttons use a scoped 2px accent outline and
 theme fill that outrank tablet button backgrounds; hover/focus fills them.
 Bounds, pointer routing and native fallback controls are unchanged.
 [Checks](radius-marker-motion-checks.md).
+
+
+Combined radius feedback chosen by the user: the decorative arrow is now
+bidirectional. The SVG corner still follows the actual clamped radius, and
+only the SVG tilts +8°/-8° according to the latest increase/decrease; release
+or cancellation returns it to neutral. Reduced-motion suppresses the tilt
+and transition. The pointer target stays fixed. See the motion check follow-up.

@@ -79,3 +79,37 @@ remain covered by export tests.
 Pending: physical S Pen, disconnected phone, native rotated touch/pen fixture,
 extreme zoom/tiny figures, native keyboard focus/reduced-motion preference,
 third-party themes/popout. These are not counted as native passes.
+
+Follow-up: the same direction path now has both inward and outward arrowheads,
+matching increase/decrease gestures. No pointer or history behavior changes.
+
+
+## Combined corner/tilt refinement
+
+The user selected both the changing corner and directional tilt. The same
+decorative direction path has two arrowheads. RadiusDrag tracks only the
+latest nonzero change of the clamped radius; the host exposes increase/
+decrease/steady. The CSS variable sets ±8° on the held SVG, alongside scale
+0.96; the original stronger reduced-motion rule still removes the transform.
+Button geometry and inverse shape CTM are untouched; release/cancel reset
+steady, numeric input remains neutral.
+
+55 focused cases and all 3301 Vitest cases pass (one existing skip), along
+with TypeScript, focused zero-warning ESLint, production build and CSS gate.
+An independent headless Chromium probe checks steady/increase/decrease with
+normal/reduced motion, interruption/release and unchanged button bounds.
+Receipt: `.out/radius-circle-motion/combined-motion-synthetic.json`.
+
+The updated actual tablet ADB check passes reversal while held: radius
+36.14118→24.09412→36.14118, same button x/y and no persisted preview.
+Native computed icon matrices show positive tilt on increase
+(0.950701,0.133413,-0.133413,0.950701) and negative tilt on decrease
+(0.950657,-0.133606,0.133606,0.950657); release transform is none.
+Both arrowheads are in the sampled decorative path. ADB stylus-source,
+Undo/CANCEL, input and settings checks still pass; original bytes restored.
+
+Native hidden Windows confirms increase/steady state, changing corner and
+number, fixed bounds, one commit and Undo. Its hidden CSS animation clock
+leaves the sampled SVG transform at identity, so that receipt does not prove
+visible Windows tilt timing. Actual tablet motion and synthetic interruption/
+reduced-motion evidence remain separately identified. No foreground takeover.

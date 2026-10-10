@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Keep the shape-radius marker fixed while its corner geometry follows the live radius, with subtle press feedback respecting reduced motion. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.
+- Use a bidirectional radius arrow. Keep the shape-radius marker fixed while its corner geometry follows the live radius, with subtle press feedback and a directional tilt respecting reduced motion. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.
 
 - Replace the small circular shape-radius marker with a rounded-corner/drag-arrow icon and show the current radius above the held control during finger, pen or mouse movement; retain exact numeric input.
 

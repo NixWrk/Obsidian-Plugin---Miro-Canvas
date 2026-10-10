@@ -5293,8 +5293,17 @@
   background: var(--interactive-accent);
 }
 
+/* Direction describes the latest radius change, without moving the hit target. */
+.miro-canvas-root .miro-canvas-shape-radius-handle[data-radius-direction="increase"] {
+  --miro-radius-tilt: 8deg;
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle[data-radius-direction="decrease"] {
+  --miro-radius-tilt: -8deg;
+}
+
 .miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] .miro-canvas-shape-radius-handle__button svg {
-  transform: scale(0.96);
+  transform: scale(0.96) rotate(var(--miro-radius-tilt, 0deg));
 }
 
 @media (prefers-reduced-motion: reduce) {

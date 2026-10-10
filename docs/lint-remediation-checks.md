@@ -2272,3 +2272,27 @@ unknown fields. Windows input stays in hidden native test Obsidian; synthetic
 host and native receipts are distinct. No screenshots during export.
 
 Final fixed marker, circle visibility and native action results: [checks](radius-marker-motion-checks.md). Native tablet ADB, native Windows renderer input, synthetic states and remaining physical-pen/phone scenarios are distinguished.
+
+
+## Bidirectional radius arrow — 2026-10-10 (before edit)
+
+The radius marker's decorative direction path currently points only inward,
+although inverse-CTM pointer movement supports increasing and decreasing the
+radius. Add the opposite arrowhead in the same SVG path, preserving the24px
+viewBox, button/target and corner indicator. Required: icon remains distinct
+from ports, both heads visible in native tablet/Windows light/dark, pointer
+handling/input/preview tests unchanged. The user is considering the preferred
+animated feedback; the arrow change does not choose a new animation variant.
+
+
+Combined motion refinement before edit: the user selected both changing the
+corner and a directional tilt. Keep synchronous corner geometry, and derive
+an increase/decrease/steady state from changes in the live clamped radius.
+Rotate only the decorative SVG by ±8° while held, returning to neutral on
+release/cancel. Keep reduced-motion stronger than the directional styles and
+never move/rotate the44px hit target. Required: reversal follows new direction,
+clamped limits do not invent commits, cancel/selection/input reset, button
+bounds fixed, actual Android held tilt/reset and bidirectional arrow, native
+Windows pointer check, reduced-motion and interruption synthetic proof.
+
+Combined feedback passed: native tablet ADB reversal and ±tilt matrices, fixed target, native Windows direction/transaction and 3301 tests. Hidden Windows does not prove visible CSS animation timing; this is recorded in the [follow-up](radius-marker-motion-checks.md#combined-cornertilt-refinement).

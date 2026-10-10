@@ -99,3 +99,7 @@ screenshots, full smoke suites or the full unit suite, and did not commit.
 The synthetic DOM and host model do not certify every Obsidian theme,
 native gesture lifecycle, rotated/zoomed geometry, or physical stylus
 handling. Those checks remain with the parent's integration work.
+
+Later combined directional tilt belongs to the parent follow-up in
+[radius motion checks](radius-marker-motion-checks.md#combined-cornertilt-refinement);
+the state-dependent tilt is additional to this earlier scale-only receipt.

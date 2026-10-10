@@ -147,6 +147,33 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
 afterEach(() => setLocale("en"));
 
 describe("shape corner handle", () => {
+  it("reports the latest radius direction through reversal and returns to neutral", () => {
+    const item = build({}, 37, 0.75);
+    expect(item.host.getAttribute("data-radius-direction")).toBe("steady");
+    item.down();
+    expect(item.host.getAttribute("data-radius-direction")).toBe("steady");
+    item.move(40, 40);
+    expect(item.host.getAttribute("data-radius-direction")).toBe("increase");
+    item.move(24, 24);
+    expect(item.host.getAttribute("data-radius-direction")).toBe("decrease");
+    item.up(24, 24);
+    expect(item.host.getAttribute("data-radius-direction")).toBe("steady");
+    expect(item.onCommit).toHaveBeenCalledExactlyOnceWith("shape1", expect.closeTo(24));
+  });
+
+  it("keeps direction neutral for numeric input and resets cancelled pointer feedback", () => {
+    const item = build();
+    item.down();
+    item.move(30, 30);
+    item.document.dispatch("pointercancel");
+    expect(item.host.getAttribute("data-radius-direction")).toBe("steady");
+    item.open();
+    item.edit("42");
+    expect(item.host.getAttribute("data-radius-direction")).toBe("steady");
+    item.key("Enter");
+    expect(item.onCommit).toHaveBeenCalledExactlyOnceWith("shape1", 42);
+  });
+
   it("keeps the pointer target fixed while the corner icon and value follow the radius", () => {
     const item = build({}, 37, 0.75);
     const corner = item.button.children[0]!.children[0]!;
