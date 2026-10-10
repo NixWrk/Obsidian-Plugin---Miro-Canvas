@@ -70,6 +70,8 @@ Live web embeds and video are omitted.
 
 ## Canvas expansion in development
 
+The selection toolbar’s **More** menu lists labelled actions: layer order, board actions and native Canvas commands, with Delete last.
+
 The following additions are implemented in the development worktree and remain
 unreleased. Verification and remaining checks are tracked in the
 [feature plan](docs/canvas-enhancement-plan.md) and

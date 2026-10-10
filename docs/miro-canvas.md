@@ -2454,3 +2454,7 @@ Node 22.13+; standalone CLI/MCP retain their Node 20+ target.
 Rectangular figures now use equal physical corner radii. The selected figure owns a radius handle and inline exact input; a global toggle hides these controls while retaining saved geometry. New rounded rectangles remember the last radius, and click/drop creation respects each catalogue aspect. Free drag dimensions stay unchanged.
 
 [Checks](shape-radius-acceptance.md).
+
+### Selection More actions (2026-10-10)
+
+More uses labelled full-width rows, preserving adopted native buttons and their handlers. Native captions follow aria-label; an owned watcher removes captions/attributes and restores native ordering on disposal. Delete is last in DOM and visual order. Coarse-pointer sizing is independent of Obsidian device classes. See [selection menu checks](selection-menu-checks.md) for native receipts and pending cases.

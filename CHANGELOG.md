@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replace the selection More popover’s scattered icon grid with labelled action rows, consistent native controls, touch targets and Delete last.
+
 - Keep rectangular shape corners circular at any width/height. Add a drag handle and exact input directly on the selected figure, plus a plugin-settings switch; remember the last radius for new rounded rectangles. Use wide/tall/square catalogue proportions for click/drop creation instead of making every figure a square.
 
 - Add adjustable card corner radius (0–48 board pixels; square by default), preserving diagram and drawing geometry.

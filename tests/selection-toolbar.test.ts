@@ -278,6 +278,26 @@ describe("selection toolbar", () => {
     expect(panel.children.indexOf(slot)).toBe(panel.children.length - 1);
   });
 
+  it("names More actions visibly in both languages without an empty link row", () => {
+    for (const locale of ["en", "ru"] as const) {
+      setLocale(locale);
+      const toolbar = new SelectionToolbar({
+        onAppearance: () => undefined, onStyle: () => undefined, onLock: () => undefined,
+        onLayer: () => undefined, onMoreActions: () => undefined,
+      }, { document: new FakeDocument() as unknown as Document });
+      const root = toolbar.element as unknown as FakeElement;
+      const more = descendants(root).find((item) => item.getAttribute("data-icon") === "more-vertical")!;
+      const panel = more.parentElement!.children.find((item) => item.className.includes("__panel"))!;
+      const buttons = descendants(panel).filter((item) => item.tagName === "button");
+      for (const button of buttons) {
+        const label = button.children.find((item) => item.className === "miro-canvas-toolbar__menu-label");
+        expect(label?.textContent).toBe(button.getAttribute("aria-label"));
+      }
+      expect(panel.children.some((item) => item.className === "miro-canvas-toolbar__row")).toBe(false);
+    }
+    setLocale("en");
+  });
+
   it("draws interface icons through the host and falls back to glyphs", () => {
     const drawn: string[] = [];
     const { root } = build({}, {

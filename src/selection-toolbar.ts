@@ -888,25 +888,28 @@ export class SelectionToolbar {
     // delete - kept as the native elements the host moves in here.
     const more = this.makePopover(lastGroup, words().toolbar.more, "miro-canvas-toolbar__button--more");
     this.icon(more.button, "more-vertical", "⋮");
-    const layerSection = append(more.panel, make(document, "div"));
-    const layerRow = this.block(layerSection, words().layer.menu, "miro-canvas-toolbar__pictures miro-canvas-toolbar__pictures--layer");
+    more.panel.className += " miro-canvas-toolbar__panel--actions";
+    const layerSection = append(more.panel, make(document, "div", "miro-canvas-toolbar__menu-section"));
+    const layerRow = this.block(layerSection, words().layer.menu, "miro-canvas-toolbar__menu-list");
     const layerOptions = layerActions().map(({ direction, label, icon }) => {
       // A command, not a choice that stays pressed.
       const option = append(layerRow, makeButton(document, label));
       option.setAttribute("data-value", direction);
       this.icon(option, icon, label.charAt(0));
+      append(option, make(document, "span", "miro-canvas-toolbar__menu-label", label));
       return option;
     });
     // A link card no longer loads its page, so it is opened from here.
-    const openLinkRow = this.block(more.panel, undefined, "miro-canvas-toolbar__row");
-    const openLink = append(openLinkRow, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--open-link"));
+    const openLink = append(more.panel, makeButton(document, words().toolbar.openLink, "miro-canvas-toolbar__button--open-link"));
     this.icon(openLink, "external-link", "↗");
+    append(openLink, make(document, "span", "miro-canvas-toolbar__menu-label", words().toolbar.openLink));
     openLink.hidden = true;
     // Delete stays last, a danger item; the native elements the host puts
     // here keep their own order and behaviour, ahead of it.
     if (this.actions.onMoreActions !== undefined) {
       const actionsButton = append(more.panel, makeButton(document, words().enhancements.selectionActions));
       this.icon(actionsButton, "workflow", "⋯");
+      append(actionsButton, make(document, "span", "miro-canvas-toolbar__menu-label", words().enhancements.selectionActions));
       this.listen(actionsButton, "click", () => {
         this.closePopovers();
         this.actions.onMoreActions?.(more.button);
@@ -915,6 +918,7 @@ export class SelectionToolbar {
     const nativeSlot = append(more.panel, make(document, "span", "miro-canvas-toolbar__native"));
     const deleteSelection = append(nativeSlot, makeButton(document,words().toolbar.deleteSelection,"miro-canvas-toolbar__button--delete"));
     this.icon(deleteSelection,"trash-2","⌫");
+    append(deleteSelection, make(document, "span", "miro-canvas-toolbar__menu-label", words().toolbar.deleteSelection));
     this.listen(deleteSelection,"click",()=>this.actions.onDelete?.());
     deleteSelection.hidden=true;
 

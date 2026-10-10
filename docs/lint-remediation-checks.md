@@ -2158,3 +2158,26 @@ Record real Android input separately from CDP setup; leave unverified cases
 pending. The current request concerns shape outlines, not card CSS radius.
 
 Final parent integration/real-device results: [shape radius acceptance](shape-radius-acceptance.md). Earlier worker snapshots are historical; pending native cases remain explicit.
+
+## Selection More menu layout — 2026-10-10 (trace before edits)
+
+User screenshot and real SM-X736B/Android16/Obsidian1.13.8 DOM show
+SelectionToolbar.build's More panel: four layer buttons in a seven-column
+picture grid, an empty open-link row, an unlabelled Board actions button,
+and adopted native canvas-menu trash/zoom/edit buttons. adoptNativeMenu moves
+actual host elements; watchNativeMenuState marks duplicated palette/direction
+buttons and keeps an inert panning snapshot. Fixed icon widths and separate
+native flex layout scatter actions and suppress visible captions.
+
+Required checks: localized visible captions for plugin and native actions;
+consistent icon alignment and full-width touch targets, no empty link gap;
+native handlers/disabled/hidden states preserved, delete last in DOM and visual
+order; observer cleanup returns native controls and removes owned captions;
+selection changes/card/edge/independent-only/locked/review, Escape/outside click;
+layer command closes with one history/Undo; native zoom/edit/delete still work;
+menu fits viewport and scrolls at large text/short height; theme tokens on dark
+and light, tablet padding. Real tablet ADB and Windows renderer input must be
+recorded separately from synthetic/unit proof. No export/screenshot concurrency.
+Full results belong in selection-menu-checks.md; unverified scenarios stay pending.
+
+Final menu results: [selection menu checks](selection-menu-checks.md). Native Android ADB and Windows renderer input are distinguished; remaining native matrix is explicit.
