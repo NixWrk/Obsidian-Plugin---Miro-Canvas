@@ -90,7 +90,7 @@ class Element {
 class DocumentHost {
   fonts = { ready: Promise.resolve() };
   sheets: Element[] = [];
-  detachedRanges = 0;
+  rangeMeasurements = 0;
   defaultView = {
     DOMMatrix: Matrix,
     setTimeout: (callback: () => void, delay: number) => globalThis.setTimeout(callback, delay) as unknown as number,
@@ -107,8 +107,10 @@ class DocumentHost {
     return {
       setStart: (target: TextNode, offset: number) => { node = target; start = offset; },
       setEnd: (_target: TextNode, offset: number) => { end = offset; },
-      getBoundingClientRect: () => ({ left: node.parentElement.bounds.left + 5 + start * 9, top: node.parentElement.bounds.top + 8, width: (end - start) * 9, height: 18 }),
-      detach: () => { this.detachedRanges += 1; },
+      getBoundingClientRect: () => {
+        this.rangeMeasurements += 1;
+        return { left: node.parentElement.bounds.left + 5 + start * 9, top: node.parentElement.bounds.top + 8, width: (end - start) * 9, height: 18 };
+      },
     };
   }
 }
@@ -182,7 +184,21 @@ describe("vector DOM serialization", () => {
     expect(output).toContain('&amp;</text>');
     expect(output).toContain('<clipPath id="tile-clip-1">');
     expect(output).not.toMatch(/foreignObject|<image/u);
-    expect(f.document.detachedRanges).toBe(1);
+    expect(f.document.rangeMeasurements).toBeGreaterThan(0);
+  });
+
+  it("never calls a retired Range method even when an older host still exposes it", async () => {
+    const f = fixture();
+    const create = f.document.createRange.bind(f.document);
+    vi.spyOn(f.document, "createRange").mockImplementation(() => {
+      const range = create();
+      Object.defineProperty(range, "detach", { value: () => { throw new Error("Retired Range method called"); } });
+      return range;
+    });
+    const output = await serializeVectorTile(asHtml(f.wrapper), "range", new AbortController().signal);
+    expect(output).toContain('x="5" y="8"');
+    expect(output).toContain('&lt;</text>');
+    expect(output).toContain('&amp;</text>');
   });
 
   it("preserves native/independent line paths, arrowhead IDs and shape geometry in their measured SVG matrices", async () => {
@@ -444,7 +460,7 @@ describe("independent vector pages", () => {
     controller.abort();
     await rejected;
     expect(vi.getTimerCount()).toBe(0);
-    expect(f.document.detachedRanges).toBeGreaterThan(0);
+    expect(f.document.rangeMeasurements).toBeGreaterThan(0);
   });
 
   it("restores the independent camera on unsupported content failure and guards enormous geometry before tile allocation", async () => {

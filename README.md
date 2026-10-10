@@ -246,7 +246,7 @@ npm run build
 Agents can use the optional [CLI or MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md) to read and
 edit boards. Ready-to-run tools are in the matching
-[tools-0.3.1 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.1) and need **Node 20+**;
+[tools-0.3.2 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.2) and need **Node 20+**;
 run them separately, outside the plugin folder. The plugin starts neither.
 
 [Source compatibility notes](docs/contributing.md#remaining-source-warnings)
@@ -268,3 +268,10 @@ locally enumerate vault file paths; the Board knowledge switch disables those
 integration hooks. Clipboard access serves explicit copy/cut/paste, card links
 and import instructions, with no background clipboard polling or upload.
 [Packaging review and capability scope](docs/release-0.3.1-checks.md).
+
+
+The remaining source-review Node/config warnings refer to standalone CLI/MCP
+sources, which are absent from the mobile plugin bundle. The tools honor
+`--config-dir`; `.obsidian` is their explicit default. The legacy command ID
+preserves hotkeys. Version0.3.2 removes deprecated Range.detach from vector
+export, retaining measured text positions and Stop behavior.

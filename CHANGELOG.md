@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.2 - 2026-10-10
+
+- Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.
+- Clarify retained standalone Node/configuration warnings and the command ID that preserves existing hotkeys.
+
 ## 0.3.1 - 2026-10-10
 
 - Keep main.js below5MB for Obsidian Sync Standard by losslessly compressing all four offline PDF fonts. Preserve their glyphs, styles, licensing and decoded bytes.

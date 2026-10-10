@@ -2544,3 +2544,33 @@ embed and import instructions are user actions. Retain their supported behavior,
 verify opt-out of board indexing and explicit clipboard triggers, document file
 scope/no background clipboard reads/no network upload. These are recommendations,
 not permissions to remove the requested search/graph/backlink/copy features.
+
+
+## Deprecated Range cleanup (2026-10-10, before implementation)
+
+Trace: runExport -> vector tile serialization -> per-character text paint uses
+one local document.createRange for setStart/setEnd/getBoundingClientRect. It
+calls Range.detach in finally after success, failure or Stop. DOM Standard
+specifies detach as a no-op; it does not release a resource. Removing that
+call and the redundant try/finally leaves the same Range measurements and
+normal lexical lifetime, while supporting hosts without the legacy method.
+Required: positioned/escaped Latin+Cyrillic text and typography unchanged;
+no detach call on success or failure; missing legacy method; abort inside glyph
+loop, no partial save and owner camera restored. Run vector suite plus real
+hidden Windows and supported Android SVG/vector PDF/PPTX/Stop checks without
+screenshots/foreground. Retain production size/script/provenance gates.
+
+Repeated Node/config/command recommendations are already traced in
+contributing.md#remaining-source-warnings: stdio CLI/MCP use Node and never
+enter main.js; standalone Vault.configDir honors --config-dir, .obsidian is an
+explicit protected default only; m1-commands preserves existing hotkeys.
+Do not import Obsidian Platform into standalone tools or rename the command
+merely to silence a context-mismatched scan. Recheck isolation/custom-config/
+legacy registration tests and refresh README explanations as needed.
+
+Verification: 49 vector and 26 config-directory focused tests pass; full local
+suite 3520 pass/one skip. Hidden Windows Obsidian 1.14.4 passes SVG/vector
+PDF/PPTX/raster PDF/Stop with source/camera restored and jobs/surfaces zero.
+Independent exported-content parsing verifies glyphs and all four font styles.
+Android 0.3.2 is pending disconnected ADB devices; do not substitute the prior
+0.3.1 tablet pass. See release-0.3.2-checks.md for the current receipt.

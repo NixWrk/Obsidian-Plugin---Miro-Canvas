@@ -274,31 +274,27 @@ export async function serializeVectorTile(
     if (style.writingMode && style.writingMode !== "horizontal-tb") unsupported("text:writing-mode");
     const range = document.createRange();
     let output = "";
-    try {
-      // Explicit glyph positions preserve Markdown wrapping, indentation, tables and inline fonts.
-      let index = 0;
-      for (const character of value) {
-        await checkpoint();
-        range.setStart(node, index);
-        index += character.length;
-        range.setEnd(node, index);
-        const box = range.getBoundingClientRect();
-        if (box.width === 0 || box.height === 0) continue;
-        const values: Record<string, string | number> = {
-          x: (box.left - viewport.left - matrix.e) / matrix.a,
-          y: (box.top - viewport.top - matrix.f) / matrix.d,
-          fill: style.color, "font-family": style.fontFamily, "font-size": style.fontSize,
-          "font-weight": style.fontWeight, "font-style": style.fontStyle,
-          "font-variant": style.fontVariant, "letter-spacing": style.letterSpacing,
-          "text-decoration": style.textDecorationLine, "dominant-baseline": "text-before-edge",
-          "xml:space": "preserve", transform: matrixText(matrix),
-        };
-        const shown = style.textTransform === "uppercase" ? character.toUpperCase() : style.textTransform === "lowercase" ? character.toLowerCase() : character;
-        output += `<text${attributes(values)}>${escaped(shown)}</text>`;
-        if (output.length > MAX_BYTES) unsupported("svg:byte-budget");
-      }
-    } finally {
-      range.detach();
+    // Explicit glyph positions preserve Markdown wrapping, indentation, tables and inline fonts.
+    let index = 0;
+    for (const character of value) {
+      await checkpoint();
+      range.setStart(node, index);
+      index += character.length;
+      range.setEnd(node, index);
+      const box = range.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      const values: Record<string, string | number> = {
+        x: (box.left - viewport.left - matrix.e) / matrix.a,
+        y: (box.top - viewport.top - matrix.f) / matrix.d,
+        fill: style.color, "font-family": style.fontFamily, "font-size": style.fontSize,
+        "font-weight": style.fontWeight, "font-style": style.fontStyle,
+        "font-variant": style.fontVariant, "letter-spacing": style.letterSpacing,
+        "text-decoration": style.textDecorationLine, "dominant-baseline": "text-before-edge",
+        "xml:space": "preserve", transform: matrixText(matrix),
+      };
+      const shown = style.textTransform === "uppercase" ? character.toUpperCase() : style.textTransform === "lowercase" ? character.toLowerCase() : character;
+      output += `<text${attributes(values)}>${escaped(shown)}</text>`;
+      if (output.length > MAX_BYTES) unsupported("svg:byte-budget");
     }
     return output;
   };
