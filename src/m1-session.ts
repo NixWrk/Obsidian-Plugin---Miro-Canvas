@@ -11,6 +11,7 @@ import { createHtmlElement, createSvgElement } from "./dom-elements";
  */
 
 import { watchNativeMenuState } from "./native-menu-state";
+import { resolveCanvasTheme, watchCanvasTheme } from "./canvas-theme";
 import { watchNativeUiVisibility } from "./native-ui-visibility";
 import { NativeStyleProperties } from "./native-style-properties";
 import {
@@ -8528,7 +8529,7 @@ export class M1CanvasSession {
 		for (const node of this.scene.nodes) {
 			const id = readCanvasElementId(node);
 			if (id !== undefined && id === this.selectedIds[0]) {
-				return shouldShowAttachmentName(node, this.currentMetadata);
+				return shouldShowAttachmentName(this.attachmentNode(node), this.currentMetadata);
 			}
 		}
 		return undefined;
@@ -9497,31 +9498,9 @@ export class M1CanvasSession {
 	}
 
 	private attachSystemThemeListener(): void {
-		const window = readRuntime(ownerDocument(this.root), "defaultView");
-		const matchMedia = readRuntime(window, "matchMedia");
-		if (typeof matchMedia !== "function") {
-			return;
-		}
-		try {
-			const media = Reflect.apply(matchMedia, window, ["(prefers-color-scheme: dark)"]) as unknown;
-			const listener = () => {
-				if (this.appearance.settings.displayTheme === "system") {
-					this.applyTheme("system");
-				}
-			};
-			const add = readRuntime(media, "addEventListener");
-			if (typeof add === "function") {
-				Reflect.apply(add, media, ["change", listener]);
-				this.disposers.push(() => {
-					const remove = readRuntime(media, "removeEventListener");
-					if (typeof remove === "function") {
-						Reflect.apply(remove, media, ["change", listener]);
-					}
-				});
-			}
-		} catch {
-			this.addDiagnostic("System theme observation is unavailable; choose light or dark explicitly.");
-		}
+		this.disposers.push(watchCanvasTheme(ownerDocument(this.root), () => {
+			this.applyTheme(this.appearance.settings.displayTheme);
+		}));
 	}
 
 	private applyTheme(theme: unknown): void {
@@ -9553,19 +9532,7 @@ export class M1CanvasSession {
 			}
 		}
 		writeAttribute(this.root, "data-miro-canvas-theme", normalized);
-		const window = readRuntime(ownerDocument(this.root), "defaultView");
-		let resolved = normalized;
-		if (normalized === "system") {
-			const matchMedia = readRuntime(window, "matchMedia");
-			if (typeof matchMedia === "function") {
-				try {
-					const media = Reflect.apply(matchMedia, window, ["(prefers-color-scheme: dark)"]) as unknown;
-					resolved = readRuntime(media, "matches") === true ? "dark" : "light";
-				} catch {
-					resolved = "light";
-				}
-			}
-		}
+		const resolved = resolveCanvasTheme(normalized, ownerDocument(this.root));
 		writeAttribute(this.root, "data-miro-canvas-resolved-theme", resolved);
 		writeAttribute(this.controls.element, "data-miro-canvas-theme", normalized);
 		writeAttribute(this.controls.element, "data-miro-canvas-resolved-theme", resolved);

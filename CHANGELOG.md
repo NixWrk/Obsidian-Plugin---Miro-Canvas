@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make the inherited board theme follow the owning Obsidian window rather than a conflicting OS preference; label it “Obsidian” / «Как в Obsidian». Follow live host changes and retain explicit board themes. Wrap long board-menu labels without displacing switches. Correct selected attachment-name checkbox state for native runtime nodes so repeated toggling and Undo/Redo work.
+
 - Replace the selection More popover’s scattered icon grid with labelled action rows, consistent native controls, touch targets and Delete last. Keep the action list inside the available board area while Android’s keyboard is open.
 
 - Keep rectangular shape corners circular at any width/height. Add a drag handle and exact input directly on the selected figure, plus a plugin-settings switch; remember the last radius for new rounded rectangles. Use wide/tall/square catalogue proportions for click/drop creation instead of making every figure a square.

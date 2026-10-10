@@ -2185,3 +2185,31 @@ Final menu results: [selection menu checks](selection-menu-checks.md). Native An
 Keyboard follow-up before edit: real tablet final capture has IME400.94116px and More clipped above the board after native Edit. keepPanelInView forces every keyboard popover above the toolbar; long action lists need the side with more available board room. Change only marked More, preserve formatting pickers, cap/scroll within bounds and restore inline placement when IME closes. Mandatory: native ADB Edit→More with keyboard, both side choices and reset unit checks.
 
 Keyboard follow-up passed: two side/reset unit cases and real SM-X736B ADB Edit→More with IME400.94116px; original file bytes remain exact. See selection-menu-checks.md.
+
+## Host theme and board-menu wrapping — 2026-10-10 (trace before edits)
+
+Real SM-X736B/Android16/Obsidian1.13.8 in MiroCanvasTest: body is theme-light,
+vault config theme=moonstone, board displayTheme=system, resolved Canvas=dark.
+M1CanvasSession.applyTheme and attachSystemThemeListener read only WebView
+prefers-color-scheme; Android OS preference can differ from Obsidian's chosen
+appearance. System boards must follow the current owning Obsidian document's
+body theme, with OS media only as a fallback. Observe host class changes without
+watching cards or writing metadata; explicit light/dark boards stay explicit.
+
+M1Controls.item's icon/label/switch row has width100% without explicit box sizing,
+and flex label lacks min-width0 or wrapping; inherited button white-space and
+Russian nameOnSelection text can push the label/switch past the board menu.
+Keep original strings/actions and tablet padding variable convention.
+
+Mandatory checks: light Obsidian + dark Android preference resolves light;
+reverse mismatch; real theme change while board remains open, system/explicit
+choice, reopen and independent export snapshot theme. Watcher teardown and
+missing media/body API fallback. Measure every board-menu row/label/switch
+inside panel for RU/EN, disabled/enabled selected attachment, narrow width and
+long labels; use real ADB taps on physical tablet and distinguish Windows CDP
+renderer input. Preserve board/file bytes during host-theme changes, restore
+test settings, leave unverified phone/popout/OS text scenarios pending.
+
+Attachment toggle follow-up before edit: actual ADB toggle sets localOverrides.f.showAttachmentName=true, but a second click stays true. selectedAttachmentVisibility passes a private native class instance to pure shouldShowAttachmentName, whose plain-object guard rejects it; the checkbox remains false. refreshDecorations already uses attachmentNode to build checked JSON id/type/file. Reuse that projection for checkbox state. Required: native runtime class with global/local visibility overrides, ADB on/off, non-file/absent selection fail closed, unknown-field/source preservation and native Undo.
+
+Final host appearance, menu wrapping and attachment toggle evidence: [checks](host-theme-menu-checks.md). ADB input, native API preparation, Windows renderer input and inherited SVG theme proof are distinguished; remaining matrix is explicit.

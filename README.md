@@ -70,6 +70,9 @@ Live web embeds and video are omitted.
 
 ## Canvas expansion in development
 
+**Board appearance:** “Obsidian” follows the current Obsidian light/dark theme, even when the device uses another theme. Explicit board Light/Dark choices stay independent. Long board-menu labels wrap inside the menu.
+
+
 The selection toolbar’s **More** menu lists labelled actions: layer order, board actions and native Canvas commands, with Delete last.
 
 The following additions are implemented in the development worktree and remain

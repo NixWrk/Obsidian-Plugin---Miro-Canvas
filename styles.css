@@ -293,13 +293,14 @@
    `placeDockMenu` (m1-controls.ts) puts it inside the view on opening, and
    this place above the row is only where it starts. */
 .miro-canvas-dock__menu {
+  box-sizing: border-box;
   position: absolute;
   right: 0;
   bottom: calc(100% + 6px);
   display: flex;
   flex-direction: column;
   width: max-content;
-  min-width: 232px;
+  min-width: min(232px, calc(100vw - 32px));
   max-width: min(320px, calc(100vw - 32px));
   max-height: min(420px, calc(100vh - 120px));
   overflow-y: auto;
@@ -319,7 +320,12 @@
 }
 
 .miro-canvas-dock .miro-canvas-dock__item {
+  box-sizing: border-box;
+  min-width: 0;
   display: flex;
+  justify-content: flex-start;
+  white-space: normal;
+  line-height: 1.35;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -365,6 +371,8 @@
 
 .miro-canvas-dock__item-label {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .miro-canvas-dock__item-hint {
@@ -405,12 +413,15 @@
 
 .miro-canvas-dock__segments {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 2px 4px 4px;
 }
 
 .miro-canvas-dock .miro-canvas-dock__segment {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   align-items: center;
