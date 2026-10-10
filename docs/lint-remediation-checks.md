@@ -2574,3 +2574,21 @@ PDF/PPTX/raster PDF/Stop with source/camera restored and jobs/surfaces zero.
 Independent exported-content parsing verifies glyphs and all four font styles.
 Android 0.3.2 is pending disconnected ADB devices; do not substitute the prior
 0.3.1 tablet pass. See release-0.3.2-checks.md for the current receipt.
+
+
+## Import expansion — attachment rollback (2026-10-11)
+
+Before fixing the new prefer-file-manager-trash-file warning: import-command calls publishImportAssets only after accepted preview; rollback runs after a binary/board write or stale-source failure. The affected action is Create board, its cancellation/error path and resulting vault attachments. Use the host FileManager trash preference on unchanged owned files only. Mandatory regression: cancel writes zero, collisions never overwrite, failed board/binary write cleans earlier owned attachments, user-edited/moved paths survive, successful creation/open failure retains assets. Unit tests: tests/import-assets.test.ts; isolated Windows import receipt pending; physical Android pending (ADB inventory empty). No source/foreground vault is involved.
+
+
+### Import expansion — path controls and tldraw narrowing (2026-10-11)
+
+Before removing no-control-regex and five unnecessary assertions: publishImportAssets is reached by Create board, validates generated source-adjacent attachment paths and rolls back owned files. tldraw.convert decodes supported packed draw records after supportedStroke narrows their props/coordinates. Mandatory checks: invalid path/control characters, collisions and rollback tests; tldraw real-fixture hash, 71/89 packed points, invalid/subnormal/nonfinite byte vectors, versions, unsupported variants and metadata reporting. Preserve path validation and narrowing; do not suppress rules. Unit: import-assets/import-tldraw; real hidden Windows import and drawing drag pending; Android pending disconnected inventory.
+
+
+### Import expansion — raster header narrowing (2026-10-11)
+
+Before removing three unnecessary non-null assertions: rasterDimensions reads WebP VP8X width/height bytes after the 30-byte header guard. Called by readEmbeddedRaster and the Excalidraw asset collector before preview/publication. Preserve the header guard and bounds. Mandatory: actual generated PNG/JPEG/GIF/WebP dimension tests, mismatched/corrupt/active MIME, excessive pixels/bytes, same-asset reuse and publication rollback. Native image-file load/aspect handling is checked in the isolated Windows receipt; Android remains pending.
+
+
+Import expansion final verification: all local gates pass (3657 Vitest/77 Python, three smokes), no new lint advisory. Owned Windows SDK1.14.4 passes 20 renderer-input scenarios and independent raster PDF after the empty-card readiness repair. CLI validate/move/undo passes with zero schema/plugin diagnostics. Exact evidence and pending physical Android/OS/stylus/graph/property cases: docs/import-expansion-checks.md and docs/receipts/import-expansion-*.json.

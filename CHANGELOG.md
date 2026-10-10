@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Extend Excalidraw import with bounded embedded PNG/JPEG/GIF/WebP attachments, raw Element Links, note heading/block subpaths, per-point pressure widths and approximate spatial groups. Report reflection, clipping/membership, binding, intrinsic image sizing, extension and stacking losses explicitly.
+- Add JSON Canvas 1.0 copy import with unknown-field/source preservation and shared native validation. Map supported Advanced Canvas collapsed groups through native group snapshots while keeping existing overrides.
+- Add a narrowly verified tldraw packed-stroke adapter with pinned sample provenance; leave Markmind rich and unevidenced tldraw variants unsupported.
+- Let independent export settle nonempty Markdown while cancelling content-free drawing-card queues, avoiding a page-render timeout on imported pen strokes.
+- Recheck source bytes after preview, publish attachments only on confirmation and clean unchanged owned attachments after failed publication. Count source IDs once while retaining all report details.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.
