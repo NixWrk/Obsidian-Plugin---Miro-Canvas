@@ -217,6 +217,8 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     new SettingsRow(rows).setName(enhancementLabels.shapeRadiusControl).setDesc(enhancementLabels.shapeRadiusControlHint)
       .addToggle(toggle => toggle.setValue(this.host.settings.shapeRadiusControlEnabled)
         .onChange(value => void this.host.saveSettings({ shapeRadiusControlEnabled: value })));
+    this.slider(rows, enhancementLabels.shapeRadiusControlMinZoom, enhancementLabels.shapeRadiusControlMinZoomHint,
+      "shapeRadiusControlMinZoomPercent", (value) => `${value}%`);
     this.slider(rows, enhancementLabels.cardCornerRadius, enhancementLabels.cardCornerRadiusHint,
       "cardCornerRadius", (value) => `${value} px`);
     new SettingsRow(rows).setName(enhancementLabels.canvasSnippets).setDesc(enhancementLabels.canvasSnippetsHint);
@@ -671,10 +673,12 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     format: (value: number) => string,
   ): void {
     const bound = SETTING_BOUNDS[key];
-    const value = this.host.settings[key];
+    const initialValue = this.host.settings[key];
     const currently = words().settings.currently;
-    new SettingsRow(rows).setName(name).setDesc(`${description} ${currently(format(value))}`)
+    new SettingsRow(rows).setName(name).setDesc(`${description} ${currently(format(initialValue))}`)
       .configure((setting) => {
+        const value = this.host.settings[key];
+        setting.setDesc(`${description} ${currently(format(value))}`);
         let valueInput: TextComponent | undefined;
         let valueSlider: SliderComponent | undefined;
         setting.addSlider((slider) => {
@@ -688,7 +692,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
             void this.host.saveSettings({ [key]: next });
           });
         });
-        if (key === "cardCornerRadius") {
+        if (key === "cardCornerRadius" || key === "shapeRadiusControlMinZoomPercent") {
           setting.addText((text) => {
             valueInput = text;
             text.inputEl.addClass("miro-canvas-card-radius-value");
@@ -702,7 +706,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
               valueSlider?.setValue(next);
               if (number !== next) text.setValue(String(next));
               setting.setDesc(`${description} ${currently(format(next))}`);
-              void this.host.saveSettings({ cardCornerRadius: next });
+              void this.host.saveSettings({ [key]: next });
             });
           });
         }

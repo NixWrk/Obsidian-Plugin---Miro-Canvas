@@ -2477,3 +2477,35 @@ Check in hidden native Windows and physical SM-X736B MiroCanvasTest, recording
 trusted CDP vs actual ADB input. Release waits for these source/build checks.
 
 Native visibility/cancellation evidence: [radius zoom checks](radius-zoom-checks.md).
+
+
+## Configurable radius-marker zoom (2026-10-10, before implementation)
+
+The user asks to configure the close-zoom percentage in plugin settings.
+Trace: MiroCanvasSettings normalization/storage is shared across device layouts;
+MiroCanvasSettingTab declares searchable native rows and saves via the live host.
+saveCanvasSettings persists, then rebuilds M1CanvasSession. Its selected-figure
+state and followViewport drive ShapeRadiusHandle, currently fixed at scale2.
+Export settings turn interactive radius controls off independently.
+
+Add one global percentage with default200, bounded0..6400 (the existing maximum
+configurable Canvas zoom), step25 on the slider and exact numeric input; 0 means
+show at any zoom. Pass its converted scale only to the selected control.
+Keep the off switch, owner validation, 44px target and cancellation before removal.
+Required checks: default/malformed/bounded values; storage and layout round trips;
+English/Russian native search indexing; slider and exact numeric persistence;
+custom100/300/0 visibility and reappearance; changing the threshold cancels an
+open draft without history; no board/source/selection/file edits; review/locked/off
+and export exclusion unchanged. Run native settings inputs on hidden Windows and
+physical SM-X736B MiroCanvasTest, reopen settings and inspect saved preference,
+then restore originals. Label ADB/CDP separately; phone remains unverified.
+
+
+Native Windows1.14.4 showed another caller dependency: it reuses the searchable
+SettingDefinitionRender closures across tab reopen. slider captured the original
+value before rendering, so memory/disk changed but reopening displayed200 again.
+Read the live host value inside each render and refresh the rendered description.
+Require a cached-definition rerender regression and actual native reopen on both
+surfaces; keep search labels available without running setting actions. Windows
+QA temporarily selects the native inline-modal branch through an instance-only
+shouldUsePopout hook, restored on close; no OS foreground or persistent setting.

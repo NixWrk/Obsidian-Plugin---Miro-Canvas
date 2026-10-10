@@ -147,6 +147,42 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
 afterEach(() => setLocale("en"));
 
 describe("shape corner handle", () => {
+  it.each([0, 1, 1.25, 3])("uses a configured minimum zoom %s across hide/show frames", minimumZoom => {
+    const start = Math.max(minimumZoom, 0.25);
+    const item = build({ minimumZoom }, 0, start);
+    expect(item.host.parentNode).toBe(item.node);
+    item.control.updateZoom(0.1);
+    expect(item.host.parentNode).toBe(minimumZoom === 0 ? item.node : undefined);
+    item.control.updateZoom(start);
+    expect(item.host.parentNode).toBe(item.node);
+    expect(item.onCommit).not.toHaveBeenCalled();
+    expect(item.onCancel).not.toHaveBeenCalled();
+  });
+
+  it.each(["drag", "number"])("cancels a %s draft when a higher configured minimum hides the control", mode => {
+    const item = build({ minimumZoom: 1 });
+    if (mode === "drag") { item.down(); item.move(35, 35); }
+    else { item.open(); item.edit("35"); }
+    item.update({ minimumZoom: 3 });
+    expect(item.onCancel).toHaveBeenCalledOnce();
+    expect(item.host.parentNode).toBeUndefined();
+    expect(item.button.captured).toBeUndefined();
+    expect(item.document.activeListeners()).toBe(0);
+    item.input.dispatch("blur");
+    item.up(35, 35);
+    expect(item.onCommit).not.toHaveBeenCalled();
+    item.update({ minimumZoom: 0 });
+    expect(item.host.parentNode).toBe(item.node);
+    expect(item.button.title).toBe(words().enhancements.shapeRadiusValue(16));
+  });
+
+  it.each([-1, NaN, Infinity])("refuses an invalid configured threshold %s", minimumZoom => {
+    const item = build({ minimumZoom });
+    expect(item.host.parentNode).toBeUndefined();
+    item.open();
+    expect(item.onCommit).not.toHaveBeenCalled();
+  });
+
   it.each([0.5, 1, 1.5, 1.99])("stays absent at displayed zoom %s and returns at 200%", zoom => {
     const item = build({}, 0, zoom);
     expect(item.host.parentNode).toBeUndefined();

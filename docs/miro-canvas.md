@@ -2527,4 +2527,4 @@ and no board/history mutation. It is excluded from vector serialization.
 Native drag admission preserves the readonly undefined lifecycle, and pure right-button mouse moves pass the pan guard. See [acceptance and limits](review-pan-checks.md).
 
 
-Radius controls in0.3.0 appear only at displayed zoom200% or higher; zoom-out removes them and cancels any unfinished draft without history. [Checks](radius-zoom-checks.md).
+Radius controls in0.3.0 appear from the configured global minimum displayed zoom (default200%; 0 shows at any zoom), with a slider and exact percentage input in plugin settings; zoom-out removes them and cancels any unfinished draft without history. [Checks](radius-zoom-checks.md).

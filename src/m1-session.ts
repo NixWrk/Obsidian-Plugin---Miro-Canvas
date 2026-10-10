@@ -3203,7 +3203,7 @@ export class M1CanvasSession {
 		}
 		this.shapeRadiusHandle?.update({ id, nodeEl, width: rect.width, height: rect.height,
 			radius: shapeCornerRadius(item?.shape, { ...rect, cornerRadius: item?.cornerRadius }), editable,
-			zoom: this.displayViewport()?.zoom ?? 0 });
+			zoom: this.displayViewport()?.zoom ?? 0, minimumZoom: this.settings.shapeRadiusControlMinZoomPercent / 100 });
 	}
 
 	private previewShapeRadius(id: string, radius: number): void {

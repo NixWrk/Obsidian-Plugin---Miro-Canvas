@@ -64,6 +64,7 @@ export interface FontListEntry {
 export interface MiroCanvasSettings {
   readonly cardCornerRadius: number;
   readonly shapeRadiusControlEnabled: boolean;
+  readonly shapeRadiusControlMinZoomPercent: number;
   readonly shapeCornerRadius: number;
   readonly allowedCanvasSnippets: readonly string[];
   readonly contentTextThreshold: number;
@@ -171,10 +172,11 @@ interface NumberBound {
 }
 
 export const SETTING_BOUNDS: Readonly<Record<
-  "shapeCornerRadius" | "cardCornerRadius" | "zoomStep" | "minZoom" | "maxZoom" | "panStep" | "fastPanMultiplier" | "connectorMagnet" | "connectorSnap" | "connectorLabelPosition" | "contentTextThreshold" | "contentFileThreshold" | "contentLinkThreshold" | "contentPluginThreshold",
+  "shapeCornerRadius" | "cardCornerRadius" | "shapeRadiusControlMinZoomPercent" | "zoomStep" | "minZoom" | "maxZoom" | "panStep" | "fastPanMultiplier" | "connectorMagnet" | "connectorSnap" | "connectorLabelPosition" | "contentTextThreshold" | "contentFileThreshold" | "contentLinkThreshold" | "contentPluginThreshold",
   NumberBound
 >> = Object.freeze({
   cardCornerRadius: { min: 0, max: 48, step: 1 },
+  shapeRadiusControlMinZoomPercent: { min: 0, max: 6400, step: 25 },
   shapeCornerRadius: { min: 0, max: 1000, step: 1 },
   zoomStep: { min: 1.02, max: 2, step: 0.01 },
   minZoom: { min: 0.01, max: 1, step: 0.01 },
@@ -200,6 +202,7 @@ const DEFAULT_DEVICE_LAYOUT: DeviceLayout = Object.freeze({
 export const DEFAULT_SETTINGS: MiroCanvasSettings = Object.freeze({
   cardCornerRadius: 0,
   shapeRadiusControlEnabled: true,
+  shapeRadiusControlMinZoomPercent: 200,
   shapeCornerRadius: 16,
   allowedCanvasSnippets: Object.freeze([]),
   contentTextThreshold: 0,
@@ -498,6 +501,7 @@ export function normalizeSettings(value: unknown, kind?: LayoutKind): MiroCanvas
     zoomStep: readNumber(value, "zoomStep", DEFAULT_SETTINGS.zoomStep),
     cardCornerRadius: readNumber(value, "cardCornerRadius", DEFAULT_SETTINGS.cardCornerRadius),
     shapeRadiusControlEnabled: readBoolean(value, "shapeRadiusControlEnabled", DEFAULT_SETTINGS.shapeRadiusControlEnabled),
+    shapeRadiusControlMinZoomPercent: readNumber(value, "shapeRadiusControlMinZoomPercent", DEFAULT_SETTINGS.shapeRadiusControlMinZoomPercent),
     shapeCornerRadius: readNumber(value, "shapeCornerRadius", DEFAULT_SETTINGS.shapeCornerRadius),
     allowedCanvasSnippets: Object.freeze(Array.isArray(value.allowedCanvasSnippets)
       ? [...new Set(value.allowedCanvasSnippets.filter((name): name is string => typeof name === "string" && name.length > 0 && name.length <= 256))].slice(0, 256) : []),

@@ -38,7 +38,7 @@ a converter runtime or install.
 
 ## Final versioned candidate
 
-3504 Vitest tests pass across168 files, one existing skip; all three synthetic
+3518 Vitest tests pass across168 files, one existing skip; all three synthetic
 UI modes and33 Python oracle cases pass. TypeScript, source/MCP/CSS lint,
 production/MCP/CLI builds, schema/submission and diff checks pass. Production
 npm audit has zero advisories. The local artifact audit verified version parity,
@@ -69,3 +69,11 @@ real text and no foreignObject. Jobs/surfaces are zero and originals restored.
 
 Publication state: versioned commit/CI, main merge, tag-triggered release and
 remote asset comparison remain to be completed.
+
+
+The configurable-radius follow-up passes3518 Vitest tests plus all16 native
+settings/visibility checks on each supported surface. Default200%, custom100/300
+and0-any-zoom, actual slider/exact entry, disk persistence and native reopen pass;
+the cached Windows render-definition issue is fixed. Both final rebuilt native
+exports pass independently with original file restoration and zero jobs/surfaces.
+Final controls smoke, strict TypeScript/lint/build and local artifact audit pass.

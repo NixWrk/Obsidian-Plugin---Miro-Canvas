@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { App, Plugin, SettingDefinitionItem, SettingDefinitionRender } from "obsidian";
+import type { App, Plugin, Setting, SettingGroup, SettingDefinitionItem, SettingDefinitionRender } from "obsidian";
 import { build } from "esbuild";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath } from "node:url";
@@ -269,6 +269,51 @@ describe("native searchable settings definitions", () => {
     await r.row("Red line").controls[0].change?.(false);
     expect(r.host.settings).toMatchObject({ cardCornerRadius: 20, allowedCanvasSnippets: ["Wide paragraphs"] });
     expect(r.app.vault.setConfig).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "ru"] as const)("indexes and saves the radius zoom percentage with slider and exact input in %s", async locale => {
+    setLocale(locale);
+    const r = rig();
+    const label = words().enhancements.shapeRadiusControlMinZoom;
+    const entries = rows(r.tab.getSettingDefinitions());
+    expect(entries.find(item => item.name === label)?.desc).toContain("200%");
+    expect(r.host.saveSettings).not.toHaveBeenCalled();
+    r.tab.update();
+    const row = r.row(label);
+    const [slider, input] = row.controls;
+    expect(slider.limits).toEqual([0, 6400, 25]);
+    expect(input.inputEl.attributes.get("aria-label")).toBe(label);
+    await slider.change?.(300);
+    expect(input.value).toBe("300");
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(300);
+    await input.change?.("125");
+    expect(slider.value).toBe(125);
+    expect(row.descEl.textContent).toContain("125%");
+    for (const invalid of ["", "NaN", "Infinity"]) await input.change?.(invalid);
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(125);
+    await input.change?.("-1");
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(0);
+    expect(input.value).toBe("0");
+    await input.change?.("9000");
+    expect(r.host.settings.shapeRadiusControlMinZoomPercent).toBe(6400);
+    expect(input.value).toBe("6400");
+    expect(r.host.settings.shapeRadiusControlEnabled).toBe(true);
+    expect(r.app.vault.setConfig).not.toHaveBeenCalled();
+    expect(r.plugin.saveData).not.toHaveBeenCalled();
+  });
+
+  it("reads live values when native Obsidian reuses cached slider definitions after reopening", async () => {
+    const r = rig();
+    const entries = rows(r.tab.getSettingDefinitions());
+    await r.host.saveSettings({ shapeRadiusControlMinZoomPercent: 125, cardCornerRadius: 17 });
+    for (const [name, value] of [[words().enhancements.shapeRadiusControlMinZoom, 125], [words().enhancements.cardCornerRadius, 17]] as const) {
+      const definition = entries.find(item => item.name === name)!;
+      const setting = new native.Setting(new native.Element()).setName(name).setDesc(typeof definition.desc === "string" ? definition.desc : "");
+      definition.render?.(setting as unknown as Setting, {} as SettingGroup);
+      expect(setting.controls[0].value).toBe(value);
+      expect(setting.controls[1].value).toBe(String(value));
+      expect(setting.descEl.textContent).toContain(String(value));
+    }
   });
 
   it("keeps toolbar ordering and scroll when definitions are updated", async () => {

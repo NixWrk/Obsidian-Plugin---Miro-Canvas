@@ -11,6 +11,7 @@ export interface ShapeRadiusHandleState {
   readonly radius: number;
   readonly editable: boolean;
   readonly zoom: number;
+  readonly minimumZoom?: number;
 }
 
 export interface ShapeRadiusHandleOptions {
@@ -89,7 +90,7 @@ export class ShapeRadiusHandle {
     if (old !== undefined && (old.id !== state.id || old.nodeEl !== state.nodeEl
       || old.width !== state.width || old.height !== state.height)) this.cancel();
     this.state = state;
-    if (state.zoom < SHAPE_RADIUS_HANDLE_MIN_ZOOM) {
+    if (state.zoom < (state.minimumZoom ?? SHAPE_RADIUS_HANDLE_MIN_ZOOM)) {
       this.cancel();
       this.host.remove();
       return;
@@ -140,7 +141,9 @@ export class ShapeRadiusHandle {
 
   private verify(state: ShapeRadiusHandleState, requireVisible = true): boolean {
     const node = state.nodeEl;
-    if ((requireVisible && state.zoom < SHAPE_RADIUS_HANDLE_MIN_ZOOM)
+    const minimumZoom = state.minimumZoom ?? SHAPE_RADIUS_HANDLE_MIN_ZOOM;
+    if (!Number.isFinite(minimumZoom) || minimumZoom < 0
+      || (requireVisible && state.zoom < minimumZoom)
       || !state.editable || !state.id || !Number.isFinite(state.radius)
       || ![state.width, state.height, state.zoom].every(value => Number.isFinite(value) && value > 0)
       || !Number.isFinite(1 / state.zoom)

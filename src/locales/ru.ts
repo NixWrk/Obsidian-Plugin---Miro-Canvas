@@ -13,7 +13,9 @@ import type { Messages } from "./en";
 export const RU: Messages = {
   enhancements: {
     shapeRadiusControl: "Регулировка скругления фигур",
-    shapeRadiusControlHint: "При масштабе 200% и выше меняй радиус ручкой на выделенной фигуре. Отключение скрывает ручку и сохраняет записанные радиусы.",
+    shapeRadiusControlHint: "Меняй радиус ручкой на выделенной фигуре. Минимальный масштаб для её показа задаётся ниже. Отключение скрывает ручку и сохраняет записанные радиусы.",
+    shapeRadiusControlMinZoom: "Показывать метку скругления от масштаба (%)",
+    shapeRadiusControlMinZoomHint: "Минимальный масштаб для показа метки на выделенной фигуре, общий для всех досок. По умолчанию — 200%. Значение 0 показывает метку при любом масштабе.",
     shapeRadiusHandle: "Изменить радиус скругления фигуры",
     shapeRadiusValue: (radius: number) => `Радиус скругления: ${Number(radius.toFixed(2))} пикселей доски. Потяни ручку или нажми, чтобы ввести точное значение.`,
     shapeRadiusLiveValue: (radius: number) => `Радиус ${Number(radius.toFixed(2))}`,

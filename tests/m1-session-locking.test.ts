@@ -173,6 +173,23 @@ describe("selection frame follows the displayed card", () => {
 });
 
 describe("radius marker follows the displayed camera", () => {
+	it("passes the global percentage as a scale only to the selected shape", () => {
+		vi.stubGlobal("HTMLElement", HostElement);
+		const { session, free } = fixture();
+		const internal = session as any;
+		internal.settings = { ...internal.settings, shapeRadiusControlMinZoomPercent: 125 };
+		internal.selectedIds = ["free"];
+		internal.shapeRadiusHandle = { update: vi.fn(), updateZoom: vi.fn(), dispose: vi.fn() };
+		vi.spyOn(internal, "landingGeometry").mockReturnValue({ scene: { items: new Map([
+			["free", { shape: "round_rectangle", cornerRadius: 16 }],
+		]) } });
+		vi.spyOn(internal, "nodeRect").mockReturnValue({ x: 0, y: 0, width: 250, height: 60 });
+		vi.spyOn(internal, "displayViewport").mockReturnValue({ x: 0, y: 0, zoom: 1.5 });
+		internal.updateShapeRadiusHandle(true);
+		expect(internal.shapeRadiusHandle.update).toHaveBeenLastCalledWith(expect.objectContaining({
+			id: "free", nodeEl: free.nodeEl, zoom: 1.5, minimumZoom: 1.25,
+		}));
+	});
 	it("updates zoom between session refreshes without walking the board nodes", () => {
 		const { session } = fixture();
 		const internal = session as any;
