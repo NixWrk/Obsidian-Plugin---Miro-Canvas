@@ -43,3 +43,31 @@ Reasons are documented in both READMEs and
 [the source compatibility notes](contributing.md#remaining-source-warnings).
 The directory scanner must be rerun after publication; local gates do not claim
 a new Community Directory acceptance.
+
+
+## Publication — 2026-10-10
+
+[PR 18](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/pull/18), candidate
+9e1c555e722eab37037a4337df20fa9894badf16, passed both plugin and smoke jobs in
+[CI 38082407115](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/actions/runs/38082407115).
+The merged tree at 2a6995ac6d2d413a73796a089a56545919f51f76 equals that tested
+candidate. Both fresh tags point to the merged commit; existing tags and assets
+were preserved. The original checkout was fast-forwarded and rebuilt from a
+clean npm ci. Its four unrelated untracked files remain untouched.
+
+[Plugin 0.3.2](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/0.3.2)
+is public and contains exactly main.js (4,628,598 bytes), manifest.json (323)
+and styles.css (166,242). The separate
+[tools-0.3.2 prerelease](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.2)
+contains only CLI (1,104,971 bytes) and MCP (1,105,388); it is not the latest
+plugin release. All five downloads match the tested builds after CRLF/LF
+normalization, with matching GitHub SHA-256 digests. The default-branch manifest
+matches. Downloaded CLI and read-only MCP both report 0.3.2.
+
+GitHub-published provenance exists for all five assets. DSSE signatures,
+subjects, source commit and tag/workflow identity were checked against the
+returned certificates. Full Sigstore root/transparency trust validation remains
+the GitHub reviewer responsibility. Receipts are ignored under
+.out/release-032-verification. The final repeated hidden Windows export and
+independent content checks pass; no current Android-device result is claimed.
+Community Directory review must be rerun for this version.
