@@ -2213,3 +2213,30 @@ test settings, leave unverified phone/popout/OS text scenarios pending.
 Attachment toggle follow-up before edit: actual ADB toggle sets localOverrides.f.showAttachmentName=true, but a second click stays true. selectedAttachmentVisibility passes a private native class instance to pure shouldShowAttachmentName, whose plain-object guard rejects it; the checkbox remains false. refreshDecorations already uses attachmentNode to build checked JSON id/type/file. Reuse that projection for checkbox state. Required: native runtime class with global/local visibility overrides, ADB on/off, non-file/absent selection fail closed, unknown-field/source preservation and native Undo.
 
 Final host appearance, menu wrapping and attachment toggle evidence: [checks](host-theme-menu-checks.md). ADB input, native API preparation, Windows renderer input and inherited SVG theme proof are distinguished; remaining matrix is explicit.
+
+
+## Discoverable shape-radius dragging — 2026-10-10 (trace before edits)
+
+ShapeRadiusHandle owns the sole selected-figure corner control. Its existing
+44px target uses pointer capture plus document listeners and inverse shape SVG
+CTM to preview a circular radius in board units; M1CanvasSession owns transient
+radiusPreview and the single native-history commit. The current 12px circular
+marker resembles native connection points. Tap opens exact numeric input, but
+touch users cannot see a drag instruction or the current value while holding.
+Replace only the marker with a rounded-corner SVG and directional affordance;
+show a non-interactive live value beside the held control. Preserve projection,
+threshold, preview transaction, input, setting, metadata, and export exclusion.
+
+Mandatory checks: actual ADB finger and ADB stylus-source held movement on
+SM-X736B in MiroCanvasTest, live value and path change before release, file and
+history unchanged while held, one commit, Undo, cancellation, exact numeric
+input, selected-only/global toggle. Verify touch/pen pointer ownership and
+rotated/non-default zoom in focused tests; distinguish actual physical pen
+handling from ADB stylus-source input. Measure 44px target, icon contrast in
+both themes, and badge above the finger; no extra selection border or input
+keyboard during dragging. Preserve fixed connector anchors/chains and source
+unknown fields. Native Windows renderer input is separate from physical mouse.
+Export jobs must be zero before screenshots; control remains excluded from
+export. Record unverified device scenarios explicitly.
+
+Final marker/live dragging evidence: [radius feedback checks](radius-feedback-checks.md). Actual ADB touch/pen-source and hidden native Windows renderer input are separated; physical S Pen and disconnected phone remain pending.

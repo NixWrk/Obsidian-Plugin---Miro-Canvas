@@ -34,6 +34,7 @@ class Element extends Events {
   public isConnected = true;
   public hidden = false;
   public title = "";
+  public textContent = "";
   public type = "";
   public min = "";
   public max = "";
@@ -87,6 +88,7 @@ class FakeDocument extends Events {
   public defaultView = null;
   public activeElement: Element | undefined;
   public createElement(tag: string): Element { return new Element(tag, this); }
+  public createElementNS(_namespace: string, tag: string): Element { return this.createElement(tag); }
 }
 
 function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zoom = 1) {
@@ -123,6 +125,7 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
   const host = node.children.find(child => child.className === "miro-canvas-shape-radius-handle")!;
   const button = host?.children[0]!;
   const input = host?.children[1]!;
+  const value = host?.children[2]!;
   const point = (x: number, y: number, pointerId = 1) => {
     const angle = rotation * Math.PI / 180;
     return { clientX: 70 + zoom * (x * Math.cos(angle) - y * Math.sin(angle)),
@@ -138,12 +141,57 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
   };
   const key = (value: string) => document.dispatch("keydown", { key: value, target: input });
   const update = (patch: Partial<ShapeRadiusHandleState> = {}) => control.update({ ...state, ...patch });
-  return { document, node, layer, svg, host, button, input, state, control, onPreview, onCommit, onCancel, down, move, up, open, edit, key, update };
+  return { document, node, layer, svg, host, button, input, value, state, control, onPreview, onCommit, onCancel, down, move, up, open, edit, key, update };
 }
 
 afterEach(() => setLocale("en"));
 
 describe("shape corner handle", () => {
+  it("distinguishes the corner icon from connection points without an extra focus target", () => {
+    const item = build();
+    const icon = item.button.children[0]!;
+    expect(icon.tagName).toBe("svg");
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+    expect(icon.getAttribute("focusable")).toBe("false");
+    expect(icon.children.map(child => child.tagName)).toEqual(["path", "path"]);
+    expect(item.value.hidden).toBe(true);
+    expect(item.value.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it.each(["touch", "pen", "mouse"])("shows live %s feedback before release and hides it after one commit", pointerType => {
+    const item = build({}, 37, 0.75);
+    item.host.dispatch("pointerdown", { target: item.button, pointerType, pointerId: 5,
+      clientX: 70, clientY: 90 });
+    expect(item.value.hidden).toBe(false);
+    expect(item.value.textContent).toBe(words().enhancements.shapeRadiusLiveValue(16));
+    expect(item.host.getAttribute("data-dragging")).toBe("true");
+    item.move(12, 12, 5);
+    expect(item.value.textContent).toBe(words().enhancements.shapeRadiusLiveValue(28));
+    expect(item.onPreview).toHaveBeenLastCalledWith("shape1", expect.closeTo(28));
+    expect(item.onCommit).not.toHaveBeenCalled();
+    item.up(12, 12, 5);
+    expect(item.onCommit).toHaveBeenCalledExactlyOnceWith("shape1", expect.closeTo(28));
+    expect(item.host.getAttribute("data-dragging")).toBe("false");
+    expect(item.value.hidden).toBe(true);
+    expect(item.input.hidden).toBe(true);
+  });
+
+  it("hides feedback on cancellation and reuses it for the next finger", () => {
+    setLocale("ru");
+    const item = build();
+    item.down();
+    item.move(200, 200);
+    expect(item.value.textContent).toBe(words().enhancements.shapeRadiusLiveValue(60));
+    item.document.dispatch("pointercancel");
+    expect(item.value.hidden).toBe(true);
+    expect(item.host.getAttribute("data-dragging")).toBe("false");
+    item.down();
+    expect(item.value.textContent).toBe(words().enhancements.shapeRadiusLiveValue(16));
+    item.up(16, 16);
+    expect(item.value.hidden).toBe(true);
+    expect(item.onCommit).not.toHaveBeenCalled();
+  });
+
   it.each([[0, 0.5], [90, 2], [37, 0.75], [-120, 1.8]])("projects physical dx/dy at rotation %s and zoom %s", (rotation, zoom) => {
     const item = build({}, rotation, zoom);
     const press = item.down();
@@ -245,7 +293,7 @@ describe("shape corner handle", () => {
     expect(item.input.hidden).toBe(false);
     expect(item.button.hidden).toBe(true);
     expect(item.document.activeElement).toBe(item.input);
-    expect(item.host.children.map(child => child.tagName)).toEqual(["button", "input"]);
+    expect(item.host.children.map(child => child.tagName)).toEqual(["button", "input", "span"]);
     item.key("Escape");
     item.down();
     item.up(24, 24);

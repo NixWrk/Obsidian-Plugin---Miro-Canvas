@@ -5254,17 +5254,45 @@
   touch-action: none;
 }
 
-.miro-canvas-root .miro-canvas-shape-radius-handle__button::before {
-  content: "";
-  position: absolute;
-  inset: 16px;
-  border: 2px solid var(--interactive-accent);
-  border-radius: 50%;
+/* A corner icon, distinct from the native circular connection points. */
+.miro-canvas-root .miro-canvas-shape-radius-handle__button svg {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 3px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s, 4px);
+  color: var(--interactive-accent);
   background: var(--background-primary);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
-.miro-canvas-root .miro-canvas-shape-radius-handle__button:hover::before {
-  background: var(--background-modifier-hover);
+.miro-canvas-root .miro-canvas-shape-radius-handle__button:hover svg,
+.miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] svg {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+/* Above the held finger; the label never intercepts another pointer. */
+.miro-canvas-root .miro-canvas-shape-radius-handle__value {
+  position: absolute;
+  inset-inline-start: 48px;
+  bottom: 48px;
+  padding: 5px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  font-size: var(--font-ui-small, 13px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .miro-canvas-root .miro-canvas-shape-radius-handle__button:focus-visible {

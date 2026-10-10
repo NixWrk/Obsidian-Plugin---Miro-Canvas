@@ -1,4 +1,4 @@
-import { createHtmlElement } from "./dom-elements";
+import { createHtmlElement, createSvgElement } from "./dom-elements";
 import { words } from "./i18n";
 
 export interface ShapeRadiusHandleState {
@@ -32,12 +32,14 @@ export class ShapeRadiusHandle {
   private readonly host: HTMLDivElement;
   private readonly button: HTMLButtonElement;
   private readonly input: HTMLInputElement;
+  private readonly value: HTMLSpanElement;
   private state: ShapeRadiusHandleState | undefined;
   private drag: RadiusDrag | undefined;
   private editingOriginal: number | undefined;
   private radius = 0;
   private suppressClick = false;
   private disposed = false;
+  private iconCreated = false;
 
   public constructor(private readonly options: ShapeRadiusHandleOptions) {
     const document = options.document;
@@ -57,6 +59,11 @@ export class ShapeRadiusHandle {
     this.input.hidden = true;
     this.host.appendChild(this.button);
     this.host.appendChild(this.input);
+    this.value = createHtmlElement(document, "span");
+    this.value.className = "miro-canvas-shape-radius-handle__value";
+    this.value.setAttribute("aria-hidden", "true");
+    this.value.hidden = true;
+    this.host.appendChild(this.value);
     this.host.addEventListener("pointerdown", this.onPointerDown);
     this.host.addEventListener("click", this.onClick);
     this.host.addEventListener("dblclick", this.stopEvent);
@@ -75,6 +82,7 @@ export class ShapeRadiusHandle {
       this.host.remove();
       return;
     }
+    this.createIcon();
     const old = this.state;
     if (old !== undefined && (old.id !== state.id || old.nodeEl !== state.nodeEl
       || old.width !== state.width || old.height !== state.height)) this.cancel();
@@ -98,6 +106,23 @@ export class ShapeRadiusHandle {
     this.button.removeEventListener("lostpointercapture", this.onPointerCancel);
     this.input.removeEventListener("input", this.onInput);
     this.input.removeEventListener("blur", this.onInputBlur);
+  }
+
+  private createIcon(): void {
+    if (this.iconCreated) return;
+    const document = this.options.document;
+    const icon = createSvgElement(document, "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("focusable", "false");
+    const corner = createSvgElement(document, "path");
+    corner.setAttribute("d", "M5 19V11a6 6 0 0 1 6-6h8");
+    const direction = createSvgElement(document, "path");
+    direction.setAttribute("d", "M12 12l7 7M15 19h4v-4");
+    icon.appendChild(corner);
+    icon.appendChild(direction);
+    this.button.appendChild(icon);
+    this.iconCreated = true;
   }
 
   private verify(state: ShapeRadiusHandleState): boolean {
@@ -156,6 +181,9 @@ export class ShapeRadiusHandle {
     this.button.title = words().enhancements.shapeRadiusValue(this.radius);
     this.button.setAttribute("aria-label", this.button.title);
     this.input.max = String(Math.min(1000, state.width / 2, state.height / 2));
+    this.host.setAttribute("data-dragging", String(this.drag !== undefined));
+    this.value.textContent = words().enhancements.shapeRadiusLiveValue(this.radius);
+    this.value.hidden = this.drag === undefined;
   }
 
   private readonly stopEvent = (event: Event): void => {
@@ -173,6 +201,7 @@ export class ShapeRadiusHandle {
     this.suppressClick = false;
     this.drag = { pointerId: event.pointerId, start, clientX: event.clientX, clientY: event.clientY, original: this.radius, moved: false };
     this.listen(true);
+    this.render();
     try {
       this.button.setPointerCapture(event.pointerId);
     } catch {
@@ -203,6 +232,7 @@ export class ShapeRadiusHandle {
     this.drag = undefined;
     this.listen(false);
     this.release(drag.pointerId);
+    this.render();
     if (drag.moved && this.state !== undefined) this.options.onCommit(this.state.id, this.radius);
   };
 

@@ -2462,3 +2462,13 @@ More uses labelled full-width rows, preserving adopted native buttons and their 
 ### Owning Obsidian appearance and board-menu labels (2026-10-10)
 
 The stored displayTheme=system now resolves from the owning document’s Obsidian theme classes before OS media. A small body-class/media watcher follows appearance changes, ignores unrelated classes and disposes with the session. Explicit board light/dark remain independent; exports freeze the resolved theme at launch. Board-menu labels shrink/wrap without displacing icons or switches. Selected attachment-name state uses the existing checked native-to-JSON projection. [Checks](host-theme-menu-checks.md).
+
+
+Shape-radius discoverability follow-up (2026-10-10): the marker is a decorative
+rounded-corner SVG with an inward drag arrow, distinct from native connection
+points. The existing 44px pointer target remains constant at different zooms.
+A localized, non-interactive value badge appears above/right while held and
+updates synchronously with the transient preview; release/cancel hides it. Tap
+still opens exact input. Icon creation is lazy, only for a verified editable
+selected rectangular figure. No metadata or history semantics changed.
+[Checks](radius-feedback-checks.md).
