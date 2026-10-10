@@ -128,3 +128,10 @@ page actions, independent SVG save and Stop preserve source and leave0 jobs/
 surfaces. Actual Android keyboard height400.94116px keeps footer/Close bounded.
 Windows stays hidden/unfocused; tablet taps use ADB. No screenshots during jobs.
 Publication checks are recorded in release-0.3.1-checks.md.
+
+
+Parent publication follow-up: core0.3.1 and tools-0.3.1 are public and point to
+the same checked commit. Exact3/2-asset contracts, downloaded content/version/
+size and matching signed GitHub provenance pass. The historical worker pending
+statements above describe its earlier handoff; final results are in
+[release0.3.1 checks](release-0.3.1-checks.md).

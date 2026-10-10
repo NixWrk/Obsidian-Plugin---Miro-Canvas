@@ -61,6 +61,39 @@ hooks on both surfaces without changing the active board. Clipboard behavior
 is retained and scoped by existing explicit action/event handlers; unit/UI
 clipboard regressions pass. Phone is not connected, no current-phone pass.
 
-Pending publication: exact candidate CI, companion CLI/MCP publication,
-core3-asset provenance/content checks and remote size check.
-The published0.3.0 tag/assets are preserved; release0.3.1 will supersede them.
+Publication completed on2026-10-10; exact CI, tags and downloaded-asset
+results are recorded below.
+The published0.3.0 tag/assets are preserved; release0.3.1 supersedes them.
+
+
+## Published assets and provenance
+
+[PR17](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/pull/17) candidate
+b912265f8acbf7d9b9f95899df9efd6d2e7eb030 passed both plugin/smoke jobs in
+[CI38056581947](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/actions/runs/38056581947).
+The merge tree atb19018aec72afe9218af7836ea18b31b85862653 equals that candidate.
+Both fresh tags point to that commit. No existing tag or release asset changed.
+Linux CI passes3518 tests with two platform-dependent skips; local Windows
+passes3519 with one skip. Its production build reproduces4,628,626 bytes.
+
+[Plugin0.3.1](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/0.3.1)
+is a normal public release containing exactly main.js/manifest.json/styles.css.
+[Tools0.3.1](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.1)
+is a linked non-latest prerelease with exactly the CLI/MCP bundles. All five
+downloads match the tested builds after CRLF/LF normalization, and GitHub's asset
+digests match their exact downloaded bytes. Downloaded CLI and read-only MCP
+both report0.3.1; remote submission checking confirms tag, default manifest,
+three-file contract and file contents. The plugin main asset is4,628,626 bytes.
+
+GitHub-published provenance exists for all five digests. The DSSE signatures
+verify against their certificate keys; subjects, source commit and tag/workflow
+identities match this release. Full Sigstore root/transparency trust validation
+remains the GitHub reviewer responsibility; the local receipt does not claim
+that separate verification. Core and tools retain separate attestations.
+Receipts are ignored under .out/release-031-verification.
+
+The original checkout was fast-forwarded and rebuilt. Its four unrelated
+untracked files remain. Real device checks used only isolated test vaults.
+Directory review itself must be rerun for0.3.1; local checks do not claim a new
+Community Directory acceptance. Vault enumeration and clipboard recommendations
+remain deliberate documented capabilities, not unresolved blocking errors.
