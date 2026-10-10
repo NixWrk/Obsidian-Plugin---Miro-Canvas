@@ -35,7 +35,9 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "html2canvas-pro": "2.5.0"
+    "html2canvas-pro": "2.5.0",
+    "jspdf": "4.2.1",
+    "svg2pdf.js": "2.8.1"
   },
   "overrides": {
     "moment": "2.31.0"

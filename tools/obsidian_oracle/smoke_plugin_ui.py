@@ -1787,8 +1787,9 @@ def main() -> int:
                 page.mouse.up()
                 assert node_count() == cards_before + 2 and armed_now() == "select", "Dragging the card button onto the board no longer makes a card"
                 page.evaluate("miroBrowser.session.toggleReviewMode()")
-                card_button.click()
-                assert armed_now() == "select" and card_button.get_attribute("aria-disabled") == "true", "The card button armed in review mode"
+                assert not card_button.is_visible(), "The creation button remains visible in review mode"
+                card_button.evaluate("element => element.click()")
+                assert armed_now() == "select" and card_button.get_attribute("aria-disabled") == "true", "The hidden card button armed in review mode"
                 page.evaluate("miroBrowser.session.toggleReviewMode()")
                 page.evaluate("() => { const b = miroBrowser; b.runtime.importData(b.initial); b.session.resetTools(); b.session.refresh(); }")
                 assert node_count() == cards_before, "Putting the board back left the new cards"

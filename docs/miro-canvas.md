@@ -2492,3 +2492,26 @@ padding variables. The panel respects owner-document safe areas and Obsidian's
 reported keyboard height. Output format captions are localized separately from
 full action names. Independent render/worker/save contracts are unchanged.
 [Native and synthetic checks](export-panel-design-checks.md).
+
+
+### Vector document modes and viewing tools — 2026-10-10
+
+The Export panel chooses Raster/Vector for PDF/PPTX as session UI state, without
+new Canvas metadata. SVG always stays vector. The existing independent renderer
+produces per-page SVG; PDF converts curated detached SVG with bundled jsPDF /
+svg2pdf and licensed Noto Sans (normal/bold/italic/bolditalic), substituting
+source fonts explicitly. Converter dependencies initialize only in that branch.
+Vector PPTX packs SVG per slide off the UI thread and retains a JPEG fallback
+for older readers. Unsupported vector material fails rather than turning the
+page into a raster result. Export Stop/source snapshot/save boundaries remain.
+
+Effective viewing includes stored review, original native readonly and an
+active SlideShow. Native menus, creation tools and styling controls are hidden,
+with ownership restored on exit; selected web links have a direct Open action.
+The dock exposes a temporary laser. SlideShow owns its own laser toggle and
+starts from native group frames in document order; export-page rectangles are
+a fallback. Its readonly overlay is not persisted. Starting presentation closes
+the export UI without cancelling an already independent job. Laser uses owner
+capture, a fixed64-point pool and600ms expiry, with no child-list work per frame
+and no board/history mutation. It is excluded from vector serialization.
+[Native acceptance and limitations](vector-viewing-acceptance.md).

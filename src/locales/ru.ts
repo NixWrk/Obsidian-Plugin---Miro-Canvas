@@ -122,6 +122,10 @@ export const RU: Messages = {
 		selectCard: "Выделите карточку, чтобы изменить её порядок.",
 	},
 	export: {
+    renderingLabel: "PDF и PowerPoint",
+    raster: "Растровый",
+    vector: "Векторный",
+    renderingHint: "SVG всегда векторный. В PowerPoint каждый слайд содержит SVG; В PDF шрифты заменяются на встроенный Noto Sans.",
 		dialogLabel: "Экспорт",
 		close: "Закрыть",
 		paperLabel: "Формат",
@@ -824,6 +828,8 @@ export const RU: Messages = {
 		fallbackTitle: "Документ",
 	},
 	slideShow: {
+		noSlides: "Добавь фреймы или страницы экспорта для показа слайдов.",
+		laserPointer: "Лазерная указка",
 		ariaLabel: "Презентация",
 		previousSlide: "Предыдущий слайд",
 		nextSlide: "Следующий слайд",

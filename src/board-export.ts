@@ -20,6 +20,7 @@ import {
 import { words } from "./i18n";
 import html2canvas from "html2canvas-pro";
 
+export type ExportRendering = "raster" | "vector";
 export type ExportKind = "pdf" | "pptx" | "svg";
 export { renderVectorExportPages } from "./vector-export";
 
@@ -28,6 +29,7 @@ export interface ExportPanelState {
   /** A board's own pages, or a presentation's slides, which set their own size. */
   readonly mode: "board" | "slides";
   readonly title: string;
+  readonly rendering?: ExportRendering;
   readonly state: ExportState;
   /** What the export is doing, while it runs. */
   readonly busy?: string;
@@ -38,6 +40,7 @@ export interface ExportPanelState {
 export interface ExportPanelActions {
   readonly onFormat: (format: PaperFormat, orientation: PaperOrientation) => void;
   readonly onQuality: (quality: ExportQuality) => void;
+  readonly onRendering?: (rendering: ExportRendering) => void;
   readonly onAddPage: () => void;
   readonly onAddFramePages: () => void;
   readonly onRemovePage: (id: string) => void;
@@ -132,7 +135,19 @@ export class ExportPanel {
         }
       }
     }
+    const rendering = this.row(settings, text.renderingLabel);
+    const modes = this.add(rendering, "div", "miro-canvas-export__segments");
+    modes.setAttribute("role", "group");
+    modes.setAttribute("aria-label", text.renderingLabel);
+    for (const [value, label] of [["raster", text.raster], ["vector", text.vector]] as const) {
+      const mode = this.button(modes, label, label, "miro-canvas-export__segment");
+      mode.setAttribute("aria-pressed", String((view.rendering ?? "raster") === value));
+      mode.disabled = busy;
+      this.on(mode, "click", () => this.actions.onRendering?.(value));
+    }
+    this.add(settings, "p", "miro-canvas-export__render-hint", text.renderingHint);
     const quality = this.row(settings, text.qualityLabel);
+    quality.hidden = view.rendering === "vector";
     const levels = this.add(quality, "div", "miro-canvas-export__segments");
     levels.setAttribute("role", "group");
     levels.setAttribute("aria-label", text.qualityLabel);

@@ -182,8 +182,10 @@ import {
 	DEFAULT_EXPORT_STATE, MAX_EXPORT_PAGES, exportRecord, pageAround, paperRatio, paperSize, readExportState, reshapePage,
 	type ExportPageRecord, type ExportRect, type ExportState,
 } from "./export-pages";
-import { ExportOverlay, ExportPanel, renderExportPages, renderVectorExportPages, type ExportKind } from "./board-export";
+import { ExportOverlay, ExportPanel, renderExportPages, renderVectorExportPages, type ExportKind, type ExportRendering } from "./board-export";
 import { packExport } from "./export-worker-client";
+import { splitVectorDocuments, vectorPageFallback } from "./vector-document";
+import { LaserPointer } from "./laser-pointer";
 import { createExportCanvas, exportCanvasSettings } from "./export-canvas";
 import { words } from "./i18n";
 
@@ -1470,6 +1472,9 @@ export class M1CanvasSession {
 	private readonly appearanceSizerStyles = new NativeStyleProperties();
 	private readonly sourceRenderer: SourceRenderer | undefined;
 	private slideShow: SlideShow | undefined;
+	private laserPointer: LaserPointer | undefined;
+	private presentationRects = new Map<string, SlideRect>();
+	private exportRendering: ExportRendering = "raster";
 	private readonly readonlyOriginal: boolean | undefined;
 	/**
 	 * The cards marked locked, or left alone as unlocked, with how each was before the plugin looked at it
@@ -1642,6 +1647,7 @@ export class M1CanvasSession {
 		readonly mode: "board" | "slides";
 		readonly title: string;
 		state: ExportState;
+		rendering: ExportRendering;
 		abort?: AbortController;
 		readonly panel: ExportPanel;
 		readonly overlay: ExportOverlay;
@@ -1817,6 +1823,8 @@ export class M1CanvasSession {
 			openCommandModal: () => this.openCommandModal(),
 			openSourceInspector: () => this.openSourceInspector(),
 			openExport: () => this.openExport(),
+			onToggleLaser: () => this.toggleLaserPointer(),
+			onPresent: () => this.startPresentation(),
 			onArrangePanels: () => this.toggleArrangeMode(),
 			onSearch: () => this.openSearch(),
 			...(options.onOpenSettings === undefined ? {} : { openSettings: options.onOpenSettings }),
@@ -4094,7 +4102,10 @@ export class M1CanvasSession {
 		for (const diagnostic of this.transientDiagnostics) {
 			diagnostics.push(diagnostic);
 		}
-		this.syncNativeReadonly(this.appearance.settings.reviewMode === true, diagnostics);
+		this.syncNativeReadonly(this.isViewing(), diagnostics);
+		const reviewClasses = readRuntime(this.root, "classList");
+		if (callRuntime(reviewClasses, "contains", "miro-canvas-reviewing") !== this.isViewing()) callRuntime(reviewClasses, this.isViewing() ? "add" : "remove", "miro-canvas-reviewing");
+		if (!this.isViewing()) this.laserPointer?.setEnabled(false);
 		this.applyTheme(this.appearance.settings.displayTheme);
 		if (appearanceChanged) {
 			this.customBoardStyles?.restoreBeforeRender();
@@ -4127,7 +4138,8 @@ export class M1CanvasSession {
 		const state: M1ControlsState = {
 			appearance: this.appearance,
 			selectedIds: this.selectedIds,
-			reviewMode: this.appearance.settings.reviewMode === true,
+			reviewMode: this.isViewing(),
+			laserEnabled: this.laserPointer?.enabled === true,
 			lockedSelection,
 			showAttachmentNames: this.appearance.settings.showAttachmentNames !== false,
 			...(selectedAttachmentNames === undefined ? {} : { selectedAttachmentNames }),
@@ -4149,6 +4161,7 @@ export class M1CanvasSession {
 		const controlSignature = appearanceSignature + safeSignature({
 			selectedIds: state.selectedIds,
 			reviewMode: state.reviewMode,
+			laserEnabled: state.laserEnabled,
 			lockedSelection: state.lockedSelection,
 			showAttachmentNames: state.showAttachmentNames,
 			selectedAttachmentNames: state.selectedAttachmentNames,
@@ -4337,7 +4350,7 @@ export class M1CanvasSession {
 			this.closeCommentThread();
 			return;
 		}
-		card.show(thread, { editable: this.appearance.settings.reviewMode !== true, authorName: this.commentAuthor().name });
+		card.show(thread, { editable: !this.isViewing(), authorName: this.commentAuthor().name });
 		if (marker !== undefined) card.place(marker.point, clientSize(this.root));
 	}
 
@@ -4422,7 +4435,7 @@ export class M1CanvasSession {
 
 	/** Colour a comment thread or lock it; a locked thread only takes being unlocked. */
 	private setCommentAppearance(id: string, origin: CommentOrigin, patch: { color?: string; locked?: boolean }): void {
-		if (this.appearance.settings.reviewMode || !this.commentThreads().some((thread) => thread.id === id && thread.origin === origin)) return;
+		if (this.isViewing() || !this.commentThreads().some((thread) => thread.id === id && thread.origin === origin)) return;
 		if (this.commentLocked(id, origin) && (patch.locked !== false || patch.color !== undefined)) return;
 		if (patch.color !== undefined && !/^#[0-9a-f]{6}$/iu.test(patch.color)) return;
 		this.writeMetadata("comment-appearance", (draft) => {
@@ -5247,7 +5260,7 @@ export class M1CanvasSession {
 	}
 
 	private updateQuickTools(): void {
-		const editable = this.appearance.settings.reviewMode !== true;
+		const editable = !this.isViewing();
 		if (!editable && this.armedTool !== "select" && this.armedTool !== "lasso") this.armedTool = "select";
 		if (this.armedTool !== "native") this.armedNative = undefined;
 		if (!isDrawingTool(this.armedTool)) this.hideBrush();
@@ -5265,7 +5278,7 @@ export class M1CanvasSession {
 	private armTool(tool: ArmedTool): void {
 		this.toolGesture?.end();
 		// Review mode keeps the tools that only select.
-		this.armedTool = this.appearance.settings.reviewMode === true && tool !== "lasso" ? "select" : tool;
+		this.armedTool = this.isViewing() && tool !== "lasso" ? "select" : tool;
 		if (this.armedTool !== "native") this.armedNative = undefined;
 		// Only a tool that really took over puts an open comment away.
 		if (this.armedTool !== "select") this.closeCommentThread();
@@ -6716,6 +6729,55 @@ export class M1CanvasSession {
 		this.refresh();
 	}
 
+	public isViewing(): boolean {
+		return this.readonlyOriginal === true || this.appearance.settings.reviewMode === true || this.slideShow?.active === true;
+	}
+
+	private toggleLaserPointer(): void {
+		if (this.disposed || this.root === undefined || !this.isViewing()) return;
+		this.laserPointer ??= new LaserPointer(this.root);
+		this.laserPointer.setEnabled(!this.laserPointer.enabled);
+		this.slideShow?.refreshLaser();
+		this.refresh();
+	}
+
+	private ensureSlideShow(): SlideShow | undefined {
+		if (this.root === undefined || this.disposed) return undefined;
+		return this.slideShow ??= new SlideShow(this.root, {
+			rectOf: (id) => this.presentationRects.get(id) ?? this.nodeRect(id),
+			show: (rect) => this.showRect(rect),
+			onActiveChange: () => {
+				this.laserPointer?.setEnabled(false);
+				if (!this.disposed) this.refresh();
+			},
+			onLaserToggle: () => this.toggleLaserPointer(),
+			isLaserEnabled: () => this.laserPointer?.enabled === true,
+			...(this.options.setIcon === undefined ? {} : { setIcon: this.options.setIcon }),
+		});
+	}
+
+	/** Native frames are slides too; export pages supply a deck when there are no frames. */
+	public startPresentation(): void {
+		if (this.disposed || this.root === undefined) return;
+		this.presentationRects.clear();
+		const nodes = readRuntime(this.currentRawDocument, "nodes");
+		let slides = (Array.isArray(nodes) ? nodes : []).flatMap((node): string[] => {
+			const id = readRuntime(node, "id");
+			return readRuntime(node, "type") === "group" && typeof id === "string" ? [id] : [];
+		});
+		if (slides.length === 0) {
+			const pages = this.exporting?.state.pages ?? readExportState(readRuntime(readRuntime(this.currentRawDocument, "miroCanvas"), "export")).pages;
+			slides = pages.map(page => {
+				const id = `export:${page.id}`;
+				this.presentationRects.set(id, page);
+				return id;
+			});
+		}
+		this.closeExport(false);
+		this.callNative("deselectAll");
+		if (!this.ensureSlideShow()?.start(slides)) this.options.onNotice?.(words().slideShow.noSlides);
+	}
+
 	/** A presentation's bar: show its slides one by one, or all of them at once, or export them. */
 	private runDeckAction(deckId: string, action: DeckAction): void {
 		if (this.root === undefined || this.disposed) return;
@@ -6730,12 +6792,8 @@ export class M1CanvasSession {
 			return;
 		}
 		this.callNative("deselectAll");
-		this.slideShow ??= new SlideShow(this.root, {
-			rectOf: (id) => this.nodeRect(id),
-			show: (rect) => this.showRect(rect),
-			...(this.options.setIcon === undefined ? {} : { setIcon: this.options.setIcon }),
-		});
-		this.slideShow.start(slides);
+		this.presentationRects.clear();
+		this.ensureSlideShow()?.start(slides);
 	}
 
 	/**
@@ -6773,6 +6831,11 @@ export class M1CanvasSession {
 				return { ...current, format, orientation, pages: current.pages.map((page) => ({ ...page, ...reshapePage(page, ratio) })) };
 			}),
 			onQuality: (quality) => this.changeExport((current) => ({ ...current, quality })),
+			onRendering: (rendering) => {
+				if (this.exporting === undefined || this.exporting.busy !== undefined) return;
+				this.exporting.rendering = this.exportRendering = rendering;
+				this.renderExport();
+			},
 			onAddPage: () => this.changeExport((current) => ({ ...current, pages: [...current.pages, this.newExportPage(current, current.pages.length + 1)] })),
 			onAddFramePages: () => this.changeExport((current) => {
 				const ratio = paperRatio(current.format, current.orientation);
@@ -6819,7 +6882,7 @@ export class M1CanvasSession {
 		document.body.appendChild(panel.element);
 		panel.element.classList.add("miro-canvas-theme-surface");
 		panel.element.setAttribute("data-miro-canvas-resolved-theme", root.getAttribute("data-miro-canvas-resolved-theme") ?? "light");
-		this.exporting = { mode: deckId === undefined ? "board" : "slides", title, state, panel, overlay, stop: false };
+		this.exporting = { mode: deckId === undefined ? "board" : "slides", title, state, rendering: this.exportRendering, panel, overlay, stop: false };
 		this.renderExport();
 	}
 
@@ -6893,6 +6956,7 @@ export class M1CanvasSession {
 		exporting.panel.update({
 			mode: exporting.mode,
 			title: exporting.title,
+			rendering: exporting.rendering,
 			state: exporting.state,
 			...(exporting.busy === undefined ? {} : { busy: exporting.busy }),
 			...(this.options.onSaveExport === undefined ? { unavailable: words().export.unavailable } : {}),
@@ -6934,6 +6998,7 @@ export class M1CanvasSession {
 		if (exporting === undefined || canvas === undefined || exporting.busy !== undefined) return;
 		const state = { ...exporting.state, pages: exporting.state.pages.map(page => ({ ...page })) };
 		const pages = state.pages;
+		const rendering = exporting.rendering ?? "raster";
 		if (pages.length === 0) return;
 		const file = readRuntime(this.view, "file");
 		const base = typeof readRuntime(file, "basename") === "string" ? readRuntime(file, "basename") as string : "Board";
@@ -6972,6 +7037,19 @@ export class M1CanvasSession {
 				bytes = await renderVectorExportPages(background.canvas as never, pages, progress, exporting.abort.signal, () => renderer?.refresh());
 				exporting.busy = words().export.writingSvg;
 				this.renderExport();
+			} else if (rendering === "vector") {
+				const svg = await renderVectorExportPages(background.canvas as never, pages, progress, exporting.abort.signal, () => renderer?.refresh());
+				const sheets = splitVectorDocuments(svg, pages.map(page => ({ ...paperSize(state.format, state.orientation, page), ...(page.name === undefined ? {} : { title: page.name }) })), document);
+				exporting.busy = kind === "pdf" ? words().export.writingPdf : words().export.writingPptx;
+				this.renderExport();
+				if (kind === "pdf") {
+					const { packVectorPdf } = await import("./vector-pdf");
+					bytes = await packVectorPdf(sheets, { title: base }, document, exporting.abort.signal);
+				} else {
+					const presentation = [];
+					for (const sheet of sheets) presentation.push({ ...sheet, ...await vectorPageFallback(sheet, document, exporting.abort.signal) });
+					bytes = await packExport("pptx-vector", presentation, { title: base }, document, exporting.abort.signal);
+				}
 			} else {
 				const pictures = await renderExportPages(background.canvas as never, pages, state.quality, progress, exporting.abort.signal, () => renderer?.refresh());
 				exporting.busy = kind === "pdf" ? words().export.writingPdf : words().export.writingPptx;
@@ -9584,13 +9662,13 @@ export class M1CanvasSession {
 
 	private policyFromDocument(document: unknown): InteractionPolicy {
 		const parsed = this.parseMetadata(document);
-		if (this.policyFor?.parsed === parsed) return this.policyFor.policy;
+		if (this.policyFor?.parsed === parsed) return this.readonlyOriginal === true || this.slideShow?.active === true ? { ...this.policyFor.policy, reviewMode: true } : this.policyFor.policy;
 		// A missing extension is an ordinary Canvas. Invalid/unsupported data
 		// must never be normalized into an unlocked default policy.
 		const policy = createInteractionPolicy(parsed.status === "valid" ? parsed.metadata
 			: parsed.status === "absent" ? { settings: {}, localOverrides: {} } : undefined);
 		this.policyFor = { parsed, policy };
-		return policy;
+		return this.readonlyOriginal === true || this.slideShow?.active === true ? { ...policy, reviewMode: true } : policy;
 	}
 
 	/**
@@ -10138,6 +10216,8 @@ export class M1CanvasSession {
 		this.cancelPendingPenDot();
 		this.selectionMoveEnd?.();
 		this.slideShow?.stop();
+		this.laserPointer?.dispose();
+		this.root?.classList.remove("miro-canvas-reviewing");
 		this.closeExport(false);
 		this.arrangeMode?.dispose();
 		this.panelVisibility?.dispose();

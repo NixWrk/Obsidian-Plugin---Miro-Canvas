@@ -957,7 +957,7 @@ export default class MiroCanvasPlugin extends Plugin {
     const session = this.activeM1Session();
     if (session === null || !(menu instanceof Menu)) return;
     session.refresh();
-    if (session.layeredCards(ids).length === 0) return;
+    if (session.isViewing() || session.layeredCards(ids).length === 0) return;
     for (const action of layerActions()) {
       menu.addItem((item) => item
         .setTitle(action.label)

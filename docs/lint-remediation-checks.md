@@ -2366,3 +2366,48 @@ recorded in [panel checks](export-panel-design-checks.md). The failed automated
 IME-open attempt is preserved separately; no synthetic keyboard pass replaces it.
 Moving radius restored: current native receipts and superseded animation checks
 are distinguished in [motion checks](radius-marker-motion-checks.md).
+
+
+## Vector PDF/PPTX and viewing tools — 2026-10-10 (before implementation)
+
+runExport currently uses independent renderVectorExportPages for SVG, and JPEG
+renderExportPages plus Worker packing for PDF/PPTX. Add transient export-panel
+rendering mode (raster default; SVG always vector), retain native page metadata
+without schema changes, and capture each vector page independently. PDF must
+contain real vector paths/text with Cyrillic-capable offline fonts; PPTX must
+contain SVG parts with real relationships and raster compatibility fallback.
+No runtime downloads/install/OS print or window activation. Unsupported vector
+content stays explicitly refused; Stop/save/snapshot/cleanup guards remain.
+Required: multi-page geometry, Latin/Cyrillic text, arrows/radii/clips/images,
+actual parsed PDF and PPTX SVG content, page ordering/quality/mode callbacks,
+Stop/failure/unload/switch and source/camera/selection preservation. Native
+Windows hidden input plus connected physical Android in MiroCanvasTest.
+
+SelectionToolbar.update currently draws disabled editing controls in review,
+and M1 owns adopted native menus, QuickTools, docks and context actions. Keep
+view/link/copy/navigation actions; hide styling/layer/lock/delete/creation rows,
+close stale editing popovers and restore native ownership on exit/disposal.
+Presentation is already SlideShow with native camera navigation. Add a bounded,
+non-persistent laser overlay available in review and slideshow; temporary
+trails never touch native drawing/history/data and are excluded from exports.
+Required: node/edge/mixed/independent/attachment/comment review selections,
+normal/locked menu regression, native menu regeneration, mode exit restoration;
+mouse/touch/pen pointer ownership, controls/scroll/link/pan unaffected when
+laser off, trail expiry/cancel/blur/unload/board-switch, zoom/rotation and
+slide next/previous/Escape. Distinguish ADB/CDP from physical stylus handling.
+
+
+Review smoke adjustment before edit: the interaction suite intentionally clicked
+an aria-disabled native creation button in review. Creation buttons now must be
+hidden, so replace that click with a visibility assertion plus a forced DOM
+click proving the handler still refuses arming. Normal creation/drag assertions
+and review exit restoration remain. Native ADB/CDP gestures supply real input.
+
+
+Vector document/viewing implementation and native acceptance:
+[checks](vector-viewing-acceptance.md). Windows and physical tablet actually
+save vector PDF/PPTX plus standalone SVG and raster PDF; independent artifact
+parsing confirms Cyrillic, paths and SVG slide parts. Viewing/laser/slideshow
+pass real native inputs; ADB stylus-source is separated from physical S Pen.
+Review-toggle saves are settled before the no-write baseline. Current phone,
+physical S Pen and opening the package in PowerPoint remain unverified.

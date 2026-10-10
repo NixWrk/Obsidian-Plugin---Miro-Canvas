@@ -5595,3 +5595,42 @@
 .miro-canvas-toolbar .miro-canvas-toolbar__panel--actions button:disabled > .svg-icon {
   color: inherit;
 }
+
+/* The rendering choice applies to PDF/PowerPoint; SVG always preserves vectors. */
+.miro-canvas-export__render-hint {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 12px);
+  line-height: 1.45;
+}
+
+/* A temporary pointer above the board; neither dot nor trail takes input. */
+.miro-canvas-root .miro-canvas-laser-pointer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+.miro-canvas-root .miro-canvas-laser-pointer__dot,
+.miro-canvas-root .miro-canvas-laser-pointer__trail {
+  position: absolute;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #ed2550;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.miro-canvas-root .miro-canvas-laser-pointer__trail {
+  width: 6px;
+  height: 6px;
+  border-width: 1px;
+  box-shadow: none;
+}
+.miro-canvas-root .miro-canvas-laser-pointer [hidden] {
+  display: none;
+}

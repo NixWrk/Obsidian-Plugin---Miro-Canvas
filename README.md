@@ -64,9 +64,13 @@ Open the GIF at full size for small controls.
 
 Export renders an independent board snapshot without screen capture, so you can
 keep editing or open another board.
-Files are saved as new vault attachments. **Each page or slide is an image of
-the board**; PowerPoint text and shapes are not separate editable objects.
-Live web embeds and video are omitted.
+Files are saved as new vault attachments. Raster PDF/PPTX store a picture per
+page. The development build adds a **Raster / Vector** choice for PDF and
+PowerPoint, while SVG remains a separate, always-vector format. Vector PDF
+embeds Noto Sans in four styles; source fonts are substituted. Vector PowerPoint
+stores one SVG per slide with a JPEG fallback for older readers; its text and
+shapes are not separate native PowerPoint objects. Live web embeds and video
+are omitted. [Modes and checks](docs/vector-viewing-acceptance.md).
 
 ## Canvas expansion in development
 
@@ -95,6 +99,8 @@ unreleased. Verification and remaining checks are tracked in the
 | **Card corners** | Set a radius from 0 to 48 board pixels using a slider or a precise value; zero gives square cards. Diagram geometry stays unchanged. |
 | **Shape corners** | Rectangular figures have equal horizontal/vertical radii in board units. Drag the corner marker with its bidirectional arrow using a finger, pen or mouse; the marker moves with the radius and the live value appears above the held control. Click it for an exact value; disable the controls in plugin settings. New click/drop shapes use the catalogue proportions, while free drawing keeps your dimensions. |
 | **CSS snippets** | Supported Obsidian snippets are excluded from boards by default. Allow individual installed snippets in searchable settings; normal notes and the selected theme retain their styling. |
+| **Viewing and slides** | Review hides editing/creation menus; selected web links retain a direct Open link action. Toggle a temporary laser from the viewing dock or slideshow bar. **Present slides** uses native frames in file order, or export pages when there are no frames. |
+| **Vector PDF/PowerPoint** | Choose Raster or Vector in Export. PDF uses embedded Noto Sans; PowerPoint embeds SVG per slide with an older-reader picture fallback. |
 | **Vector export** | Export actual shapes, lines and text to SVG, with clipped pages stacked vertically. Intrinsic raster attachments remain images. |
 
 SVG references installed fonts and omits cosmetic shadows. Unsupported rich

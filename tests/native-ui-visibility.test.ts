@@ -112,7 +112,7 @@ describe("fixed native UI visibility ownership", () => {
     rig.state.dispose();
   });
 
-  it.each(["is-screenshotting", "miro-canvas-presenting"])("observes %s and restores the menu after the mode ends", mode => {
+  it.each(["is-screenshotting", "miro-canvas-presenting", "miro-canvas-reviewing"])("observes %s and restores the menu after the mode ends", mode => {
     const rig = fixture();
     rig.root.classList.add(mode); rig.owner.flush(); suppressed(rig.menu);
     rig.root.classList.remove(mode); rig.owner.flush();
@@ -127,6 +127,39 @@ describe("fixed native UI visibility ownership", () => {
     rig.state.refresh(); suppressed(rig.menu);
     rig.independent(false); rig.root.classList.remove("is-screenshotting"); rig.state.refresh(); suppressed(rig.menu);
     rig.root.classList.remove("miro-canvas-presenting"); rig.state.refresh(); expect(rig.menu.hidden).toBe(false);
+    rig.state.dispose();
+  });
+
+  it("restores latest native display/hidden on review exit and disposal without replacing handlers", () => {
+    const rig = fixture();
+    rig.root.classList.add("miro-canvas-reviewing"); rig.owner.flush(); suppressed(rig.menu);
+    rig.menu.style.setProperty("display", "inline-flex", "important");
+    rig.menu.setAttribute("hidden", "native-review-change");
+    rig.owner.flush(); suppressed(rig.menu);
+    rig.root.classList.remove("miro-canvas-reviewing"); rig.owner.flush();
+    expect(rig.menu.style.getPropertyValue("display")).toBe("inline-flex");
+    expect(rig.menu.style.getPropertyPriority("display")).toBe("important");
+    expect(rig.menu.getAttribute("hidden")).toBe("native-review-change");
+    rig.menu.hidden = false;
+    rig.root.classList.add("miro-canvas-reviewing"); rig.owner.flush();
+    rig.menu.style.setProperty("display", "grid"); rig.menu.hidden = false;
+    rig.state.dispose();
+    expect(rig.menu.style.getPropertyValue("display")).toBe("grid");
+    expect(rig.menu.hidden).toBe(false);
+    expect(rig.owner.observers[0].disconnect).toHaveBeenCalledOnce();
+    rig.menu.style.setProperty("display", "flex"); rig.owner.flush();
+    expect(rig.menu.style.getPropertyValue("display")).toBe("flex");
+  });
+
+  it("keeps review menus hidden when independent and presentation reasons end first", () => {
+    const rig = fixture();
+    rig.independent(true);
+    rig.root.classList.add("miro-canvas-reviewing");
+    rig.root.classList.add("miro-canvas-presenting"); rig.owner.flush();
+    rig.independent(false); rig.root.classList.remove("miro-canvas-presenting"); rig.owner.flush();
+    suppressed(rig.menu);
+    rig.root.classList.remove("miro-canvas-reviewing"); rig.owner.flush();
+    expect(rig.menu.hidden).toBe(false);
     rig.state.dispose();
   });
 

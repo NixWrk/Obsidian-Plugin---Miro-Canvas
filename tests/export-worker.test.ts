@@ -425,3 +425,22 @@ it.each([false, true])("runs the actual browser IIFE with no DOM, Node, network 
     expect(new Uint8Array(response.bytes)).toEqual(expected);
   }
 });
+
+
+describe("vector PPTX worker input", () => {
+  it("preserves SVG pages and isolates only the dedicated fallback buffers", () => {
+    const original = page({ image: Uint8Array.of(0xff, 0xd8, 0xff, 0xc0, 0, 11, 8, 2, 88, 3, 32, 1, 0x11, 0, 0xff, 0xd9) });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><path d="M0 0L20 20"/></svg>';
+    const request = prepareExportWorkerRequest(1, "pptx-vector", [{ ...original, svg }], {});
+    expect(request.pages[0]!.svg).toBe(svg);
+    expect(original.image.byteLength).toBe(16);
+    const result = packExportWorkerRequest(request);
+    expect(result.type).toBe("result");
+    if (result.type === "result") expect(new TextDecoder().decode(result.bytes)).toContain("svgBlip");
+  });
+
+  it("rejects missing SVG and counts it against the mobile transfer budget", () => {
+    expect(() => prepareExportWorkerRequest(1, "pptx-vector", [page()], {})).toThrow();
+    expect(() => prepareExportWorkerRequest(1, "pptx-vector", [{ ...page(), svg: "x".repeat(100) }], {}, 100)).toThrow();
+  });
+});

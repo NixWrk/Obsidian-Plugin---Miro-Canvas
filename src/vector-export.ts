@@ -9,6 +9,7 @@ const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const MAX_BYTES = 32 * 1024 * 1024;
 const MAX_TILES = 2000;
 const EXCLUDED = [
+  ".miro-canvas-laser-pointer",
   ".miro-canvas-shape-radius-handle",
   ".miro-canvas-group-hidden", ".canvas-node-interaction-layer", ".canvas-node-resizer",
   ".canvas-selection", ".canvas-card-menu", ".canvas-menu", ".canvas-node-controls",

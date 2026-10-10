@@ -6,7 +6,7 @@
  * keyboard listener.
  */
 
-import { createHtmlElement } from "./dom-elements";
+import { createHtmlElement, createSvgElement } from "./dom-elements";
 import { words } from "./i18n";
 import { TOOLTIP_DELAY } from "./tooltips";
 
@@ -23,8 +23,13 @@ export interface SlideShowHost {
   /** Brings a board rectangle into view. */
   readonly show: (rect: SlideRect) => void;
   readonly setIcon?: (element: HTMLElement, icon: string) => void;
+  readonly onActiveChange?: (active: boolean) => void;
+  readonly onLaserToggle?: () => void;
+  readonly isLaserEnabled?: () => boolean;
 }
 
+const EDITABLE_SELECTOR = 'input, textarea, select, button, a, [role="textbox"], [role="slider"],'
+  + ' [contenteditable]:not([contenteditable="false"])';
 const PRESENTING_CLASS = "miro-canvas-presenting";
 const NEXT_KEYS = new Set(["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"]);
 const PREVIOUS_KEYS = new Set(["ArrowLeft", "ArrowUp", "PageUp", "Backspace"]);
@@ -34,6 +39,10 @@ export class SlideShow {
   private index = 0;
   private bar: HTMLElement | undefined;
   private counter: HTMLElement | undefined;
+  private laserButton: HTMLButtonElement | undefined;
+  private ownsPresentingClass = false;
+  private reportedActive = false;
+  private disposed = false;
   private readonly onKey = (event: KeyboardEvent): void => this.handleKey(event);
 
   public constructor(
@@ -51,13 +60,21 @@ export class SlideShow {
 
   /** Starts at a slide; slides that no longer exist are skipped. */
   public start(slides: readonly string[], from = 0): boolean {
+    if (this.disposed) return false;
     const shown = slides.filter((id) => this.host.rectOf(id) !== undefined);
     if (shown.length === 0) return false;
     this.stop();
     this.slides = shown;
-    this.mount();
-    this.go(Math.max(0, shown.indexOf(slides[from] ?? "")));
-    return true;
+    try {
+      this.mount();
+      this.go(Math.max(0, shown.indexOf(slides[from] ?? "")));
+      this.reportedActive = true;
+      this.host.onActiveChange?.(true);
+      return true;
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
   }
 
   public next(): void {
@@ -84,12 +101,31 @@ export class SlideShow {
     this.bar.remove();
     this.bar = undefined;
     this.counter = undefined;
-    this.root.classList.remove(PRESENTING_CLASS);
+    this.laserButton = undefined;
+    this.slides = [];
+    if (this.ownsPresentingClass) this.root.classList.remove(PRESENTING_CLASS);
+    this.ownsPresentingClass = false;
+    if (this.reportedActive) {
+      this.reportedActive = false;
+      this.host.onActiveChange?.(false);
+    }
+  }
+
+  /** Reconcile a laser change initiated by another board control. */
+  public refreshLaser(): void {
+    this.laserButton?.setAttribute("aria-pressed", String(this.host.isLaserEnabled?.() === true));
+  }
+
+  public dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.stop();
   }
 
   private mount(): void {
     const document = this.root.ownerDocument;
     const bar = createHtmlElement(document, "div");
+    this.bar = bar;
     bar.className = "miro-canvas-slideshow";
     bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", words().slideShow.ariaLabel);
@@ -110,21 +146,58 @@ export class SlideShow {
     counter.className = "miro-canvas-slideshow__counter";
     bar.appendChild(counter);
     button(words().slideShow.nextSlide, "chevron-right", "›", () => this.next()).classList.add("miro-canvas-slideshow__next");
+    if (this.host.onLaserToggle !== undefined) {
+      this.laserButton = button(words().slideShow.laserPointer, "mouse-pointer-2", "", () => {
+        this.host.onLaserToggle?.();
+        this.refreshLaser();
+      });
+      this.laserButton.classList.add("miro-canvas-slideshow__laser");
+      if (this.host.setIcon === undefined) {
+        const svg = createSvgElement(document, "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("class", "svg-icon");
+        svg.setAttribute("width", "18");
+        svg.setAttribute("height", "18");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "2");
+        svg.setAttribute("stroke-linejoin", "round");
+        const path = createSvgElement(document, "path");
+        path.setAttribute("d", "M4 4l7.07 17 2.51-7.39L21 11.07Z");
+        svg.appendChild(path);
+        this.laserButton.appendChild(svg);
+      }
+      this.refreshLaser();
+    }
     button(words().slideShow.endPresentation, "x", "×", () => this.stop());
     // The board must not start a drag or select under the bar.
     bar.addEventListener("pointerdown", (event) => event.stopPropagation());
     this.root.appendChild(bar);
-    this.root.classList.add(PRESENTING_CLASS);
-    document.addEventListener("keydown", this.onKey, true);
     this.bar = bar;
     this.counter = counter;
+    this.ownsPresentingClass = !this.root.classList.contains(PRESENTING_CLASS);
+    this.root.classList.add(PRESENTING_CLASS);
+    document.addEventListener("keydown", this.onKey, true);
+  }
+
+  private isEditing(event: KeyboardEvent): boolean {
+    const targets = typeof event.composedPath === "function" ? event.composedPath() : [event.target];
+    return targets.some(target => typeof (target as Element | null)?.closest === "function"
+      && (target as Element).closest(EDITABLE_SELECTOR) !== null);
   }
 
   private handleKey(event: KeyboardEvent): void {
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === "Escape") {
+      this.stop();
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || this.isEditing(event)) return;
     let handled = true;
-    if (event.key === "Escape") this.stop();
-    else if (NEXT_KEYS.has(event.key)) this.next();
+    if (NEXT_KEYS.has(event.key)) this.next();
     else if (PREVIOUS_KEYS.has(event.key)) this.previous();
     else if (event.key === "Home") this.go(0);
     else if (event.key === "End") this.go(this.slides.length - 1);

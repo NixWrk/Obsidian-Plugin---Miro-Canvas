@@ -408,6 +408,9 @@ export class QuickTools {
   private foldedSettings: SettingsLayer | undefined;
   /** The drawing tool the pen button goes back to. */
   private drawingTool: QuickTool = "pen";
+  private readonly moreHost: HTMLElement;
+  private readonly morePanel: HTMLElement;
+  private readonly creationDrags = new Set<() => void>();
   private readonly panels: { readonly button: HTMLButtonElement; readonly panel: HTMLElement }[] = [];
   private readonly listeners: (() => void)[] = [];
   private shownShape = "";
@@ -531,6 +534,8 @@ export class QuickTools {
     const moreHost = bar.appendChild(this.make("span", "miro-canvas-toolbar__popover miro-canvas-tools__more"));
     const more = moreHost.appendChild(this.iconButton(words().tools.more, "plus", "+"));
     const morePanel = moreHost.appendChild(this.panel(more, "miro-canvas-tools__menu"));
+    this.moreHost = moreHost;
+    this.morePanel = morePanel;
     for (const item of ALL_TOOLBAR_ITEMS) {
       if (!onBar.has(item)) this.placeToolbarItem(morePanel, item, true);
     }
@@ -557,6 +562,11 @@ export class QuickTools {
       // A tool picked afresh opens its settings, however the last one left them.
       this.foldedSettings = undefined;
     }
+    if (this.editable && !state.editable) {
+      this.closePanels();
+      this.nativePress = undefined;
+      for (const cancel of this.creationDrags) cancel();
+    }
     this.armed = state.armed;
     this.editable = state.editable;
     this.connectorColor.value = state.connectorColor ?? "#1a1a1a";
@@ -573,8 +583,17 @@ export class QuickTools {
     for (const [tool, button] of this.buttons) {
       button.setAttribute("aria-pressed", tool === state.armed ? "true" : "false");
       // Selecting changes nothing, so review mode keeps Select and the lasso.
-      button.disabled = tool !== "select" && tool !== "lasso" && !state.editable;
+      const unavailable = tool !== "select" && tool !== "lasso" && !state.editable;
+      button.disabled = unavailable;
+      if (tool === "shape") button.parentElement!.hidden = unavailable;
+      else button.hidden = unavailable;
     }
+    if (this.penButton !== undefined) this.penButton.hidden = !state.editable;
+    for (const slot of this.nativeSlots.values()) slot.hidden = !state.editable;
+    this.moreHost.hidden = !state.editable && !(["select", "lasso"] as const).some(tool => {
+      const button = this.buttons.get(tool);
+      return button !== undefined && this.morePanel.contains(button);
+    });
     for (const [kind, button] of this.shapeButtons) {
       button.setAttribute("aria-pressed", kind === state.shape ? "true" : "false");
     }
@@ -624,7 +643,6 @@ export class QuickTools {
       }
       this.shownShape = state.shape;
     }
-    if (!state.editable) this.closePanels();
   }
 
   /**
@@ -725,6 +743,8 @@ export class QuickTools {
   }
 
   public dispose(): void {
+    for (const cancel of this.creationDrags) cancel();
+    this.creationDrags.clear();
     for (const [button, original] of this.fileButtonLabels) {
       for (const [attribute, value] of [["aria-label", original.label], ["title", original.title]] as const) {
         if (value === null) button.removeAttribute(attribute);
@@ -893,6 +913,7 @@ export class QuickTools {
       button.appendChild(this.make("span", "miro-canvas-tools__item-label", spec.label));
     }
     this.listen(button, "click", () => {
+      if (!this.editable) return;
       if (isDrawingTool(this.armed)) this.toggleSettings("drawing");
       else this.actions.onArm(this.drawingTool);
       if (withLabel) this.closePanels();
@@ -912,6 +933,7 @@ export class QuickTools {
     if (spec.tool !== "shape") {
       this.listen(button, "click", () => {
         if (this.consumeDragSuppression()) return;
+        if (!this.editable && spec.tool !== "select" && spec.tool !== "lasso") return;
         if (spec.tool === "connector" && this.armed === "connector") this.toggleSettings("connector");
         else this.actions.onArm(spec.tool);
       });
@@ -947,6 +969,7 @@ export class QuickTools {
     button.setAttribute("aria-haspopup", "true");
     button.setAttribute("aria-expanded", "false");
     this.listen(button, "click", () => {
+      if (button.disabled || button.hidden || (!this.editable && panel !== this.morePanel)) return;
       if (this.consumeDragSuppression()) return;
       const open = panel.hidden;
       if (open) onOpen?.();
@@ -1026,12 +1049,14 @@ export class QuickTools {
       const wasDragging = dragging;
       const point = { x: event.clientX, y: event.clientY };
       cleanup();
-      if (wasDragging) this.actions.onDragCreate?.(tool, point);
+      if (wasDragging && this.editable) this.actions.onDragCreate?.(tool, point);
     };
     const onCancel = (event: PointerEvent): void => {
       if (event.pointerId === pointerId) cleanup();
     };
+    this.creationDrags.add(cleanup);
     this.listen(button, "pointerdown", (event) => {
+      if (!this.editable) return;
       const pointer = event as PointerEvent;
       // A right- or middle-button mouse press stays whatever it already
       // does; a touch or a pen always reports button 0 and is welcome here.

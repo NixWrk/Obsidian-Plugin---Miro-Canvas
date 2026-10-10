@@ -146,6 +146,13 @@ function descendants(root: FakeElement): FakeElement[] {
   return [root, ...root.children.flatMap((child) => descendants(child))];
 }
 
+function shown(element: FakeElement): boolean {
+  for (let current: FakeElement | undefined = element; current !== undefined; current = current.parentNode) {
+    if (current.hidden) return false;
+  }
+  return true;
+}
+
 function toolButton(root: FakeElement, tool: QuickTool): FakeElement {
   const matches = descendants(root).filter((item) => item.attributes.get("data-tool") === tool);
   if (matches.length !== 1) throw new Error(`expected one button for ${tool}, found ${matches.length}`);
@@ -360,7 +367,7 @@ describe("quick tools", () => {
     expect(button.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("disables every tool but the selecting ones and closes open panels when the board stops being editable", () => {
+  it("hides creation tools and closes open panels when the board stops being editable", () => {
     const { root, tools } = build();
     toolButton(root, "shape").dispatch("click");
     tools.update({ ...STATE, editable: false });
@@ -368,7 +375,46 @@ describe("quick tools", () => {
     for (const tool of QUICK_TOOLS) {
       // Selecting changes nothing, so Select and the lasso stay live.
       expect(toolButton(root, tool).disabled).toBe(tool !== "select" && tool !== "lasso");
+      if (tool !== "select" && tool !== "lasso") expect(shown(toolButton(root, tool))).toBe(false);
     }
+  });
+
+  it.each<{ items: readonly ToolbarItem[] }>([{ items: ["select", "lasso"] }, { items: ["text"] }])("retains only selection choices in review with toolbar items %j", ({ items }) => {
+    const { tools, root } = buildWithItems(items);
+    const more = byLabel(root, "More tools");
+    tools.update({ ...STATE, editable: false });
+    if (items.includes("select") && items.includes("lasso")) {
+      expect(shown(more)).toBe(false);
+      expect(shown(toolButton(root, "select"))).toBe(true);
+      expect(shown(toolButton(root, "lasso"))).toBe(true);
+    } else {
+      expect(shown(more)).toBe(true);
+      more.dispatch("click");
+      expect(shown(toolButton(root, "select"))).toBe(true);
+      expect(shown(toolButton(root, "lasso"))).toBe(true);
+      tools.update({ ...STATE, editable: false });
+      expect(panelOf(more).hidden).toBe(false);
+    }
+    expect(descendants(root).filter(item => item.attributes.has("data-native")).every(item => item.hidden)).toBe(true);
+    expect(shown(byLabel(root, "Pen\nP"))).toBe(false);
+    tools.update(STATE);
+    expect(shown(more)).toBe(true);
+    expect(shown(toolButton(root, "shape"))).toBe(items.includes("shape") || !panelOf(more).hidden);
+    more.dispatch("click");
+    if (panelOf(more).hidden) more.dispatch("click");
+    expect(shown(toolButton(root, "shape"))).toBe(true);
+  });
+
+  it("keeps select and lasso useful while refusing stale creation clicks in review", () => {
+    const { tools, root, calls } = build();
+    tools.update({ ...STATE, editable: false });
+    toolButton(root, "text").dispatch("click");
+    toolButton(root, "shape").dispatch("click");
+    byLabel(root, "Pen\nP").dispatch("click");
+    expect(calls).toEqual([]);
+    toolButton(root, "select").dispatch("click");
+    toolButton(root, "lasso").dispatch("click");
+    expect(calls).toEqual([{ kind: "arm", tool: "select" }, { kind: "arm", tool: "lasso" }]);
   });
 
   it("marks the armed tool and the chosen shape as pressed", () => {
@@ -541,6 +587,31 @@ describe("dragging a tool off the bar to create it", () => {
     root.dispatch("pointerdown", { pointerId: 4, stopPropagation: () => {} });
     select.dispatch("click");
     expect(calls).toEqual([{ kind: "arm", tool: "select" }]);
+  });
+
+  it("cancels a held creation drag on entering review and allows creation again on exit", () => {
+    const document = new FakeDocument();
+    const created = vi.fn();
+    const tools = new QuickTools({ onArm: () => undefined, onShape: () => undefined, onPen: () => undefined, onDragCreate: created },
+      { document: document as unknown as Document });
+    const root = tools.element as unknown as FakeElement;
+    const button = toolButton(root, "frame");
+    button.dispatch("pointerdown", { pointerId: 7, clientX: 0, clientY: 0, button: 0, pointerType: "touch" });
+    button.dispatch("pointermove", { pointerId: 7, clientX: 0, clientY: 20 });
+    expect(document.body.children).toHaveLength(1);
+    tools.update({ ...STATE, editable: false });
+    expect(document.body.children).toHaveLength(0);
+    button.dispatch("pointerup", { pointerId: 7, clientX: 50, clientY: 50 });
+    expect(created).not.toHaveBeenCalled();
+    button.dispatch("pointerdown", { pointerId: 8, clientX: 0, clientY: 0, button: 0, pointerType: "pen" });
+    button.dispatch("pointermove", { pointerId: 8, clientX: 0, clientY: 20 });
+    expect(document.body.children).toHaveLength(0);
+    tools.update(STATE);
+    button.dispatch("pointerdown", { pointerId: 9, clientX: 0, clientY: 0, button: 0, pointerType: "mouse" });
+    button.dispatch("pointermove", { pointerId: 9, clientX: 0, clientY: 20 });
+    button.dispatch("pointerup", { pointerId: 9, clientX: 50, clientY: 60 });
+    expect(created).toHaveBeenCalledExactlyOnceWith("frame", { x: 50, y: 60 });
+    expect(document.body.children).toHaveLength(0);
   });
 
   it("scales the ghost by the board's own zoom, read once the drag starts", () => {
@@ -976,7 +1047,14 @@ describe("native Canvas's own buttons on the bar", () => {
     expect(stopped).toHaveBeenCalled();
     expect(armed).toEqual([]);
     expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(shown(button)).toBe(false);
+    const slot = tools.nativeSlot("card") as unknown as FakeElement;
+    const lateButton = slot.appendChild(new FakeElement("div"));
+    lateButton.className = "canvas-card-menu-button";
+    expect(shown(lateButton)).toBe(false);
     tools.update({ ...STATE, editable: true });
+    expect(shown(button)).toBe(true);
+    expect(shown(lateButton)).toBe(true);
     expect(button.getAttribute("aria-disabled")).toBe("false");
   });
 

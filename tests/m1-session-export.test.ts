@@ -10,17 +10,22 @@ vi.mock("../src/selection-handles", async original => ({ ...await original<objec
 vi.mock("../src/comment-markers", () => ({ CommentMarkers: class {} }));
 vi.mock("../src/quick-tools", async original => ({ ...await original<object>(), QuickTools: class {} }));
 
-const boundary = vi.hoisted(() => ({ create: vi.fn(), render: vi.fn(), vector: vi.fn(), pack: vi.fn() }));
+const boundary = vi.hoisted(() => ({ create: vi.fn(), render: vi.fn(), vector: vi.fn(), pack: vi.fn(), pdf: vi.fn(), split: vi.fn(), fallback: vi.fn() }));
 vi.mock("../src/export-canvas", async original => ({ ...await original<object>(), createExportCanvas: boundary.create }));
 vi.mock("../src/board-export", async original => ({ ...await original<object>(), renderExportPages: boundary.render, renderVectorExportPages: boundary.vector }));
 vi.mock("../src/export-worker-client", () => ({ packExport: boundary.pack }));
+vi.mock("../src/vector-pdf", () => ({ packVectorPdf: boundary.pdf }));
+vi.mock("../src/vector-document", () => ({ splitVectorDocuments: boundary.split, vectorPageFallback: boundary.fallback }));
 
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 it.each([
   { kind: "pdf" as const, fails: false }, { kind: "pdf" as const, fails: true },
   { kind: "svg" as const, fails: false }, { kind: "svg" as const, fails: true },
-])("isolates styles, palette, zoom and collapsed state ($kind; render fails: $fails)", async ({ kind, fails }) => {
+  { kind: "pdf" as const, rendering: "vector", fails: false }, { kind: "pdf" as const, rendering: "vector", fails: true },
+  { kind: "pptx" as const, rendering: "vector", fails: false }, { kind: "pptx" as const, rendering: "vector", fails: true },
+])("isolates styles, palette, zoom and collapsed state ($kind; render fails: $fails)", async ({ kind, fails, ...mode }) => {
+  const vector = "rendering" in mode && mode.rendering === "vector";
   const saved = {
     nodes: [{ id: "group", type: "group", x: 0, y: 0, width: 900, height: 700 }], edges: [],
     miroSource: { evidence: "keep" }, future: { keep: true },
@@ -38,6 +43,9 @@ it.each([
   const disposeBackground = vi.fn();
   boundary.create.mockReturnValue({ view: exportView, canvas: exportCanvas, dispose: disposeBackground });
   boundary.pack.mockResolvedValue(new Uint8Array([1, 2, 3]));
+  boundary.pdf.mockResolvedValue(new Uint8Array([1, 2, 3]));
+  boundary.split.mockReturnValue([{ width: 400, height: 300, svg: "<svg/>" }]);
+  boundary.fallback.mockResolvedValue({ image: new Uint8Array([4, 5]), pixelWidth: 400, pixelHeight: 300 });
   const settingsSeen: MiroCanvasSettings[] = [];
   const disposeRenderer = vi.spyOn(M1CanvasSession.prototype, "dispose").mockImplementation(() => undefined);
   vi.spyOn(M1CanvasSession.prototype, "refresh").mockImplementation(function (this: M1CanvasSession) {
@@ -69,10 +77,10 @@ it.each([
   for (const [key, value] of Object.entries({
     view: activeView, settings, root: { ownerDocument: { createElement() {} }, getAttribute: () => "dark" },
     options: { onSaveExport: save, onNotice: notice, onExportJob: () => release },
-    exporting: { state: { ...DEFAULT_EXPORT_STATE, pages: [{ id: "page", x: 0, y: 0, width: 10000, height: 8000 }] }, stop: false },
+    exporting: { rendering: vector ? "vector" : "raster", state: { ...DEFAULT_EXPORT_STATE, pages: [{ id: "page", x: 0, y: 0, width: 10000, height: 8000 }] }, stop: false },
     nativeCanvas: (): typeof activeCanvas => activeCanvas, savedDocument: (): typeof saved => saved, renderExport: (): void => undefined,
   })) Reflect.set(session, key, value);
-  const runExport = Reflect.get(session, "runExport") as (kind: "pdf" | "svg") => Promise<void>;
+  const runExport = Reflect.get(session, "runExport") as (kind: "pdf" | "pptx" | "svg") => Promise<void>;
   await runExport.call(session, kind);
   expect(boundary.create).toHaveBeenCalledOnce();
   expect(boundary.create.mock.calls[0]![0]).toBe(activeView);
@@ -100,9 +108,11 @@ it.each([
   expect(release).toHaveBeenCalledOnce();
   expect(Reflect.get(session, "exporting")).toMatchObject({ busy: undefined, abort: undefined });
   expect(save).toHaveBeenCalledTimes(fails ? 0 : 1);
-  expect(boundary.pack).toHaveBeenCalledTimes(fails || kind === "svg" ? 0 : 1);
-  expect(boundary.render).toHaveBeenCalledTimes(kind === "pdf" ? 1 : 0);
-  expect(boundary.vector).toHaveBeenCalledTimes(kind === "svg" ? 1 : 0);
+  expect(boundary.pack).toHaveBeenCalledTimes(fails || kind === "svg" || (kind === "pdf" && vector) ? 0 : 1);
+  expect(boundary.pdf).toHaveBeenCalledTimes(!fails && kind === "pdf" && vector ? 1 : 0);
+  if (!fails && kind === "pptx" && vector) expect(boundary.pack.mock.calls[0]![0]).toBe("pptx-vector");
+  expect(boundary.render).toHaveBeenCalledTimes(!vector && kind === "pdf" ? 1 : 0);
+  expect(boundary.vector).toHaveBeenCalledTimes(kind === "svg" || vector ? 1 : 0);
   if (!fails) expect(save).toHaveBeenCalledWith(`Board.${kind}`, kind === "svg" ? new Uint8Array([7, 8, 9]) : new Uint8Array([1, 2, 3]), "Board.canvas");
   if (fails) expect(notice).toHaveBeenCalledWith("raster failed");
 });

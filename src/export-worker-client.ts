@@ -25,7 +25,7 @@ let nextJobId = 0;
 /** Pack independent page pictures off the UI thread; never fall back to live capture. */
 export async function packExport(
   kind: ExportWorkerKind,
-  pages: readonly ExportPage[],
+  pages: readonly (ExportPage & { readonly svg?: string })[],
   info: ExportInfo,
   document: Document,
   signal: AbortSignal,

@@ -94,7 +94,8 @@ export function watchNativeUiVisibility(root: HTMLElement,
     if (disposed) return;
     drain();
     const hideMenus = root.classList.contains("is-screenshotting")
-      || root.classList.contains("miro-canvas-presenting") || isIndependentOnly();
+      || root.classList.contains("miro-canvas-presenting")
+      || root.classList.contains("miro-canvas-reviewing") || isIndependentOnly();
     for (const target of targets.values()) {
       if (target.kind === "menu" && !hideMenus) {
         release(target);

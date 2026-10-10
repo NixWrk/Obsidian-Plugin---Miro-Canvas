@@ -118,6 +118,10 @@ export const EN = {
 		selectCard: "Select a card to reorder.",
 	},
 	export: {
+    renderingLabel: "PDF and PowerPoint",
+    raster: "Raster",
+    vector: "Vector",
+    renderingHint: "SVG always stays vector. Vector PowerPoint uses one SVG per slide; PDF uses embedded Noto Sans fonts.",
 		dialogLabel: "Export",
 		close: "Close",
 		paperLabel: "Paper",
@@ -849,6 +853,8 @@ export const EN = {
 	},
 	/** The presentation bar and its keyboard control (slide-show.ts). */
 	slideShow: {
+		noSlides: "Add frames or export pages to present slides.",
+		laserPointer: "Laser pointer",
 		ariaLabel: "Presentation",
 		previousSlide: "Previous slide",
 		nextSlide: "Next slide",

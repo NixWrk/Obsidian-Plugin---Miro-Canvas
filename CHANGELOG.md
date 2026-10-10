@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Raster/Vector PDF and PowerPoint export while retaining standalone SVG. Vector PDF embeds licensed Noto Sans in four styles and preserves real paths/text/clipping; vector PPTX embeds SVG per slide with a JPEG compatibility fallback. Keep independent snapshots, Stop and guarded saves; load the bundled PDF libraries only when requested.
+- Hide editing and creation menus in review, restoring them on exit and retaining direct selected-link opening. Add a temporary laser pointer to review and slideshow controls; its bounded fading trail never changes board data/history or enters exports. Present ordinary native frames in file order, with export pages as a fallback, and restore readonly on exit.
+
 - Refine the export panel with grouped page actions, compact paper/quality controls, native SVG action icons, a scrolling body and persistent Close/output actions; account for tablet safe areas and the real Android keyboard. Keep PDF/PowerPoint/SVG callbacks and independent rendering unchanged.
 
 - Use a bidirectional radius arrow and restore the earlier marker movement with the live radius. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.

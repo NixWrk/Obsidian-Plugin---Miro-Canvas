@@ -153,11 +153,12 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
   readonly render: (patch?: Partial<ExportPanelState>) => void;
 } {
   const calls: Record<string, unknown[]> = {
-    format: [], quality: [], addPage: [], addFramePages: [], removePage: [], movePage: [], showPage: [], exportKind: [], close: [], stop: [],
+    format: [], quality: [], rendering: [], addPage: [], addFramePages: [], removePage: [], movePage: [], showPage: [], exportKind: [], close: [], stop: [],
   };
   const actions: ExportPanelActions = {
     onFormat: (format, orientation) => calls.format.push([format, orientation]),
     onQuality: (quality) => calls.quality.push(quality),
+    onRendering: (rendering) => calls.rendering.push(rendering),
     onAddPage: () => calls.addPage.push(true),
     onAddFramePages: () => calls.addFramePages.push(true),
     onRemovePage: (id) => calls.removePage.push(id),
@@ -176,6 +177,21 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
 }
 
 describe("ExportPanel", () => {
+  it("changes PDF/PowerPoint rendering while SVG remains an independent format", () => {
+    const { root, calls, render } = buildPanel();
+    const text = words().export;
+    expect(byLabel(root, text.raster).getAttribute("aria-pressed")).toBe("true");
+    byLabel(root, text.vector).dispatch("click");
+    expect(calls.rendering).toEqual(["vector"]);
+    render({ rendering: "vector" });
+    expect(byLabel(root, text.vector).getAttribute("aria-pressed")).toBe("true");
+    expect(byLabel(root, text.standardHint).parentNode!.parentNode!.hidden).toBe(true);
+    byLabel(root, text.exportSvg).dispatch("click");
+    expect(calls.exportKind).toEqual(["svg"]);
+    render({ busy: "Writing" });
+    expect(byLabel(root, text.vector).disabled).toBe(true);
+  });
+
   it("retains named output actions when their visible captions are shortened", () => {
     const { root, calls } = buildPanel();
     const text = words().export;
