@@ -66,3 +66,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ```
+
+
+## Vector PDF dependencies
+
+- jsPDF4.2.1: https://github.com/parallax/jsPDF (MIT). The reviewed build removes
+  unused external-viewer output modes and the HTML/addSvgAsImage plugins; core
+  offline PDF drawing, text, TTF and PNG functions are retained. The source pin
+  and complete build transformation are in scripts/offline-pdf-build.mjs.
+- svg2pdf.js2.8.1: https://github.com/yWorks/svg2pdf.js (MIT), converts prepared
+  offline SVG paths/text to PDF.
+- fflate0.8.3: https://github.com/101arrowz/fflate (MIT), restores losslessly
+  compressed bundled TTF bytes locally. Font glyphs and licenses are unchanged.
+
+Their copyright/license comments remain in the distributed bundle. Noto Sans
+copyright and full SIL Open Font License are retained in src/vector-pdf-fonts.ts
+and its distributed output; original font hashes are checked before repacking.

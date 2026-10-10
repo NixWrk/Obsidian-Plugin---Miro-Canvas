@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import fontAssets from "../src/assets/vector-pdf-fonts/fonts.json";
 import { jsPDF } from "jspdf";
 import { packVectorPdf } from "../src/vector-pdf";
 import { registerVectorPdfFont, vectorPdfFontStyle, vectorPdfHasGlyph } from "../src/vector-pdf-fonts";
@@ -49,6 +51,15 @@ it("selects all four offline font styles and refuses uncovered codepoints", () =
     for (const character of "AБяЁїє—€") expect(vectorPdfHasGlyph(character.codePointAt(0)!, style)).toBe(true);
     expect(vectorPdfHasGlyph(0x1f600, style)).toBe(false);
     expect(vectorPdfHasGlyph(0x4e00, style)).toBe(false);
+  }
+});
+it("restores the exact original TTF bytes for every compressed offline font style", () => {
+  const pdf = new jsPDF({ putOnlyUsedFonts: true });
+  for (const font of fontAssets.fonts) {
+    registerVectorPdfFont(pdf, "Compressed Noto", font.style as "normal" | "bold" | "italic" | "bolditalic");
+    const bytes = Buffer.from(pdf.getFileFromVFS(font.file), "base64");
+    expect(bytes.length).toBe(font.byteLength);
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(font.sha256);
   }
 });
 it("registers actual Identity-H TTFs and emits a Unicode font and mapping", () => {

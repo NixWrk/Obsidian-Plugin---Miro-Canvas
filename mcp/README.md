@@ -20,8 +20,21 @@ tells an agent how to use it and how the format works.
 
 ## Download
 
-From [release 0.2.9](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/0.2.9)
-or a later release, download `miro-canvas-cli.mjs` or `miro-canvas-mcp.mjs`.
+Starting with plugin version 0.3.1, download `miro-canvas-cli.mjs` or
+`miro-canvas-mcp.mjs` from the matching **companion tools release**:
+[tools-0.3.1](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.1).
+Each plugin release links to its `tools-<plugin-version>` prerelease, built
+from the same tagged commit with separate build provenance. For later
+versions, follow that link in the plugin release notes. The tools prerelease
+is excluded from the latest plugin release.
+
+Direct downloads for 0.3.1:
+
+- [CLI](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/tools-0.3.1/miro-canvas-cli.mjs)
+- [MCP server](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/download/tools-0.3.1/miro-canvas-mcp.mjs)
+
+Earlier downloads remain in [release 0.2.9](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/0.2.9)
+and the following plugin releases through 0.3.0.
 Node 20+ is required; no dependency install is needed. Run the downloaded file
 with `node /absolute/path/to/miro-canvas-cli.mjs --help`, or register the MCP
 file with your client. These optional files go outside the plugin's installation

@@ -2528,3 +2528,6 @@ Native drag admission preserves the readonly undefined lifecycle, and pure right
 
 
 Radius controls in0.3.0 appear from the configured global minimum displayed zoom (default200%; 0 shows at any zoom), with a slider and exact percentage input in plugin settings; zoom-out removes them and cancels any unfinished draft without history. [Checks](radius-zoom-checks.md).
+
+
+Release0.3.1 keeps the mobile plugin below5MB through lossless offline PDF-font compression and excludes unused external-viewer/script-loader code at build time. CLI/MCP remain available from a separate companion tools release. [Packaging checks](release-0.3.1-checks.md).

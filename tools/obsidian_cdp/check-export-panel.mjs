@@ -90,8 +90,7 @@ try {
   fits(receipt.empty);
   await tap('.miro-canvas-export__add-button:first-child');
   if (serial) {
-    const shot = await run(adb, ['-s',serial,'exec-out','screencap','-p'], {windowsHide:true,encoding:'buffer',timeout:12000,maxBuffer:8*1024*1024});
-    writeFileSync(new URL('tablet-ready.png',out),shot.stdout);
+    // Layout is measured directly; user screen capture is unnecessary.
   }
   await checked(`const s=app.plugins.plugins['miro-canvas'].m1Session,old=s.options.onSaveExport;window.exportPanelSaveOriginal=old;window.exportPanelSaved=[];s.options.onSaveExport=async function(name,bytes,path){const result=await old.call(this,name,bytes,path);const xml=new TextDecoder().decode(bytes),doc=new DOMParser().parseFromString(xml,'image/svg+xml');window.exportPanelSaved.push({name,path:result,bytes:bytes.length,svg:doc.documentElement.localName==='svg',text:doc.documentElement.textContent});return result;};return true;`);
   const saveBefore = await data();
@@ -113,7 +112,7 @@ try {
   receipt.checks.push('real independent SVG save and Stop via footer; no screenshots during jobs');
   if (serial) {
     await tap('.miro-canvas-export__close');
-    await checked(`const c=app.workspace.activeLeaf.view.canvas;c.setViewport(170,90,0);c.selectOnly(c.nodes.get('a'));app.plugins.plugins['miro-canvas'].m1Session.refresh();return true;`);
+    await checked(`const c=app.workspace.activeLeaf.view.canvas;c.setViewport(170,90,1);c.selectOnly(c.nodes.get('a'));app.plugins.plugins['miro-canvas'].m1Session.refresh();return true;`);
     await wait(300);
     await tap('.miro-canvas-shape-radius-handle__button');
     for (let attempt=0;attempt<12;attempt++) {

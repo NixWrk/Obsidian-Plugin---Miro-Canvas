@@ -148,8 +148,9 @@ macOS and Linux remain unverified. [Test coverage](docs/lint-remediation-checks.
 4. Choose **Latest version**, keep **Enable after installing the plugin**
    selected and press **Add plugin**.
 
-BRAT manages its own automatic updates. Releases named `fonts-…` are font
-packs, not plugin releases.
+BRAT manages its own automatic updates. Releases named `fonts-…` contain font packs; `tools-…` prereleases contain
+optional standalone CLI/MCP tools. Plugin releases contain only the three
+Obsidian files.
 
 ### Manually
 
@@ -244,7 +245,8 @@ npm run build
 
 Agents can use the optional [CLI or MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md) to read and
-edit boards. Ready-to-run tools are in the latest release and need **Node 20+**;
+edit boards. Ready-to-run tools are in the matching
+[tools-0.3.1 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.1) and need **Node 20+**;
 run them separately, outside the plugin folder. The plugin starts neither.
 
 [Source compatibility notes](docs/contributing.md#remaining-source-warnings)
@@ -257,3 +259,12 @@ configuration and the command ID that preserves saved hotkeys.
 Optional font packs include their own font licenses.
 
 An independent community project by NixWrk, unaffiliated with Miro or Obsidian.
+
+
+The plugin bundle stays below5MB for Obsidian Sync Standard. PDF fonts are
+compressed locally without losing glyphs; external PDF viewer/script loaders
+are removed during the checked build. Graph/backlinks and property search
+locally enumerate vault file paths; the Board knowledge switch disables those
+integration hooks. Clipboard access serves explicit copy/cut/paste, card links
+and import instructions, with no background clipboard polling or upload.
+[Packaging review and capability scope](docs/release-0.3.1-checks.md).

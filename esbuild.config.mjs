@@ -1,6 +1,9 @@
 import esbuild from "esbuild";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { offlinePdfPlugin } from "./scripts/offline-pdf-build.mjs";
+import { checkProductionBundle } from "./scripts/check-production.mjs";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const production = process.argv.includes("--production");
@@ -50,6 +53,10 @@ export const exportWorkerPlugin = {
 
 // Importing the build hooks for verification never writes main.js.
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  const pdfLicenses = await Promise.all(["jspdf", "svg2pdf.js", "fflate"].map(async name => {
+    const license = await readFile(path.join(rootDir, "node_modules", name, "LICENSE"), "utf8");
+    return `Bundled ${name}:\n${license.replace(/\r\n/g, "\n")}`;
+  }));
   const context = await esbuild.context({
     entryPoints: [path.join(rootDir, "src", "main.ts")],
     outfile: path.join(rootDir, "main.js"),
@@ -59,7 +66,8 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
     target: "es2020",
     external: ["obsidian", "electron"],
     inject: [workerInjection],
-    plugins: [exportWorkerPlugin],
+    plugins: [exportWorkerPlugin, offlinePdfPlugin],
+    banner: { js: `/*! Offline PDF dependency notices\n${pdfLicenses.join("\n")} */` },
     sourcemap: production ? false : "inline",
     minify: production,
     logLevel: "info"
@@ -75,7 +83,11 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
     process.once("SIGINT", dispose);
     process.once("SIGTERM", dispose);
   } else {
-    await context.rebuild();
-    await context.dispose();
+    try {
+      await context.rebuild();
+      if (production) await checkProductionBundle(path.join(rootDir, "main.js"));
+    } finally {
+      await context.dispose();
+    }
   }
 }

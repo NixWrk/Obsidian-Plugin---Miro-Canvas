@@ -3858,6 +3858,7 @@
    Only the body scrolls; Close and the output actions stay within reach. */
 .miro-canvas-export {
   --miro-canvas-export-control-height: 34px;
+  --miro-canvas-export-viewport-height: 100vh;
   --miro-canvas-export-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --miro-canvas-export-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --miro-canvas-export-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
@@ -3871,8 +3872,7 @@
   box-sizing: border-box;
   width: 374px;
   max-width: calc(100vw - 32px - var(--miro-canvas-export-safe-left) - var(--miro-canvas-export-safe-right));
-  max-height: calc(100vh - 32px - var(--keyboard-height, 0px) - var(--miro-canvas-export-safe-top) - var(--miro-canvas-export-safe-bottom));
-  max-height: calc(100dvh - 32px - var(--keyboard-height, 0px) - var(--miro-canvas-export-safe-top) - var(--miro-canvas-export-safe-bottom));
+  max-height: calc(var(--miro-canvas-export-viewport-height) - 32px - var(--keyboard-height, 0px) - var(--miro-canvas-export-safe-top) - var(--miro-canvas-export-safe-bottom));
   overflow: hidden;
   color: var(--text-normal);
   font-size: var(--font-ui-small, 13px);
@@ -3881,6 +3881,12 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m, 8px);
   box-shadow: var(--shadow-s, 0 4px 16px rgb(0 0 0 / 20%));
+}
+
+@supports (height: 100dvh) {
+  .miro-canvas-export {
+    --miro-canvas-export-viewport-height: 100dvh;
+  }
 }
 
 .miro-canvas-export[hidden] {

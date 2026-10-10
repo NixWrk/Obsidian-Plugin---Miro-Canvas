@@ -26,6 +26,8 @@ export function inspectRelease(manifest, release) {
   assert.equal(release.tag_name, manifest.version, "Release tag does not match the manifest");
   assert.equal(release.draft, false, "Release must be public");
   assert.equal(release.prerelease, false, "Plugin release must not be a prerelease");
+  assert.deepEqual(release.assets.map(asset => asset.name).sort(), ["main.js", "manifest.json", "styles.css"].sort(), "Plugin release must contain exactly the three Obsidian files");
+  assert.ok(release.assets.find(asset => asset.name === "main.js")?.size < 5_000_000, "main.js exceeds the Sync Standard size budget");
   for (const name of ["main.js", "manifest.json", "styles.css"]) {
     assert.ok(release.assets.some((asset) => asset.name === name && asset.size > 0), `Missing release asset: ${name}`);
   }

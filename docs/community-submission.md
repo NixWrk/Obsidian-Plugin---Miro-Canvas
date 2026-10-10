@@ -1,6 +1,6 @@
 # Community directory submission package
 
-Updated on 2026-10-10 for Miro Canvas 0.3.0. The owner has created a directory
+Updated on 2026-10-10 for Miro Canvas 0.3.1. The owner has created a directory
 draft; review of 0.2.3 reported blocking errors addressed by this release.
 Acceptance and publication of the directory listing remain pending.
 
@@ -23,7 +23,7 @@ were checked on 2026-10-04, before preparation continued after midnight.
 | Name | Miro Canvas |
 | Plugin ID | `miro-canvas` |
 | Author | NixWrk |
-| Version | 0.3.0 |
+| Version | 0.3.1 |
 | Minimum app version | 1.13.7 |
 | Platforms | Desktop and mobile editing and export |
 | License | MIT; third-party notices in repository |
