@@ -1,10 +1,10 @@
 /**
  * "Import into a board": the Obsidian side of the importers.
  *
- * Reads the source once (`cachedRead`: the source is only ever read), asks
+ * Reads a fresh source snapshot (`read`: the source is only ever read), asks
  * the importers which of them it belongs to, builds the board in memory,
  * shows what was found and where the board will go, and on the person's
- * press creates one new file and opens it.  The import is that single
+ * press publishes any prepared pictures, creates a new board and opens it.  The import is that single
  * creation: no file is ever modified or overwritten, the source least of
  * all, and undoing it is deleting the new board.
  *
@@ -16,6 +16,7 @@
 import type { App, Modal, TFile } from "obsidian";
 
 import { words } from "./i18n";
+import { publishImportAssets, type PublishedImportAssets } from "./import-assets";
 import {
 	addReportCard,
 	idFactory,
@@ -26,7 +27,7 @@ import {
 } from "./importers/board-builder";
 import { IMPORT_ADAPTERS, findAdapter, mayImport } from "./importers/registry";
 import { importTargetPath } from "./importers/target-path";
-import { ImportError, type FormatAdapter, type ImportContext, type ImportReport, type ImportResult, type ImportSource } from "./importers/types";
+import { MAX_IMPORT_SOURCE_LENGTH, ImportError, type FormatAdapter, type ImportContext, type ImportReport, type ImportResult, type ImportSource } from "./importers/types";
 
 /** What the preview shows before anything is written. */
 export interface ImportPreview {
@@ -35,6 +36,7 @@ export interface ImportPreview {
 	/** Where the new board will be created. */
 	readonly targetPath: string;
 	readonly report: ImportReport;
+	readonly assetCount?: number;
 }
 
 /** What the person chose in the preview. */
@@ -79,6 +81,11 @@ export function canImportFile(app: App, file: TFile): boolean {
 	return mayImport(file.extension, frontmatter);
 }
 
+/** A source-picker snapshot; source contents are read only after the choice. */
+export function availableImportFiles(app: App): TFile[] {
+	return app.vault.getFiles().filter((file) => canImportFile(app, file));
+}
+
 /**
  * Creates the board at the first free name.  Should the name be taken
  * between the preview and the press (another window, a sync), the next free
@@ -108,11 +115,19 @@ export async function importIntoBoard(host: ImportHost, file: TFile): Promise<TF
 	const strings = words().importer;
 	const normalize = host.normalizePath ?? fallbackNormalizePath;
 
+	if (file.stat?.size > MAX_IMPORT_SOURCE_LENGTH) {
+		host.notice(strings.invalid(file.extension, importReasonName("tooLarge")));
+		return null;
+	}
 	let text: string;
 	try {
-		text = await host.app.vault.cachedRead(file);
+		text = await host.app.vault.read(file);
 	} catch {
 		host.notice(strings.readFailed);
+		return null;
+	}
+	if (text.length > MAX_IMPORT_SOURCE_LENGTH) {
+		host.notice(strings.invalid(file.extension, importReasonName("tooLarge")));
 		return null;
 	}
 	const isNote = file.extension.toLowerCase() === "md";
@@ -160,14 +175,27 @@ export async function importIntoBoard(host: ImportHost, file: TFile): Promise<TF
 
 	const exists = (path: string): boolean => host.app.vault.getAbstractFileByPath(normalize(path)) !== null;
 	const targetPath = normalize(importTargetPath(source.path, exists, strings.boardSuffix));
-	const choice = await host.confirm({ formatLabel: importFormatLabel(result.report), targetPath, report: result.report });
+	const choice = await host.confirm({ formatLabel: importFormatLabel(result.report), targetPath, report: result.report, assetCount: result.assets?.length ?? 0 });
 	if (choice === null) return null;
 
+	const sourceUnchanged = async (): Promise<boolean> => file.path === source.path && await host.app.vault.read(file) === source.text;
+	let assets: PublishedImportAssets | undefined;
 	let board: TFile;
 	try {
+		if (!await sourceUnchanged()) {
+			host.notice(strings.staleSource);
+			return null;
+		}
+		assets = await publishImportAssets(host.app.vault, result.assets ?? [], source.path, (asset) => host.app.fileManager.trashFile(asset));
+		if (!await sourceUnchanged()) {
+			await assets.rollback();
+			host.notice(strings.staleSource);
+			return null;
+		}
 		const finished = choice.reportCard ? addReportCard(result, newId) : result;
 		board = await createBoard(host, source.path, JSON.stringify(finished.document, null, "\t"));
 	} catch (error) {
+		await assets?.rollback();
 		console.error("[miro-canvas] import failed while creating the board", error);
 		host.notice(strings.failed);
 		return null;
@@ -209,6 +237,7 @@ export function showImportPreview(modal: Modal, preview: ImportPreview): Promise
 		summary.createEl("p", { text: strings.formatLine(preview.formatLabel) });
 		summary.createEl("p", { text: strings.targetLine(preview.targetPath) });
 		summary.createEl("p", { text: strings.countsLine(counts.converted, counts.approximated, counts.notImported) });
+		if ((preview.assetCount ?? 0) > 0) summary.createEl("p", { text: strings.assetsLine(preview.assetCount ?? 0) });
 		if (counts.skipped > 0) summary.createEl("p", { text: strings.skippedLine(counts.skipped) });
 
 		// The first entries, so a person sees what will not look the same
@@ -224,7 +253,7 @@ export function showImportPreview(modal: Modal, preview: ImportPreview): Promise
 			for (const entry of listed.slice(0, PREVIEW_ENTRIES)) {
 				appendEntryRow(body, [entry.sourceType, entry.sourceId, importEntryWhy(entry)], "td");
 			}
-			const more = counts.approximated + counts.notImported - Math.min(listed.length, PREVIEW_ENTRIES);
+			const more = listed.length + (preview.report.omittedEntries ?? 0) - Math.min(listed.length, PREVIEW_ENTRIES);
 			if (more > 0) content.createEl("p", { text: reportWords.more(more), cls: "miro-canvas-import-preview__more" });
 		}
 

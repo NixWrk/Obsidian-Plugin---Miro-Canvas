@@ -148,8 +148,8 @@ export class BoardBuilder {
 	/** Source ids every entry is about, beyond the cap as well. */
 	private readonly reportedSources = new Set<string>();
 	private readonly entries: ImportEntry[] = [];
-	private approximatedCount = 0;
-	private notImportedCount = 0;
+	private readonly outcomes = new Map<string, "approximated" | "notImported" | "skipped">();
+	private omittedEntries = 0;
 	private skippedCount = 0;
 	private convertedWithoutBinding = 0;
 
@@ -200,9 +200,9 @@ export class BoardBuilder {
 	}
 
 	/** A native file card pointing at a file in the vault. */
-	file(rect: BoardRect, path: string, options: CardOptions = {}): string {
+	file(rect: BoardRect, path: string, options: CardOptions & { readonly subpath?: string } = {}): string {
 		const id = this.newId();
-		this.nodes.push({ id, type: "file", file: path, x: round(rect.x), y: round(rect.y), width: side(rect.width), height: side(rect.height) });
+		this.nodes.push({ id, type: "file", file: path, ...(options.subpath === undefined ? {} : { subpath: options.subpath }), x: round(rect.x), y: round(rect.y), width: side(rect.width), height: side(rect.height) });
 		this.applyOptions(id, options);
 		return id;
 	}
@@ -270,10 +270,11 @@ export class BoardBuilder {
 	/** Records an element that was approximated or left out. */
 	note(entry: ImportEntry): void {
 		this.reportedSources.add(entry.sourceId);
-		if (entry.status === "approximated") this.approximatedCount += 1;
-		else if (entry.status === "skipped") this.skippedCount += 1;
-		else this.notImportedCount += 1;
+		const outcome = entry.status === "approximated" ? "approximated" : entry.status === "skipped" ? "skipped" : "notImported";
+		const previous = this.outcomes.get(entry.sourceId);
+		if (previous === undefined || outcome === "notImported" || previous === "skipped") this.outcomes.set(entry.sourceId, outcome);
 		if (this.entries.length < MAX_IMPORT_ENTRIES) this.entries.push({ ...entry });
+		else if (entry.status !== "skipped") this.omittedEntries += 1;
 	}
 
 	/** Counts elements that came over exactly without a binding of their own (a copied board keeps its ids). */
@@ -292,11 +293,12 @@ export class BoardBuilder {
 		for (const sourceId of this.boundSources) {
 			if (!this.reportedSources.has(sourceId)) converted += 1;
 		}
+		const outcomes = [...this.outcomes.values()];
 		return {
 			converted,
-			approximated: this.approximatedCount,
-			notImported: this.notImportedCount,
-			skipped: this.skippedCount,
+			approximated: outcomes.filter((outcome) => outcome === "approximated").length,
+			notImported: outcomes.filter((outcome) => outcome === "notImported").length,
+			skipped: this.skippedCount + outcomes.filter((outcome) => outcome === "skipped").length,
 		};
 	}
 
@@ -312,6 +314,7 @@ export class BoardBuilder {
 			importedAt: this.context.now,
 			counts: this.counts(),
 			entries: this.entries.map((entry) => ({ ...entry })),
+			...(this.omittedEntries === 0 ? {} : { omittedEntries: this.omittedEntries }),
 		};
 	}
 
@@ -429,6 +432,10 @@ export function importFormatName(format: ImportFormat): string {
 	switch (format) {
 		case "advanced-canvas":
 			return formats.advancedCanvas;
+		case "tldraw":
+			return formats.tldraw;
+		case "json-canvas":
+			return formats.jsonCanvas;
 		case "excalidraw":
 			return formats.excalidraw;
 		case "mindmap-outline":
@@ -519,7 +526,7 @@ export function reportCardMarkdown(report: ImportReport): string {
 	];
 	// Skipped elements are counted above; the table lists what a person may want to look at.
 	const listed = report.entries.filter((entry) => entry.status !== "skipped");
-	const total = report.counts.approximated + report.counts.notImported;
+	const total = listed.length + (report.omittedEntries ?? 0);
 	if (listed.length > 0) {
 		lines.push("", `### ${strings.detailsHeading}`, "", `| ${strings.what} | ${strings.id} | ${strings.why} |`, "| --- | --- | --- |");
 		for (const entry of listed.slice(0, REPORT_CARD_MAX_ROWS)) {
@@ -609,5 +616,5 @@ export function addReportCard(result: ImportResult, newId: () => string): Import
 		...(metadata === undefined ? {} : { miroCanvas: metadata }),
 	};
 	assertNothingNewToSay(document, before);
-	return { document, report: { ...result.report, reportNodeId: id } };
+	return { ...result, document, report: { ...result.report, reportNodeId: id } };
 }

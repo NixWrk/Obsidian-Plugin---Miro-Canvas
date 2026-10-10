@@ -15,18 +15,21 @@
  * to a source element: Advanced Canvas still draws the copy as it drew the
  * original, and the plugin draws it from the overrides.  An override the
  * board already has wins over the one Advanced Canvas's style would give.
- * Nothing is taken out of the copy but lines whose end is on no card, which
- * no Canvas could open.
+ * Unreadable native records and lines with missing ends are omitted with
+ * diagnostics; every readable record retains its unknown fields.
  *
  * Pure: never imports "obsidian"; the board it returns is checked the way
  * `BoardBuilder.finish` checks a built one.
  */
 
+import { groupCollapse, toggleGroupCollapse } from "../board-groups";
 import type { CanvasShapeKind } from "../canvas-authoring";
 import { MIRO_CANVAS_SCHEMA_VERSION, validateMiroCanvasMetadata, type MiroCanvasDiagnostic } from "../metadata";
 import { BoardBuilder, assertNothingNewToSay } from "./board-builder";
+import { canvasElementSourceId, isReadableCanvasEdge, isReadableCanvasNode, noteMissingCanvasAssets, readJsonCanvasDocument } from "./json-canvas";
 import {
 	ImportError,
+	MAX_IMPORT_ELEMENTS,
 	type FormatAdapter,
 	type ImportContext,
 	type ImportEntryStatus,
@@ -108,15 +111,18 @@ function isRecord(value: unknown): value is UnknownRecord {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isFiniteNumber(value: unknown): value is number {
-	return typeof value === "number" && Number.isFinite(value);
-}
-
 function hasOwn(record: UnknownRecord, key: string): boolean {
 	return Object.prototype.hasOwnProperty.call(record, key);
 }
 
-/** The style values Advanced Canvas has set; it writes `null` for a style put back to its default. */
+/** Malformed styles are described without invoking their own coercion fields. */
+function styleDescription(value: unknown): string {
+	if (Array.isArray(value)) return "array";
+	if (isRecord(value)) return "object";
+	return String(value);
+}
+
+/** The styles Advanced Canvas set; null means a style returned to its default. */
 function setStyles(value: unknown): [string, unknown][] {
 	if (!isRecord(value)) return [];
 	return Object.entries(value).filter(([, style]) => style !== null && style !== undefined);
@@ -150,7 +156,7 @@ function detectAdvancedCanvas(source: ImportSource): boolean {
 	if (source.extension !== "canvas") return false;
 	let board: unknown;
 	try {
-		board = JSON.parse(source.text);
+		board = readJsonCanvasDocument(source);
 	} catch {
 		return false;
 	}
@@ -193,11 +199,11 @@ function readPluginData(document: UnknownRecord): PluginData {
  */
 function addMissing(target: UnknownRecord, patch: UnknownRecord): void {
 	for (const [key, value] of Object.entries(patch)) {
-		const existing = target[key];
+		const existing = hasOwn(target, key) ? target[key] : undefined;
 		if (isRecord(existing) && isRecord(value)) {
 			addMissing(existing, value);
 		} else if (!hasOwn(target, key)) {
-			target[key] = value;
+			Object.defineProperty(target, key, { value, enumerable: true, configurable: true, writable: true });
 		}
 	}
 }
@@ -244,9 +250,15 @@ class AdvancedCanvasCopy {
 	private readonly reported = new Set<string>();
 	/** Settings kept but not drawn, reported once for each kind. */
 	private readonly keptKinds = new Set<string>();
+	private readonly context: ImportContext;
+	private groupCount = 0;
+	private collapseWork = 0;
+	private readonly sourceLength: number;
 
-	constructor(document: UnknownRecord, context: ImportContext) {
+	constructor(document: UnknownRecord, context: ImportContext, sourceLength: number) {
 		this.builder = new BoardBuilder("advanced-canvas", context);
+		this.context = context;
+		this.sourceLength = sourceLength;
 		this.document = document;
 		this.plugin = readPluginData(document);
 	}
@@ -255,6 +267,10 @@ class AdvancedCanvasCopy {
 		this.notePluginData();
 		this.keepReadableNodes();
 		this.keepReadableEdges();
+		noteMissingCanvasAssets(this.nodes, sourcePath, this.context, (entry) => {
+			this.reported.add(entry.nodeId as string);
+			this.builder.note(entry);
+		});
 		for (const node of this.nodes) this.convertNode(node);
 		for (const edge of this.edges) this.convertEdge(edge);
 		this.convertPresentation();
@@ -287,16 +303,14 @@ class AdvancedCanvasCopy {
 	private keepReadableNodes(): void {
 		const source = this.document.nodes as unknown[];
 		source.forEach((node, index) => {
-			const readable = isRecord(node)
-				&& typeof node.id === "string" && node.id !== "" && !this.nodeIds.has(node.id)
-				&& typeof node.type === "string" && node.type !== ""
-				&& isFiniteNumber(node.x) && isFiniteNumber(node.y) && isFiniteNumber(node.width) && isFiniteNumber(node.height);
+			const readable = isReadableCanvasNode(node, true) && !this.nodeIds.has(node.id as string);
 			if (readable) {
 				this.nodes.push(node);
+				if (node.type === "group") this.groupCount += 1;
 				this.nodeIds.add(node.id as string);
 				return;
 			}
-			const id = isRecord(node) && typeof node.id === "string" && node.id !== "" ? node.id : `nodes[${index}]`;
+			const id = canvasElementSourceId(node, "nodes", index);
 			this.builder.note({ sourceId: id, sourceType: "node", status: "invalid-source", reason: "invalidElement" });
 		});
 		this.document.nodes = this.nodes;
@@ -311,27 +325,27 @@ class AdvancedCanvasCopy {
 		const source = Array.isArray(this.document.edges) ? this.document.edges : [];
 		const usedIds = new Set<string>(this.nodeIds);
 		source.forEach((edge, index) => {
-			if (!isRecord(edge) || typeof edge.id !== "string" || edge.id === "" || usedIds.has(edge.id)) {
-				const id = isRecord(edge) && typeof edge.id === "string" && edge.id !== "" ? edge.id : `edges[${index}]`;
+			if (!isReadableCanvasEdge(edge, true) || usedIds.has(edge.id as string)) {
+				const id = canvasElementSourceId(edge, "edges", index);
 				this.builder.note({ sourceId: id, sourceType: "edge", status: "invalid-source", reason: "invalidElement" });
 				return;
 			}
-			usedIds.add(edge.id);
+			usedIds.add(edge.id as string);
 			if (this.holdsOn(edge.fromNode) && this.holdsOn(edge.toNode)) {
 				this.edges.push(edge);
 				return;
 			}
 			if (this.reattachToPortal(edge)) {
 				this.edges.push(edge);
-				this.reported.add(edge.id);
-				this.builder.note({ sourceId: edge.id, sourceType: "edge", status: "approximated", reason: "portalEdge" });
+				this.reported.add(edge.id as string);
+				this.builder.note({ sourceId: edge.id as string, sourceType: "edge", status: "approximated", reason: "portalEdge" });
 				return;
 			}
 			const intoPortal = [edge.fromNode, edge.toNode].some((end) => typeof end === "string" && portalOf(end) !== undefined);
 			if (intoPortal) {
-				this.builder.note({ sourceId: edge.id, sourceType: "edge", status: "plugin-unsupported", reason: "portalEdge" });
+				this.builder.note({ sourceId: edge.id as string, sourceType: "edge", status: "plugin-unsupported", reason: "portalEdge" });
 			} else {
-				this.builder.note({ sourceId: edge.id, sourceType: "edge", status: "invalid-source", reason: "invalidElement" });
+				this.builder.note({ sourceId: edge.id as string, sourceType: "edge", status: "invalid-source", reason: "invalidElement" });
 			}
 		});
 		this.document.edges = this.edges;
@@ -368,20 +382,49 @@ class AdvancedCanvasCopy {
 			this.noteElement(id, type, "approximated", "portal");
 		}
 		this.notePortalEdges(node);
-		if (type === "group" && (node.collapsed === true || node.isCollapsed === true)) {
-			this.noteElement(id, type, "approximated", "collapsed");
-		}
+		if (type === "group" && (node.collapsed === true || node.isCollapsed === true)) this.convertCollapse(node);
 		for (const setting of KEPT_NODE_SETTINGS) {
 			const value = node[setting];
 			if (value !== undefined && value !== null && value !== false) this.keptKind(setting, `${type} setting`);
 		}
 	}
 
+	/** Use the same snapshot planner as the native group action; never store projected boxes. */
+	private convertCollapse(node: UnknownRecord): void {
+		const id = node.id as string;
+		if (!this.plugin.writable) {
+			this.noteElement(id, "group", "plugin-unsupported", "collapsed");
+			return;
+		}
+		const ownOverrides = this.plugin.record.localOverrides;
+		const own = isRecord(ownOverrides) && hasOwn(ownOverrides, id) ? ownOverrides[id] : undefined;
+		if (valueAt(own, ["groupCollapse"]) !== undefined) {
+			this.noteElement(id, "group", "approximated", "existingOverride");
+			return;
+		}
+		// Bound both nested membership scans and copies of the board's unknown data.
+		this.collapseWork += Math.max(this.sourceLength, this.nodes.length * (this.groupCount + 1));
+		if (this.collapseWork > MAX_IMPORT_ELEMENTS * 128) {
+			this.noteElement(id, "group", "plugin-unsupported", "collapsed");
+			return;
+		}
+		const overrides = isRecord(ownOverrides) ? { ...ownOverrides } : {};
+		if (!hasOwn(overrides, id)) Object.defineProperty(overrides, id, { value: {}, enumerable: true, configurable: true, writable: true });
+		const planningDocument = { ...this.document, miroCanvas: { ...this.plugin.record, localOverrides: overrides } };
+		const planned = toggleGroupCollapse(planningDocument, id);
+		const snapshot = planned === undefined ? undefined : groupCollapse(planned, id);
+		if (snapshot === undefined) {
+			this.noteElement(id, "group", "plugin-unsupported", "collapsed");
+			return;
+		}
+		this.addOverride(node, ["groupCollapse"], snapshot, "collapsed");
+	}
+
 	/** Advanced Canvas draws a shape on text cards only. */
 	private nodeShape(node: UnknownRecord, value: unknown): void {
 		const mapped = typeof value === "string" ? NODE_SHAPES.get(value) : undefined;
 		if (mapped === undefined || node.type !== "text") {
-			this.keptKind(`styleAttributes.shape: ${String(value)}`, `${String(node.type)} style`);
+			this.keptKind(`styleAttributes.shape: ${styleDescription(value)}`, `${String(node.type)} style`);
 			return;
 		}
 		this.addOverride(node, ["shape"], { kind: mapped.value, fallback: "text" }, mapped.approximation);
@@ -390,7 +433,7 @@ class AdvancedCanvasCopy {
 	private nodeBorder(node: UnknownRecord, value: unknown): void {
 		const mapped = typeof value === "string" ? NODE_BORDERS.get(value) : undefined;
 		if (mapped === undefined) {
-			this.keptKind(`styleAttributes.border: ${String(value)}`, `${String(node.type)} style`);
+			this.keptKind(`styleAttributes.border: ${styleDescription(value)}`, `${String(node.type)} style`);
 			return;
 		}
 		this.addOverride(node, ["borderStyle"], mapped.value, mapped.approximation);
@@ -400,7 +443,7 @@ class AdvancedCanvasCopy {
 	private nodeAlignment(node: UnknownRecord, value: unknown): void {
 		const mapped = typeof value === "string" ? TEXT_ALIGNMENTS.get(value) : undefined;
 		if (mapped === undefined || node.type !== "text") {
-			this.keptKind(`styleAttributes.textAlign: ${String(value)}`, `${String(node.type)} style`);
+			this.keptKind(`styleAttributes.textAlign: ${styleDescription(value)}`, `${String(node.type)} style`);
 			return;
 		}
 		this.addOverride(node, ["typography", "alignment"], mapped.value, mapped.approximation);
@@ -438,7 +481,7 @@ class AdvancedCanvasCopy {
 	private edgePath(edge: UnknownRecord, value: unknown): void {
 		const mapped = typeof value === "string" ? EDGE_PATHS.get(value) : undefined;
 		if (mapped === undefined) {
-			this.keptKind(`styleAttributes.path: ${String(value)}`, "edge style");
+			this.keptKind(`styleAttributes.path: ${styleDescription(value)}`, "edge style");
 			return;
 		}
 		this.addOverride(edge, ["connector", "strokeStyle"], mapped.value, mapped.approximation);
@@ -448,7 +491,7 @@ class AdvancedCanvasCopy {
 	private edgeArrow(edge: UnknownRecord, value: unknown): void {
 		const mapped = typeof value === "string" ? EDGE_ARROWS.get(value) : undefined;
 		if (mapped === undefined) {
-			this.keptKind(`styleAttributes.arrow: ${String(value)}`, "edge style");
+			this.keptKind(`styleAttributes.arrow: ${styleDescription(value)}`, "edge style");
 			return;
 		}
 		const ends: string[] = [];
@@ -465,7 +508,7 @@ class AdvancedCanvasCopy {
 	private edgeRoute(edge: UnknownRecord, value: unknown): void {
 		const mapped = typeof value === "string" ? EDGE_ROUTES.get(value) : undefined;
 		if (mapped === undefined) {
-			this.keptKind(`styleAttributes.pathfindingMethod: ${String(value)}`, "edge style");
+			this.keptKind(`styleAttributes.pathfindingMethod: ${styleDescription(value)}`, "edge style");
 			return;
 		}
 		this.addOverride(edge, ["connector", "route"], mapped.value, mapped.approximation);
@@ -494,11 +537,19 @@ class AdvancedCanvasCopy {
 			this.builder.note({ sourceId: startNode, sourceType: "start node", status: "approximated", reason: "existingOverride" });
 			return;
 		}
+		const outgoingByNode = new Map<string, UnknownRecord[]>();
+		for (const edge of this.edges) {
+			if (edge.fromNode === edge.toNode) continue;
+			const from = edge.fromNode as string;
+			const outgoing = outgoingByNode.get(from) ?? [];
+			outgoing.push(edge);
+			outgoingByNode.set(from, outgoing);
+		}
 		const slides = [startNode];
 		const visited = new Set(slides);
 		let current = startNode;
 		for (;;) {
-			const outgoing = this.edges.filter((edge) => edge.fromNode === current && edge.toNode !== current);
+			const outgoing = outgoingByNode.get(current) ?? [];
 			if (outgoing.length === 0) break;
 			if (outgoing.length > 1) {
 				this.builder.note({ sourceId: current, sourceType: "slide order", status: "approximated", reason: "branchingDeck" });
@@ -537,7 +588,7 @@ class AdvancedCanvasCopy {
 			return false;
 		}
 		const ownOverrides = this.plugin.record.localOverrides;
-		if (valueAt(isRecord(ownOverrides) ? ownOverrides[id] : undefined, path) !== undefined) {
+		if (valueAt(isRecord(ownOverrides) && hasOwn(ownOverrides, id) ? ownOverrides[id] : undefined, path) !== undefined) {
 			this.noteElement(id, type, "approximated", "existingOverride");
 			return false;
 		}
@@ -570,9 +621,9 @@ class AdvancedCanvasCopy {
 			if (!isRecord(record.localOverrides)) record.localOverrides = {};
 			const overrides = record.localOverrides as UnknownRecord;
 			for (const [id, patch] of this.additions) {
-				const own = overrides[id];
+				const own = hasOwn(overrides, id) ? overrides[id] : undefined;
 				if (isRecord(own)) addMissing(own, patch);
-				else overrides[id] = patch;
+				else Object.defineProperty(overrides, id, { value: patch, enumerable: true, configurable: true, writable: true });
 			}
 		}
 		if (this.deck !== undefined) record.decks = [this.deck];
@@ -607,15 +658,19 @@ function firstSlideLine(outgoing: readonly UnknownRecord[]): UnknownRecord {
 }
 
 function convertAdvancedCanvas(source: ImportSource, context: ImportContext): ImportResult {
-	let document: unknown;
-	try {
-		document = JSON.parse(source.text);
-	} catch (error) {
-		throw new ImportError("unreadableData", error instanceof Error ? error.message : undefined);
+	const document = readJsonCanvasDocument(source);
+	let elements = (document.nodes as unknown[]).length + (document.edges as unknown[]).length;
+	for (const node of document.nodes as unknown[]) {
+		if (!isRecord(node)) continue;
+		if (Array.isArray(node.interdimensionalEdges)) elements += node.interdimensionalEdges.length;
+		if (isRecord(node.edgesToNodeFromPortal)) {
+			for (const lines of Object.values(node.edgesToNodeFromPortal)) {
+				if (Array.isArray(lines)) elements += lines.length;
+			}
+		}
+		if (elements > MAX_IMPORT_ELEMENTS) throw new ImportError("tooLarge");
 	}
-	if (!isRecord(document) || !Array.isArray(document.nodes)) throw new ImportError("unknownStructure");
-	if (document.edges !== undefined && !Array.isArray(document.edges)) throw new ImportError("unknownStructure");
-	return new AdvancedCanvasCopy(document, context).convert(source.path);
+	return new AdvancedCanvasCopy(document, context, source.text.length).convert(source.path);
 }
 
 export const advancedCanvasAdapter: FormatAdapter = {

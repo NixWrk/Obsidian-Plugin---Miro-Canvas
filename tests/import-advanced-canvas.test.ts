@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { collapsedGroupOwners, groupCollapse, projectCollapsedGroups, toggleGroupCollapse } from "../src/board-groups";
+import { buildCanvasAnchorGeometry } from "../src/connector-endpoints";
 import { advancedCanvasAdapter } from "../src/importers/advanced-canvas";
 import { addReportCard, assertImportedBoard, idFactory } from "../src/importers/board-builder";
 import { findAdapter } from "../src/importers/registry";
-import { ImportError, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
+import { ImportError, MAX_IMPORT_ELEMENTS, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
 import { validateMiroCanvasMetadata } from "../src/metadata";
 
 type UnknownRecord = Record<string, unknown>;
@@ -183,7 +185,7 @@ describe("importing an Advanced Canvas board", () => {
 
 	it("keeps portals, lines into them and collapsed groups, and says how they look", () => {
 		const result = convert(STYLED);
-		expect(whyOf(entriesFor(result, "portal"))).toEqual(["approximated:portal"]);
+		expect(whyOf(entriesFor(result, "portal"))).toEqual(["missing-asset:fileNotFound", "approximated:portal"]);
 		expect(entriesFor(result, "portal")[0]!.nodeId).toBe("portal");
 		expect(whyOf(entriesFor(result, "ie-1"))).toEqual(["plugin-unsupported:portalEdge"]);
 		expect(whyOf(entriesFor(result, "e-into-portal"))).toEqual(["approximated:portalEdge"]);
@@ -227,8 +229,9 @@ describe("importing an Advanced Canvas board", () => {
 		// The slide order is not a card: slide 2 itself came over exactly.
 		const aboutCards = new Set(result.report.entries.filter((entry) => entry.sourceType !== "slide order").map((entry) => entry.sourceId));
 		const convertedCount = [...onBoard].filter((id) => !aboutCards.has(id)).length;
-		expect(result.report.counts).toEqual({ converted: convertedCount, approximated: 10, notImported: 8, skipped: 0 });
-		expect(convertedCount).toBe(26);
+		// Multiple reasons count once; the missing portal file outweighs its approximation.
+		expect(result.report.counts).toEqual({ converted: convertedCount, approximated: 7, notImported: 10, skipped: 0 });
+		expect(convertedCount).toBe(25);
 	});
 
 	it("names the format's own version in the report", () => {
@@ -258,7 +261,7 @@ describe("importing an Advanced Canvas board", () => {
 		expect(decks[0]!.startNode).toBe("a");
 		expect(records(decks[0]!.slides).map((slide) => slide.nodeId)).toEqual(["a", "b"]);
 		expect(whyOf(entriesFor(result, "a"))).toEqual(["approximated:collapsed"]);
-		expect(whyOf(entriesFor(result, "p"))).toEqual(["approximated:portal"]);
+		expect(whyOf(entriesFor(result, "p"))).toEqual(["missing-asset:fileNotFound", "approximated:portal"]);
 		expect(records(result.document.nodes)).toEqual(legacy.nodes);
 		expect(result.report.formatVersion).toBeUndefined();
 	});
@@ -275,10 +278,10 @@ describe("importing an Advanced Canvas board", () => {
 
 	it("refuses a file that is not a board", () => {
 		expect(() => convert("{ not json")).toThrow(ImportError);
-		expect(() => convert(board({ edges: [] }))).toThrow(ImportError);
+		expect(convert(board({ edges: [] })).document).toEqual({ nodes: [], edges: [] });
 		expect(() => convert(board({ nodes: [], edges: {} }))).toThrow(ImportError);
 		try {
-			convert(board({ edges: [] }));
+			convert(board({ edges: {} }));
 		} catch (error) {
 			expect((error as ImportError).reason).toBe("unknownStructure");
 		}
@@ -399,5 +402,186 @@ describe("the report card on a board whose plugin data came with it", () => {
 		expect(withCard.document.miroCanvas).toBe("not plugin data");
 		expect(card.text).toContain("[[Boards/Styled.canvas]]");
 		expect(records(withCard.document.nodes)).toHaveLength(records(result.document.nodes).length + 1);
+	});
+});
+
+
+// Author-generated synthetic collapse and validation boards.
+describe("Advanced Canvas collapse through the native snapshot planner", () => {
+	function collapsedBoard() {
+		return {
+			nodes: [
+				{ id: "g", type: "group", x: -100, y: -100, width: 900, height: 700, label: "Outer", collapsed: true, future: { keep: true } },
+				{ id: "nested", type: "group", x: 0, y: 0, width: 500, height: 400, collapsed: true },
+				{ id: "inside", type: "text", text: "Child", x: 100, y: 100, width: 100, height: 80 },
+				{ id: "boundary", type: "text", text: "Boundary", x: 700, y: 500, width: 100, height: 100 },
+				{ id: "partial", type: "text", text: "Partial", x: 750, y: 500, width: 100, height: 100 },
+				{ id: "outside", type: "text", text: "Outside", x: 1000, y: 0, width: 100, height: 80 },
+			],
+			edges: [
+				{ id: "internal", fromNode: "inside", toNode: "boundary" },
+				{ id: "external", fromNode: "inside", toNode: "outside", fromSide: "right", toSide: "left" },
+			],
+			miroSource: { evidence: [{ content: "untouched" }] },
+			miroCanvas: { schemaVersion: 1, localOverrides: { g: { future: { keep: true } } }, future: { keep: true } },
+		};
+	}
+
+	it("uses existing collapse metadata, retains every raw position and projects nested children and lines", () => {
+		const original = collapsedBoard();
+		const result = convert(board(original));
+		expect(result.document.nodes).toEqual(original.nodes);
+		expect(result.document.edges).toEqual(original.edges);
+		expect(result.document.miroSource).toEqual(original.miroSource);
+		expect(groupCollapse(result.document, "g")).toEqual({ width: 900, height: 700, children: ["nested", "inside", "boundary"] });
+		expect(groupCollapse(result.document, "nested")).toEqual({ width: 500, height: 400, children: ["inside"] });
+		expect(overridesOf(result).g!.future).toEqual({ keep: true });
+		expect(metadataOf(result).future).toEqual({ keep: true });
+		const before = validateMiroCanvasMetadata(original.miroCanvas).diagnostics;
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual(before);
+		const owners = collapsedGroupOwners(result.document);
+		expect(owners.get("inside")).toBe("g");
+		expect(owners.get("internal")).toBe("g");
+		expect(owners.has("external")).toBe(false);
+		expect(owners.has("partial")).toBe(false);
+		const projection = projectCollapsedGroups(result.document, owners);
+		expect(records(projection.nodes)[0]).toMatchObject({ x: -100, y: -100, width: 280, height: 64 });
+		const geometry = buildCanvasAnchorGeometry(result.document, undefined, undefined, undefined, owners);
+		expect(geometry.edges?.external?.start).toEqual({ x: 180, y: -68 });
+		expect(records(result.document.nodes).every((node) => !("projectedCollapsed" in node))).toBe(true);
+		const expanded = toggleGroupCollapse(result.document, "g")!;
+		expect(expanded.nodes).toEqual(original.nodes);
+		expect(expanded.edges).toEqual(original.edges);
+		expect(expanded.miroSource).toEqual(original.miroSource);
+		expect(groupCollapse(expanded, "g")).toBeUndefined();
+		expect(groupCollapse(expanded, "nested")).toBeDefined();
+	});
+
+	it("preserves an existing snapshot including unknown fields and reports the override", () => {
+		const original = collapsedBoard();
+		const snapshot = { width: 700, height: 500, children: ["inside"], futureSnapshot: { keep: true } };
+		const document = {
+			...original,
+			miroCanvas: { ...original.miroCanvas, localOverrides: { g: { ...original.miroCanvas.localOverrides.g, groupCollapse: snapshot } } },
+		};
+		const result = convert(board(document));
+		expect(groupCollapse(result.document, "g")).toEqual(snapshot);
+		expect(whyOf(entriesFor(result, "g"))).toEqual(["approximated:existingOverride"]);
+		expect(result.document.nodes).toEqual(document.nodes);
+	});
+
+	it.each([null, "unreadable", { schemaVersion: 2 }, { schemaVersion: 1, localOverrides: { g: { groupCollapse: null } } }])("leaves unreadable metadata intact and reports unsupported collapse: %j", (miroCanvas) => {
+		const document = { ...collapsedBoard(), miroCanvas };
+		const result = convert(board(document));
+		expect(result.document.miroCanvas).toEqual(miroCanvas);
+		expect(result.document.nodes).toEqual(document.nodes);
+		expect(whyOf(entriesFor(result, "g"))).toContain("plugin-unsupported:collapsed");
+	});
+
+	it("handles prototype-named IDs without mutating object prototypes or unrelated overrides", () => {
+		const document = {
+			nodes: [
+				{ id: "__proto__", type: "group", x: 0, y: 0, width: 500, height: 400, collapsed: true },
+				{ id: "constructor", type: "text", text: "", x: 10, y: 10, width: 100, height: 80, styleAttributes: { shape: "pill" } },
+			],
+			edges: [],
+		};
+		const result = convert(board(document));
+		expect(groupCollapse(result.document, "__proto__")).toEqual({ width: 500, height: 400, children: ["constructor"] });
+		expect(Object.getOwnPropertyDescriptor(overridesOf(result), "__proto__")?.value).toHaveProperty("groupCollapse");
+		expect(Object.getOwnPropertyDescriptor(overridesOf(result), "constructor")?.value).toEqual({ shape: { kind: "flow_chart_terminator", fallback: "text" } });
+		expect(Object.prototype).not.toHaveProperty("groupCollapse");
+		expect(Object.prototype).not.toHaveProperty("shape");
+	});
+
+	it("bounds nested membership work on large boards and reports unprojected groups", () => {
+		const nodes = Array.from({ length: 300 }, (_, index) => ({
+			id: `g${index}`, type: "group", x: index * 1000, y: 0, width: 200, height: 100, collapsed: true,
+		}));
+		const result = convert(board({ nodes, edges: [] }));
+		expect(result.document.nodes).toEqual(nodes);
+		expect(result.report.entries.some((entry) => entry.reason === "collapsed" && entry.status === "plugin-unsupported")).toBe(true);
+		expect(result.report.entries.some((entry) => entry.reason === "collapsed" && entry.status === "approximated")).toBe(true);
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual([]);
+	});
+});
+
+describe("Advanced Canvas shared native validation and asset reports", () => {
+	it("accepts omitted arrays and still reports a missing presentation start", () => {
+		const result = convert(board({ metadata: { version: "1.0-1.0", startNode: "gone" } }));
+		expect(result.document.nodes).toEqual([]);
+		expect(result.document.edges).toEqual([]);
+		expect(whyOf(entriesFor(result, "gone"))).toEqual(["invalid-source:invalidElement"]);
+		expect(advancedCanvasAdapter.detect(canvasSource(board({ metadata: { startNode: "gone" } })))).toBe(true);
+	});
+
+	it("applies the same positive integer geometry, required card fields and optional line validation", () => {
+		const nodes = [
+			{ id: "valid", type: "text", text: "", x: -10, y: -10, width: 100, height: 60, color: "7", styleAttributes: { border: "dashed" } },
+			{ id: "zero", type: "text", text: "", x: 0, y: 0, width: 0, height: 60 },
+			{ id: "fraction", type: "text", text: "", x: 0.5, y: 0, width: 100, height: 60 },
+			{ id: "no-file", type: "file", x: 0, y: 0, width: 100, height: 60 },
+		];
+		const result = convert(board({
+			nodes,
+			edges: [
+				{ id: "valid-line", fromNode: "valid", toNode: "valid" },
+				{ id: "invalid-end", fromNode: "valid", toNode: "valid", toEnd: "diamond" },
+				{ id: "lost-card", fromNode: "valid", toNode: "zero" },
+			],
+		}));
+		expect(result.document.nodes).toEqual([nodes[0]]);
+		expect(records(result.document.edges).map((edge) => edge.id)).toEqual(["valid-line"]);
+		expect(result.report.counts.notImported).toBe(5);
+	});
+
+	it("keeps missing group backgrounds and file cards with stable reasons", () => {
+		const nodes = [
+			{ id: "image", type: "file", file: "missing.png", subpath: "#page=1", x: 0, y: 0, width: 100, height: 60 },
+			{ id: "g", type: "group", background: "missing.png", backgroundStyle: "cover", x: 0, y: 0, width: 300, height: 200 },
+		];
+		const result = convert(board({ nodes }));
+		expect(result.document.nodes).toEqual(nodes);
+		expect(whyOf(entriesFor(result, "image"))).toEqual(["missing-asset:fileNotFound"]);
+		expect(whyOf(entriesFor(result, "g"))).toEqual(["missing-asset:imageNotFound"]);
+		expect(result.document.miroCanvas).toBeUndefined();
+	});
+
+	it("bounds stored portal edges as well as native elements", () => {
+		const document = {
+			nodes: [{ id: "p", type: "file", file: "Other.canvas", x: 0, y: 0, width: 100, height: 60, portal: true, interdimensionalEdges: Array.from({ length: MAX_IMPORT_ELEMENTS }, () => null) }],
+		};
+		try {
+			convert(board(document));
+			throw new Error("Expected oversized portal data to fail");
+		} catch (error) {
+			expect(error).toBeInstanceOf(ImportError);
+			expect((error as ImportError).reason).toBe("tooLarge");
+		}
+	});
+});
+
+
+describe("bounded Advanced Canvas extension handling", () => {
+	it("reports malformed style objects without invoking source-defined coercion fields", () => {
+		const node = { id: "n", type: "text", text: "", x: 0, y: 0, width: 100, height: 60, styleAttributes: { shape: { toString: false }, border: { toString: null }, textAlign: [] } };
+		const edge = { id: "e", fromNode: "n", toNode: "n", styleAttributes: { path: { toString: false }, arrow: { valueOf: null, toString: null }, pathfindingMethod: [] } };
+		const result = convert(board({ nodes: [node], edges: [edge] }));
+		expect(result.document.nodes).toEqual([node]);
+		expect(result.document.edges).toEqual([edge]);
+		expect(result.report.entries.every((entry) => entry.status === "plugin-unsupported" && entry.reason === "customStyle")).toBe(true);
+		expect(result.report.entries).toHaveLength(6);
+	});
+
+	it("bounds repeated snapshot copies of large unknown metadata without discarding it", () => {
+		const document = {
+			nodes: [{ id: "g", type: "group", x: 0, y: 0, width: 100, height: 60, collapsed: true }],
+			unknown: "x".repeat(MAX_IMPORT_ELEMENTS * 128),
+		};
+		const result = convert(board(document));
+		expect(result.document.unknown).toBe(document.unknown);
+		expect(result.document.nodes).toEqual(document.nodes);
+		expect(result.document.miroCanvas).toBeUndefined();
+		expect(whyOf(entriesFor(result, "g"))).toEqual(["plugin-unsupported:collapsed"]);
 	});
 });

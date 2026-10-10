@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decompressFromBase64 } from "../src/importers/lz-string";
+import { decompressFromBase64, LZ_MAX_INPUT_LENGTH } from "../src/importers/lz-string";
 import { compressToBase64 } from "./helpers/lz-string-compress";
 
 /** A repeatable stream of pseudo-random numbers, so a failing case can be replayed. */
@@ -22,6 +22,9 @@ function randomText(length: number, alphabet: string, seed: number): string {
 }
 
 describe("decompressFromBase64", () => {
+  it("refuses oversized encoded input before allocating values", () => {
+    expect(decompressFromBase64("A".repeat(LZ_MAX_INPUT_LENGTH + 1))).toBeUndefined();
+  });
   // Worked out by hand from the algorithm: a 2-bit code, then an 8-bit
   // literal written lowest bit first, then the 3-bit end code, six bits to a
   // Base64 character.

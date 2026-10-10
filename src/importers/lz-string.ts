@@ -13,6 +13,9 @@
 /** The largest drawing text we unpack: 64 MB of UTF-16 code units. */
 export const LZ_MAX_OUTPUT_LENGTH = 64 * 1024 * 1024;
 
+/** Cap the encoded input before allocating the six-bit value array. */
+export const LZ_MAX_INPUT_LENGTH = 16 * 1024 * 1024;
+
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /** Each Base64 character carries six bits, read from the highest down. */
@@ -104,6 +107,7 @@ function readLiteral(reader: BitReader, code: number): string | undefined {
  * the line breaks a file puts into a long block.
  */
 export function decompressFromBase64(input: string, maxOutputLength = LZ_MAX_OUTPUT_LENGTH): string | undefined {
+  if (input.length > LZ_MAX_INPUT_LENGTH) return undefined;
   if (input.length === 0) return undefined;
   const values = base64Values(input);
   if (values === undefined) return undefined;

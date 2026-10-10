@@ -5,15 +5,14 @@
  * An importer is pure.  It never imports "obsidian", never writes a file and
  * never reads one but the source it is given; the vault is reached only
  * through `ImportContext.resolveLink`, and the board it builds goes back to
- * `import-command.ts`, which alone creates the file.
+ * `import-command.ts`, which alone publishes the board and optional prepared attachments.
  *
- * `ImportReport` already has the shape a future `miroCanvas.imports[]`
- * record would take (the proposal for miro2obsidian's schema), so the day
- * the schema carries it the report can be written as it is.
+ * ImportReport follows the imports[] proposal plus runtime-only omitted
+ * detail counts. Nothing is serialized into metadata before schema support.
  */
 
 /** The formats a board can be imported from, by the importer's own name. */
-export const IMPORT_FORMATS = ["advanced-canvas", "excalidraw", "mindmap-outline", "markmind-rich"] as const;
+export const IMPORT_FORMATS = ["advanced-canvas", "json-canvas", "tldraw", "excalidraw", "mindmap-outline", "markmind-rich"] as const;
 export type ImportFormat = (typeof IMPORT_FORMATS)[number];
 
 /** The file being imported, as read once from the vault; never written back. */
@@ -76,16 +75,28 @@ export type ImportEntryStatus = (typeof IMPORT_ENTRY_STATUSES)[number];
  */
 export const IMPORT_REASONS = [
 	// Excalidraw
+	"tldrawStroke",
+	"tldrawVariant",
+	"pressure",
+	"binding",
+	"imageScale",
+	"frameMembership",
+	"customData",
+	"zOrder",
 	"roughness",
 	"hatch",
 	"groups",
 	"opacity",
 	"imageCrop",
+	"imageAspect",
 	"background",
 	"embed",
 	"iframe",
 	"formula",
 	"embeddedImage",
+	"invalidAsset",
+	"unsupportedAsset",
+	"assetTooLarge",
 	"imageNotFound",
 	"fileNotFound",
 	"elementLink",
@@ -98,6 +109,7 @@ export const IMPORT_REASONS = [
 	// Mind maps
 	"layout",
 	"frontmatter",
+	"noteBody",
 	"textBeforeRoot",
 	"extraRoots",
 	"foldedBranch",
@@ -164,12 +176,25 @@ export interface ImportReport {
 	readonly counts: ImportCounts;
 	/** At most `MAX_IMPORT_ENTRIES`; `counts` still counts every one. */
 	readonly entries: readonly ImportEntry[];
+	/** Non-skipped details omitted by the bounded report, when there are any. */
+	readonly omittedEntries?: number;
+}
+
+/** Limits shared by the host and pure readers, before parsing or decoding. */
+export const MAX_IMPORT_SOURCE_LENGTH = 64 * 1024 * 1024;
+export const MAX_IMPORT_ELEMENTS = 50_000;
+
+/** An attachment prepared in memory; the host publishes it only after preview. */
+export interface ImportAsset {
+	readonly path: string;
+	readonly bytes: Uint8Array;
 }
 
 /** A board built from a source, not yet written: a JSON Canvas document and its report. */
 export interface ImportResult {
 	readonly document: Record<string, unknown>;
 	readonly report: ImportReport;
+	readonly assets?: readonly ImportAsset[];
 }
 
 /** One importer: whether a source is its format, and the board it makes of one. */
