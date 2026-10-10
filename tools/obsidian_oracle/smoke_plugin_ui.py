@@ -1653,7 +1653,9 @@ def main() -> int:
                   const b=miroBrowser,s=b.session;
                   // Obsidian's own rules for a button - its base rule, then the one a tablet adds - ahead of the plugin's styles, as in Obsidian.
                   const obsidian=document.createElement('style');
-                  obsidian.textContent=':root{--size-4-1:4px;--size-4-3:12px;--size-4-5:20px}button{padding:var(--size-4-1) var(--size-4-3)}.is-tablet button:not(.clickable-icon){padding:var(--size-4-1) var(--size-4-5)}';
+                  const baseRule=':root{--size-4-1:4px;--size-4-3:12px;--size-4-5:20px}button{padding:var(--size-4-1) var(--size-4-3)}';
+                  const tabletRule='.is-tablet button:not(.clickable-icon){padding:var(--size-4-1) var(--size-4-5)}';
+                  obsidian.textContent=baseRule+tabletRule;
                   document.head.prepend(obsidian);
                   const tablet=['is-mobile','is-tablet'].filter((name)=>!document.body.classList.contains(name));
                   const theirs=(element)=>/(^|\s)miro-(canvas|source)-/.test(String(element.className));
@@ -1666,8 +1668,11 @@ def main() -> int:
                   const classes=new Set();
                   const same=(where)=>{
                     const buttons=[...new Set(roots().flatMap((root)=>[...root.querySelectorAll('button')]))];
-                    const without=snapshot(buttons);
+                    // Hold the device layout constant; compare only the host padding rule.
                     document.body.classList.add(...tablet);
+                    obsidian.textContent=baseRule;
+                    const without=snapshot(buttons);
+                    obsidian.textContent=baseRule+tabletRule;
                     const on=snapshot(buttons);
                     document.body.classList.remove(...tablet);
                     const changed=[];

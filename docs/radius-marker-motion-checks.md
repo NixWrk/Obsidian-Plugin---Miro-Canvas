@@ -1,3 +1,38 @@
+# Radius marker feedback — current behavior and historical checks
+
+## Moving marker restored — 2026-10-10
+
+The user requested the earlier movement with the bidirectional arrow retained.
+Radius-relative clamped placement is restored; the fixed target, corner-morph
+and decorative tilt experiment below is superseded. The target remains44px
+at different zooms; pointer capture and inverse-CTM projection support continued
+movement and reversal. The live badge and exact input remain. Connection-circle
+accent outlines are retained. No file-format or history change.
+
+Physical SM-X736B/R52Y808PDJB, Android16, Obsidian1.13.8, WebView153,
+MiroCanvasTest: updated `check-shape-radius.mjs` passed at125% with actual ADB
+input. Finger16 ->36.14118 and reverse24.09412 move the target with the radius;
+the two-headed arrow remains and the icon's authored transform is none.
+Preview leaves file/history/node geometry unchanged, release commits one step
+and hides the badge. Undo restores radius and target coordinates; CANCEL,
+exact input12, native settings toggle and wide click/free-drag creation pass.
+ADB stylus-source16 ->30.49412 reports pointerType pen; physical S Pen remains
+unverified. Native/independent/chained anchors and unknown/source fields pass.
+Original board bytes were restored exactly. Receipt:
+`tools/obsidian_cdp/.out/card-radius-tablet/native-R52Y808PDJB.json`.
+
+Hidden Windows native Obsidian1.14.4 at125%, trusted CDP mouse: light/dark target
+44px, held movement16 ->32, unchanged bytes/history before release, single
+commit and Undo restoring target coordinates passed. Window stays hidden;
+original bytes restored. Receipt:
+`tools/obsidian_cdp/.out/radius-feedback/native-Windows.json`.
+
+Final 3301 tests/one existing skip, tsc, focused lint and CSS gate passed.
+Current marker tests cover rotated/non-default-zoom reversal/cancellation.
+The native phone/physical-pen scenarios remain pending.
+
+## Superseded fixed-marker experiment
+
 # Fixed radius marker and visible connection circles — 2026-10-10
 
 The radius control is anchored at safe corner spacing instead of travelling

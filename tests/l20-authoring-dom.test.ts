@@ -135,6 +135,10 @@ class TestDocument extends TestTarget {
     }
   }
   node(tag: string): TestNode { const node = new TestNode(this, tag); this.created.push(node); return node; }
+  createElementNS(namespace: string, name: string): TestNode {
+    expect(namespace).toBe("http://www.w3.org/2000/svg");
+    return this.node(name);
+  }
   asDocument(): Document { return this as unknown as Document; }
 }
 

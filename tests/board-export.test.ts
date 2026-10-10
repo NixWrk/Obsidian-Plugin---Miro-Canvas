@@ -114,6 +114,7 @@ class FakeWindow {
 class FakeDocument {
   public readonly defaultView = new FakeWindow();
   public createElement(tagName: string): FakeElement { return new FakeElement(tagName); }
+  public createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName); }
 }
 
 function descendants(root: FakeElement): FakeElement[] {
@@ -175,6 +176,41 @@ function buildPanel(overrides: Partial<ExportPanelState> = {}): {
 }
 
 describe("ExportPanel", () => {
+  it("retains named output actions when their visible captions are shortened", () => {
+    const { root, calls } = buildPanel();
+    const text = words().export;
+    for (const [label, caption] of [[text.exportPdf, text.pdfCaption], [text.exportPptx, text.pptxCaption], [text.exportSvg, text.svgCaption]]) {
+      const button = byLabel(root, label!);
+      expect(button.textContent).toBe(caption);
+      button.dispatch("click");
+    }
+    expect(calls.exportKind).toEqual(["pdf", "pptx", "svg"]);
+  });
+
+  it("gives the paper dropdown a name and preserves the selected orientation on change", () => {
+    const { root, calls, render } = buildPanel();
+    const select = descendants(root).find(item => item.tagName === "select")!;
+    expect(select.getAttribute("aria-label")).toBe(words().export.paperLabel);
+    select.value = "letter";
+    select.dispatch("change");
+    expect(calls.format).toEqual([["letter", "landscape"]]);
+    render({ busy: "Rendering" });
+    expect(descendants(root).find(item => item.tagName === "select")!.disabled).toBe(true);
+  });
+
+  it("removes replaced controls' listeners and keeps Stop beside progress", () => {
+    const { root, calls, render } = buildPanel({ busy: "Rendering" });
+    const oldStop = byLabel(root, words().export.stop);
+    const status = descendants(root).find(item => item.className === "miro-canvas-export__status")!;
+    expect(oldStop.parentNode).toBe(status.parentNode);
+    expect(status.getAttribute("role")).toBe("status");
+    render({ busy: undefined });
+    oldStop.dispatch("click");
+    expect(calls.stop).toEqual([]);
+    const close = byLabel(root, words().export.close);
+    expect(close.children[0]!.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("keeps Stop and Close available in the existing panel while export runs", () => {
     const { root, calls, render } = buildPanel({ busy: "Rendering pages" });
     const stop = byLabel(root, words().export.stop);

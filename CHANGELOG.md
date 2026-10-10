@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Use a bidirectional radius arrow. Keep the shape-radius marker fixed while its corner geometry follows the live radius, with subtle press feedback and a directional tilt respecting reduced motion. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.
+- Refine the export panel with grouped page actions, compact paper/quality controls, native SVG action icons, a scrolling body and persistent Close/output actions; account for tablet safe areas and the real Android keyboard. Keep PDF/PowerPoint/SVG callbacks and independent rendering unchanged.
+
+- Use a bidirectional radius arrow and restore the earlier marker movement with the live radius. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.
 
 - Replace the small circular shape-radius marker with a rounded-corner/drag-arrow icon and show the current radius above the held control during finger, pen or mouse movement; retain exact numeric input.
 

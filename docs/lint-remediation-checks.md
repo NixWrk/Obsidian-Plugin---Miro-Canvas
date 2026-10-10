@@ -2296,3 +2296,73 @@ bounds fixed, actual Android held tilt/reset and bidirectional arrow, native
 Windows pointer check, reduced-motion and interruption synthetic proof.
 
 Combined feedback passed: native tablet ADB reversal and ±tilt matrices, fixed target, native Windows direction/transaction and 3301 tests. Hidden Windows does not prove visible CSS animation timing; this is recorded in the [follow-up](radius-marker-motion-checks.md#combined-cornertilt-refinement).
+
+
+## Export-panel composition — 2026-10-10 (trace before implementation edits)
+
+ExportPanel in board-export.ts builds header, paper/orientation, full placement
+paragraph, page list/add actions, quality and three output buttons;
+M1CanvasSession.openExport mounts it on owner document.body and keeps overlay
+pages on native board. Export progress replaces panel DOM; Stop/Close abort
+owned work, page show stays available. runExport/independent rendering/save
+boundaries stay outside this design change. No settings/format change.
+
+Actual tablet SM-X736B/Obsidian1.13.8: panel300×714 CSSpx at top16; default
+mobile button pills and a large paragraph overwhelm page controls, format
+buttons stack, tiny24px page actions. Body safe-area-inset-top30.117647px means
+its top currently reaches the OS status area. Layout-only detector is clean;
+rendered hierarchy and tablet specificity still require changes.
+
+Refine the existing Obsidian visual world: fixed header/close and output footer,
+one scrolling body; pages/order/help grouped, paper and quality together.
+Keep full visible placement help and existing direct PDF/PowerPoint/SVG actions
+with shorter localized format captions. Native-style SVG action icons replace
+Unicode symbols; scoped controls beat tablet pills and preserve padding vars.
+The panel bounds account for safe areas and actual --keyboard-height.
+
+Mandatory: physical tablet ADB open/add/show/reorder/remove/orientation/quality/
+close; native Windows renderer input with hidden window. Board/slides, empty/
+one/many/long-name pages, English/Russian, light/dark, narrow and large text.
+Keyboard height must leave Close/Stop/output within available bounds; all touch
+targets at least44px and no overlaps. Busy/unavailable/empty disabled states,
+Stop and Close, disposal/listener cleanup; three outputs still call original
+kind; real independent save/Stop proof without screenshots or foreground
+during export. Preserve source bytes/camera/selection except explicit page-show
+input and guarded page changes; one history boundary/Undo. Renderer/parser/
+worker source remains unchanged. Distinguish synthetic from native evidence.
+
+
+Export smoke follow-up before test edit: the tablet-padding gate toggles
+mobile/tablet classes together with the host rule, so intentional34px desktop
+versus44px mobile targets are reported as a padding failure. Hold the device
+classes constant and toggle only the reconstructed host tablet rule. Continue
+comparing padding/width/height for every button and retain the coverage guards;
+do not exempt export controls or suppress geometry checks.
+
+
+## Restore moving radius marker — 2026-10-10 (before edit)
+
+The user requests the earlier radius animation with the bidirectional arrow
+retained. ShapeRadiusHandle.render currently pins the target, morphs the SVG
+corner and exposes direction state for CSS tilt. Restore the radius-relative
+clamped left/top positions from 07dd8c5; keep inverse-CTM pointer capture, the
+44px screen target, live badge, numeric input and both arrowheads. Remove only
+the experimental corner morph/direction/tilt styles and their obsolete checks.
+Connection-circle outlines and export-panel styling remain in scope unchanged.
+
+Required: moving target follows the same live radius before release and after
+commit/cancel/Undo, both-direction reversal at rotation/non-default zoom, no
+persistence before release, one history boundary, native/independent/chained
+line invariants, exact input/toggle. Physical tablet ADB touch and stylus-source
+input are separate from physical S Pen; Windows uses hidden native renderer
+input. Preserve source bytes/settings and retain two arrowheads. No export
+screenshots or foreground takeover. Record current native results separately
+from the superseded fixed-target receipts.
+
+
+Export composition completed: native Windows and tablet action/save/Stop checks,
+plus the user's physical tablet keyboard and native bounds measurement, are
+recorded in [panel checks](export-panel-design-checks.md). The failed automated
+IME-open attempt is preserved separately; no synthetic keyboard pass replaces it.
+Moving radius restored: current native receipts and superseded animation checks
+are distinguished in [motion checks](radius-marker-motion-checks.md).

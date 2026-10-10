@@ -2474,18 +2474,21 @@ selected rectangular figure. No metadata or history semantics changed.
 [Checks](radius-feedback-checks.md).
 
 
-Fixed marker/connection-circle follow-up (2026-10-10): ShapeRadiusHandle stays
-at safe corner spacing independent of radius. Its SVG corner changes directly
-with the current radius, while the number is the exact feedback; pressing scales
-only the icon to 0.96 over 120ms and reduced-motion removes that transition. The
-four SelectionHandles connection buttons use a scoped 2px accent outline and
-theme fill that outrank tablet button backgrounds; hover/focus fills them.
-Bounds, pointer routing and native fallback controls are unchanged.
-[Checks](radius-marker-motion-checks.md).
+Radius feedback follow-up (2026-10-10): the bidirectional arrow remains, but
+at the user's request the earlier marker movement with radius is restored.
+Clamped radius-relative placement keeps the 44px screen target reachable;
+inverse-CTM pointer capture continues the gesture while the marker moves.
+The live number and exact input remain. The corner-morph/tilt experiment is
+superseded; its receipts are historical. The four connection buttons retain
+their scoped 2px accent outline and theme fill, without routing changes.
+[Current and historical checks](radius-marker-motion-checks.md).
 
+### Export-panel composition (2026-10-10)
 
-Combined radius feedback chosen by the user: the decorative arrow is now
-bidirectional. The SVG corner still follows the actual clamped radius, and
-only the SVG tilts +8°/-8° according to the latest increase/decrease; release
-or cancellation returns it to neutral. Reduced-motion suppresses the tilt
-and transition. The pointer target stays fixed. See the motion check follow-up.
+ExportPanel groups page ordering/help/add actions above the paper/orientation
+and quality controls. Header/Close and output/Stop footer stay outside the one
+scrolling body. Scoped SVG-icon controls retain accessible names and tablet
+padding variables. The panel respects owner-document safe areas and Obsidian's
+reported keyboard height. Output format captions are localized separately from
+full action names. Independent render/worker/save contracts are unchanged.
+[Native and synthetic checks](export-panel-design-checks.md).

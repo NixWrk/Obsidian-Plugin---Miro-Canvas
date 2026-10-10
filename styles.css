@@ -3854,27 +3854,33 @@
   z-index: var(--miro-canvas-layer);
 }
 
-/* The export panel: paper, pages, quality and the two ways out.  Mounted
-   on document.body rather than the board's own root, so its fixed
-   position is never clipped by an ancestor that sets a backdrop-filter or
-   a transform. */
+/* The export panel is mounted on document.body, outside the board's transforms.
+   Only the body scrolls; Close and the output actions stay within reach. */
 .miro-canvas-export {
+  --miro-canvas-export-control-height: 34px;
+  --miro-canvas-export-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --miro-canvas-export-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --miro-canvas-export-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --miro-canvas-export-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: calc(16px + var(--miro-canvas-export-safe-top));
+  right: calc(16px + var(--miro-canvas-export-safe-right));
   z-index: 1000;
-  display: grid;
-  gap: 10px;
-  width: min(300px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 374px;
+  max-width: calc(100vw - 32px - var(--miro-canvas-export-safe-left) - var(--miro-canvas-export-safe-right));
+  max-height: calc(100vh - 32px - var(--keyboard-height, 0px) - var(--miro-canvas-export-safe-top) - var(--miro-canvas-export-safe-bottom));
+  max-height: calc(100dvh - 32px - var(--keyboard-height, 0px) - var(--miro-canvas-export-safe-top) - var(--miro-canvas-export-safe-bottom));
+  overflow: hidden;
   color: var(--text-normal);
   font-size: var(--font-ui-small, 13px);
+  line-height: 1.4;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m, 8px);
-  box-shadow: var(--shadow-l, 0 10px 32px rgb(0 0 0 / 35%));
+  box-shadow: var(--shadow-s, 0 4px 16px rgb(0 0 0 / 20%));
 }
 
 .miro-canvas-export[hidden] {
@@ -3883,112 +3889,255 @@
 
 .miro-canvas-export__header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.miro-canvas-export__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-ui-medium, 15px);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.miro-canvas-export__body {
+  display: grid;
+  flex: 0 1 auto;
+  gap: 14px;
+  min-height: 0;
+  padding: 0 14px 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.miro-canvas-export__pages,
+.miro-canvas-export__settings,
+.miro-canvas-export__row,
+.miro-canvas-export__page-list {
+  display: grid;
+  min-width: 0;
+}
+
+.miro-canvas-export__pages {
+  gap: 8px;
+}
+
+.miro-canvas-export__section-header {
+  display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
 
-.miro-canvas-export__title {
-  font-size: var(--font-ui-medium, 15px);
-  font-weight: 600;
-}
-
-.miro-canvas-export__row {
-  display: grid;
-  gap: 4px;
-}
-
-.miro-canvas-export__label {
+.miro-canvas-export__label,
+.miro-canvas-export__page-count {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller, 12px);
+  overflow-wrap: anywhere;
 }
 
-.miro-canvas-export__segments {
-  display: flex;
+.miro-canvas-export__page-count {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.miro-canvas-export__page-list {
   gap: 4px;
-}
-
-.miro-canvas-export__segment {
-  flex: 1;
-  --miro-canvas-button-padding: 4px 8px;
-  padding: var(--miro-canvas-button-padding);
-  color: var(--text-normal);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s, 4px);
-  box-shadow: none;
-  font-size: inherit;
-}
-
-.miro-canvas-export__segment[aria-pressed="true"] {
-  color: var(--text-on-accent);
-  background: var(--interactive-accent);
-  border-color: var(--interactive-accent);
-}
-
-.miro-canvas-export__pages {
-  display: grid;
-  gap: 4px;
-  max-height: 220px;
-  overflow: auto;
-}
-
-.miro-canvas-export__empty {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller, 12px);
 }
 
 .miro-canvas-export__page {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
 }
 
-.miro-canvas-export__page-name {
-  flex: 1;
-  --miro-canvas-button-padding: 4px 6px;
-  padding: var(--miro-canvas-button-padding);
-  overflow: hidden;
-  color: var(--text-normal);
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+.miro-canvas-export__layout-hint,
+.miro-canvas-export__empty,
+.miro-canvas-export__status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 12px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.miro-canvas-export__page-name:hover {
-  background: var(--background-modifier-hover);
+.miro-canvas-export__empty {
+  padding: 8px 0;
 }
 
-.miro-canvas-export__page-action {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--icon-color);
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+.miro-canvas-export__settings {
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--background-modifier-border);
 }
 
+.miro-canvas-export__row {
+  gap: 6px;
+}
+
+.miro-canvas-export__segments,
 .miro-canvas-export__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
-.miro-canvas-export__out {
-  margin-top: 4px;
+/* These scoped controls outrank Obsidian's tablet button geometry. */
+.miro-canvas-export[role="dialog"] button[class],
+.miro-canvas-export[role="dialog"] select.dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: var(--miro-canvas-export-control-height);
+  margin: 0;
+  --miro-canvas-button-padding: 6px 10px;
+  padding: var(--miro-canvas-button-padding);
+  color: var(--text-normal);
+  background-color: var(--interactive-normal, var(--background-primary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.miro-canvas-export__out button {
-  flex: 1;
+.miro-canvas-export[role="dialog"] select.miro-canvas-export__format {
+  width: 100%;
+  --miro-canvas-button-padding: 6px 28px 6px 10px;
+  text-align: left;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__segment {
+  flex: 1 1 100px;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__add-button {
+  flex: 1 1 130px;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__page-name {
+  display: block;
+  flex: 1 1 0;
+  width: 0;
+  --miro-canvas-button-padding: 6px 8px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: transparent;
+  border: 0;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__page-action,
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__close {
+  flex: 0 0 var(--miro-canvas-export-control-height);
+  width: var(--miro-canvas-export-control-height);
+  height: var(--miro-canvas-export-control-height);
+  --miro-canvas-button-padding: 0;
+  color: var(--icon-color, var(--text-muted));
+  background-color: transparent;
+  border: 0;
+}
+
+.miro-canvas-export .clickable-icon svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.miro-canvas-export[role="dialog"] button[class]:enabled:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__segment[aria-pressed="true"],
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__output.mod-cta {
+  color: var(--text-on-accent);
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 500;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__segment[aria-pressed="true"]:enabled:hover,
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__output.mod-cta:enabled:hover {
+  background-color: var(--interactive-accent-hover, var(--interactive-accent));
+}
+
+.miro-canvas-export[role="dialog"] :is(button, select):focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.miro-canvas-export[role="dialog"] :is(button, select):disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.miro-canvas-export__footer {
+  display: grid;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.miro-canvas-export__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .miro-canvas-export__status {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller, 12px);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__stop {
+  flex: 0 1 auto;
+}
+
+.miro-canvas-export__out {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.miro-canvas-export[role="dialog"] button.miro-canvas-export__output {
+  width: 100%;
+  --miro-canvas-button-padding: 6px;
+}
+
+.is-mobile .miro-canvas-export,
+.is-tablet .miro-canvas-export {
+  --miro-canvas-export-control-height: 44px;
+}
+
+@media (any-pointer: coarse) {
+  .miro-canvas-export {
+    --miro-canvas-export-control-height: 44px;
+  }
+}
+
+@media (max-width: 320px) {
+  .miro-canvas-export__out {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* The pages drawn over the board: dashed so they read as a plan rather
@@ -5007,13 +5156,6 @@
   justify-content: flex-start;
 }
 
-.miro-canvas-export__layout-hint {
-  margin: 0 0 12px;
-  font-size: var(--font-ui-small);
-  line-height: 1.5;
-  color: var(--text-normal);
-}
-
 .miro-canvas-panel-toggle[data-panel-moving="true"] {
   cursor: grabbing;
   outline: 2px solid var(--interactive-accent);
@@ -5078,11 +5220,6 @@
 .miro-canvas-root > .miro-canvas-tools[data-miro-tools-more-open="true"] ~ .miro-canvas-arrange-tray {
   visibility: hidden;
   pointer-events: none;
-}
-
-.miro-canvas-export__stop {
-  --miro-canvas-button-padding: 4px 12px;
-  padding: var(--miro-canvas-button-padding);
 }
 
 /* Owned hidden states outrank their component display rules, including the
@@ -5283,37 +5420,12 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
-  transform-origin: center;
-  transition: transform 120ms ease-out;
 }
 
 .miro-canvas-root .miro-canvas-shape-radius-handle__button:hover svg,
 .miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] svg {
   color: var(--text-on-accent);
   background: var(--interactive-accent);
-}
-
-/* Direction describes the latest radius change, without moving the hit target. */
-.miro-canvas-root .miro-canvas-shape-radius-handle[data-radius-direction="increase"] {
-  --miro-radius-tilt: 8deg;
-}
-
-.miro-canvas-root .miro-canvas-shape-radius-handle[data-radius-direction="decrease"] {
-  --miro-radius-tilt: -8deg;
-}
-
-.miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] .miro-canvas-shape-radius-handle__button svg {
-  transform: scale(0.96) rotate(var(--miro-radius-tilt, 0deg));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .miro-canvas-root .miro-canvas-shape-radius-handle__button svg {
-    transition: none;
-  }
-
-  .miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] .miro-canvas-shape-radius-handle__button svg {
-    transform: none;
-  }
 }
 
 /* Above the held finger; the label never intercepts another pointer. */
