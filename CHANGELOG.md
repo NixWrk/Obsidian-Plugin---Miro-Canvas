@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the shape-radius marker fixed while its corner geometry follows the live radius, with subtle press feedback respecting reduced motion. Give side connection circles explicit accent outlines that remain visible over Obsidian tablet button rules.
+
 - Replace the small circular shape-radius marker with a rounded-corner/drag-arrow icon and show the current radius above the held control during finger, pen or mouse movement; retain exact numeric input.
 
 - Make the inherited board theme follow the owning Obsidian window rather than a conflicting OS preference; label it “Obsidian” / «Как в Obsidian». Follow live host changes and retain explicit board themes. Wrap long board-menu labels without displacing switches. Correct selected attachment-name checkbox state for native runtime nodes so repeated toggling and Undo/Redo work.

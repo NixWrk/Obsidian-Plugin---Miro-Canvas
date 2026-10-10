@@ -14,7 +14,7 @@ const shell=async command=>(await run(adb,['-s',serial,'shell',...command],{wind
 async function point(selector){return check(`const e=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.getBoundingClientRect().width>0);if(!e)throw Error('missing target '+${JSON.stringify(selector)});const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;if(!e.contains(document.elementFromPoint(x,y)))throw Error('target obscured');return {x,y,dpr:devicePixelRatio};`);}
 async function hideKeyboard(){const dump=await shell(['dumpsys','input_method']);if(/mInputShown=true/u.test(dump)||await check("return parseFloat(getComputedStyle(document.body).getPropertyValue('--keyboard-height'))>0;")){await shell(['input','keyevent','4']);await wait(300);}}
 async function tap(selector){const p=await point(selector);await shell(['input','tap',String(Math.round(p.x*p.dpr)),String(Math.round(p.y*p.dpr))]);await wait(250);}
-const snap=()=>check(`const p=app.plugins.plugins['miro-canvas'],s=p.m1Session,v=app.workspace.activeLeaf.view.canvas,n=v.nodes.get('a');return {radius:v.getData().miroCanvas.localOverrides.a.cornerRadius,preview:s.radiusPreview?.radius??null,path:n.nodeEl.querySelector('.miro-source-decoration-shape path').getAttribute('d'),history:v.history.current,len:v.history.data.length,node:{x:n.x,y:n.y,width:n.width,height:n.height},geometry:s.landingGeometry().geometry.edges,lines:[...document.querySelectorAll('.miro-board-connector path')].map(e=>e.getAttribute('d')),bytes:await app.vault.read(app.workspace.getActiveFile()),control:(()=>{const h=document.querySelector('.miro-canvas-shape-radius-handle'),b=h?.querySelector('button'),v=h?.querySelector('.miro-canvas-shape-radius-handle__value'),r=b?.getBoundingClientRect();return {dragging:h?.getAttribute('data-dragging'),value:v?.textContent,valueHidden:v?.hidden,inputHidden:h?.querySelector('input')?.hidden,iconPaths:b?.querySelectorAll('svg path').length,width:r?.width,height:r?.height};})()};`);
+const snap=()=>check(`const p=app.plugins.plugins['miro-canvas'],s=p.m1Session,v=app.workspace.activeLeaf.view.canvas,n=v.nodes.get('a');return {radius:v.getData().miroCanvas.localOverrides.a.cornerRadius,preview:s.radiusPreview?.radius??null,path:n.nodeEl.querySelector('.miro-source-decoration-shape path').getAttribute('d'),history:v.history.current,len:v.history.data.length,node:{x:n.x,y:n.y,width:n.width,height:n.height},geometry:s.landingGeometry().geometry.edges,lines:[...document.querySelectorAll('.miro-board-connector path')].map(e=>e.getAttribute('d')),bytes:await app.vault.read(app.workspace.getActiveFile()),control:(()=>{const h=document.querySelector('.miro-canvas-shape-radius-handle'),b=h?.querySelector('button'),v=h?.querySelector('.miro-canvas-shape-radius-handle__value'),r=b?.getBoundingClientRect();return {dragging:h?.getAttribute('data-dragging'),value:v?.textContent,valueHidden:v?.hidden,inputHidden:h?.querySelector('input')?.hidden,iconPaths:b?.querySelectorAll('svg path').length,width:r?.width,height:r?.height,x:r?.x,y:r?.y,corner:b?.querySelector('svg path')?.getAttribute('d')};})()};`);
 function circular(path,width,height){const m=path.match(/A([\d.e+-]+) ([\d.e+-]+)/u);if(!m)return {radius:0};const x=Number(m[1])*width/100,y=Number(m[2])*height/100;assert.ok(Math.abs(x-y)<1e-5,`${x} vs ${y}`);return {x,y};}
 try{
  receipt.device={model:(await shell(['getprop','ro.product.model'])).trim(),android:(await shell(['getprop','ro.build.version.release'])).trim(),runtime:await check("return {version:window.appVersion,userAgent:navigator.userAgent};")};
@@ -27,6 +27,7 @@ try{
  holding=true;await shell(['input','touchscreen','motionevent','DOWN',String(Math.round(p.x*p.dpr)),String(Math.round(p.y*p.dpr))]);
  await shell(['input','touchscreen','motionevent','MOVE',String(Math.round((p.x+25)*p.dpr)),String(Math.round((p.y+25)*p.dpr))]);
  await wait(120);receipt.held=await snap();
+ assert.equal(receipt.held.control.x,receipt.before.control.x);assert.equal(receipt.held.control.y,receipt.before.control.y);assert.notEqual(receipt.held.control.corner,receipt.before.control.corner);
  assert.equal(receipt.held.control.dragging,'true');assert.equal(receipt.held.control.valueHidden,false);assert.match(receipt.held.control.value,/Радиус|Radius/u);assert.equal(receipt.held.control.iconPaths,2);assert.equal(receipt.held.control.inputHidden,true);assert.ok(Math.abs(receipt.held.control.width-44)<.1);assert.ok(Math.abs(receipt.held.control.height-44)<.1);
  assert.equal(await check("return app.plugins.plugins['miro-canvas'].exportJobs.size;"),0);const shot=await run(adb,['-s',serial,'exec-out','screencap','-p'],{encoding:'buffer',windowsHide:true,timeout:12000,maxBuffer:16*1024*1024});writeFileSync(new URL('radius-drag-'+serial+'.png',out),shot.stdout);
 
@@ -45,6 +46,9 @@ try{
  receipt.penHeld=await snap();
  assert.ok(receipt.penHeld.preview>16);
  assert.equal(receipt.penHeld.control.valueHidden,false);
+ assert.equal(receipt.penHeld.control.x,penBefore.control.x);
+ assert.equal(receipt.penHeld.control.y,penBefore.control.y);
+ assert.notEqual(receipt.penHeld.control.corner,penBefore.control.corner);
  assert.equal(receipt.penHeld.control.inputHidden,true);
  assert.equal(receipt.penHeld.bytes,penBefore.bytes);
  assert.equal(receipt.penHeld.history,penBefore.history);

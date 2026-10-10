@@ -40,6 +40,7 @@ export class ShapeRadiusHandle {
   private suppressClick = false;
   private disposed = false;
   private iconCreated = false;
+  private cornerPath: SVGPathElement | undefined;
 
   public constructor(private readonly options: ShapeRadiusHandleOptions) {
     const document = options.document;
@@ -119,6 +120,7 @@ export class ShapeRadiusHandle {
     corner.setAttribute("d", "M5 19V11a6 6 0 0 1 6-6h8");
     const direction = createSvgElement(document, "path");
     direction.setAttribute("d", "M12 12l7 7M15 19h4v-4");
+    this.cornerPath = corner;
     icon.appendChild(corner);
     icon.appendChild(direction);
     this.button.appendChild(icon);
@@ -175,8 +177,13 @@ export class ShapeRadiusHandle {
     const state = this.state;
     if (state === undefined) return;
     const spacing = 22 / state.zoom;
-    this.host.style.left = `clamp(min(50%, ${spacing}px), ${this.radius / state.width * 100}%, 50%)`;
-    this.host.style.top = `clamp(min(50%, ${spacing}px), ${this.radius / state.height * 100}%, 50%)`;
+    this.host.style.left = `min(50%, ${spacing}px)`;
+    this.host.style.top = `min(50%, ${spacing}px)`;
+    // The corner changes with the figure; the pointer target stays in place.
+    const maximum = Math.min(1000, state.width / 2, state.height / 2);
+    const iconRadius = Number((this.radius / maximum * 10).toFixed(3));
+    this.cornerPath?.setAttribute("d", iconRadius === 0 ? "M5 19V5H19"
+      : `M5 19V${5 + iconRadius}A${iconRadius} ${iconRadius} 0 0 1 ${5 + iconRadius} 5H19`);
     this.host.style.transform = `translate(-50%, -50%) scale(${1 / state.zoom})`;
     this.button.title = words().enhancements.shapeRadiusValue(this.radius);
     this.button.setAttribute("aria-label", this.button.title);

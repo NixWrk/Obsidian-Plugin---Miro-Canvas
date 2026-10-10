@@ -147,6 +147,46 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
 afterEach(() => setLocale("en"));
 
 describe("shape corner handle", () => {
+  it("keeps the pointer target fixed while the corner icon and value follow the radius", () => {
+    const item = build({}, 37, 0.75);
+    const corner = item.button.children[0]!.children[0]!;
+    const original = corner.getAttribute("d");
+    const left = item.host.style.left;
+    const top = item.host.style.top;
+    const transform = item.host.style.transform;
+    item.down();
+    item.move(40, 40);
+    expect(item.onPreview).toHaveBeenLastCalledWith("shape1", expect.closeTo(40));
+    expect(corner.getAttribute("d")).not.toBe(original);
+    expect(item.host.style.left).toBe(left);
+    expect(item.host.style.top).toBe(top);
+    expect(item.host.style.transform).toBe(transform);
+    item.up(40, 40);
+    item.update({ radius: 40 });
+    expect(item.host.style.left).toBe(left);
+    expect(item.host.style.top).toBe(top);
+    item.open();
+    item.edit("0");
+    expect(corner.getAttribute("d")).toBe("M5 19V5H19");
+    expect(item.host.style.left).toBe(left);
+    item.key("Escape");
+    expect(corner.getAttribute("d")).not.toBe("M5 19V5H19");
+    expect(item.host.style.top).toBe(top);
+  });
+
+  it("shows square and maximally rounded corners without translating the control", () => {
+    const item = build({ radius: 0 });
+    const corner = item.button.children[0]!.children[0]!;
+    expect(corner.getAttribute("d")).toBe("M5 19V5H19");
+    item.down(0, 0);
+    item.move(100, 100);
+    expect(corner.getAttribute("d")).toBe("M5 19V15A10 10 0 0 1 15 5H19");
+    item.document.dispatch("pointercancel");
+    expect(corner.getAttribute("d")).toBe("M5 19V5H19");
+    expect(item.onCommit).not.toHaveBeenCalled();
+    expect(item.host.style.left).toBe("min(50%, 22px)");
+  });
+
   it("distinguishes the corner icon from connection points without an extra focus target", () => {
     const item = build();
     const icon = item.button.children[0]!;
@@ -210,8 +250,8 @@ describe("shape corner handle", () => {
 
   it("uses one equal radius on a non-square figure and clamped accessible spacing", () => {
     const item = build({}, 0, 2);
-    expect(item.host.style.left).toBe("clamp(min(50%, 11px), 4%, 50%)");
-    expect(item.host.style.top).toBe("clamp(min(50%, 11px), 13.333333333333334%, 50%)");
+    expect(item.host.style.left).toBe("min(50%, 11px)");
+    expect(item.host.style.top).toBe("min(50%, 11px)");
     expect(item.host.style.transform).toBe("translate(-50%, -50%) scale(0.5)");
     expect(item.host.style.border).toBeUndefined();
     expect(item.node.attributes.size).toBe(1);
@@ -263,7 +303,7 @@ describe("shape corner handle", () => {
     }
     expect(item.onCancel).toHaveBeenCalledOnce();
     expect(item.onCommit).not.toHaveBeenCalled();
-    expect(item.host.style.left).toContain("4%");
+    expect(item.host.style.left).toBe("min(50%, 22px)");
     expect(item.document.activeListeners()).toBe(0);
     item.up(36, 36);
     expect(item.onCommit).not.toHaveBeenCalled();
@@ -331,7 +371,7 @@ describe("shape corner handle", () => {
     item.input.dispatch("blur");
     expect(item.onCancel).toHaveBeenCalledOnce();
     expect(item.onCommit).not.toHaveBeenCalled();
-    expect(item.host.style.left).toContain("4%");
+    expect(item.host.style.left).toBe("min(50%, 22px)");
   });
 
   it("clamps numeric bounds and accepts valid input after an invalid value", () => {

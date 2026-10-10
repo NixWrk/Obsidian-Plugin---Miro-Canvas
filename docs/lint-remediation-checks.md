@@ -2240,3 +2240,35 @@ Export jobs must be zero before screenshots; control remains excluded from
 export. Record unverified device scenarios explicitly.
 
 Final marker/live dragging evidence: [radius feedback checks](radius-feedback-checks.md). Actual ADB touch/pen-source and hidden native Windows renderer input are separated; physical S Pen and disconnected phone remain pending.
+
+
+## Fixed radius marker and visible connection circles — 2026-10-10 (before edits)
+
+ShapeRadiusHandle.render positions the whole 44px control at radius/width and
+radius/height percentages, so it slides diagonally during a gesture. Keep it
+at the existing safe corner spacing instead; animate the rounded corner's
+geometry from the clamped radius itself and retain the live number. No delayed
+geometry transitions during pointer movement. Press/release feedback may use
+a small interruptible transform transition, disabled by reduced-motion.
+
+Actual SM-X736B/Obsidian1.13.8 DOM shows the visible side circles are plugin
+buttons .miro-canvas-handle--connect, not native connection points (the native
+interaction layer is hidden for this selection). Their computed background is
+rgb246/246/246 despite .miro-canvas-handle's accent fill: Obsidian's tablet button
+selector outweighs the broad plugin rule. SelectionHandles supplies one per
+side at contourPoint positions; tap quick-creates, drag begins a connector.
+Set scoped explicit accent borders and theme background, plus filled hover/
+focus states, without changing bounds/centres/hit routing or native fallback.
+
+Mandatory: fixed marker bounding box throughout finger/pen movement and after
+commit/Undo/cancel, live icon path and number follow the same radius, zero and
+maximum radius, rotation/non-default zoom, numeric input, selection/global
+toggle. Physical tablet ADB preview/commit/Undo/CANCEL and pen-source handling
+are separate from physical S Pen. Inspect all four visible connection circles
+in both themes, tablet-rule specificity, idle/hover/focus, drag-create native
+edge before/after release and Undo, tap quick-create and Undo, cancel without
+persistence. Preserve attached native/independent/chained lines, history and
+unknown fields. Windows input stays in hidden native test Obsidian; synthetic
+host and native receipts are distinct. No screenshots during export.
+
+Final fixed marker, circle visibility and native action results: [checks](radius-marker-motion-checks.md). Native tablet ADB, native Windows renderer input, synthetic states and remaining physical-pen/phone scenarios are distinguished.

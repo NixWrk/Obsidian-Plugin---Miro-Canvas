@@ -2234,6 +2234,19 @@
   font-size: 12px;
 }
 
+/* Keep side circles visible against the board and tablet button styles. */
+.miro-canvas-root .miro-canvas-handles .miro-canvas-handle--connect {
+  color: var(--interactive-accent);
+  background: var(--background-primary);
+  border: 2px solid var(--interactive-accent);
+}
+
+.miro-canvas-root .miro-canvas-handles .miro-canvas-handle--connect:hover,
+.miro-canvas-root .miro-canvas-handles .miro-canvas-handle--connect:focus-visible {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
 .miro-canvas-handle--connect[data-handle-position="0.5"] { --miro-handle-position: 50%; }
 .miro-canvas-handle--top { top: 0; left: var(--miro-handle-position); }
 .miro-canvas-handle--bottom { top: 100%; left: var(--miro-handle-position); }
@@ -5270,12 +5283,28 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
+  transform-origin: center;
+  transition: transform 120ms ease-out;
 }
 
 .miro-canvas-root .miro-canvas-shape-radius-handle__button:hover svg,
 .miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] svg {
   color: var(--text-on-accent);
   background: var(--interactive-accent);
+}
+
+.miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] .miro-canvas-shape-radius-handle__button svg {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .miro-canvas-root .miro-canvas-shape-radius-handle__button svg {
+    transition: none;
+  }
+
+  .miro-canvas-root .miro-canvas-shape-radius-handle[data-dragging="true"] .miro-canvas-shape-radius-handle__button svg {
+    transform: none;
+  }
 }
 
 /* Above the held finger; the label never intercepts another pointer. */

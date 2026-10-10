@@ -2472,3 +2472,13 @@ updates synchronously with the transient preview; release/cancel hides it. Tap
 still opens exact input. Icon creation is lazy, only for a verified editable
 selected rectangular figure. No metadata or history semantics changed.
 [Checks](radius-feedback-checks.md).
+
+
+Fixed marker/connection-circle follow-up (2026-10-10): ShapeRadiusHandle stays
+at safe corner spacing independent of radius. Its SVG corner changes directly
+with the current radius, while the number is the exact feedback; pressing scales
+only the icon to 0.96 over 120ms and reduced-motion removes that transition. The
+four SelectionHandles connection buttons use a scoped 2px accent outline and
+theme fill that outrank tablet button backgrounds; hover/focus fills them.
+Bounds, pointer routing and native fallback controls are unchanged.
+[Checks](radius-marker-motion-checks.md).
