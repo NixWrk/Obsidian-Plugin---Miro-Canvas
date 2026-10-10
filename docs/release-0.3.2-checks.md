@@ -27,8 +27,9 @@ SVG slide parts. Receipts are ignored under .out/vector-viewing.
 
 Android acceptance is pending: neither the tablet nor phone is currently listed
 by ADB. The preceding 0.3.1 tablet result is not counted as a 0.3.2 pass.
-Publication is pending this acceptance or the user's choice of Windows-only
-verification for this no-op removal.
+After this device limitation was reported, the owner instructed testing and
+release on 2026-10-10. Publication proceeds with the verified Windows and
+automated evidence; current Android acceptance remains unverified.
 
 ## Retained source warnings
 
