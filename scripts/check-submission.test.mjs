@@ -24,3 +24,9 @@ test("rejects draft, prerelease, wrong-tag and incomplete releases", () => {
   assert.throws(() => inspectRelease(manifest, { ...release, prerelease: true }));
   assert.throws(() => inspectRelease(manifest, { ...release, assets: release.assets.slice(1) }));
 });
+
+
+test("rejects extra standalone tools in plugin release and oversized main.js", () => {
+  assert.throws(() => inspectRelease(manifest, { ...release, assets: [...release.assets, { name: "miro-canvas-cli.mjs", size: 100 }] }), /exactly/);
+  assert.throws(() => inspectRelease(manifest, { ...release, assets: release.assets.map(asset => asset.name === "main.js" ? { ...asset, size: 5_000_000 } : asset) }), /Sync Standard/);
+});

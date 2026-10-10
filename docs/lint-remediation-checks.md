@@ -2509,3 +2509,38 @@ Require a cached-definition rerender regression and actual native reopen on both
 surfaces; keep search labels available without running setting actions. Windows
 QA temporarily selects the native inline-modal branch through an instance-only
 shouldUsePopout hook, restored on close; no OS foreground or persistent setting.
+
+
+## Release 0.3.0 packaging review (2026-10-10, before implementation)
+
+Trace: runExport -> packVectorPdf -> jsPDF.output("arraybuffer") and svg2pdf.
+The bundled jsPDF4.2.1 output switch also includes pdfobjectnewwindow, which
+creates an external PDFObject script; the plugin never invokes that mode.
+Remove that executable viewer code in a reviewed build transform; require pinned
+source integrity and fail closed on dependency drift. Do not disguise the token.
+Gate the final production bundle against script creation/network-viewer code.
+The four full Noto Sans TTFs contribute about3MB base64 to main.js. Repackage
+losslessly/offline, retain all glyph ranges/styles/licenses and verify decoded
+font SHA before native text/style/export/Stop checks. Require main.js below
+5,000,000 bytes in both local packaging and release workflow.
+
+CSS trace: the fixed export panel declares max-height twice for vh/dvh fallback.
+Use a named viewport-height variable with @supports override so each declaration
+block contains one max-height, retaining safe-area/keyboard calculations.
+Require desktop/tablet export scrolling/output/Stop and keyboard/safe bounds;
+record real native input separately from synthetic viewport measurements.
+
+Release workflow currently uploads5 files together. Publish only main.js,
+manifest.json and styles.css in the plugin release; retain CLI/MCP in a separate
+explicit tools release with discoverable README links and provenance.
+Require manifest/tag/default-branch parity, exact downloaded3-asset comparison,
+attestations, standalone CLI/MCP version/readonly startup and no runtime tools
+installation. Preserve already-published0.3.0; use a fresh patch version.
+
+Vault enumeration trace: obsidian-board-index filters Canvas files for initial
+cache and missing-link consumers; canvas-property-results supplies property
+query candidates. Clipboard trace: board copy/cut/paste events, copy card link/
+embed and import instructions are user actions. Retain their supported behavior,
+verify opt-out of board indexing and explicit clipboard triggers, document file
+scope/no background clipboard reads/no network upload. These are recommendations,
+not permissions to remove the requested search/graph/backlink/copy features.

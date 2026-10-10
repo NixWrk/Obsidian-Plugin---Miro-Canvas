@@ -98,6 +98,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 /** Offline SIL-OFL Noto Sans; see assets/vector-pdf-fonts/OFL.txt and checks. */
 import fontAssets from "./assets/vector-pdf-fonts/fonts.json";
 import type { jsPDF } from "jspdf";
+import { gunzipSync } from "fflate";
 
 export type VectorPdfFontStyle = "normal" | "bold" | "italic" | "bolditalic";
 
@@ -122,10 +123,32 @@ export function vectorPdfHasGlyph(codepoint: number, style: VectorPdfFontStyle):
   return false;
 }
 
+const decodedFonts = new Map<VectorPdfFontStyle, string>();
+
+/** Restore the bundled TTF without changing its glyphs or requiring a download. */
+function vectorPdfFontBase64(style: VectorPdfFontStyle): string {
+  const cached = decodedFonts.get(style);
+  if (cached !== undefined) return cached;
+  const font = fontAssets.fonts.find(font => font.style === style);
+  if (font === undefined) throw new Error("Unknown bundled PDF font style.");
+  const compressed = Uint8Array.from(atob(font.gzipBase64), character => character.charCodeAt(0));
+  const bytes = gunzipSync(compressed, { out: new Uint8Array(font.byteLength) });
+  if (bytes.length !== font.byteLength || bytes[0] !== 0 || bytes[1] !== 1 || bytes[2] !== 0 || bytes[3] !== 0) {
+    throw new Error("Bundled PDF font decoding failed.");
+  }
+  let binary = "";
+  for (let start = 0; start < bytes.length; start += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
+  }
+  const base64 = btoa(binary);
+  decodedFonts.set(style, base64);
+  return base64;
+}
+
 export function registerVectorPdfFont(pdf: jsPDF, family: string, style: VectorPdfFontStyle): void {
   const font = fontAssets.fonts.find(font => font.style === style);
   if (font === undefined) throw new Error("Unknown bundled PDF font style.");
-  pdf.addFileToVFS(font.file, font.base64);
+  pdf.addFileToVFS(font.file, vectorPdfFontBase64(style));
   pdf.addFont(font.file, family, style, "Identity-H");
   if (!pdf.getFontList()[family]?.includes(style)) throw new Error("Bundled PDF font registration failed.");
 }

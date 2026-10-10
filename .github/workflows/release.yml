@@ -3,13 +3,12 @@ name: Release
 # The tag is the version without a "v": the Obsidian catalogue asks for that.
 on:
   push:
-    # "fonts-N" tags publish font packs instead: fonts.yml.
-    tags: ["*", "!fonts-*"]
+    # Font packs use fonts.yml; companion tools tags must not enter this job.
+    tags: ["*", "!fonts-*", "!tools-*"]
 
 permissions:
   contents: write
-  # To sign the build: anyone can check that main.js was built from this
-  # repository and not swapped on the way.
+  # Core and tools can each be verified against this tagged build.
   id-token: write
   attestations: write
 
@@ -27,6 +26,10 @@ jobs:
       - run: npm run check
       - run: npm run lint
       - run: npm run lint:css
+      - name: Production PDF, CSS and release contract regressions
+        run: node --test scripts/offline-pdf-build.test.mjs scripts/check-css.test.mjs scripts/check-submission.test.mjs
+      - name: Reproducible offline font assets
+        run: node scripts/compress-pdf-fonts.mjs --check
       - run: npm test
       - run: npm run build
       - run: npm run mcp:build
@@ -40,20 +43,51 @@ jobs:
           manifest=$(node -p "require('./manifest.json').version")
           echo "tag $tag, manifest $manifest"
           test "$tag" = "$manifest"
-      - name: Attest build provenance
+      - name: Plugin package gate
+        run: |
+          npm run submission:check
+          test "$(wc -c < main.js)" -lt 5000000
+      - name: Companion tag is new
+        run: |
+          existing_tools_tag=$(git ls-remote --tags origin "refs/tags/tools-${GITHUB_REF_NAME}")
+          if test -n "$existing_tools_tag"; then
+            echo "Companion tools tag already exists; refusing to reuse or change a published build." >&2
+            exit 1
+          fi
+      - name: Attest plugin core provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: "main.js, styles.css, mcp/dist/miro-canvas-mcp.mjs, mcp/dist/miro-canvas-cli.mjs"
+          subject-path: "main.js, manifest.json, styles.css"
+      - name: Attest standalone tools provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: "mcp/dist/miro-canvas-mcp.mjs, mcp/dist/miro-canvas-cli.mjs"
       # The release notes are this version's section of the changelog: from
-      # its "## " heading to the next one.
+      # its "## " heading to the next one, plus the companion download link.
       - name: Release notes for this version
-        run: awk -v version="$GITHUB_REF_NAME" '/^## /{ if (seen) exit; if (index($0, version)) seen = 1; next } seen' CHANGELOG.md > NOTES.md
-      - name: Create release
+        run: |
+          awk -v version="$GITHUB_REF_NAME" '/^## /{ if (seen) exit; if (index($0, version)) seen = 1; next } seen' CHANGELOG.md > NOTES.md
+          release_base="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag"
+          printf '\nOptional standalone [CLI and MCP tools](%s/tools-%s) are available separately (Node 20+).\n' "$release_base" "$GITHUB_REF_NAME" >> NOTES.md
+          printf 'Standalone CLI and MCP bundles for [Miro Canvas %s](%s/%s), built from the same tagged commit.\n\nDownload `miro-canvas-cli.mjs` or `miro-canvas-mcp.mjs` and run it with Node 20+ outside the Obsidian plugin folder. No dependency install is needed.\n' "$GITHUB_REF_NAME" "$release_base" "$GITHUB_REF_NAME" > TOOLS-NOTES.md
+      # Publish the downloads before linking to them from the plugin release.
+      # gh creates this new companion tag at the checked-out version commit.
+      - name: Create companion tools prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "tools-${GITHUB_REF_NAME}" \
+            --target "${GITHUB_SHA}" \
+            --title "Tools for Miro Canvas ${GITHUB_REF_NAME}" \
+            --prerelease --latest=false \
+            --notes-file TOOLS-NOTES.md \
+            mcp/dist/miro-canvas-mcp.mjs mcp/dist/miro-canvas-cli.mjs
+      - name: Create plugin release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag \
             --title "${GITHUB_REF_NAME}" \
             --notes-file NOTES.md \
-            main.js manifest.json styles.css \
-            mcp/dist/miro-canvas-mcp.mjs mcp/dist/miro-canvas-cli.mjs
+            main.js manifest.json styles.css

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.3.1 - 2026-10-10
+
+- Keep main.js below5MB for Obsidian Sync Standard by losslessly compressing all four offline PDF fonts. Preserve their glyphs, styles, licensing and decoded bytes.
+- Remove unused jsPDF external PDF viewers and HTML/SVG raster plugins at build time; add source-integrity, runtime-script and production-size checks.
+- Replace the export panel’s duplicate max-height with a vh/dvh variable fallback, retaining safe-area and keyboard bounds.
+- Publish only the three Obsidian files in plugin releases; provide the optional CLI/MCP bundles in matching tools companion prereleases.
+- Document vault enumeration for local graph/backlinks/property search and clipboard access for explicit copy/cut/paste actions.
+
 ## 0.3.0 - 2026-10-10
 
 - Add a global minimum zoom percentage for the figure radius marker in plugin settings, with slider and exact input; default 200%, or 0 for any zoom. Follow native displayed zoom, remove the marker while zooming out and cancel unfinished radius drafts without a history entry; retain drag/exact input and the settings switch.

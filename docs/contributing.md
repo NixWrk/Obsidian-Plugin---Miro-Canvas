@@ -76,7 +76,10 @@ unit/synthetic and physical-device evidence.
   3. Push and wait for CI to pass.
   4. Push the tag `x.y.z`, without a "v". `.github/workflows/release.yml`
      checks, builds and publishes `main.js`, `manifest.json` and `styles.css`,
-     plus the optional standalone MCP and CLI bundles.
+     and creates a linked `tools-x.y.z` prerelease for the optional standalone
+     MCP and CLI bundles. Companion tags are excluded from plugin workflows.
+     Production builds enforce the 5MB ceiling and removal of unused script
+     loaders; dependency-source changes require a new offline-PDF review.
 - **Font packs.**
   1. When a font changes, rebuild with
      `python tools/build_font_packs.py --write-catalogue src/font-pack-catalogue.ts`.
