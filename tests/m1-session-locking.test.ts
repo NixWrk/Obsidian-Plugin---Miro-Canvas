@@ -172,6 +172,21 @@ describe("selection frame follows the displayed card", () => {
 	});
 });
 
+describe("radius marker follows the displayed camera", () => {
+	it("updates zoom between session refreshes without walking the board nodes", () => {
+		const { session } = fixture();
+		const internal = session as any;
+		const updateZoom = vi.fn();
+		internal.shapeRadiusHandle = { updateZoom, update: vi.fn(), dispose: vi.fn() };
+		const displayed = vi.spyOn(internal, "displayViewport");
+		for (const zoom of [0.5, 1, 1.99, 2]) {
+			displayed.mockReturnValue({ x: 0, y: 0, zoom });
+			internal.followViewport();
+			expect(updateZoom).toHaveBeenLastCalledWith(zoom);
+		}
+	});
+});
+
 describe("resize history", () => {
   it("repaints metadata after native Undo and Redo without another board input", () => {
     const { canvas, session, initial } = fixture();

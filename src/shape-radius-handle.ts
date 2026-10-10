@@ -1,6 +1,8 @@
 import { createHtmlElement, createSvgElement } from "./dom-elements";
 import { words } from "./i18n";
 
+export const SHAPE_RADIUS_HANDLE_MIN_ZOOM = 2;
+
 export interface ShapeRadiusHandleState {
   readonly id: string;
   readonly nodeEl: HTMLElement;
@@ -76,7 +78,7 @@ export class ShapeRadiusHandle {
 
   public update(state: ShapeRadiusHandleState | undefined): void {
     if (this.disposed) return;
-    if (state === undefined || !this.verify(state)) {
+    if (state === undefined || !this.verify(state, false)) {
       this.cancel();
       this.state = undefined;
       this.host.remove();
@@ -87,9 +89,20 @@ export class ShapeRadiusHandle {
     if (old !== undefined && (old.id !== state.id || old.nodeEl !== state.nodeEl
       || old.width !== state.width || old.height !== state.height)) this.cancel();
     this.state = state;
+    if (state.zoom < SHAPE_RADIUS_HANDLE_MIN_ZOOM) {
+      this.cancel();
+      this.host.remove();
+      return;
+    }
     if (this.drag === undefined && this.editingOriginal === undefined) this.radius = this.clamp(state.radius);
     if (this.host.parentNode !== state.nodeEl) state.nodeEl.appendChild(this.host);
     this.render();
+  }
+
+  /** Follow one owned figure as native Canvas animates its displayed zoom. */
+  public updateZoom(zoom: number): void {
+    if (this.disposed || this.state === undefined || this.state.zoom === zoom) return;
+    this.update({ ...this.state, zoom });
   }
 
   public dispose(): void {
@@ -125,9 +138,10 @@ export class ShapeRadiusHandle {
     this.iconCreated = true;
   }
 
-  private verify(state: ShapeRadiusHandleState): boolean {
+  private verify(state: ShapeRadiusHandleState, requireVisible = true): boolean {
     const node = state.nodeEl;
-    if (!state.editable || !state.id || !Number.isFinite(state.radius)
+    if ((requireVisible && state.zoom < SHAPE_RADIUS_HANDLE_MIN_ZOOM)
+      || !state.editable || !state.id || !Number.isFinite(state.radius)
       || ![state.width, state.height, state.zoom].every(value => Number.isFinite(value) && value > 0)
       || !Number.isFinite(1 / state.zoom)
       || node.ownerDocument !== this.options.document || !node.isConnected

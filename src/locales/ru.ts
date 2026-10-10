@@ -13,7 +13,7 @@ import type { Messages } from "./en";
 export const RU: Messages = {
   enhancements: {
     shapeRadiusControl: "Регулировка скругления фигур",
-    shapeRadiusControlHint: "Меняй радиус ручкой прямо на фигуре. Отключение скрывает ручку и сохраняет записанные радиусы.",
+    shapeRadiusControlHint: "При масштабе 200% и выше меняй радиус ручкой на выделенной фигуре. Отключение скрывает ручку и сохраняет записанные радиусы.",
     shapeRadiusHandle: "Изменить радиус скругления фигуры",
     shapeRadiusValue: (radius: number) => `Радиус скругления: ${Number(radius.toFixed(2))} пикселей доски. Потяни ручку или нажми, чтобы ввести точное значение.`,
     shapeRadiusLiveValue: (radius: number) => `Радиус ${Number(radius.toFixed(2))}`,

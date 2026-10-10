@@ -13,7 +13,7 @@ This document defines the architecture and implementation order. Miro export,
 the canonical REST/Web SDK union, and JSON-to-Canvas conversion remain separate
 from the plugin.
 
-## Canvas expansion — Unreleased
+## Canvas expansion — 0.3.0
 
 The 2026-10-09 card appearance work adds a global 0–48px corner radius
 (slider and numeric field, zero by default), without changing diagram geometry.
@@ -35,7 +35,8 @@ matrix cases and supported-version phone evidence remain pending.
 The [execution plan](canvas-enhancement-plan.md) and
 feature check documents distinguish source inspection, pure/unit/synthetic
 results and actual app input. This section describes implemented behavior and
-its limits; it is not a release or completed native-test receipt.
+its limits; individual native receipts and remaining coverage are recorded
+separately. [Release checks](release-0.3.0-checks.md).
 
 ### Search and connections
 
@@ -2524,3 +2525,6 @@ and no board/history mutation. It is excluded from vector serialization.
 [Native acceptance and limitations](vector-viewing-acceptance.md).
 
 Native drag admission preserves the readonly undefined lifecycle, and pure right-button mouse moves pass the pan guard. See [acceptance and limits](review-pan-checks.md).
+
+
+Radius controls in0.3.0 appear only at displayed zoom200% or higher; zoom-out removes them and cancels any unfinished draft without history. [Checks](radius-zoom-checks.md).

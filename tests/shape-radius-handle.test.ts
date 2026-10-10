@@ -91,7 +91,7 @@ class FakeDocument extends Events {
   public createElementNS(_namespace: string, tag: string): Element { return this.createElement(tag); }
 }
 
-function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zoom = 1) {
+function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zoom = 2) {
   const document = new FakeDocument();
   const node = document.createElement("div");
   node.className = "canvas-node is-focused";
@@ -122,7 +122,7 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
   const onCancel = vi.fn();
   const control = new ShapeRadiusHandle({ document: document as unknown as Document, onPreview, onCommit, onCancel });
   control.update(state);
-  const host = node.children.find(child => child.className === "miro-canvas-shape-radius-handle")!;
+  const host = Reflect.get(control, "host") as Element;
   const button = host?.children[0]!;
   const input = host?.children[1]!;
   const value = host?.children[2]!;
@@ -147,8 +147,46 @@ function build(overrides: Partial<ShapeRadiusHandleState> = {}, rotation = 0, zo
 afterEach(() => setLocale("en"));
 
 describe("shape corner handle", () => {
+  it.each([0.5, 1, 1.5, 1.99])("stays absent at displayed zoom %s and returns at 200%", zoom => {
+    const item = build({}, 0, zoom);
+    expect(item.host.parentNode).toBeUndefined();
+    item.open();
+    expect(item.input.hidden).toBe(true);
+    expect(item.onPreview).not.toHaveBeenCalled();
+    expect(item.onCommit).not.toHaveBeenCalled();
+    item.control.updateZoom(2);
+    expect(item.host.parentNode).toBe(item.node);
+    expect(item.node.descendants().filter(element => element === item.host)).toHaveLength(1);
+    item.control.updateZoom(zoom);
+    expect(item.host.parentNode).toBeUndefined();
+    expect(item.document.activeListeners()).toBe(0);
+    expect(item.onCancel).not.toHaveBeenCalled();
+    item.control.updateZoom(2);
+    expect(item.host.parentNode).toBe(item.node);
+    expect(item.onCommit).not.toHaveBeenCalled();
+  });
+
+  it.each(["drag", "number"])("cancels a %s draft before hiding on zoom-out", mode => {
+    const item = build();
+    if (mode === "drag") { item.down(); item.move(40, 40); }
+    else { item.open(); item.edit("40"); }
+    expect(item.onPreview).toHaveBeenCalled();
+    item.control.updateZoom(1.5);
+    expect(item.onCancel).toHaveBeenCalledTimes(1);
+    expect(item.onCommit).not.toHaveBeenCalled();
+    expect(item.host.parentNode).toBeUndefined();
+    expect(item.button.captured).toBeUndefined();
+    expect(item.document.activeListeners()).toBe(0);
+    item.input.dispatch("blur");
+    item.up(40, 40);
+    expect(item.onCommit).not.toHaveBeenCalled();
+    item.control.updateZoom(2);
+    expect(item.host.parentNode).toBe(item.node);
+    expect(item.button.title).toBe(words().enhancements.shapeRadiusValue(16));
+  });
+
   it("moves the marker with live radius through reversal and restores its position on cancel", () => {
-    const item = build({}, 37, 0.75);
+    const item = build({}, 37, 2.5);
     const initial = [item.host.style.left, item.host.style.top];
     item.down();
     item.move(40, 40);
@@ -177,7 +215,7 @@ describe("shape corner handle", () => {
   });
 
   it.each(["touch", "pen", "mouse"])("shows live %s feedback before release and hides it after one commit", pointerType => {
-    const item = build({}, 37, 0.75);
+    const item = build({}, 37, 2.5);
     item.host.dispatch("pointerdown", { target: item.button, pointerType, pointerId: 5,
       clientX: 70, clientY: 90 });
     expect(item.value.hidden).toBe(false);
@@ -210,7 +248,7 @@ describe("shape corner handle", () => {
     expect(item.onCommit).not.toHaveBeenCalled();
   });
 
-  it.each([[0, 0.5], [90, 2], [37, 0.75], [-120, 1.8]])("projects physical dx/dy at rotation %s and zoom %s", (rotation, zoom) => {
+  it.each([[0, 2], [90, 3], [37, 2.5], [-120, 4]])("projects physical dx/dy at rotation %s and zoom %s", (rotation, zoom) => {
     const item = build({}, rotation, zoom);
     const press = item.down();
     expect(press.preventDefault).toHaveBeenCalledOnce();
@@ -399,7 +437,7 @@ describe("shape corner handle", () => {
 
   it.each([{ editable: false }, { width: 0 }, { height: -1 }, { zoom: 0 }, { zoom: NaN }, { radius: Infinity }, { id: "other" }])("fails closed for invalid state %j", patch => {
     const item = build(patch);
-    expect(item.host).toBeUndefined();
+    expect(item.host.parentNode).toBeUndefined();
     expect(item.onCommit).not.toHaveBeenCalled();
   });
 

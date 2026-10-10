@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-10-10
+
+- Show the figure radius marker only at 200% zoom or higher. Follow native displayed zoom, remove the marker while zooming out and cancel unfinished radius drafts without a history entry; retain drag/exact input and the settings switch.
+
 - Restore native Canvas pan/pinch for finger drags from selected, unselected or locked native cards and native mixed/collapsed selection areas in review, native readonly and slideshow; board navigation leaves node positions and history unchanged. Preserve native right-button mouse panning through the move guard.
 - Add Raster/Vector PDF and PowerPoint export while retaining standalone SVG. Vector PDF embeds licensed Noto Sans in four styles and preserves real paths/text/clipping; vector PPTX embeds SVG per slide with a JPEG compatibility fallback. Keep independent snapshots, Stop and guarded saves; load the bundled PDF libraries only when requested.
 - Hide editing and creation menus in review, restoring them on exit and retaining direct selected-link opening. Add a temporary laser pointer to review and slideshow controls; its bounded fading trail never changes board data/history or enters exports. Present ordinary native frames in file order, with export pages as a fallback, and restore readonly on exit.
@@ -31,8 +35,9 @@
 - Prefer a permanent palette for new or uncustomized boards while preserving customized local palettes. Add named scoped CSS declarations from a restricted subset and zoom content thresholds with selection/editing exemptions.
 - Wait for native Markdown rendering before independent PDF/PowerPoint capture so card text remains in background exports under default throttling.
 
-The expansion remains unreleased; verification and remaining checks are
-tracked in the [feature plan](docs/canvas-enhancement-plan.md).
+Verification, supported behavior and remaining coverage follow-ups are
+tracked in the [feature plan](docs/canvas-enhancement-plan.md) and
+[release checks](docs/release-0.3.0-checks.md).
 
 - Refresh all 58 English/Russian guide GIFs with readable step captions, simpler workflows and clear final states. Add one board-theme switch example per language; keep card colors and content visible across both themes. Place panels beside the work, select cards before following links, and verify actual drawing/erasure and reachable controls.
 - Simplify the English and Russian READMEs with a feature overview, quick installation and first steps. Keep all detailed instructions and existing GIFs in linked user guides; move CLI examples and source-warning notes to the contributor guides.

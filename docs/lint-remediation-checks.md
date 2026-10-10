@@ -2452,3 +2452,28 @@ Require undefined/no native initialization in viewing and retain existing
 locked-group inert lifecycle tests outside viewing.
 
 Final scope, actual input receipts and pending checks: [viewing pan checks](review-pan-checks.md).
+
+
+## Radius marker visibility while zooming (2026-10-10, before implementation)
+
+Trace: updateShapeRadiusHandle creates the one selected-figure control at every
+positive zoom. Its inverse-scale transform keeps it 44 screen pixels even when
+the figure shrinks. followViewport moves other controls between refreshes but
+does not update this control's zoom. Thus it stays prominent when zooming out.
+The control owns pointer capture and numeric drafts; hiding must cancel a draft
+before DOM removal/blur so it cannot commit a radius or create history.
+
+Show it only on a selected editable rectangular figure at displayed zoom >=2
+(200%, native Canvas's normal maximum), preserving the settings switch and
+existing bidirectional drag/exact input. Keep valid hidden ownership so native
+zoom-in can restore it without scanning all nodes per frame. Follow only the
+selected control's displayed zoom. Export continues excluding the control.
+Required: 50/100/150/199/200% zoom, native wheel/pinch and zoom presets without
+manual refresh, same owner on reappearance, no duplicate marker/selection border,
+selection/lock/review/settings-off, rotated/non-square geometry, drag and numeric
+draft cancellation while zooming out, pointer capture/listener cleanup, no
+file/history changes on hiding/showing, keyboard bounds and vector exclusion.
+Check in hidden native Windows and physical SM-X736B MiroCanvasTest, recording
+trusted CDP vs actual ADB input. Release waits for these source/build checks.
+
+Native visibility/cancellation evidence: [radius zoom checks](radius-zoom-checks.md).

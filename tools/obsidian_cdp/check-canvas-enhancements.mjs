@@ -61,6 +61,8 @@ async function command(id) {
   const label = await checked(`const id=${JSON.stringify(`miro-canvas:${id}`)},command=app.commands.commands[id];
     if(!command)throw Error('missing command');app.commands.executeCommandById('command-palette:open');return command.name;`);
   await wait(150);
+  await client.send('Input.dispatchKeyEvent',{type:'rawKeyDown',key:'a',code:'KeyA',modifiers:2,windowsVirtualKeyCode:65});
+  await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'a',code:'KeyA',modifiers:2,windowsVirtualKeyCode:65});
   await client.send('Input.insertText', { text: label });
   await wait(250);
   await tap('.suggestion-item', label.replace(/^Miro Canvas:\s*/u, ''));
@@ -85,6 +87,7 @@ async function geometry() {
 }
 let prior;
 try {
+  if(!serial)await client.send('Emulation.setFocusEmulationEnabled',{enabled:true});
   prior = await checked(`const p=app.plugins.plugins['miro-canvas'];for(const modal of p.enhancementModals)modal.close();return {path:app.workspace.getActiveFile()?.path,settings:structuredClone(p.canvasSettings)};`);
   await checked(readFileSync(new URL('./canvas-enhancement-fixture.js', import.meta.url), 'utf8'));
   await pump();
@@ -269,11 +272,11 @@ try {
   } else if (phase === 'embeds') {
     const boardPath=await checked('return app.workspace.getActiveFile().path;');
     const notePath=`Canvas card embed ${Date.now()}.md`;
-    await checked(`const f=await app.vault.create(${JSON.stringify(notePath)},${JSON.stringify(`![[${boardPath}#node-a]]`)});await app.workspace.getLeaf(false).openFile(f,{active:true,state:{mode:'preview'}});return true;`);
+    await checked(`const f=await app.vault.create(${JSON.stringify(notePath)},${JSON.stringify(`![[${boardPath}#node-a]]`)});const leaf=app.workspace.getLeaf(false);await leaf.openFile(f,{active:true,state:{mode:'preview'}});await app.workspace.revealLeaf(leaf);app.workspace.setActiveLeaf(leaf,{focus:false});return true;`);
     await checked(`const r=app.workspace.activeLeaf.view.previewMode.renderer;r.onResize();if(!app.isMobile)r.onRender();return true;`);
     await wait(1800);
     await checked(`const r=app.workspace.activeLeaf.view.previewMode.renderer;if(!app.isMobile)r.onRender();return true;`);
-    const embed=await checked(`const e=app.workspace.activeLeaf.view.previewMode.containerEl.querySelector('.miro-canvas-card-embed');return {state:e?.dataset.cardState,text:e?.textContent,wholeBoards:document.querySelectorAll('.markdown-preview-view .canvas-wrapper').length,creators:document.querySelectorAll('[data-miro-canvas-card-creator]').length};`);
+    const embed=await checked(`const e=app.workspace.activeLeaf.view.previewMode.containerEl.querySelector('.miro-canvas-card-embed');return {viewState:app.workspace.activeLeaf.view.getState(),previewRect:app.workspace.activeLeaf.view.previewMode.containerEl.getBoundingClientRect().toJSON(),state:e?.dataset.cardState,text:e?.textContent,wholeBoards:document.querySelectorAll('.markdown-preview-view .canvas-wrapper').length,creators:document.querySelectorAll('[data-miro-canvas-card-creator]').length};`);
     assert.equal(embed.state,'ready',JSON.stringify(embed));
     assert.ok(embed.text.includes('Launch card'),JSON.stringify(embed));
     assert.ok(!embed.text.includes('Second card'));
@@ -321,9 +324,13 @@ try {
     const preRename=await checked(`const p=app.plugins.plugins['miro-canvas'],f=app.workspace.getActiveFile();return {knowledge:p.boardIndex.getKnowledge(f.path),cache:app.metadataCache.getFileCache(f),clean:app.metadataCache.isCacheClean()};`);
     receipt.checks.push({name:'linked-note content search and native property-edge command',search,related,preRename});
     const renamePromise=checked(`await app.fileManager.renameFile(app.vault.getAbstractFileByPath(${JSON.stringify(second)}),${JSON.stringify(renamed)});return true;`);
-    await wait(450);
-    const asks=await checked(`return [...document.querySelectorAll('.modal-container button')].some(e=>e.textContent==='Just once');`);
-    if(asks)await tap('.modal-container button','Just once');
+    for(let attempt=0;attempt<50;attempt++){
+      const label=await checked(`return [...document.querySelectorAll('.modal-container button')].find(e=>/Just once|Только.*раз|Один раз/iu.test(e.textContent))?.textContent;`);
+      if(label){await tap('.modal-container button',label);break;}
+      const renameSettled=await checked(`return app.vault.getAbstractFileByPath(${JSON.stringify(renamed)})!==null&&app.metadataCache.isCacheClean();`);
+      if(renameSettled)break;
+      await wait(120);
+    }
     await renamePromise;await checked(`await app.plugins.plugins['miro-canvas'].renameWork;return true;`);await wait(1800);await pump();
     const renamedState=await checked(`const s=app.plugins.plugins['miro-canvas'].m1Session;return {nodes:s.view.canvas.getData().nodes,source:s.view.canvas.getData().miroSource};`);
     assert.equal(renamedState.nodes.find(n=>n.id==='target-file').file,renamed);assert.ok(renamedState.nodes.find(n=>n.id==='a').text.includes(stem+' Renamed'),JSON.stringify(renamedState));assert.deepEqual(renamedState.source,initial.source);
@@ -353,10 +360,10 @@ try {
     receipt.checks.push({name:'properties UI projects native metadata/cache/references',cache});
     const propertyPath=`Canvas property mention ${Date.now()}.canvas`;
     await checked(`await app.vault.create(${JSON.stringify(propertyPath)},JSON.stringify({nodes:[],edges:[],miroCanvas:{schemaVersion:1,properties:{related:'[[Feature Reference]]'}}}));return true;`);await wait(1600);
-    const backlinkLeafId=await checked(`const file=app.vault.getAbstractFileByPath('Feature Reference.md');await app.workspace.getLeaf(false).openFile(file,{active:true});
+    const backlinkLeafId=await checked(`const file=app.vault.getAbstractFileByPath('Feature Reference.md');await app.workspace.getLeaf(false).openFile(file,{active:true});const noteLeaf=app.workspace.activeLeaf;
       const leaf=app.isMobile?app.workspace.getRightLeaf(false):app.workspace.getLeavesOfType('backlink').find(l=>l.view.backlink)??app.workspace.getLeaf(false);
-      await leaf.setViewState({type:'backlink',state:{file:file.path}});if(app.isMobile)await app.workspace.revealLeaf(leaf);app.workspace.rightSplit.expand();
-      await leaf.view.loadFile(file);app.workspace.setActiveLeaf(leaf,{focus:false});return leaf.id;`);await wait(1200);
+      await leaf.setViewState({type:'backlink',state:{file:file.path}});await app.workspace.revealLeaf(leaf);app.workspace.rightSplit.expand();
+      await leaf.view.loadFile(file);app.workspace.setActiveLeaf(noteLeaf,{focus:false});return leaf.id;`);await wait(1200);
     const backlink=await checked(`const v=app.workspace.getLeavesOfType('backlink').find(l=>l.id===${JSON.stringify(backlinkLeafId)}).view,b=v.backlink;app.plugins.plugins['miro-canvas'].backlinks.refresh();b.backlinkDom.onResize();b.backlinkDom.changed.run();b.backlinkDom.infinityScroll.compute();return {file:v.file?.path,rect:v.containerEl.getBoundingClientRect().toJSON(),count:b.backlinkCountEl.textContent,text:v.containerEl.textContent,propertyRows:[...v.containerEl.querySelectorAll('[data-miro-canvas-property]')].map(e=>e.textContent),html:v.containerEl.innerHTML.slice(-1500)};`);
     assert.equal(backlink.file,'Feature Reference.md','backlink pane source must be the prepared note');
     assert.ok(Number(backlink.count)>0,JSON.stringify(backlink));
@@ -420,5 +427,6 @@ try {
     if(${phase === 'palette' || phase === 'presentation'})await p.saveCanvasSettings(${JSON.stringify(prior.settings)});
     const f=app.vault.getAbstractFileByPath(${JSON.stringify(prior.path)});if(f)await app.workspace.getLeaf(false).openFile(f,{active:true});return true;`).catch(error=>{receipt.restoreError=String(error);});
   writeFileSync(new URL(`native-${phase}-${serial??'Windows'}.json`,out),JSON.stringify(receipt,null,2));
+  if(!serial)await client.send('Emulation.setFocusEmulationEnabled',{enabled:false});
   client.close();
 }

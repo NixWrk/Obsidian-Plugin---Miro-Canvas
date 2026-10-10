@@ -3203,7 +3203,7 @@ export class M1CanvasSession {
 		}
 		this.shapeRadiusHandle?.update({ id, nodeEl, width: rect.width, height: rect.height,
 			radius: shapeCornerRadius(item?.shape, { ...rect, cornerRadius: item?.cornerRadius }), editable,
-			zoom: finite(this.viewport.getViewport()?.zoom) ?? 1 });
+			zoom: this.displayViewport()?.zoom ?? 0 });
 	}
 
 	private previewShapeRadius(id: string, radius: number): void {
@@ -4382,7 +4382,9 @@ export class M1CanvasSession {
 	 * positions are recomputed, from measurements cached per document.
 	 */
 	private followViewport(): void {
-		this.followedViewport = this.viewportSignature(this.displayViewport(), this.boardSize());
+		const displayed = this.displayViewport();
+		this.shapeRadiusHandle?.updateZoom(displayed?.zoom ?? 0);
+		this.followedViewport = this.viewportSignature(displayed, this.boardSize());
 		this.connectorLayer?.render();
 		this.updateConnectorLabels();
 		this.updateMixedSelectionFrame();

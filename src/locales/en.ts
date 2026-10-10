@@ -9,7 +9,7 @@
 export const EN = {
   enhancements: {
     shapeRadiusControl: "Shape corner controls",
-    shapeRadiusControlHint: "Adjust the corner radius with a handle directly on the figure. Turning this off hides the control and keeps saved radii.",
+    shapeRadiusControlHint: "At 200% zoom or higher, drag the handle on the selected figure to adjust its corners. Turning this off hides the control and keeps saved radii.",
     shapeRadiusHandle: "Adjust shape corner radius",
     shapeRadiusValue: (radius: number) => `Corner radius: ${Number(radius.toFixed(2))} board pixels. Drag to adjust or click to enter an exact value.`,
     shapeRadiusLiveValue: (radius: number) => `Radius ${Number(radius.toFixed(2))}`,

@@ -72,7 +72,7 @@ stores one SVG per slide with a JPEG fallback for older readers; its text and
 shapes are not separate native PowerPoint objects. Live web embeds and video
 are omitted. [Modes and checks](docs/vector-viewing-acceptance.md).
 
-## Canvas expansion in development
+## Canvas expansion in 0.3.0
 
 **Board appearance:** “Obsidian” follows the current Obsidian light/dark theme, even when the device uses another theme. Explicit board Light/Dark choices stay independent. Long board-menu labels wrap inside the menu.
 
@@ -81,8 +81,8 @@ The selection toolbar’s **More** menu lists labelled actions: layer order, boa
 
 The **Export** panel groups page ordering and paper/quality controls, with a scrolling body and persistent Close/output actions. Touch controls and safe-area/keyboard bounds are checked in native Obsidian. [Panel checks](docs/export-panel-design-checks.md).
 
-The following additions are implemented in the development worktree and remain
-unreleased. Verification and remaining checks are tracked in the
+Version 0.3.0 adds the following board workflows. Verification and remaining
+coverage follow-ups are tracked in the
 [feature plan](docs/canvas-enhancement-plan.md) and
 [integration checks](docs/obsidian-integration-checks.md).
 
@@ -97,7 +97,7 @@ unreleased. Verification and remaining checks are tracked in the
 | **Shared colors and styles** | Prefer a permanent palette across boards while retaining customized local palettes. Apply named, scoped CSS declarations from a restricted subset. |
 | **Zoom content** | Set content thresholds for text, file, web and Miro cards; selected or edited cards stay readable. |
 | **Card corners** | Set a radius from 0 to 48 board pixels using a slider or a precise value; zero gives square cards. Diagram geometry stays unchanged. |
-| **Shape corners** | Rectangular figures have equal horizontal/vertical radii in board units. Drag the corner marker with its bidirectional arrow using a finger, pen or mouse; the marker moves with the radius and the live value appears above the held control. Click it for an exact value; disable the controls in plugin settings. New click/drop shapes use the catalogue proportions, while free drawing keeps your dimensions. |
+| **Shape corners** | Rectangular figures have equal horizontal/vertical radii in board units. At 200% zoom or higher, drag the corner marker with its bidirectional arrow using a finger, pen or mouse; the marker moves with the radius and the live value appears above the held control. Click it for an exact value; disable the controls in plugin settings. New click/drop shapes use the catalogue proportions, while free drawing keeps your dimensions. |
 | **CSS snippets** | Supported Obsidian snippets are excluded from boards by default. Allow individual installed snippets in searchable settings; normal notes and the selected theme retain their styling. |
 | **Viewing and slides** | Review hides editing/creation menus; selected web links retain a direct Open link action. Toggle a temporary laser from the viewing dock or slideshow bar. **Present slides** uses native frames in file order, or export pages when there are no frames. In viewing mode, a finger drag can start on a card or selection to pan the board without changing card positions or history. |
 | **Vector PDF/PowerPoint** | Choose Raster or Vector in Export. PDF uses embedded Noto Sans; PowerPoint embeds SVG per slide with an older-reader picture fallback. |
@@ -125,7 +125,7 @@ board/note navigation. The SM-A336E/Obsidian 1.12.7 checks also cover gestures,
 themes and independent exports; that app is below the supported minimum.
 [Phone input distinctions and results](docs/smartphone-enhancement-checks.md).
 
-[Behavior, persistence and remaining checks](docs/miro-canvas.md#canvas-expansion--unreleased)
+[Behavior, persistence and remaining checks](docs/miro-canvas.md#canvas-expansion--030)
 
 ## Installing
 
