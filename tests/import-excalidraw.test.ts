@@ -4,9 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { resolveAnchor } from "../src/anchors";
+import { MAX_STROKE_POINTS, readLocalStroke, type LocalStroke } from "../src/local-items";
+
 import { assertImportedBoard, idFactory } from "../src/importers/board-builder";
 import { convertExcalidraw, detectExcalidraw, excalidrawAdapter } from "../src/importers/excalidraw";
-import { ImportError, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
+import { ImportError, MAX_IMPORT_ELEMENTS, MAX_IMPORT_SOURCE_LENGTH, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
 import { validateMiroCanvasMetadata } from "../src/metadata";
 import { CONNECTOR_CAPS } from "../src/source-model";
 import { compressToBase64 } from "./helpers/lz-string-compress";
@@ -209,18 +212,19 @@ describe("excalidraw importer: the scene fixture", () => {
 
 	it("counts each element once: converted, or under its entries", () => {
 		const elementIds = new Set(report.entries.map((entry) => entry.sourceId));
-		const onceKinds = ["roughness", "hatch", "groups", "opacity", "imageCrop", "background"];
+		const onceKinds = ["roughness", "hatch", "opacity", "imageCrop", "background", "zOrder", ...report.entries.filter((entry) => entry.sourceType === "groupIds").map((entry) => entry.sourceId)];
 		const elementEntries = [...elementIds].filter((id) => !onceKinds.includes(id));
 		const live = sceneElements().filter((element) => element === null || element.isDeleted !== true);
 		expect(report.counts.converted + elementEntries.length).toBe(live.length);
-		expect(report.counts).toEqual({ converted: 16, approximated: 7, notImported: 14, skipped: 2 });
+		const lost = new Set(report.entries.filter((entry) => entry.status !== "approximated" && entry.status !== "skipped").map((entry) => entry.sourceId));
+		const approximated = new Set(report.entries.filter((entry) => entry.status === "approximated" && !lost.has(entry.sourceId)).map((entry) => entry.sourceId));
+		expect(report.counts).toEqual({ converted: 13, approximated: approximated.size, notImported: lost.size, skipped: 2 });
 	});
 
 	it("reports what the board cannot draw once per kind", () => {
 		for (const [reason, field] of [
 			["roughness", "roughness"],
 			["hatch", "fillStyle"],
-			["groups", "groupIds"],
 			["opacity", "opacity"],
 			["imageCrop", "crop"],
 			["background", "viewBackgroundColor"],
@@ -346,7 +350,10 @@ describe("excalidraw importer: the scene fixture", () => {
 		expect(connector.waypoints).toEqual([{ x: 650, y: 100 }, { x: 650, y: 200 }]);
 		expect(connector.startCap).toBe("erd_one");
 		expect(connector.endCap).toBe("erd_many");
-		expect(board.entries("a-oval")).toEqual([{ sourceId: "a-oval", sourceType: "arrow", status: "approximated", reason: "arrowhead" }]);
+		expect(board.entries("a-oval")).toEqual([
+			{ sourceId: "a-oval", sourceType: "startBinding", status: "approximated", reason: "binding" },
+			{ sourceId: "a-oval", sourceType: "arrow", status: "approximated", reason: "arrowhead" },
+		]);
 
 		// The end on the turned text card lies on its bottom middle once turned.
 		const toText = board.override("a-text").connectorAnchors as Record<string, Record<string, unknown>>;
@@ -375,6 +382,7 @@ describe("excalidraw importer: the scene fixture", () => {
 		const odd = board.connectors[board.idOf("a-odd")]!;
 		expect([odd.startCap, odd.endCap]).toEqual(["filled_oval", "arrow"]);
 		expect(board.entries("a-odd")).toEqual([
+			{ sourceId: "a-odd", sourceType: "startBinding", status: "source-limited", reason: "binding" },
 			{ sourceId: "a-odd", sourceType: "arrow", status: "approximated", reason: "arrowhead" },
 			{ sourceId: "a-odd", sourceType: "arrow", status: "plugin-unsupported", reason: "elementLinkDropped" },
 		]);
@@ -465,7 +473,7 @@ describe("excalidraw importer: the scene fixture", () => {
 
 	it("leaves a placeholder for pictures and embeds that cannot come over", () => {
 		expect(board.entries("picture-data")).toEqual([
-			{ sourceId: "picture-data", sourceType: "image", status: "missing-asset", reason: "embeddedImage", nodeId: board.idOf("picture-data") },
+			{ sourceId: "picture-data", sourceType: "image", status: "invalid-source", reason: "invalidAsset", nodeId: board.idOf("picture-data") },
 		]);
 		expect(board.node("picture-data")).toMatchObject({ x: 0, y: 500, width: 300, height: 160 });
 		expect(board.override("picture-data").borderStyle).toBe("dashed");
@@ -572,8 +580,8 @@ describe("excalidraw importer: the plugin's notes", () => {
 		expect(() => assertImportedBoard(document)).not.toThrow();
 		expect(validateMiroCanvasMetadata(document.miroCanvas).diagnostics).toEqual([]);
 		expect(board.result.report.formatVersion).toBe("2");
-		expect(board.result.report.counts).toEqual({ converted: 8, approximated: 0, notImported: 1, skipped: 0 });
-		expect(board.result.report.entries.map((entry) => entry.sourceId)).toEqual(["roughness"]);
+		expect(board.result.report.counts).toEqual({ converted: 6, approximated: 2, notImported: 3, skipped: 0 });
+		expect(board.result.report.entries.map((entry) => entry.reason)).toEqual(["pressure", "binding", "binding", "roughness", "zOrder", "noteBody"]);
 
 		expect(board.node("9gViyYN8")).toMatchObject({ type: "text", text: "Start", x: -512, y: -239, width: 200, height: 110 });
 		expect(board.override("9gViyYN8").shape).toEqual({ kind: "round_rectangle", fallback: "text" });
@@ -669,5 +677,244 @@ describe("excalidraw importer: pen strokes in the default ink", () => {
 			}
 			expect(inkOf(board, "green").color).toBe("#2f9e44");
 		}
+	});
+});
+
+
+/** Author-generated data: provenance lives beside the expansion scene. */
+function expansionSource(): ImportSource {
+	return { path: "Drawings/excalidraw-expansion-semantics.excalidraw", extension: "excalidraw", text: fixture("excalidraw-expansion-semantics.excalidraw") };
+}
+
+function expansionBoard(elements: readonly Record<string, unknown>[]): Board {
+	return new Board(convertExcalidraw({ path: "Drawings/excalidraw-expansion-generated.excalidraw", extension: "excalidraw", text: JSON.stringify({ type: "excalidraw", version: 2, elements }) }, context()));
+}
+
+function strokeOf(board: Board, sourceId: string): LocalStroke {
+	return (board.override(sourceId).item as { stroke: LocalStroke }).stroke;
+}
+
+function penElement(extra: Record<string, unknown> = {}): Record<string, unknown> {
+	return { id: "pen", type: "freedraw", x: -20, y: -30, angle: 0, strokeWidth: 2, points: [[0, 0], [10, 0], [20, 10]], pressures: [0, 0.5, 1], simulatePressure: false, ...extra };
+}
+
+describe("excalidraw expansion: pressure and rotation", () => {
+	it("preserves a measured width at every rotated point, including repeated coordinates", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		const node = board.node("measured");
+		const stroke = strokeOf(board, "measured");
+		expect(readLocalStroke(stroke)).toEqual(stroke);
+		expect(stroke.widths).toEqual([5.25, 16.17, 8.88, 12.02]);
+		expect(stroke.width).toBe(16.17);
+		const expected = [{ x: -64, y: -68 }, { x: -64, y: -56 }, { x: -64, y: -56 }, { x: -72, y: -44 }];
+		for (let index = 0; index < expected.length; index += 1) {
+			expect(node.x + stroke.points[index * 2]!).toBeCloseTo(expected[index]!.x, 2);
+			expect(node.y + stroke.points[index * 2 + 1]!).toBeCloseTo(expected[index]!.y, 2);
+			expect(stroke.points[index * 2]!).toBeGreaterThanOrEqual(stroke.width / 2);
+			expect(stroke.points[index * 2 + 1]!).toBeGreaterThanOrEqual(stroke.width / 2);
+			expect(stroke.points[index * 2]! + stroke.width / 2).toBeLessThanOrEqual(node.width);
+			expect(stroke.points[index * 2 + 1]! + stroke.width / 2).toBeLessThanOrEqual(node.height);
+		}
+		expect(board.entries("measured")).toEqual([{ sourceId: "measured", sourceType: "pressures", status: "approximated", reason: "pressure", nodeId: node.id }]);
+	});
+
+	it("ignores stale samples when pressure is simulated and reports the outline approximation", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		expect(strokeOf(board, "simulated").widths).toBeUndefined();
+		expect(strokeOf(board, "simulated").width).toBe(8.5);
+		expect(board.entries("simulated")[0]).toMatchObject({ status: "approximated", reason: "pressure" });
+	});
+
+	it("keeps the newer constant-width mode constant, irrespective of pressure samples", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		expect(strokeOf(board, "uniform").widths).toBeUndefined();
+		expect(strokeOf(board, "uniform").width).toBe(2.8);
+		expect(board.entries("uniform")).toEqual([]);
+	});
+
+	it.each([undefined, [], [0.5], [0, 0.5, 1.01], [-0.1, 0.5, 1], [0, null, 1], "invalid"])("reports invalid measured pressures %j while retaining the drawing", (pressures) => {
+		const board = expansionBoard([penElement({ pressures })]);
+		expect(strokeOf(board, "pen").widths).toBeUndefined();
+		expect(readLocalStroke(strokeOf(board, "pen"))).toBeDefined();
+		expect(board.entries("pen")[0]).toMatchObject({ sourceType: "pressures", status: "invalid-source", reason: "pressure", nodeId: board.idOf("pen") });
+	});
+
+	it("duplicates the measured width with the point of a single-touch dot", () => {
+		const board = expansionBoard([penElement({ points: [[3, -7]], pressures: [0] })]);
+		const stroke = strokeOf(board, "pen");
+		expect(stroke.points).toHaveLength(4);
+		expect(stroke.widths).toEqual([5.25, 5.25]);
+		expect(stroke.width).toBe(5.25);
+	});
+
+	it("keeps a pressure-only peak and matching sample indices when reducing a long straight stroke", () => {
+		const count = MAX_STROKE_POINTS * 2;
+		const peak = MAX_STROKE_POINTS + 7;
+		const points = Array.from({ length: count }, (_, index) => [index, 0]);
+		const pressures = points.map((_, index) => index === peak ? 1 : 0);
+		const board = expansionBoard([penElement({ x: 0, y: 0, points, pressures })]);
+		const node = board.node("pen");
+		const stroke = strokeOf(board, "pen");
+		expect(stroke.widths!.length).toBeLessThanOrEqual(MAX_STROKE_POINTS);
+		expect(stroke.widths!.length).toBe(stroke.points.length / 2);
+		const peakIndex = stroke.widths!.indexOf(16.17);
+		expect(peakIndex).toBeGreaterThanOrEqual(0);
+		expect(node.x + stroke.points[peakIndex * 2]!).toBe(peak);
+		for (let index = 0; index < stroke.widths!.length; index += 1) {
+			const sourceX = node.x + stroke.points[index * 2]!;
+			expect(stroke.widths![index]).toBe(sourceX === peak ? 16.17 : 5.25);
+		}
+		expect(readLocalStroke(stroke)).toBeDefined();
+	});
+
+	it("bounds widths at the writer limit and never rounds a tiny stroke to zero", () => {
+		for (const strokeWidth of [0.000001, 100_000]) {
+			const board = expansionBoard([penElement({ strokeWidth })]);
+			const stroke = strokeOf(board, "pen");
+			expect(stroke.width).toBeGreaterThan(0);
+			expect(stroke.width).toBeLessThanOrEqual(1_000);
+			expect(readLocalStroke(stroke)).toBeDefined();
+		}
+	});
+
+	it("reads a large point array without spreading it into a function call", () => {
+		const points = Array.from({ length: 140_000 }, (_, index) => [index / 1_000, 0]);
+		const board = expansionBoard([penElement({ points, pressures: [], simulatePressure: true, angle: Math.PI / 2 })]);
+		expect(strokeOf(board, "pen").points.length / 2).toBeLessThanOrEqual(MAX_STROKE_POINTS);
+		expect(readLocalStroke(strokeOf(board, "pen"))).toBeDefined();
+	});
+});
+
+describe("excalidraw expansion: structural approximations and losses", () => {
+	it("makes transparent native spatial groups, outer before inner, and reports membership as approximated", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		const outer = board.node("group:outer-group");
+		const inner = board.node("group:inner-group");
+		expect(outer.type).toBe("group");
+		expect(inner.type).toBe("group");
+		expect(outer.label).toBe("");
+		expect(board.nodes.indexOf(outer)).toBeLessThan(board.nodes.indexOf(inner));
+		for (const sourceId of ["group:outer-group", "group:inner-group"]) {
+			expect(board.override(sourceId)).toMatchObject({ item: { type: "frame" }, colors: { fill: null }, borderStyle: "none", borderWidth: 0 });
+			expect(board.entries(sourceId)).toEqual([{ sourceId, sourceType: "groupIds", status: "approximated", reason: "groups", nodeId: board.idOf(sourceId) }]);
+		}
+		// The owner is rotated: its actual box spans x=-100..-60 and y=-120..-40.
+		expect(inner).toMatchObject({ x: -101, y: -121, width: 42, height: 82 });
+		expect(outer.x).toBeLessThanOrEqual(inner.x);
+		expect(outer.y).toBeLessThanOrEqual(inner.y);
+		expect(outer.x + outer.width).toBeGreaterThanOrEqual(board.node("goal").x + board.node("goal").width);
+	});
+
+	it("keeps spatial groups honest when their bounds also capture an unrelated card", () => {
+		const box = { type: "rectangle", x: 0, y: 0, width: 20, height: 20, groupIds: ["g"] };
+		const board = expansionBoard([{ ...box, id: "left" }, { ...box, id: "right", x: 100 }, { ...box, id: "unrelated", x: 50, groupIds: [] }]);
+		expect(board.node("group:g")).toMatchObject({ x: -1, y: -1, width: 122, height: 22 });
+		expect(board.entries("group:g")[0]).toMatchObject({ status: "approximated", reason: "groups" });
+		expect(board.node("unrelated").x).toBe(50);
+	});
+
+	it("reports groups of independent lines that native spatial frames cannot capture", () => {
+		const board = expansionBoard([{ id: "line", type: "line", x: 0, y: 0, points: [[0, 0], [40, 0]], groupIds: ["line-only"] }]);
+		expect(board.nodes.filter((node) => node.type === "group")).toHaveLength(0);
+		expect(board.entries("groups")).toEqual([{ sourceId: "groups", sourceType: "groupIds", status: "plugin-unsupported", reason: "groups" }]);
+	});
+
+	it("rejects malformed group IDs and avoids synthetic binding collisions", () => {
+		const box = { type: "rectangle", x: 0, y: 0, width: 20, height: 20 };
+		const board = expansionBoard([{ ...box, id: "group:g", groupIds: ["g"] }, { ...box, id: "bad-group", groupIds: ["", 2] }]);
+		expect(board.node("group:g").type).toBe("text");
+		expect(board.node("group:group:g").type).toBe("group");
+		expect(board.entries("bad-group")[0]).toMatchObject({ sourceType: "groupIds", status: "invalid-source", reason: "groups" });
+	});
+
+	it("keeps named frame rotation and lock, while reporting explicit membership and invalid parents", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		expect(board.override("inner-frame")).toMatchObject({ rotation: 90, locked: true, item: { type: "frame" } });
+		expect(board.node("inner-frame").label).toBe("Вложенная рамка");
+		expect(board.entries("inner-frame")[0]).toMatchObject({ sourceType: "frameId", status: "plugin-unsupported", reason: "frameMembership" });
+		expect(board.entries("owner")[0]).toMatchObject({ sourceType: "frameId", status: "plugin-unsupported", reason: "frameMembership" });
+		expect(board.entries("dangling-member")[0]).toMatchObject({ sourceType: "frameId", status: "invalid-source", reason: "frameMembership" });
+		const self = expansionBoard([{ id: "self", type: "frame", x: 0, y: 0, width: 40, height: 40, frameId: "self" }]);
+		expect(self.entries("self")[0]).toMatchObject({ status: "invalid-source", reason: "frameMembership" });
+	});
+
+	it("reports non-default image scale and non-empty customData rather than discarding them silently", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		expect(board.entries("flipped")).toContainEqual({ sourceId: "flipped", sourceType: "scale", status: "plugin-unsupported", reason: "imageScale" });
+		expect(board.entries("custom")).toEqual([{ sourceId: "custom", sourceType: "customData", status: "plugin-unsupported", reason: "customData" }]);
+		expect(board.entries("empty-custom")).toEqual([]);
+		expect(board.node("custom").text).toBe("Свойства");
+		expect(JSON.stringify(board.result.document)).not.toContain("never execute");
+		const defaults = expansionBoard([{ id: "normal", type: "image", x: 0, y: 0, width: 40, height: 40, scale: [1, 1] }]);
+		expect(defaults.entries("normal").some((entry) => entry.reason === "imageScale")).toBe(false);
+		const malformed = expansionBoard([{ id: "invalid-scale", type: "image", x: 0, y: 0, width: 40, height: 40, scale: [2, 1] }]);
+		expect(malformed.entries("invalid-scale")).toContainEqual({ sourceId: "invalid-scale", sourceType: "scale", status: "invalid-source", reason: "imageScale" });
+	});
+
+	it("retains card array order despite conflicting fractional indices and reports cross-kind z-order loss", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		expect(board.nodes.indexOf(board.node("owner"))).toBeLessThan(board.nodes.indexOf(board.node("goal")));
+		expect(board.entries("zOrder")).toEqual([{ sourceId: "zOrder", sourceType: "elements", status: "plugin-unsupported", reason: "zOrder" }]);
+		expect(board.node("owner").text).toBe("Связь [[Заметка]]");
+	});
+});
+
+describe("excalidraw expansion: binding and import bounds", () => {
+	it("binds an early arrow through contained text using the container's turn", () => {
+		const board = new Board(convertExcalidraw(expansionSource(), context()));
+		const edge = board.edge("lead-arrow");
+		expect(edge.fromNode).toBe(board.idOf("owner"));
+		expect(edge.toNode).toBe(board.idOf("goal"));
+		const anchors = board.override("lead-arrow").connectorAnchors as Record<string, unknown>;
+		expect(anchors.from).toEqual({ type: "node", nodeId: board.idOf("owner"), u: 1, v: 0.5 });
+		expect(anchors.to).toEqual({ type: "node", nodeId: board.idOf("goal"), u: 0, v: 0.5 });
+		const resolved = resolveAnchor(anchors.from, { nodes: { [board.idOf("owner")]: { ...board.node("owner"), rotation: 90 } } });
+		expect(resolved.valid).toBe(true);
+		expect(resolved.point).toMatchObject({ x: -80, y: -40 });
+		expect(board.override("lead-arrow").connector).toMatchObject({ route: "elbowed", waypoints: [{ x: -80, y: 40 }] });
+		expect(board.entries("lead-arrow").some((entry) => entry.reason === "binding")).toBe(false);
+	});
+
+	it("reads an orbit endpoint rather than its focus and reports lost gap/orbit behaviour", () => {
+		const board = expansionBoard([
+			{ id: "orbit", type: "arrow", x: 105, y: 20, points: [[0, 0], [100, 0]], startBinding: { elementId: "box", fixedPoint: [0.5, 0.5], mode: "orbit" } },
+			{ id: "box", type: "rectangle", x: 0, y: 0, width: 100, height: 40 },
+		]);
+		const connector = board.connectors[board.idOf("orbit")]!;
+		expect(connector.from).toEqual({ type: "node", nodeId: board.idOf("box"), u: 1, v: 0.5 });
+		expect(connector.to).toEqual({ type: "free", x: 205, y: 20 });
+		expect(board.entries("orbit")[0]).toMatchObject({ sourceType: "startBinding", status: "approximated", reason: "binding" });
+	});
+
+	it("reports a missing binding target while retaining the saved endpoint", () => {
+		const board = expansionBoard([{ id: "dangling", type: "arrow", x: -10, y: -20, points: [[0, 0], [30, 0]], endBinding: { elementId: "absent" } }]);
+		expect(board.connectors[board.idOf("dangling")]!.to).toEqual({ type: "free", x: 20, y: -20 });
+		expect(board.entries("dangling")[0]).toMatchObject({ sourceType: "endBinding", status: "source-limited", reason: "binding" });
+	});
+
+	it("enforces the shared text and element caps before allocating board IDs", () => {
+		const noIds = { ...context(), newId: (): string => { throw new Error("allocated before checking the cap"); } };
+		const tooLong = { ...expansionSource(), text: " ".repeat(MAX_IMPORT_SOURCE_LENGTH + 1) };
+		const tooMany = { ...expansionSource(), text: JSON.stringify({ type: "excalidraw", elements: Array.from({ length: MAX_IMPORT_ELEMENTS + 1 }, () => null) }) };
+		for (const source of [tooLong, tooMany]) {
+			expect(() => convertExcalidraw(source, noIds)).toThrowError(expect.objectContaining({ reason: "tooLarge" }));
+		}
+		const atLimit = expansionBoard(Array.from({ length: MAX_IMPORT_ELEMENTS }, () => ({ id: "deleted", type: "rectangle", isDeleted: true })));
+		expect(atLimit.result.report.counts.skipped).toBe(MAX_IMPORT_ELEMENTS);
+	});
+
+	it("converts plain JSON, JSON Markdown and compressed Markdown identically without changing source bytes", () => {
+		const plain = expansionSource();
+		const original = plain.text;
+		const convert = (encoding: "json" | "compressed-json"): ImportResult => {
+			const drawing = encoding === "json" ? original : compressToBase64(original);
+			return convertExcalidraw({ path: plain.path, extension: "md", frontmatter: { "excalidraw-plugin": "parsed" }, text: `---\nexcalidraw-plugin: parsed\n---\n## Drawing\n\`\`\`${encoding}\n${drawing}\n\`\`\`\n` }, context());
+		};
+		const result = convertExcalidraw(plain, context());
+		expect(convert("json")).toEqual(result);
+		expect(convert("compressed-json")).toEqual(result);
+		expect(plain.text).toBe(original);
+		expect(() => assertImportedBoard(result.document)).not.toThrow();
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual([]);
 	});
 });

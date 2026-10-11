@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Preserve source theme, supported static image reflection and restricted passive SVG attachments on Excalidraw import; retain native palette tint, invisible containers and direct routes on Advanced imports.
+- Add bounded tldraw native shape/text/line/image and authored Markmind rich tree import. Read complete geometry/styles from already-open audited source editors without changing them; reject stale/incomplete captures.
+- Remove native card padding and scrollbar reservation from imported local text/shape labels, retaining ordinary native card layout. Report remaining font, sketch, curve and editor feature differences explicitly.
+
+- Extend Excalidraw import with bounded embedded PNG/JPEG/GIF/WebP attachments, raw Element Links, note heading/block subpaths, per-point pressure widths and approximate spatial groups. Report reflection, clipping/membership, binding, intrinsic image sizing, extension and stacking losses explicitly.
+- Add JSON Canvas 1.0 copy import with unknown-field/source preservation and shared native validation. Map supported Advanced Canvas collapsed groups through native group snapshots while keeping existing overrides.
+- Add pinned tldraw sample provenance and expose unsupported variants/components in the import report.
+- Let independent export settle nonempty Markdown while cancelling content-free drawing-card queues, avoiding a page-render timeout on imported pen strokes.
+- Recheck source bytes after preview, publish attachments only on confirmation and clean unchanged owned attachments after failed publication. Count source IDs once while retaining all report details.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.

@@ -1522,7 +1522,7 @@ are read, their code is not copied) and Advanced Canvas boards. This is stage 6
 **How it runs.** One action, "Import into a board", in the command palette
 (for the open file) and in a file's menu (for a `.excalidraw` file, a note
 whose properties carry `excalidraw-plugin` or `mindmap-plugin`, and every
-`.canvas`; the content decides). The file is read once (`cachedRead`), the
+`.canvas`; the content decides). The source snapshot is read freshly (`read`), the
 importer that recognises it builds the board in memory, and a preview says
 what was found (format and version), where the board goes, how many elements
 were converted, approximated and not imported, the first 20 entries, and
@@ -1548,13 +1548,14 @@ taken 1:1.
 | pen stroke | drawing item; the turn is worked into its points |
 | frame, magic frame | frame (a named group drawn under every card) |
 | picture from the vault | file card; missing - dashed placeholder "picture not found" |
-| picture stored inside the drawing, iframe, unknown element | dashed placeholder where it was |
+| embedded PNG/JPEG/GIF/WebP | bounded new file cards and attachments published after accepted preview |
+| unsupported/corrupt picture, iframe, unknown element | diagnosed dashed placeholder where it was |
 | `$$…$$` formula, web embed, embedded note | card with the LaTeX, card with a link, file card |
 | element `link` | a line under the card's text; on a line, stroke, picture or frame it is reported ("link not kept") |
 | Excalidraw's default ink (`#1e1e1e`, `#000000`) | the board's own text, outline and line colours, which read on light and dark boards; a pen stroke, which must name its colour, takes the pen's own default for the theme the new board opens in (white on dark, `#1a1a1a` on light) |
 
 Reported once per kind, not drawn: hand-drawn roughness, hatched fills,
-groups, shape transparency, picture cropping, the background colour. A closed
+shape transparency, picture cropping, the background colour. Groups become transparent spatial frames, explicitly approximated. A closed
 line's or pen stroke's fill is reported per element ("fill of a closed line").
 Deleted elements are counted as skipped. Excalidraw's bookkeeping (`seed`,
 `version`, `index`, `updated`, `boundElements`...) carries nothing a board
@@ -1585,7 +1586,8 @@ board does not already have (an existing override wins and is reported).
 | arrow triangle-outline, thin-triangle, halved-triangle, diamond(-outline), circle(-outline), blunt | triangle, arrow, stealth (approx.), filled_diamond/diamond, filled_oval/oval, none (approx.) |
 | pathfindingMethod direct, square, a-star | straight, elbowed, elbowed (approx.) |
 | start node and the lines out of it | `miroCanvas.decks[0]`; at a branch the first line wins (approx.) |
-| portal, collapsed group | kept as a file card / shown open (approx.) |
+| portal | kept as a file card (approx.) |
+| collapsed group | existing native group snapshot and compact projection (spatial membership approximated) |
 
 Lines into a portal are reattached to the portal's card where their id says
 which, otherwise reported. With both plugins on, the checked board was not
@@ -1619,8 +1621,7 @@ to raise once its agent is done): `{ id, format, formatVersion?, sourcePath,
 importer, importerVersion, importedAt, reportNodeId?, counts { converted,
 approximated, notImported, skipped }, entries[{ sourceId, sourceType, status,
 reason, nodeId? }] (maxItems 10000) }`. `ImportReport` in
-`src/importers/types.ts` already has exactly this shape, so the day the schema
-carries it the report is written as it is.
+`src/importers/types.ts` describes the proposed fields; its optional runtime-only omittedEntries counts capped details. No imports[] record is written before an upstream schema change.
 
 - [x] `MIGRATE-001` Add explicit, non-destructive import adapters for these
   formats. Convert recoverable structure into native Canvas plus versioned
@@ -2534,3 +2535,10 @@ Release0.3.1 keeps the mobile plugin below5MB through lossless offline PDF-font 
 
 
 Release0.3.2 removes the no-op Range.detach call from vector glyph measurement. The remaining Node/config/legacy command warnings have their standalone/compatibility reasons documented; they do not justify importing Obsidian into the Node tools.
+
+
+## Import expansion — 2026-10-11
+
+[Current format/loss matrix](import.md), [plan](import-expansion-plan.md) and [acceptance](import-expansion-checks.md) supersede the initial 2026-09-28 limitations above. JSON Canvas copies native fields and preserves every unknown field/miroSource. Excalidraw imports bounded raster/passive SVG assets, supported static reflection, source theme, raw Element Links, native file subpaths and pressure widths; grouping remains spatial. Advanced Canvas retains native palette tint and invisible containers while using its existing group snapshot planner. tldraw supports the bounded native subsets in the [pinned audit](import-tldraw-audit.md); Markmind rich supports an authored single tree. Complete version-pinned open source views can supply read-only geometry/styles; dirty/stale/incomplete observations fall back atomically. Native Markdown metrics, sampled curves and unsupported editor features remain explicit differences. No schema fields or foreign runtime are introduced.
+
+Pure adapters return document/report plus optional in-memory assets. import-command is the only publication owner, reads fresh source bytes, checks after preview and asset staging, then creates the new board. Failure uses the FileManager trash preference only for unchanged owned attachment identities/paths/bytes; an empty folder may remain, and user-edited files survive. Source IDs are classified once; detail entries preserve every reason and report capped rows independently. No new schema fields or editor runtime are introduced.

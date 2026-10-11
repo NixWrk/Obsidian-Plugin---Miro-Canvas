@@ -26,26 +26,34 @@
  * Every element either comes over, bound to its card or line, or is an entry
  * of the report (LIMIT-001); a visual element that cannot come over leaves
  * a placeholder card where it was.  What the board cannot draw at all -
- * hand-drawn roughness, hatching, groups, transparency, cropping, the
+ * hand-drawn roughness, hatching, transparency, cropping, the
  * background colour - is reported once per kind, not once per element.
  * Excalidraw's bookkeeping (`seed`, `version`, `versionNonce`, `index`,
- * `updated`, `boundElements`, `lastCommittedPoint`, `pressures`,
- * `simulatePressure`, `status`, `scale`, `customData`, `frameId`) carries
- * nothing a board shows and is neither kept nor reported.
+ * `updated`, `boundElements`, `lastCommittedPoint`, `status`) is not kept.
+ * Pressure samples become per-point widths, but the freehand outline and
+ * simulated pressure remain approximations. Image flips, explicit frame
+ * membership/clipping and non-empty custom data are reported as losses.
+ * Groups become transparent spatial frames with explicit approximation
+ * entries: native containment may capture unrelated cards. Groups without
+ * any card remain unsupported. Scene array order is authoritative;
+ * fractional indices are not re-sorted.
  *
  * Pure: the source text is only read, and the vault is reached only
  * through `ImportContext.resolveLink`.
  */
 
 import type { CanvasAnchor } from "../anchors";
-import { isValidFontSize } from "../appearance";
+import { isValidFontSize, isValidLineHeight } from "../appearance";
 import { MAX_WAYPOINTS } from "../connector-route";
 import { defaultPenInk, simplifyPoints, strokeBounds, type StrokePoint } from "../drawing";
 import { MAX_STROKE_POINTS, readLocalStroke, type LocalStroke } from "../local-items";
+import { ImportAssets } from "./assets";
 import { BoardBuilder, type BoardRect, type ImportedCardStyle, type SourceElement } from "./board-builder";
 import { readExcalidrawFile, type ExcalidrawFile, type ExcalidrawReadErrorCode } from "./excalidraw-file";
 import {
 	ImportError,
+	MAX_IMPORT_ELEMENTS,
+	MAX_IMPORT_SOURCE_LENGTH,
 	type FormatAdapter,
 	type ImportContext,
 	type ImportEntryStatus,
@@ -166,6 +174,9 @@ const DEFAULT_ARROWHEAD_SIZE = 15;
  * stroke's size.
  */
 const FREEDRAW_SIZE_PER_WIDTH = 4.25;
+/** Published outline parameters, not an imported freehand renderer. */
+const FREEDRAW_THINNING = 0.6;
+const CONSTANT_FREEDRAW_SIZE_PER_WIDTH = 1.4;
 /**
  * Excalidraw's default ink, today's and the plain black of older drawings.
  * Excalidraw turns it light on a dark canvas; kept as it is, text and
@@ -214,18 +225,22 @@ export function detectExcalidraw(source: ImportSource): boolean {
 
 /** The board a drawing makes; throws `ImportError` when the file holds no drawing that can be read. */
 export function convertExcalidraw(source: ImportSource, context: ImportContext): ImportResult {
+	if (source.text.length > MAX_IMPORT_SOURCE_LENGTH) throw new ImportError("tooLarge", "Excalidraw source exceeds the text limit");
 	const read = readExcalidrawFile(source.text);
 	if (!read.ok) throw new ImportError(READ_ERROR_REASONS[read.error.code], read.error.detail);
-	const drawing = new DrawingImport(read.file, source.path, context);
+	if (read.file.scene.elements.length > MAX_IMPORT_ELEMENTS) throw new ImportError("tooLarge", "Excalidraw scene exceeds the element limit");
+	const drawing = new DrawingImport(read.file, source.path, context, source.frontmatter);
 	return drawing.build();
 }
 
 /** One drawing on its way to a board. */
 class DrawingImport {
 	private readonly builder: BoardBuilder;
+	private readonly assets: ImportAssets;
 	private readonly file: ExcalidrawFile;
 	private readonly sourcePath: string;
 	private readonly context: ImportContext;
+	private readonly displayTheme: "light" | "dark" | undefined;
 	/** Live elements in the drawing's own order, back to front. */
 	private readonly elements: DrawingElement[] = [];
 	private readonly byId = new Map<string, DrawingElement>();
@@ -238,12 +253,16 @@ class DrawingImport {
 	/** Cards arrows may hold on to, by the id of the element they stand for. */
 	private readonly placed = new Map<string, PlacedCard>();
 	private readonly lostStyles = new Set<ImportReason>();
+	private readonly reflectedImages = new Set<string>();
 
-	constructor(file: ExcalidrawFile, sourcePath: string, context: ImportContext) {
+	constructor(file: ExcalidrawFile, sourcePath: string, context: ImportContext, private readonly frontmatter?: Readonly<Record<string, unknown>>) {
 		this.builder = new BoardBuilder("excalidraw", context);
+		this.assets = new ImportAssets(sourcePath, context.newId);
 		this.file = file;
 		this.sourcePath = sourcePath;
-		this.context = context;
+		const sourceTheme = isRecord(file.scene.appState) ? file.scene.appState.theme : undefined;
+		this.displayTheme = sourceTheme === "light" || sourceTheme === "dark" ? sourceTheme : undefined;
+		this.context = this.displayTheme === undefined ? context : { ...context, theme: this.displayTheme };
 	}
 
 	build(): ImportResult {
@@ -258,18 +277,27 @@ class DrawingImport {
 		for (const element of this.elements) {
 			if (LINE_TYPES.has(element.type)) this.placeLine(element);
 		}
+		this.placeGroups();
+		for (const element of this.elements) this.collectLostStyles(element);
+		this.collectBackground();
+		this.noteLostStyles();
+		this.noteOrderLoss();
+		if (this.file.noteBody !== undefined) this.note({ sourceId: "noteBody", sourceType: "Markdown", status: "plugin-unsupported", reason: "noteBody" });
+		for (const key of Object.keys(this.frontmatter ?? {})) {
+			if (key === "excalidraw-plugin" || key === "position") continue;
+			this.note({ sourceId: `frontmatter:${key}`, sourceType: key, status: "plugin-unsupported", reason: "frontmatter" });
+		}
 		// Text inside a shape or on a line came over with it, as its text.
 		for (const textId of this.containedTexts) {
 			if (!this.reported.has(textId)) this.builder.countConverted();
 		}
-		for (const element of this.elements) this.collectLostStyles(element);
-		this.collectBackground();
-		this.noteLostStyles();
 		const formatVersion = this.file.formatVersion === "unknown" ? undefined : this.file.formatVersion;
-		return this.builder.finish({
+		const result = this.builder.finish({
 			sourcePath: this.sourcePath,
 			...(formatVersion === undefined ? {} : { formatVersion }),
-		});
+		}, this.displayTheme);
+		const assets = this.assets.list();
+		return assets.length === 0 ? result : { ...result, assets };
 	}
 
 	/** Every element of the scene: deleted ones counted, unreadable ones reported, the rest kept. */
@@ -289,7 +317,8 @@ class DrawingImport {
 				this.note({ sourceId: id, sourceType: type, status: "invalid-source", reason: "invalidElement" });
 				return;
 			}
-			const element = { id, type, data: value };
+			const data = this.file.links.has(id) ? { ...value, link: this.file.links.get(id) } : value;
+			const element = { id, type, data };
 			this.elements.push(element);
 			this.byId.set(id, element);
 		});
@@ -331,7 +360,7 @@ class DrawingImport {
 		const nodeId = this.builder.shapeCard(rect, linked.text, { kind, fallback: "text" }, { source: sourceOf(element), style });
 		this.remember(element, nodeId, rect);
 		// An arrow bound to the text inside holds on to the shape.
-		if (label !== undefined) this.remember(label, nodeId, rect);
+		if (label !== undefined) this.placed.set(label.id, this.placed.get(element.id)!);
 		this.noteLinks(linked.linked, nodeId);
 	}
 
@@ -349,7 +378,7 @@ class DrawingImport {
 	private placeFrame(element: DrawingElement): void {
 		const rect = boxOf(element.data);
 		const name = typeof element.data.name === "string" ? element.data.name : "";
-		const nodeId = this.builder.frame(rect, name, { source: sourceOf(element), ...styleOption(lockedStyle(element.data)) });
+		const nodeId = this.builder.frame(rect, name, { source: sourceOf(element), ...styleOption(turnedStyle(element.data)) });
 		this.remember(element, nodeId, rect);
 		this.noteLostLink(element);
 	}
@@ -372,7 +401,7 @@ class DrawingImport {
 				this.placeholder(element, "missing-asset", isNoteLink(target) ? "fileNotFound" : "imageNotFound");
 				return;
 			}
-			const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...styleOption(turnedStyle(element.data)) });
+			const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...fileSubpath(embed.link), ...styleOption(turnedStyle(element.data)) });
 			this.remember(element, nodeId, rect);
 			this.noteLostLink(element);
 			return;
@@ -385,9 +414,26 @@ class DrawingImport {
 			this.approximateAsCard(element, rect, markdownLink(embed.url), "embed");
 			return;
 		}
-		if (embed === undefined && fileId !== undefined && hasDataUrl(this.file.scene.files, fileId)) {
-			this.placeholder(element, "missing-asset", "embeddedImage");
-			return;
+		if (embed === undefined && fileId !== undefined && isRecord(this.file.scene.files)) {
+			const entry = Object.prototype.hasOwnProperty.call(this.file.scene.files, fileId) ? this.file.scene.files[fileId] : undefined;
+			if (isRecord(entry)) {
+				const scale = element.data.scale;
+				const validScale = Array.isArray(scale) && scale.length === 2 && scale.every(value => value === 1 || value === -1);
+				const reflection = validScale ? { flipX: scale[0] === -1, flipY: scale[1] === -1 } : {};
+				const asset = this.assets.add(fileId, entry.dataURL, reflection);
+				if (!asset.ok) {
+					this.placeholder(element, asset.reason === "unsupportedAsset" ? "plugin-unsupported" : "invalid-source", asset.reason);
+					return;
+				}
+				const nodeId = this.builder.file(rect, asset.path, { source: sourceOf(element), style: { ...turnedStyle(element.data), showAttachmentName: false } });
+				if (reflection.flipX || reflection.flipY) this.reflectedImages.add(element.id);
+				this.remember(element, nodeId, rect);
+				if (Math.abs(rect.width / rect.height - asset.width / asset.height) > 0.001) {
+					this.note({ sourceId: element.id, sourceType: "image", status: "approximated", reason: "imageAspect", nodeId });
+				}
+				this.noteLostLink(element);
+				return;
+			}
 		}
 		this.placeholder(element, "missing-asset", "imageNotFound");
 	}
@@ -409,7 +455,7 @@ class DrawingImport {
 			this.placeholder(element, "missing-asset", "fileNotFound");
 			return;
 		}
-		const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...styleOption(turnedStyle(element.data)) });
+		const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...fileSubpath(link), ...styleOption(turnedStyle(element.data)) });
 		this.remember(element, nodeId, rect);
 	}
 
@@ -433,11 +479,20 @@ class DrawingImport {
 	private placeStroke(element: DrawingElement): void {
 		const data = element.data;
 		let points = boardPoints(data);
-		// A single touch of the pen is a dot: a stroke from the point to itself.
-		if (points.length === 1) points = [points[0], points[0]];
-		points = fewerPoints(points, MAX_STROKE_POINTS);
 		const strokeWidth = positiveNumber(data.strokeWidth) ?? 1;
-		const width = Math.min(1_000, roundTo(strokeWidth * FREEDRAW_SIZE_PER_WIDTH, 2));
+		const constantWidth = isRecord(data.strokeOptions) && data.strokeOptions.variability === "constant";
+		const size = strokeWidth * (constantWidth ? CONSTANT_FREEDRAW_SIZE_PER_WIDTH : FREEDRAW_SIZE_PER_WIDTH);
+		const pressures = constantWidth || data.simulatePressure !== false ? undefined : readPressures(data.pressures, points.length);
+		let widths = pressures?.map((pressure) => pressureWidth(size, pressure));
+		// A single touch of the pen is a dot: a stroke from the point to itself.
+		if (points.length === 1) {
+			points = [points[0], points[0]];
+			if (widths !== undefined) widths = [widths[0], widths[0]];
+		}
+		const kept = fewerStrokePoints(points, widths, MAX_STROKE_POINTS);
+		points = kept.points;
+		widths = kept.widths;
+		const width = widths === undefined ? Math.min(1_000, Math.max(0.01, roundTo(size, 2))) : maximum(widths);
 		const bounds = strokeBounds(points, width);
 		const left = Math.floor(bounds.x);
 		const top = Math.floor(bounds.y);
@@ -454,6 +509,7 @@ class DrawingImport {
 		const candidate: LocalStroke = {
 			color: ownColor ?? defaultPenInk(this.context.theme ?? "light"),
 			width,
+			...(widths === undefined ? {} : { widths }),
 			...(opacity < 1 ? { opacity } : {}),
 			box: { width: right - left, height: bottom - top },
 			points: points.flatMap((point) => [roundTo(point.x - left, 2), roundTo(point.y - top, 2)]),
@@ -465,6 +521,10 @@ class DrawingImport {
 		}
 		const rect = { x: left, y: top, width: right - left, height: bottom - top };
 		const nodeId = this.builder.drawing(rect, stroke, { source: sourceOf(element), ...styleOption(lockedStyle(data)) });
+		this.placed.set(element.id, { nodeId, rect, angle: 0 });
+		if (!constantWidth && (data.simulatePressure === true || data.simulatePressure === false || Array.isArray(data.pressures) && data.pressures.length > 0)) {
+			this.note({ sourceId: element.id, sourceType: "pressures", status: data.simulatePressure === false && pressures === undefined ? "invalid-source" : "approximated", reason: "pressure", nodeId });
+		}
 		this.noteLostFill(element, nodeId);
 		this.noteLostLink(element);
 	}
@@ -488,8 +548,8 @@ class DrawingImport {
 		const strokeStyle = strokeStyleOf(data.strokeStyle);
 		const headSize = headSizeOf(data.startArrowhead, data.endArrowhead);
 		const line = {
-			from: this.endAnchor(data.startBinding, first),
-			to: this.endAnchor(data.endBinding, last),
+			from: this.endAnchor(element, "startBinding", first),
+			to: this.endAnchor(element, "endBinding", last),
 			route: routeOf(data, points.length),
 			startCap: startHead.cap,
 			endCap: endHead.cap,
@@ -514,16 +574,30 @@ class DrawingImport {
 	 * to, at the share of that element's unturned box the end lies at, or on
 	 * the board where it is.
 	 */
-	private endAnchor(binding: unknown, point: StrokePoint): CanvasAnchor {
+	private endAnchor(element: DrawingElement, field: "startBinding" | "endBinding", point: StrokePoint): CanvasAnchor {
+		const binding = element.data[field];
 		const free: CanvasAnchor = { type: "free", ...roundPoint(point) };
-		if (!isRecord(binding) || typeof binding.elementId !== "string") return free;
+		if (binding === undefined || binding === null) return free;
+		if (!isRecord(binding) || typeof binding.elementId !== "string" || binding.elementId === "") {
+			this.note({ sourceId: element.id, sourceType: field, status: "invalid-source", reason: "binding" });
+			return free;
+		}
 		const target = this.placed.get(binding.elementId);
-		if (target === undefined) return free;
+		if (target === undefined) {
+			this.note({ sourceId: element.id, sourceType: field, status: "source-limited", reason: "binding" });
+			return free;
+		}
 		const rect = target.rect;
 		const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 		const local = rotateAround(point, centre, -target.angle);
-		const u = rect.width > 0 ? clampUnit((local.x - rect.x) / rect.width) : 0.5;
-		const v = rect.height > 0 ? clampUnit((local.y - rect.y) / rect.height) : 0.5;
+		const rawU = rect.width > 0 ? (local.x - rect.x) / rect.width : 0.5;
+		const rawV = rect.height > 0 ? (local.y - rect.y) / rect.height : 0.5;
+		const u = clampUnit(rawU);
+		const v = clampUnit(rawV);
+		// A native card anchor has no outside gap or orbit-binding behaviour.
+		if (Math.abs(rawU - u) > 0.0001 || Math.abs(rawV - v) > 0.0001 || binding.mode === "orbit") {
+			this.note({ sourceId: element.id, sourceType: field, status: "approximated", reason: "binding" });
+		}
 		return { type: "node", nodeId: target.nodeId, u: roundTo(u, 4), v: roundTo(v, 4) };
 	}
 
@@ -597,6 +671,9 @@ class DrawingImport {
 	/** The looks of an element the board cannot draw, each kind remembered once. */
 	private collectLostStyles(element: DrawingElement): void {
 		const data = element.data;
+		if (element.type === "text" && data.fontFamily !== undefined && (typeof data.fontFamily !== "number" || FONT_FAMILIES[data.fontFamily] === undefined)) {
+			this.note({ sourceId: element.id, sourceType: "fontFamily", status: "plugin-unsupported", reason: "customStyle" });
+		}
 		const roughness = finiteNumber(data.roughness);
 		if (ROUGH_TYPES.has(element.type) && roughness !== undefined && roughness > 0) this.lostStyles.add("roughness");
 		const fill = readColor(data.backgroundColor);
@@ -604,11 +681,83 @@ class DrawingImport {
 		if (FILLED_TYPES.has(element.type) && filled && typeof data.fillStyle === "string" && data.fillStyle !== "solid") {
 			this.lostStyles.add("hatch");
 		}
-		if (Array.isArray(data.groupIds) && data.groupIds.length > 0) this.lostStyles.add("groups");
 		const opacity = finiteNumber(data.opacity);
 		// A pen stroke keeps its transparency; nothing else on a board has one.
 		if (element.type !== "freedraw" && opacity !== undefined && opacity < 100) this.lostStyles.add("opacity");
 		if (element.type === "image" && isRecord(data.crop)) this.lostStyles.add("imageCrop");
+		if (element.type === "image" && data.scale !== undefined) {
+			const scale = data.scale;
+			const valid = Array.isArray(scale) && scale.length === 2 && scale.every((value) => value === 1 || value === -1);
+			if (!valid || (scale[0] !== 1 || scale[1] !== 1) && !this.reflectedImages.has(element.id)) {
+				this.note({ sourceId: element.id, sourceType: "scale", status: valid ? "plugin-unsupported" : "invalid-source", reason: "imageScale" });
+			}
+		}
+		if (data.frameId !== undefined && data.frameId !== null) {
+			const frame = typeof data.frameId === "string" ? this.byId.get(data.frameId) : undefined;
+			const valid = frame !== undefined && FRAME_TYPES.has(frame.type) && frame.id !== element.id;
+			this.note({ sourceId: element.id, sourceType: "frameId", status: valid ? "plugin-unsupported" : "invalid-source", reason: "frameMembership" });
+		}
+		if (data.customData !== undefined && data.customData !== null && (!isRecord(data.customData) || Object.keys(data.customData).length > 0)) {
+			this.note({ sourceId: element.id, sourceType: "customData", status: isRecord(data.customData) ? "plugin-unsupported" : "invalid-source", reason: "customData" });
+		}
+	}
+
+	/** A source group becomes a transparent spatial frame, never exact membership. */
+	private placeGroups(): void {
+		const groups = new Map<string, { cards: Set<string>; bounds?: BoardRect; depth: number; locked: boolean }>();
+		for (const element of this.elements) {
+			const groupIds = element.data.groupIds;
+			if (groupIds === undefined || groupIds === null) continue;
+			if (!Array.isArray(groupIds) || groupIds.some((id) => typeof id !== "string" || id === "")) {
+				this.note({ sourceId: element.id, sourceType: "groupIds", status: "invalid-source", reason: "groups" });
+				continue;
+			}
+			const card = this.placed.get(element.id);
+			const bounds = card === undefined ? LINE_TYPES.has(element.type) ? strokeBounds(boardPoints(element.data), positiveNumber(element.data.strokeWidth) ?? 1) : undefined : cardBounds(card);
+			for (let index = 0; index < groupIds.length; index += 1) {
+				const groupId = groupIds[index] as string;
+				let group = groups.get(groupId);
+				if (group === undefined) {
+					if (groups.size >= MAX_IMPORT_ELEMENTS) throw new ImportError("tooLarge", "Excalidraw scene exceeds the group limit");
+					group = { cards: new Set(), depth: 0, locked: false };
+					groups.set(groupId, group);
+				}
+				group.depth = Math.max(group.depth, groupIds.length - index - 1);
+				group.locked ||= element.data.locked === true;
+				if (card !== undefined) group.cards.add(card.nodeId);
+				if (bounds !== undefined) group.bounds = unionBounds(group.bounds, bounds);
+			}
+		}
+		// Outer frames precede inner ones; equal-depth groups keep source order.
+		const ordered = [...groups].sort((left, right) => left[1].depth - right[1].depth);
+		const sourceIds = new Set(this.byId.keys());
+		for (const [groupId, group] of ordered) {
+			if (group.cards.size === 0 || group.bounds === undefined) {
+				this.lostStyles.add("groups");
+				continue;
+			}
+			let sourceId = `group:${groupId}`;
+			while (sourceIds.has(sourceId)) sourceId = `group:${sourceId}`;
+			sourceIds.add(sourceId);
+			const nodeId = this.builder.frame(group.bounds, "", {
+				source: { id: sourceId, type: "group" },
+				style: { colors: { fill: null }, borderStyle: "none", borderWidth: 0, ...(group.locked ? { locked: true } : {}) },
+			});
+			this.note({ sourceId, sourceType: "groupIds", status: "approximated", reason: "groups", nodeId });
+		}
+	}
+
+	/** Cards retain their relative order; lines are placed afterwards to resolve bindings. */
+	private noteOrderLoss(): void {
+		let sawLine = false;
+		for (const element of this.elements) {
+			if (this.containedTexts.has(element.id) || FRAME_TYPES.has(element.type)) continue;
+			if (LINE_TYPES.has(element.type)) sawLine = true;
+			else if (sawLine) {
+				this.note({ sourceId: "zOrder", sourceType: "elements", status: "plugin-unsupported", reason: "zOrder" });
+				return;
+			}
+		}
 	}
 
 	private collectBackground(): void {
@@ -705,6 +854,7 @@ function cardStyle(shape: ElementRecord | undefined, text: ElementRecord | undef
 function typographyOf(text: ElementRecord): Record<string, unknown> | undefined {
 	const typography: Record<string, unknown> = {};
 	if (isValidFontSize(text.fontSize)) typography.fontSize = roundTo(text.fontSize, 2);
+	if (isValidLineHeight(text.lineHeight)) typography.lineHeight = roundTo(text.lineHeight, 4);
 	const family = typeof text.fontFamily === "number" ? FONT_FAMILIES[text.fontFamily] : undefined;
 	if (family !== undefined) typography.fontFamily = family;
 	if (text.textAlign === "left" || text.textAlign === "center" || text.textAlign === "right") typography.alignment = text.textAlign;
@@ -787,13 +937,67 @@ function boardPoints(data: ElementRecord): StrokePoint[] {
 	const originX = finiteNumber(data.x) ?? 0;
 	const originY = finiteNumber(data.y) ?? 0;
 	const angle = finiteNumber(data.angle) ?? 0;
-	const xs = relative.map((point) => point.x);
-	const ys = relative.map((point) => point.y);
+	const bounds = strokeBounds(relative);
 	const centre = {
-		x: originX + (Math.min(...xs) + Math.max(...xs)) / 2,
-		y: originY + (Math.min(...ys) + Math.max(...ys)) / 2,
+		x: originX + bounds.x + bounds.width / 2,
+		y: originY + bounds.y + bounds.height / 2,
 	};
 	return relative.map((point) => rotateAround({ x: originX + point.x, y: originY + point.y }, centre, angle));
+}
+
+/** A turned card's full box, with a unit of slack for native spatial containment. */
+function cardBounds(card: PlacedCard): BoardRect {
+	const { rect, angle } = card;
+	const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+	return strokeBounds([
+		{ x: rect.x, y: rect.y },
+		{ x: rect.x + rect.width, y: rect.y },
+		{ x: rect.x + rect.width, y: rect.y + rect.height },
+		{ x: rect.x, y: rect.y + rect.height },
+	].map((point) => rotateAround(point, centre, angle)));
+}
+
+function unionBounds(before: BoardRect | undefined, added: BoardRect): BoardRect {
+	if (before === undefined) return added;
+	const x = Math.min(before.x, added.x);
+	const y = Math.min(before.y, added.y);
+	return { x, y, width: Math.max(before.x + before.width, added.x + added.width) - x, height: Math.max(before.y + before.height, added.y + added.height) - y };
+}
+
+/** Measured pressure must name every source point; zero is a valid light touch. */
+function readPressures(value: unknown, pointCount: number): number[] | undefined {
+	if (!Array.isArray(value) || value.length !== pointCount) return undefined;
+	if (value.some((pressure) => finiteNumber(pressure) === undefined || pressure < 0 || pressure > 1)) return undefined;
+	return value as number[];
+}
+
+/** The published radius model as a diameter; smoothing and caps are still approximated. */
+function pressureWidth(size: number, pressure: number): number {
+	const share = 0.5 + FREEDRAW_THINNING * (pressure - 0.5);
+	return Math.min(1_000, Math.max(0.01, roundTo(2 * size * Math.sin(share * Math.PI / 2), 2)));
+}
+
+function maximum(values: readonly number[]): number {
+	let result = 0;
+	for (const value of values) result = Math.max(result, value);
+	return result;
+}
+
+/** Keep both the course and pressure changes; the same source indices choose both arrays. */
+function fewerStrokePoints(points: StrokePoint[], widths: number[] | undefined, limit: number): { points: StrokePoint[]; widths?: number[] } {
+	if (widths === undefined) return { points: fewerPoints(points, limit) };
+	if (points.length <= limit) return { points, widths };
+	const indices = new Map(points.map((point, index) => [point, index]));
+	const pressurePoints = widths.map((width, index) => ({ x: index, y: width }));
+	let tolerance = 0.25;
+	let kept: number[];
+	do {
+		const geometry = simplifyPoints(points, tolerance).map((point) => indices.get(point)!);
+		const pressure = simplifyPoints(pressurePoints, tolerance).map((point) => point.x);
+		kept = [...new Set([...geometry, ...pressure])].sort((left, right) => left - right);
+		tolerance *= 2;
+	} while (kept.length > limit);
+	return { points: kept.map((index) => points[index]), widths: kept.map((index) => widths[index]) };
 }
 
 /** The same course in at most `limit` points, dropping the ones that say least about its shape. */
@@ -897,11 +1101,12 @@ function markdownLink(url: string): string {
 	return `[${shown}](${target})`;
 }
 
-/** Whether the plain scene stores the picture itself, as a data URL. */
-function hasDataUrl(files: unknown, fileId: string): boolean {
-	if (!isRecord(files)) return false;
-	const entry = Object.prototype.hasOwnProperty.call(files, fileId) ? files[fileId] : undefined;
-	return isRecord(entry) && typeof entry.dataURL === "string" && entry.dataURL.startsWith("data:");
+/** Keep heading, block and PDF subpaths exactly as the native file card reads them. */
+function fileSubpath(link: string): { readonly subpath?: string } {
+	const wiki = /^!?\[\[([^\]]*)\]\]/u.exec(link.trim());
+	const inner = (wiki === null ? link.trim() : wiki[1]).split("|")[0];
+	const hash = inner.indexOf("#");
+	return hash < 0 ? {} : { subpath: inner.slice(hash) };
 }
 
 /** Whether a note's frontmatter, read from its first lines, has `key`. */

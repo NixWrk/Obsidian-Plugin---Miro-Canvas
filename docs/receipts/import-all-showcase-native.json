@@ -1,0 +1,262 @@
+{
+  "port": 9352,
+  "input": "trusted CDP renderer mouse/key input",
+  "preparation": "Vault fixture staging; private Canvas viewport/selection probes",
+  "screenshots": false,
+  "osInput": false,
+  "checks": [
+    {
+      "name": "cancel",
+      "path": "Native import.excalidraw.md",
+      "preview": "Found: Excalidraw drawing, version 2\n\nNew board: Native import (board 4).canvas\n\nConverted: 8 · approximated: 1 · not imported: 1\n\nNew picture attachments beside the source: 1\n\nApproximated or not imported\nWhat\tId\tWhy\npressures\tpen\tApproximated: pressure widths transferred; freehand smoothing and simulated pressure differ\nelements\tzOrder\tNot supported by the plugin yet: lines and cards cannot share one stacking order\n\nThe original file is not changed.\n\nPut an import report card on the board\nCreate board\nCancel",
+      "filesUnchanged": true
+    },
+    {
+      "name": "import",
+      "source": "Native import.excalidraw.md",
+      "board": "Native import (board 4).canvas",
+      "preview": "Found: Excalidraw drawing, version 2\n\nNew board: Native import (board 4).canvas\n\nConverted: 8 · approximated: 1 · not imported: 1\n\nNew picture attachments beside the source: 1\n\nApproximated or not imported\nWhat\tId\tWhy\npressures\tpen\tApproximated: pressure widths transferred; freehand smoothing and simulated pressure differ\nelements\tzOrder\tNot supported by the plugin yet: lines and cards cannot share one stacking order\n\nThe original file is not changed.\n\nPut an import report card on the board\nCreate board\nCancel",
+      "sourceUnchanged": true,
+      "report": true
+    },
+    {
+      "name": "single-card drag",
+      "zoom": -1,
+      "nativeBefore": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 160 45 L 460 45"
+        }
+      ],
+      "nativeHeld": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 300 145 L 460 45"
+        }
+      ],
+      "independentBefore": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 160 70.002 L 350 220"
+        }
+      ],
+      "independentHeld": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 300 170.002 L 350 220"
+        }
+      ],
+      "previewNotSaved": true,
+      "committed": true,
+      "undo": true
+    },
+    {
+      "name": "frame drag",
+      "zoom": -1,
+      "nativeBefore": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 160 45 L 460 45"
+        }
+      ],
+      "nativeHeld": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 280 125 L 460 45"
+        }
+      ],
+      "independentBefore": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 160 70.002 L 350 220"
+        }
+      ],
+      "independentHeld": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 280 150.002 L 350 220"
+        }
+      ],
+      "previewNotSaved": true,
+      "committed": true,
+      "undo": true
+    },
+    {
+      "name": "mixed-selection drag",
+      "zoom": -1,
+      "nativeBefore": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 160 45 L 460 45"
+        }
+      ],
+      "nativeHeld": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 280 105 L 580 105"
+        }
+      ],
+      "independentBefore": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 160 70.002 L 350 220"
+        }
+      ],
+      "independentHeld": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 280 130.002 L 350 220"
+        }
+      ],
+      "previewNotSaved": true,
+      "committed": true,
+      "undo": true
+    },
+    {
+      "name": "resize",
+      "zoom": -1,
+      "nativeBefore": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 160 45 L 460 45"
+        }
+      ],
+      "nativeHeld": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 269 75.5 L 460 45"
+        }
+      ],
+      "independentBefore": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 160 70.002 L 350 220"
+        }
+      ],
+      "independentHeld": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 269 117.448 L 350 220"
+        }
+      ],
+      "previewNotSaved": true,
+      "committed": true,
+      "undo": true
+    },
+    {
+      "name": "rotation",
+      "zoom": -1,
+      "nativeBefore": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 160 45 L 460 45"
+        }
+      ],
+      "nativeHeld": [
+        {
+          "id": "12a5bbef1ed92963",
+          "d": "M 122.207 -22.96 L 460 45"
+        }
+      ],
+      "independentBefore": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 160 70.002 L 350 220"
+        }
+      ],
+      "independentHeld": [
+        {
+          "id": "455fc7b908bf94cd",
+          "d": "M 143.447 -9.769 L 350 220"
+        }
+      ],
+      "previewNotSaved": true,
+      "committed": true,
+      "undo": true
+    },
+    {
+      "name": "reopen",
+      "board": "Native import (board 4).canvas"
+    },
+    {
+      "name": "board search reads imported note heading"
+    },
+    {
+      "name": "native resolved-links and actual backlinks pane",
+      "resolved": {
+        "Native note.md": 2,
+        "Native import.excalidraw.md": 1,
+        "Miro Canvas pictures b328f27c0183bd2f/b2eaa1bc3d770892.png": 1
+      },
+      "paneRow": true,
+      "graphUI": false
+    },
+    {
+      "name": "independent raster PDF export; SVG limitation recorded",
+      "input": "instrumented export setup/call; native renderer/save",
+      "path": "Native import (board 4).pdf",
+      "bytes": 85091,
+      "sourceUnchanged": true,
+      "jobsClean": true,
+      "svgCreated": false,
+      "notices": [
+        "Vector export cannot preserve this content: markdown:list-marker",
+        "Exported to Native import (board 4).pdf"
+      ]
+    },
+    {
+      "name": "plugin-off native fallback",
+      "nodes": 7,
+      "edges": 1
+    },
+    {
+      "name": "import",
+      "source": "Native import (board 4).canvas",
+      "board": "Native import (board 4) (board).canvas",
+      "preview": "Found: JSON Canvas board, version 1.0\n\nNew board: Native import (board 4) (board).canvas\n\nConverted: 8 · approximated: 0 · not imported: 0\n\nThe original file is not changed.\n\nPut an import report card on the board\nCreate board\nCancel",
+      "sourceUnchanged": true,
+      "report": false
+    },
+    {
+      "name": "import",
+      "source": "Actual tldraw.tldr.md",
+      "board": "Actual tldraw (board 7).canvas",
+      "preview": "Found: tldraw (supported native elements), version 1 / schema 2 / draw 5\n\nNew board: Actual tldraw (board 7).canvas\n\nConverted: 0 · approximated: 2 · not imported: 2\n\nApproximated or not imported\nWhat\tId\tWhy\nmarkdown\ttldraw-wrapper\tNot supported by the plugin yet: extension data not interpreted\ndraw\tshape:B8g2DGB0V1tqtCGkUopau\tApproximated: stroke width, smoothing and ink approximated\ndraw\tshape:lYFTlcgUfO12Ftet14pMy\tApproximated: stroke width, smoothing and ink approximated\nmeta\tdocument:document\tNot supported by the plugin yet: extension data not interpreted\n\nThe original file is not changed.\n\nPut an import report card on the board\nCreate board\nCancel",
+      "sourceUnchanged": true,
+      "report": false
+    },
+    {
+      "name": "tldraw real raw fixture in synthetic wrapper",
+      "board": "Actual tldraw (board 7).canvas"
+    },
+    {
+      "name": "import",
+      "source": "Advanced native.canvas",
+      "board": "Advanced native (board 4).canvas",
+      "preview": "Found: Advanced Canvas board, version 1.0-1.0\n\nNew board: Advanced native (board 4).canvas\n\nConverted: 1 · approximated: 1 · not imported: 0\n\nApproximated or not imported\nWhat\tId\tWhy\ngroup\tg\tApproximated: collapsed group uses native containment and a compact preview\n\nThe original file is not changed.\n\nPut an import report card on the board\nCreate board\nCancel",
+      "sourceUnchanged": true,
+      "report": false
+    },
+    {
+      "name": "Advanced Canvas compact snapshot without persisted preview",
+      "board": "Advanced native (board 4).canvas"
+    },
+    {
+      "name": "marked-note file-menu import",
+      "board": "Actual tldraw (board 8).canvas"
+    },
+    {
+      "name": "source-picker cancellation writes nothing"
+    },
+    {
+      "name": "raw tldr source picker without editor or visible extension",
+      "board": "Actual tldraw (board 9).canvas"
+    }
+  ],
+  "passed": true,
+  "runtime": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.12.7 Chrome/142.0.7444.265 Electron/39.8.3 Safari/537.36",
+    "desktop": false,
+    "asar": "obsidian-1.14.4.asar"
+  }
+}

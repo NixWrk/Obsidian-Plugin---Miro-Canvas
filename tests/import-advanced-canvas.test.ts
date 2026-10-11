@@ -4,11 +4,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { collapsedGroupOwners, groupCollapse, projectCollapsedGroups, toggleGroupCollapse } from "../src/board-groups";
+import { buildCanvasAnchorGeometry } from "../src/connector-endpoints";
 import { advancedCanvasAdapter } from "../src/importers/advanced-canvas";
 import { addReportCard, assertImportedBoard, idFactory } from "../src/importers/board-builder";
 import { findAdapter } from "../src/importers/registry";
-import { ImportError, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
+import { ImportError, MAX_IMPORT_ELEMENTS, type ImportContext, type ImportEntry, type ImportResult, type ImportSource } from "../src/importers/types";
 import { validateMiroCanvasMetadata } from "../src/metadata";
+import { buildSourceScene } from "../src/source-model";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -136,14 +139,14 @@ describe("importing an Advanced Canvas board", () => {
 
 	it("writes card styles as the plugin's overrides", () => {
 		const overrides = overridesOf(convert(STYLED));
-		expect(overrides["t-pill"]).toEqual({ shape: { kind: "flow_chart_terminator", fallback: "text" }, borderStyle: "dashed", typography: { alignment: "center" } });
-		expect(overrides["t-diamond"]).toEqual({ shape: { kind: "rhombus", fallback: "text" }, borderStyle: "dotted", typography: { alignment: "right" } });
-		expect(overrides["t-parallelogram"]).toEqual({ shape: { kind: "parallelogram", fallback: "text" }, borderStyle: "none" });
-		expect(overrides["t-circle"]).toEqual({ shape: { kind: "circle", fallback: "text" } });
-		expect(overrides["t-predefined"]).toEqual({ shape: { kind: "flow_chart_predefined_process", fallback: "text" } });
+		expect(overrides["t-pill"]).toEqual({ shape: { kind: "flow_chart_terminator", fallback: "text" }, borderStyle: "dashed", typography: { alignment: "center", verticalAlign: "middle" } });
+		expect(overrides["t-diamond"]).toEqual({ shape: { kind: "rhombus", fallback: "text" }, borderStyle: "dotted", typography: { alignment: "right", verticalAlign: "top" } });
+		expect(overrides["t-parallelogram"]).toEqual({ shape: { kind: "parallelogram", fallback: "text" }, typography: { alignment: "left", verticalAlign: "top" }, borderStyle: "none" });
+		expect(overrides["t-circle"]).toEqual({ shape: { kind: "circle", fallback: "text" }, typography: { alignment: "left", verticalAlign: "top" } });
+		expect(overrides["t-predefined"]).toEqual({ shape: { kind: "flow_chart_predefined_process", fallback: "text" }, typography: { alignment: "left", verticalAlign: "top" } });
 		// A style put back to its default (`textAlign: null`) writes nothing.
-		expect(overrides["t-document"]).toEqual({ shape: { kind: "flow_chart_document", fallback: "text" } });
-		expect(overrides["t-database"]).toEqual({ shape: { kind: "can", fallback: "text" } });
+		expect(overrides["t-document"]).toEqual({ shape: { kind: "flow_chart_document", fallback: "text" }, typography: { alignment: "left", verticalAlign: "top" } });
+		expect(overrides["t-database"]).toEqual({ shape: { kind: "can", fallback: "text" }, typography: { alignment: "left", verticalAlign: "top" } });
 		// Advanced Canvas draws shapes on text cards only; the others keep theirs for it alone.
 		expect(overrides["f-shaped"]).toBeUndefined();
 		expect(overrides["t-custom"]).toBeUndefined();
@@ -159,7 +162,7 @@ describe("importing an Advanced Canvas board", () => {
 		expect(overrides["e-diamond-outline"]).toEqual({ connector: { endCap: "diamond", route: "elbowed" } });
 		expect(overrides["e-circle"]).toEqual({ connector: { endCap: "filled_oval" } });
 		expect(overrides["e-circle-outline"]).toEqual({ connector: { startCap: "oval" } });
-		expect(overrides["e-blunt"]).toEqual({ connector: { endCap: "none" } });
+		expect(overrides["e-blunt"]).toEqual({ connector: { endCap: "erd_one" } });
 		// No end with an arrow: the arrowhead is nowhere to be drawn.
 		expect(overrides["e-no-ends"]).toBeUndefined();
 		expect(overrides["e-custom"]).toBeUndefined();
@@ -175,7 +178,7 @@ describe("importing an Advanced Canvas board", () => {
 	it("lets the board's own override win and adds only what it lacks", () => {
 		const result = convert(STYLED);
 		const overrides = overridesOf(result);
-		expect(overrides["t-existing"]).toEqual({ shape: { kind: "rectangle", fallback: "text" }, typography: { fontSize: 20 }, borderStyle: "dashed" });
+		expect(overrides["t-existing"]).toEqual({ shape: { kind: "rectangle", fallback: "text" }, typography: { fontSize: 20, alignment: "left", verticalAlign: "top" }, borderStyle: "dashed" });
 		expect(overrides["e-existing"]).toEqual({ connector: { strokeStyle: "solid" } });
 		expect(whyOf(entriesFor(result, "t-existing"))).toEqual(["approximated:existingOverride"]);
 		expect(whyOf(entriesFor(result, "e-existing"))).toEqual(["approximated:existingOverride"]);
@@ -183,7 +186,7 @@ describe("importing an Advanced Canvas board", () => {
 
 	it("keeps portals, lines into them and collapsed groups, and says how they look", () => {
 		const result = convert(STYLED);
-		expect(whyOf(entriesFor(result, "portal"))).toEqual(["approximated:portal"]);
+		expect(whyOf(entriesFor(result, "portal"))).toEqual(["missing-asset:fileNotFound", "approximated:portal"]);
 		expect(entriesFor(result, "portal")[0]!.nodeId).toBe("portal");
 		expect(whyOf(entriesFor(result, "ie-1"))).toEqual(["plugin-unsupported:portalEdge"]);
 		expect(whyOf(entriesFor(result, "e-into-portal"))).toEqual(["approximated:portalEdge"]);
@@ -227,8 +230,9 @@ describe("importing an Advanced Canvas board", () => {
 		// The slide order is not a card: slide 2 itself came over exactly.
 		const aboutCards = new Set(result.report.entries.filter((entry) => entry.sourceType !== "slide order").map((entry) => entry.sourceId));
 		const convertedCount = [...onBoard].filter((id) => !aboutCards.has(id)).length;
-		expect(result.report.counts).toEqual({ converted: convertedCount, approximated: 10, notImported: 8, skipped: 0 });
-		expect(convertedCount).toBe(26);
+		// Multiple reasons count once; the missing portal file outweighs its approximation.
+		expect(result.report.counts).toEqual({ converted: convertedCount, approximated: 7, notImported: 10, skipped: 0 });
+		expect(convertedCount).toBe(25);
 	});
 
 	it("names the format's own version in the report", () => {
@@ -258,7 +262,7 @@ describe("importing an Advanced Canvas board", () => {
 		expect(decks[0]!.startNode).toBe("a");
 		expect(records(decks[0]!.slides).map((slide) => slide.nodeId)).toEqual(["a", "b"]);
 		expect(whyOf(entriesFor(result, "a"))).toEqual(["approximated:collapsed"]);
-		expect(whyOf(entriesFor(result, "p"))).toEqual(["approximated:portal"]);
+		expect(whyOf(entriesFor(result, "p"))).toEqual(["missing-asset:fileNotFound", "approximated:portal"]);
 		expect(records(result.document.nodes)).toEqual(legacy.nodes);
 		expect(result.report.formatVersion).toBeUndefined();
 	});
@@ -275,10 +279,10 @@ describe("importing an Advanced Canvas board", () => {
 
 	it("refuses a file that is not a board", () => {
 		expect(() => convert("{ not json")).toThrow(ImportError);
-		expect(() => convert(board({ edges: [] }))).toThrow(ImportError);
+		expect(convert(board({ edges: [] })).document).toEqual({ nodes: [], edges: [] });
 		expect(() => convert(board({ nodes: [], edges: {} }))).toThrow(ImportError);
 		try {
-			convert(board({ edges: [] }));
+			convert(board({ edges: {} }));
 		} catch (error) {
 			expect((error as ImportError).reason).toBe("unknownStructure");
 		}
@@ -318,11 +322,11 @@ describe("a board that already has plugin data the plugin complains about", () =
 		expect(metadata.futureField).toEqual({ from: "a newer version" });
 		expect(overridesOf(result)["t-existing"]).toEqual({
 			shape: { kind: "rectangle", fallback: "text" },
-			typography: { fontSize: 20 },
+			typography: { fontSize: 20, alignment: "left", verticalAlign: "top" },
 			futureStyle: "kept",
 			borderStyle: "dashed",
 		});
-		expect(overridesOf(result)["t-pill"]).toEqual({ shape: { kind: "flow_chart_terminator", fallback: "text" }, borderStyle: "dashed", typography: { alignment: "center" } });
+		expect(overridesOf(result)["t-pill"]).toEqual({ shape: { kind: "flow_chart_terminator", fallback: "text" }, borderStyle: "dashed", typography: { alignment: "center", verticalAlign: "middle" } });
 		expect(whyOf(entriesFor(result, "miroCanvas"))).toEqual(["plugin-unsupported:existingOverride"]);
 		// Nothing the importer added gives the validator anything new to say.
 		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual(before);
@@ -399,5 +403,307 @@ describe("the report card on a board whose plugin data came with it", () => {
 		expect(withCard.document.miroCanvas).toBe("not plugin data");
 		expect(card.text).toContain("[[Boards/Styled.canvas]]");
 		expect(records(withCard.document.nodes)).toHaveLength(records(result.document.nodes).length + 1);
+	});
+});
+
+
+// Author-generated synthetic collapse and validation boards.
+describe("Advanced Canvas collapse through the native snapshot planner", () => {
+	function collapsedBoard() {
+		return {
+			nodes: [
+				{ id: "g", type: "group", x: -100, y: -100, width: 900, height: 700, label: "Outer", collapsed: true, future: { keep: true } },
+				{ id: "nested", type: "group", x: 0, y: 0, width: 500, height: 400, collapsed: true },
+				{ id: "inside", type: "text", text: "Child", x: 100, y: 100, width: 100, height: 80 },
+				{ id: "boundary", type: "text", text: "Boundary", x: 700, y: 500, width: 100, height: 100 },
+				{ id: "partial", type: "text", text: "Partial", x: 750, y: 500, width: 100, height: 100 },
+				{ id: "outside", type: "text", text: "Outside", x: 1000, y: 0, width: 100, height: 80 },
+			],
+			edges: [
+				{ id: "internal", fromNode: "inside", toNode: "boundary" },
+				{ id: "external", fromNode: "inside", toNode: "outside", fromSide: "right", toSide: "left" },
+			],
+			miroSource: { evidence: [{ content: "untouched" }] },
+			miroCanvas: { schemaVersion: 1, localOverrides: { g: { future: { keep: true } } }, future: { keep: true } },
+		};
+	}
+
+	it("uses existing collapse metadata, retains every raw position and projects nested children and lines", () => {
+		const original = collapsedBoard();
+		const result = convert(board(original));
+		expect(result.document.nodes).toEqual(original.nodes);
+		expect(result.document.edges).toEqual(original.edges);
+		expect(result.document.miroSource).toEqual(original.miroSource);
+		expect(groupCollapse(result.document, "g")).toEqual({ width: 900, height: 700, children: ["nested", "inside", "boundary"] });
+		expect(groupCollapse(result.document, "nested")).toEqual({ width: 500, height: 400, children: ["inside"] });
+		expect(overridesOf(result).g!.future).toEqual({ keep: true });
+		expect(metadataOf(result).future).toEqual({ keep: true });
+		const before = validateMiroCanvasMetadata(original.miroCanvas).diagnostics;
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual(before);
+		const owners = collapsedGroupOwners(result.document);
+		expect(owners.get("inside")).toBe("g");
+		expect(owners.get("internal")).toBe("g");
+		expect(owners.has("external")).toBe(false);
+		expect(owners.has("partial")).toBe(false);
+		const projection = projectCollapsedGroups(result.document, owners);
+		expect(records(projection.nodes)[0]).toMatchObject({ x: -100, y: -100, width: 280, height: 64 });
+		const geometry = buildCanvasAnchorGeometry(result.document, undefined, undefined, undefined, owners);
+		expect(geometry.edges?.external?.start).toEqual({ x: 180, y: -68 });
+		expect(records(result.document.nodes).every((node) => !("projectedCollapsed" in node))).toBe(true);
+		const expanded = toggleGroupCollapse(result.document, "g")!;
+		expect(expanded.nodes).toEqual(original.nodes);
+		expect(expanded.edges).toEqual(original.edges);
+		expect(expanded.miroSource).toEqual(original.miroSource);
+		expect(groupCollapse(expanded, "g")).toBeUndefined();
+		expect(groupCollapse(expanded, "nested")).toBeDefined();
+	});
+
+	it("preserves an existing snapshot including unknown fields and reports the override", () => {
+		const original = collapsedBoard();
+		const snapshot = { width: 700, height: 500, children: ["inside"], futureSnapshot: { keep: true } };
+		const document = {
+			...original,
+			miroCanvas: { ...original.miroCanvas, localOverrides: { g: { ...original.miroCanvas.localOverrides.g, groupCollapse: snapshot } } },
+		};
+		const result = convert(board(document));
+		expect(groupCollapse(result.document, "g")).toEqual(snapshot);
+		expect(whyOf(entriesFor(result, "g"))).toEqual(["approximated:existingOverride"]);
+		expect(result.document.nodes).toEqual(document.nodes);
+	});
+
+	it.each([null, "unreadable", { schemaVersion: 2 }, { schemaVersion: 1, localOverrides: { g: { groupCollapse: null } } }])("leaves unreadable metadata intact and reports unsupported collapse: %j", (miroCanvas) => {
+		const document = { ...collapsedBoard(), miroCanvas };
+		const result = convert(board(document));
+		expect(result.document.miroCanvas).toEqual(miroCanvas);
+		expect(result.document.nodes).toEqual(document.nodes);
+		expect(whyOf(entriesFor(result, "g"))).toContain("plugin-unsupported:collapsed");
+	});
+
+	it("handles prototype-named IDs without mutating object prototypes or unrelated overrides", () => {
+		const document = {
+			nodes: [
+				{ id: "__proto__", type: "group", x: 0, y: 0, width: 500, height: 400, collapsed: true },
+				{ id: "constructor", type: "text", text: "", x: 10, y: 10, width: 100, height: 80, styleAttributes: { shape: "pill" } },
+			],
+			edges: [],
+		};
+		const result = convert(board(document));
+		expect(groupCollapse(result.document, "__proto__")).toEqual({ width: 500, height: 400, children: ["constructor"] });
+		expect(Object.getOwnPropertyDescriptor(overridesOf(result), "__proto__")?.value).toHaveProperty("groupCollapse");
+		expect(Object.getOwnPropertyDescriptor(overridesOf(result), "constructor")?.value).toEqual({ shape: { kind: "flow_chart_terminator", fallback: "text" }, typography: { alignment: "left", verticalAlign: "top" } });
+		expect(Object.prototype).not.toHaveProperty("groupCollapse");
+		expect(Object.prototype).not.toHaveProperty("shape");
+	});
+
+	it("bounds nested membership work on large boards and reports unprojected groups", () => {
+		const nodes = Array.from({ length: 300 }, (_, index) => ({
+			id: `g${index}`, type: "group", x: index * 1000, y: 0, width: 200, height: 100, collapsed: true,
+		}));
+		const result = convert(board({ nodes, edges: [] }));
+		expect(result.document.nodes).toEqual(nodes);
+		expect(result.report.entries.some((entry) => entry.reason === "collapsed" && entry.status === "plugin-unsupported")).toBe(true);
+		expect(result.report.entries.some((entry) => entry.reason === "collapsed" && entry.status === "approximated")).toBe(true);
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual([]);
+	});
+});
+
+describe("Advanced Canvas shared native validation and asset reports", () => {
+	it("accepts omitted arrays and still reports a missing presentation start", () => {
+		const result = convert(board({ metadata: { version: "1.0-1.0", startNode: "gone" } }));
+		expect(result.document.nodes).toEqual([]);
+		expect(result.document.edges).toEqual([]);
+		expect(whyOf(entriesFor(result, "gone"))).toEqual(["invalid-source:invalidElement"]);
+		expect(advancedCanvasAdapter.detect(canvasSource(board({ metadata: { startNode: "gone" } })))).toBe(true);
+	});
+
+	it("applies the same positive integer geometry, required card fields and optional line validation", () => {
+		const nodes = [
+			{ id: "valid", type: "text", text: "", x: -10, y: -10, width: 100, height: 60, color: "7", styleAttributes: { border: "dashed" } },
+			{ id: "zero", type: "text", text: "", x: 0, y: 0, width: 0, height: 60 },
+			{ id: "fraction", type: "text", text: "", x: 0.5, y: 0, width: 100, height: 60 },
+			{ id: "no-file", type: "file", x: 0, y: 0, width: 100, height: 60 },
+		];
+		const result = convert(board({
+			nodes,
+			edges: [
+				{ id: "valid-line", fromNode: "valid", toNode: "valid" },
+				{ id: "invalid-end", fromNode: "valid", toNode: "valid", toEnd: "diamond" },
+				{ id: "lost-card", fromNode: "valid", toNode: "zero" },
+			],
+		}));
+		expect(result.document.nodes).toEqual([nodes[0]]);
+		expect(records(result.document.edges).map((edge) => edge.id)).toEqual(["valid-line"]);
+		expect(result.report.counts.notImported).toBe(5);
+	});
+
+	it("keeps missing group backgrounds and file cards with stable reasons", () => {
+		const nodes = [
+			{ id: "image", type: "file", file: "missing.png", subpath: "#page=1", x: 0, y: 0, width: 100, height: 60 },
+			{ id: "g", type: "group", background: "missing.png", backgroundStyle: "cover", x: 0, y: 0, width: 300, height: 200 },
+		];
+		const result = convert(board({ nodes }));
+		expect(result.document.nodes).toEqual(nodes);
+		expect(whyOf(entriesFor(result, "image"))).toEqual(["missing-asset:fileNotFound"]);
+		expect(whyOf(entriesFor(result, "g"))).toEqual(["missing-asset:imageNotFound"]);
+		expect(result.document.miroCanvas).toBeUndefined();
+	});
+
+	it("bounds stored portal edges as well as native elements", () => {
+		const document = {
+			nodes: [{ id: "p", type: "file", file: "Other.canvas", x: 0, y: 0, width: 100, height: 60, portal: true, interdimensionalEdges: Array.from({ length: MAX_IMPORT_ELEMENTS }, () => null) }],
+		};
+		try {
+			convert(board(document));
+			throw new Error("Expected oversized portal data to fail");
+		} catch (error) {
+			expect(error).toBeInstanceOf(ImportError);
+			expect((error as ImportError).reason).toBe("tooLarge");
+		}
+	});
+});
+
+
+describe("bounded Advanced Canvas extension handling", () => {
+	it("reports malformed style objects without invoking source-defined coercion fields", () => {
+		const node = { id: "n", type: "text", text: "", x: 0, y: 0, width: 100, height: 60, styleAttributes: { shape: { toString: false }, border: { toString: null }, textAlign: [] } };
+		const edge = { id: "e", fromNode: "n", toNode: "n", styleAttributes: { path: { toString: false }, arrow: { valueOf: null, toString: null }, pathfindingMethod: [] } };
+		const result = convert(board({ nodes: [node], edges: [edge] }));
+		expect(result.document.nodes).toEqual([node]);
+		expect(result.document.edges).toEqual([edge]);
+		expect(result.report.entries.every((entry) => entry.status === "plugin-unsupported" && entry.reason === "customStyle")).toBe(true);
+		expect(result.report.entries).toHaveLength(6);
+	});
+
+	it("bounds repeated snapshot copies of large unknown metadata without discarding it", () => {
+		const document = {
+			nodes: [{ id: "g", type: "group", x: 0, y: 0, width: 100, height: 60, collapsed: true }],
+			unknown: "x".repeat(MAX_IMPORT_ELEMENTS * 128),
+		};
+		const result = convert(board(document));
+		expect(result.document.unknown).toBe(document.unknown);
+		expect(result.document.nodes).toEqual(document.nodes);
+		expect(result.document.miroCanvas).toBeUndefined();
+		expect(whyOf(entriesFor(result, "g"))).toEqual(["plugin-unsupported:collapsed"]);
+	});
+});
+
+
+// Authored format cases audited against the official Advanced Canvas 7.1.0 release.
+describe("Advanced Canvas 7.1.0 compatible style fidelity", () => {
+	const card = { id: "n", type: "text", text: "Heading\n\nSecond line", x: -120, y: 40, width: 320, height: 200 };
+
+	it.each(["pill", "diamond", "parallelogram", "circle", "predefined-process", "document", "database"])("retains native left/top text placement on mapped %s cards", (shape) => {
+		const node = { ...card, color: "3", styleAttributes: { shape, textAlign: null, border: null }, future: { unchanged: true } };
+		const result = convert(board({ nodes: [node], edges: [], metadata: { version: "1.0-1.0" }, miroSource: { unchanged: [1] } }));
+		expect(result.document.nodes).toEqual([node]);
+		expect(result.document.miroSource).toEqual({ unchanged: [1] });
+		expect(overridesOf(result).n!.typography).toEqual({ alignment: "left", verticalAlign: "top" });
+		const descriptor = buildSourceScene(result.document).items.get("n")!;
+		expect(descriptor.css["text-align"]).toBe("left");
+		expect(descriptor.css["vertical-align"]).toBe("top");
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual([]);
+	});
+
+	it.each([
+		["left", "top"],
+		["center", "middle"],
+		["right", "top"],
+	])("maps %s alignment including the source's %s vertical placement", (alignment, verticalAlign) => {
+		const node = { ...card, styleAttributes: { textAlign: alignment, shape: "pill" } };
+		const result = convert(board({ nodes: [node] }));
+		expect(result.document.nodes).toEqual([node]);
+		expect(overridesOf(result).n!.typography).toEqual({ alignment, verticalAlign });
+		const descriptor = buildSourceScene(result.document).items.get("n")!;
+		expect(descriptor.css["text-align"]).toBe(alignment);
+		expect(descriptor.css["vertical-align"]).toBe(verticalAlign);
+	});
+
+	it.each(["text", "file", "group"])("keeps invisible %s native content tint and preserves source data", (type) => {
+		const node = { ...card, type, file: "Note.md", label: "Group", color: "#55aa77", styleAttributes: { border: "invisible" } };
+		const result = advancedCanvasAdapter.convert(canvasSource(board({ nodes: [node] })), { ...context(), resolveLink: (link) => link });
+		expect(result.document.nodes).toEqual([node]);
+		expect(overridesOf(result).n!.borderStyle).toBe("none");
+		expect(overridesOf(result).n!.colors).toBeUndefined();
+		expect(overridesOf(result).n!.showAttachmentName).toBe(type === "file" ? false : undefined);
+		expect(buildSourceScene(result.document).items.get("n")!.css["background-color"]).toBeUndefined();
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual([]);
+	});
+
+	it("keeps an existing explicit transparent fill on an invisible colored card", () => {
+		const node = { ...card, color: "4", styleAttributes: { border: "invisible" } };
+		const own = { colors: { fill: null, border: "#123456" } };
+		const result = convert(board({ nodes: [node], miroCanvas: { schemaVersion: 1, localOverrides: { n: own } } }));
+		expect(result.document.nodes).toEqual([node]);
+		expect(overridesOf(result).n!.colors).toEqual(own.colors);
+		expect(buildSourceScene(result.document).items.get("n")!.css["background-color"]).toBe("transparent");
+		expect(validateMiroCanvasMetadata(result.document.miroCanvas).diagnostics).toEqual([]);
+	});
+
+	it("lets explicit existing fill, attachment name and both text alignments win", () => {
+		const node = { ...card, type: "file", file: "Note.md", styleAttributes: { border: "invisible" } };
+		const own = { colors: { fill: "#abcdef" }, borderStyle: "dotted", showAttachmentName: true };
+		const fileResult = convert(board({ nodes: [node], miroCanvas: { schemaVersion: 1, localOverrides: { n: own } } }));
+		expect(overridesOf(fileResult).n).toEqual(own);
+		expect(whyOf(entriesFor(fileResult, "n"))).toEqual([
+			"missing-asset:fileNotFound", "approximated:existingOverride", "approximated:existingOverride",
+		]);
+		const textOwn = { typography: { alignment: "right", verticalAlign: "bottom", fontSize: 22 } };
+		const textResult = convert(board({ nodes: [{ ...card, styleAttributes: { shape: "pill", textAlign: "center" } }], miroCanvas: { schemaVersion: 1, localOverrides: { n: textOwn } } }));
+		expect(overridesOf(textResult).n!.typography).toEqual(textOwn.typography);
+		expect(records(textResult.document.nodes)[0]!.x).toBe(card.x);
+	});
+
+	it("recognises every explicit spec default instead of reporting it as an unsupported custom style", () => {
+		const node = { ...card, styleAttributes: { shape: "rectangle", border: "solid", textAlign: "left" } };
+		const edge = { id: "e", fromNode: "n", toNode: "n", fromEnd: "arrow", styleAttributes: { arrow: "triangle", path: "solid", pathfindingMethod: "bezier" } };
+		const result = convert(board({ nodes: [node], edges: [edge] }));
+		expect(result.document.nodes).toEqual([node]);
+		expect(result.document.edges).toEqual([edge]);
+		expect(result.report.entries).toEqual([]);
+		expect(overridesOf(result).n).toEqual({ borderStyle: "solid", typography: { alignment: "left", verticalAlign: "top" } });
+		expect(overridesOf(result).e).toEqual({ connector: { startCap: "filled_triangle", endCap: "filled_triangle", strokeStyle: "solid", route: "curved" } });
+		expect(result.report.counts).toEqual({ converted: 2, approximated: 0, notImported: 0, skipped: 0 });
+	});
+
+	it("retains null defaults as native rendering rather than adding a shape or style", () => {
+		const node = { ...card, styleAttributes: { shape: null, border: null, textAlign: null } };
+		const edge = { id: "e", fromNode: "n", toNode: "n", styleAttributes: { arrow: null, path: null, pathfindingMethod: null } };
+		const result = convert(board({ nodes: [node], edges: [edge] }));
+		expect(result.document).toEqual({ nodes: [node], edges: [edge] });
+		expect(result.report.entries).toEqual([]);
+		expect(buildSourceScene(result.document).items.get("e")!.connector?.endCap).toBe("filled_triangle");
+	});
+
+	it.each([
+		["triangle", "filled_triangle"], ["triangle-outline", "triangle"], ["thin-triangle", "arrow"],
+		["halved-triangle", "stealth"], ["diamond", "filled_diamond"], ["diamond-outline", "diamond"],
+		["circle", "filled_oval"], ["circle-outline", "oval"], ["blunt", "erd_one"],
+	])("maps source %s to a visible %s cap on both requested ends", (arrow, cap) => {
+		const edge = { id: "e", fromNode: "n", toNode: "n", fromEnd: "arrow", toEnd: "arrow", styleAttributes: { arrow } };
+		const result = convert(board({ nodes: [card], edges: [edge] }));
+		expect(result.document.edges).toEqual([edge]);
+		expect(overridesOf(result).e!.connector).toEqual({ startCap: cap, endCap: cap });
+		if (arrow === "halved-triangle" || arrow === "blunt") {
+			expect(whyOf(entriesFor(result, "e"))).toEqual(["approximated:arrowhead"]);
+		}
+	});
+
+	it("keeps explicitly absent arrowheads absent and existing caps unchanged", () => {
+		const edge = { id: "e", fromNode: "n", toNode: "n", fromEnd: "none", toEnd: "none", styleAttributes: { arrow: "blunt" } };
+		const noEnds = convert(board({ nodes: [card], edges: [edge] }));
+		expect(noEnds.document.miroCanvas).toBeUndefined();
+		expect(noEnds.report.entries).toEqual([]);
+		const own = { connector: { startCap: "diamond", endCap: "oval" } };
+		const existing = convert(board({ nodes: [card], edges: [{ ...edge, fromEnd: "arrow", toEnd: "arrow" }], miroCanvas: { schemaVersion: 1, localOverrides: { e: own } } }));
+		expect(overridesOf(existing).e).toEqual(own);
+		expect(whyOf(entriesFor(existing, "e"))).toEqual(["approximated:existingOverride", "approximated:existingOverride"]);
+	});
+
+	it.each([["bezier", "curved"], ["direct", "straight"], ["square", "elbowed"], ["a-star", "elbowed"]])("maps the declared %s route to %s without changing source endpoints", (method, route) => {
+		const edge = { id: "e", fromNode: "n", fromSide: "bottom", toNode: "n", toSide: "left", styleAttributes: { pathfindingMethod: method } };
+		const result = convert(board({ nodes: [card], edges: [edge] }));
+		expect(result.document.edges).toEqual([edge]);
+		expect(overridesOf(result).e!.connector).toEqual({ route });
+		expect(result.report.entries).toEqual(method === "a-star" ? [{ sourceId: "e", sourceType: "edge", status: "approximated", reason: "pathfinding", nodeId: "e" }] : []);
 	});
 });

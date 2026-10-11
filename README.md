@@ -192,13 +192,16 @@ Shortcuts work while you are not editing text:
 
 - **From Miro:** use the separate [miro2obsidian](https://github.com/NixWrk/Miro_2_Obsidian)
   converter to create vault files, then open the board with Miro Canvas.
-- **From Excalidraw, Enhancing Mindmap, Markmind or Advanced Canvas:** choose
+- **From Excalidraw, JSON Canvas, Advanced Canvas or mind-map outlines:** choose
   **Import into a board** from the file menu or command palette. Review the
-  preview before creating the board; the original file is preserved.
+  preview before creating the board; the original file is preserved. With another file open, the command offers a source picker.
 
 Some styles and layouts are approximated; imported Miro tables lack cell
 text because the source export does not supply it.
 [Import instructions and limitations](docs/import.md).
+
+
+Embedded Excalidraw PNG/JPEG/GIF/WebP and restricted passive SVG become new vault attachments after preview; supported static pictures retain reflection and source theme. Native Canvas copies preserve unknown fields. Import also supports bounded tldraw shapes/text/lines/images and authored Markmind rich trees. Already-open audited source views can supply mindmap layout and tldraw appearance. Fonts, sketch contours and unsupported editor features can still differ. [Formats and exact limits](docs/import.md).
 
 ## Your files and privacy
 

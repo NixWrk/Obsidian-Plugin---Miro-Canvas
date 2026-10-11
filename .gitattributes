@@ -1,0 +1,3 @@
+# Keep pinned external format evidence byte-for-byte on every platform.
+tests/fixtures/import/tldraw-current-schema.tldr -text
+tests/fixtures/import/tldraw-plugin-LICENSE.txt -text

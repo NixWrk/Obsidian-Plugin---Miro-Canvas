@@ -1,0 +1,388 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "synthetic miro-canvas regression fixture; authored 2026-10-11",
+  "elements": [
+    {
+      "id": "lead-arrow",
+      "type": "arrow",
+      "x": -80,
+      "y": -40,
+      "width": 180,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "outer-frame",
+      "isDeleted": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          80
+        ],
+        [
+          180,
+          80
+        ]
+      ],
+      "startBinding": {
+        "elementId": "owner-label",
+        "fixedPoint": [
+          1,
+          0.5
+        ],
+        "mode": "inside"
+      },
+      "endBinding": {
+        "elementId": "goal",
+        "focus": 0,
+        "gap": 0
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": true
+    },
+    {
+      "id": "inner-frame",
+      "type": "frame",
+      "x": -130,
+      "y": -110,
+      "width": 120,
+      "height": 80,
+      "angle": 1.5707963267948966,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "outer-frame",
+      "isDeleted": false,
+      "name": "Вложенная рамка",
+      "locked": true
+    },
+    {
+      "id": "owner-label",
+      "type": "text",
+      "x": -110,
+      "y": -90,
+      "width": 60,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "inner-group",
+        "outer-group"
+      ],
+      "frameId": "inner-frame",
+      "isDeleted": false,
+      "text": "Связь [[Заметка]]",
+      "originalText": "Связь [[Заметка]]",
+      "containerId": "owner",
+      "fontSize": 20,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "id": "owner",
+      "type": "rectangle",
+      "x": -120,
+      "y": -100,
+      "width": 80,
+      "height": 40,
+      "angle": 1.5707963267948966,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "inner-group",
+        "outer-group"
+      ],
+      "frameId": "inner-frame",
+      "isDeleted": false,
+      "index": "z9"
+    },
+    {
+      "id": "goal",
+      "type": "rectangle",
+      "x": 100,
+      "y": 0,
+      "width": 60,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "outer-group"
+      ],
+      "frameId": "outer-frame",
+      "isDeleted": false,
+      "index": "a0"
+    },
+    {
+      "id": "outer-frame",
+      "type": "frame",
+      "x": -160,
+      "y": -140,
+      "width": 400,
+      "height": 300,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "name": "План"
+    },
+    {
+      "id": "measured",
+      "type": "freedraw",
+      "x": -80,
+      "y": -60,
+      "width": 24,
+      "height": 8,
+      "angle": 1.5707963267948966,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          12,
+          0
+        ],
+        [
+          12,
+          0
+        ],
+        [
+          24,
+          8
+        ]
+      ],
+      "pressures": [
+        0,
+        1,
+        0.25,
+        0.5
+      ],
+      "simulatePressure": false
+    },
+    {
+      "id": "simulated",
+      "type": "freedraw",
+      "x": 20,
+      "y": -80,
+      "width": 24,
+      "height": 8,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          12,
+          0
+        ],
+        [
+          24,
+          8
+        ]
+      ],
+      "pressures": [
+        1,
+        0,
+        1
+      ],
+      "simulatePressure": true
+    },
+    {
+      "id": "uniform",
+      "type": "freedraw",
+      "x": 20,
+      "y": -40,
+      "width": 24,
+      "height": 8,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          12,
+          0
+        ],
+        [
+          24,
+          8
+        ]
+      ],
+      "pressures": [
+        0,
+        1,
+        0
+      ],
+      "simulatePressure": false,
+      "strokeOptions": {
+        "variability": "constant",
+        "streamline": 0
+      }
+    },
+    {
+      "id": "flipped",
+      "type": "image",
+      "x": 280,
+      "y": -100,
+      "width": 120,
+      "height": 60,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "fileId": "vault-image",
+      "status": "saved",
+      "scale": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "custom",
+      "type": "text",
+      "x": 280,
+      "y": 0,
+      "width": 160,
+      "height": 40,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "text": "Свойства",
+      "customData": {
+        "synthetic": true,
+        "payload": "<script>never execute</script>"
+      }
+    },
+    {
+      "id": "empty-custom",
+      "type": "text",
+      "x": 280,
+      "y": 60,
+      "width": 160,
+      "height": 40,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "isDeleted": false,
+      "text": "Без свойств",
+      "customData": {}
+    },
+    {
+      "id": "dangling-member",
+      "type": "rectangle",
+      "x": 280,
+      "y": 120,
+      "width": 80,
+      "height": 40,
+      "angle": 0,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeStyle": "solid",
+      "strokeWidth": 2,
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "missing-frame",
+      "isDeleted": false
+    }
+  ],
+  "appState": {},
+  "files": {}
+}

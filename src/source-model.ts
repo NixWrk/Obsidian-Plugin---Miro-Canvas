@@ -149,6 +149,10 @@ export function readWaypoints(value: unknown): readonly { readonly x: number; re
 }
 
 export interface SourceItemDescriptor {
+  /** A native colored card supplies its palette, without freezing the theme. */
+  readonly nativePalette?: boolean;
+  /** Advanced's absent container preserves the native content tint. */
+  readonly invisibleNativeContainer?: boolean;
   readonly sourceId?: string;
   readonly kind: SourceItemKind;
   readonly shape?: string;
@@ -848,6 +852,11 @@ function indexSource(document: unknown, diagnostics: string[]): IndexedSource {
         diagnostics.push(`binding-malformed: ${canvasId}.`);
         continue;
       }
+      // Other importers keep provenance here, not Miro source objects.
+      const role = valueOf(binding, "role");
+      const format = typeof role === "string" ? /^import:(excalidraw|mindmap-outline|markmind-rich|tldraw):.+$/u.exec(role)?.[1] : undefined;
+      if (format !== undefined && sourceId.startsWith(`${format}:`)
+        || role === "import-report" && sourceId.startsWith("import:")) continue;
       sourceForCanvas.set(canvasId, sourceId);
       // A copy shows the item its original shows, without taking its place:
       // the item is kept once, however many nodes show it.
@@ -998,9 +1007,15 @@ export function buildSourceScene(document: unknown): SourceScene {
   const metadata = valueOf(document, "miroCanvas");
   const overrides = valueOf(metadata, "localOverrides");
   if (isRecord(overrides)) {
+    const nativeNodes = new Map<string, unknown>();
+    for (const node of (arrayValue(valueOf(document, "nodes")) ?? []).slice(0, MAX_SOURCE_ITEMS)) {
+      const id = valueOf(node, "id");
+      if (typeof id === "string") nativeNodes.set(id, node);
+    }
     const edgeIds = new Set(edges.map((edge) => valueOf(edge, "id")).filter((id): id is string => typeof id === "string"));
     for (const canvasId of ownNames(overrides)) {
       if (items.has(canvasId) || edgeIds.has(canvasId)) continue;
+      const node = nativeNodes.get(canvasId);
       const shape = localShapeKind(document, canvasId);
       const css: Record<string, string> = {};
       const item = shape === undefined ? readLocalItem(valueOf(localOverride(document, canvasId), "item")) : undefined;
@@ -1047,8 +1062,11 @@ export function buildSourceScene(document: unknown): SourceScene {
       // on the border it no longer has.
       if (shape === undefined && rotation === 0 && Object.keys(css).length === 0) continue;
       items.set(canvasId, Object.freeze(shape === undefined
-        ? { kind: "text", rotation, css: Object.freeze(css) }
-        : { kind: "shape", shape, cornerRadius: localCornerRadius(document, canvasId), rotation, css: Object.freeze(css) }));
+        ? { kind: "text", rotation, css: Object.freeze(css),
+          ...(css["border-style"] === "none" && valueOf(valueOf(node, "styleAttributes"), "border") === "invisible"
+            && css["background-color"] === undefined ? { invisibleNativeContainer: true } : {}) }
+        : { kind: "shape", shape, cornerRadius: localCornerRadius(document, canvasId), rotation, css: Object.freeze(css),
+          ...(typeof valueOf(node, "color") === "string" ? { nativePalette: true } : {}) }));
     }
   }
 

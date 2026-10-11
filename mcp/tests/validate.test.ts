@@ -112,6 +112,14 @@ describe("the plugin's checks", () => {
 		expect(validateBoard(document).valid).toBe(true);
 	});
 
+	it("accepts provenance bindings for native and independent imported lines", () => {
+		const document = board();
+		const nativeId = document.edges[0].id;
+		document.miroCanvas.connectors = { free: { id: "free", from: { type: "free", x: 0, y: 0 }, to: { type: "free", x: 10, y: 10 }, route: "straight", color: "#000000", width: 2, startCap: "none", endCap: "arrow" } };
+		document.miroCanvas.bindings = { [nativeId]: { sourceId: "excalidraw:native", role: "import:excalidraw:arrow" }, free: { sourceId: "excalidraw:free", role: "import:excalidraw:arrow" } };
+		expect(codes(document)).not.toContain("warning:binding-orphan");
+	});
+
 	it("warns of records about cards the board no longer has", () => {
 		const document = board();
 		document.miroCanvas.localOverrides = { gone: { rotation: 10 } };

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { App, TFile } from "obsidian";
 import { setLocale, words } from "../src/i18n";
-import { importIntoBoard, type ImportChoice, type ImportHost, type ImportPreview } from "../src/import-command";
+import { availableImportFiles, importIntoBoard, type ImportChoice, type ImportHost, type ImportPreview } from "../src/import-command";
 import {
 	BoardBuilder,
 	REPORT_CARD_MAX_ROWS,
@@ -205,6 +205,16 @@ describe("BoardBuilder", () => {
 		// f1, r1, d1, i1, a1, a2 came over exactly; t1 was approximated; e1 has a
 		// placeholder; roughness is counted once as a kind; two were deleted.
 		expect(report.counts).toEqual({ converted: 6, approximated: 1, notImported: 2, skipped: 2 });
+	});
+
+	it("counts multiple reasons for one source once at its worst outcome", () => {
+		const builder = new BoardBuilder("excalidraw", context());
+		builder.card({ x: 0, y: 0, width: 10, height: 10 }, "A", { source: { id: "a", type: "rectangle" } });
+		builder.note({ sourceId: "a", sourceType: "rectangle", status: "approximated", reason: "groups" });
+		builder.note({ sourceId: "a", sourceType: "rectangle", status: "plugin-unsupported", reason: "opacity" });
+		builder.note({ sourceId: "a", sourceType: "rectangle", status: "approximated", reason: "elementLink" });
+		expect(builder.counts()).toEqual({ converted: 0, approximated: 0, notImported: 1, skipped: 0 });
+		expect(builder.report({ sourcePath: "A.excalidraw" }).entries).toHaveLength(3);
 	});
 
 	it("reports in the shape of the imports[] proposal", () => {
@@ -451,7 +461,7 @@ function fakeHost(options: {
 	const app = {
 		vault: {
 			getAbstractFileByPath: (path: string) => files.get(path) ?? null,
-			cachedRead: async () => {
+			read: async () => {
 				if (options.readFails === true) throw new Error("unreadable");
 				return "source text";
 			},
@@ -494,6 +504,16 @@ const oneCardAdapter: FormatAdapter = {
 		return builder.finish({ sourcePath: source.path, formatVersion: "basic" });
 	},
 };
+
+describe("import source picker", () => {
+	it("lists raw drawings, native boards and marked notes without reading their contents", () => {
+		const files = [{ path: "raw.tldr", extension: "tldr" }, { path: "raw.excalidraw", extension: "excalidraw" }, { path: "board.canvas", extension: "canvas" }, { path: "marked.md", extension: "md" }, { path: "note.md", extension: "md" }, { path: "image.png", extension: "png" }];
+		const read = vi.fn();
+		const app = { vault: { getFiles: () => files, read }, metadataCache: { getFileCache: (file: { path: string }) => file.path === "marked.md" ? { frontmatter: { "tldraw-file": true } } : null } } as unknown as App;
+		expect(availableImportFiles(app).map(file => file.path)).toEqual(files.slice(0, 4).map(file => file.path));
+		expect(read).not.toHaveBeenCalled();
+	});
+});
 
 describe("importIntoBoard", () => {
 	it("shows the preview, then creates one new board with the report card and opens it", async () => {

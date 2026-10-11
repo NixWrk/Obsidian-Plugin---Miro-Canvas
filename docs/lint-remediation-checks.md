@@ -2574,3 +2574,40 @@ PDF/PPTX/raster PDF/Stop with source/camera restored and jobs/surfaces zero.
 Independent exported-content parsing verifies glyphs and all four font styles.
 Android 0.3.2 is pending disconnected ADB devices; do not substitute the prior
 0.3.1 tablet pass. See release-0.3.2-checks.md for the current receipt.
+
+
+## Import expansion — attachment rollback (2026-10-11)
+
+Before fixing the new prefer-file-manager-trash-file warning: import-command calls publishImportAssets only after accepted preview; rollback runs after a binary/board write or stale-source failure. The affected action is Create board, its cancellation/error path and resulting vault attachments. Use the host FileManager trash preference on unchanged owned files only. Mandatory regression: cancel writes zero, collisions never overwrite, failed board/binary write cleans earlier owned attachments, user-edited/moved paths survive, successful creation/open failure retains assets. Unit tests: tests/import-assets.test.ts; isolated Windows import receipt pending; physical Android pending (ADB inventory empty). No source/foreground vault is involved.
+
+
+### Import expansion — path controls and tldraw narrowing (2026-10-11)
+
+Before removing no-control-regex and five unnecessary assertions: publishImportAssets is reached by Create board, validates generated source-adjacent attachment paths and rolls back owned files. tldraw.convert decodes supported packed draw records after supportedStroke narrows their props/coordinates. Mandatory checks: invalid path/control characters, collisions and rollback tests; tldraw real-fixture hash, 71/89 packed points, invalid/subnormal/nonfinite byte vectors, versions, unsupported variants and metadata reporting. Preserve path validation and narrowing; do not suppress rules. Unit: import-assets/import-tldraw; real hidden Windows import and drawing drag pending; Android pending disconnected inventory.
+
+
+### Import expansion — raster header narrowing (2026-10-11)
+
+Before removing three unnecessary non-null assertions: rasterDimensions reads WebP VP8X width/height bytes after the 30-byte header guard. Called by readEmbeddedRaster and the Excalidraw asset collector before preview/publication. Preserve the header guard and bounds. Mandatory: actual generated PNG/JPEG/GIF/WebP dimension tests, mismatched/corrupt/active MIME, excessive pixels/bytes, same-asset reuse and publication rollback. Native image-file load/aspect handling is checked in the isolated Windows receipt; Android remains pending.
+
+
+Import expansion final verification: all local gates pass (3657 Vitest/77 Python, three smokes), no new lint advisory. Owned Windows SDK1.14.4 passes 20 renderer-input scenarios and independent raster PDF after the empty-card readiness repair. CLI validate/move/undo passes with zero schema/plugin diagnostics. Exact evidence and pending physical Android/OS/stylus/graph/property cases: docs/import-expansion-checks.md and docs/receipts/import-expansion-*.json.
+
+## Pure source appearance readers — 2026-10-11
+
+The open mindmap reader's Reflect.apply result is narrowed from unknown; SVG
+geometry/polyline checks use Obsidian's cross-window instanceOf helper. User
+action: import an already-open audited map. Required regression checks are
+complete node/path capture, source-owner window isolation, 50/100/200% capture,
+and fallback on unavailable source geometry. Actual isolated Windows capture
+is recorded separately from pure parser tests; Android input remains pending.
+
+Before the two redundant style assertions are removed: import command/source observer -> context mindmapLayout/tldrawAppearance -> pure source-text/geometry/style validation -> BoardBuilder metadata -> preview/publication. User actions are imports from already-open original editors, captured styles and paths, stale/unknown-capture fallback. Regression gates: valid captured metadata; exact source/AST/hierarchy/ID coverage; malformed/stale/unsafe/duplicate/over-budget snapshots rejected atomically; sampled straight paths/anchors retained; default offline imports unchanged; source immutability; focused mindmap/tldraw suites and TypeScript/targeted lint/diff check. Native observer/rendering, actual OS/stylus and physical Android acceptance remain pending separate parent receipts.
+
+## Markmind authored rich tree — 2026-10-12
+
+Before the control-character regex, redundant narrowed assertions and unsafe prototype assignment are replaced in src/importers/markmind-rich.ts: rich marker/fenced own data -> checked source IDs/text/positions and parent tree -> optional exact-source captured styles/paths -> BoardBuilder cards/native edges -> existing preview/publication. User actions: import the actual authored Markmind 3.7.4 tree, import offline with persisted x/y, import from an open matched source view, reject stale/unsafe/partial snapshots, expose component/fold/style losses. Mandatory regressions: authored 13 nodes/12 edges and source bytes; invalid/control IDs, parents/cycles/root/caps; safe style and component losses; complete snapshot ID/text/parent/position/style/path/theme coverage, endpoint compatibility, no accessor execution, detached output and atomic fallback; rich/basic/common tests, types/scoped lint/diff. Current pure/synthetic unit evidence is 117 tests; real Markmind rendering/input and physical Android acceptance remain pending with the parent. Exact own sample provenance and scope: docs/import-markmind-rich-checks.md. No proprietary implementation or schema change.
+
+## Tldraw source reader realm guard — 2026-10-11
+
+Trace: import-command tldraw context -> readOpenTldrawAppearance -> shape-owned SVG shaft sampling. User action: import an already-open original tldraw drawing, including a source view in another document realm. The lint warning concerns its SVGGeometryElement type guard; use Obsidian's instanceOf against the source owner's constructor, retaining the explicit missing-path guard. Required: TypeScript and target lint; actual owner-view capture succeeds; absent/foreign/stale view returns undefined; sampled board coordinates and source bytes unchanged. No Android/OS input claim.

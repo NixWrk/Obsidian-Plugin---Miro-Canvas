@@ -9050,7 +9050,9 @@ export class M1CanvasSession {
 			if (hasOverride || this.editorAppearanceDom.has(shell) || readRuntime(node, "isEditing") === true) {
 				this.decorateNodeAppearance(node, sourceScene);
 			}
+			this.refreshHiddenAttachmentLabels(node, shell);
 		}
+		this.sourceRenderer?.refresh();
 	}
 
 	/**
@@ -9117,14 +9119,18 @@ export class M1CanvasSession {
 		this.editorAppearanceDom.clear();
 	}
 
-	private attachmentLabelTargets(element: HTMLElement): readonly HTMLElement[] {
+	private attachmentLabelTargets(element: HTMLElement, nodeRoot?: unknown): readonly HTMLElement[] {
 		const result: HTMLElement[] = [];
-		const querySelectorAll = readRuntime(element, "querySelectorAll");
+		const parent = typeof element.closest === "function" ? element.closest(".canvas-node") : null;
+		const candidate = isElement(nodeRoot) ? nodeRoot : parent;
+		const root = isElement(candidate) && candidate.ownerDocument === element.ownerDocument
+			&& typeof candidate.contains === "function" && candidate.contains(element) ? candidate : element;
+		const querySelectorAll = readRuntime(root, "querySelectorAll");
 		if (typeof querySelectorAll !== "function") {
 			return result;
 		}
 		try {
-			const matches: unknown = Reflect.apply(querySelectorAll, element, [
+			const matches: unknown = Reflect.apply(querySelectorAll, root, [
 				".canvas-node-label, .file-embed-title, .internal-embed-title",
 			]);
 			const length = finite(readRuntime(matches, "length")) ?? 0;
@@ -9164,6 +9170,16 @@ export class M1CanvasSession {
 			restoreAttribute(element, "data-miro-canvas-native-label-hidden", snapshot.hidden);
 		}
 		this.hiddenNativeAttachmentLabels.clear();
+	}
+
+	/** A native label may arrive after its card's first decoration pass. */
+	private refreshHiddenAttachmentLabels(node: unknown, dom: HTMLElement): void {
+		const candidate = this.attachmentNode(node);
+		if (candidate === undefined || (candidate.type !== "file" && candidate.type !== "document")
+			|| decideAttachmentLabel(candidate, this.currentMetadata).visible) return;
+		for (const label of this.attachmentLabelTargets(dom, readRuntime(node, "nodeEl"))) {
+			this.hideNativeAttachmentLabel(label);
+		}
 	}
 
 	private attachmentNode(node: unknown): UnknownRecord | undefined {
@@ -9264,9 +9280,9 @@ export class M1CanvasSession {
 				continue;
 			}
 			const decision = decideAttachmentLabel(candidate, this.currentMetadata);
-			const nativeLabels = this.attachmentLabelTargets(dom);
+			const nativeLabels = this.attachmentLabelTargets(dom, readRuntime(node, "nodeEl"));
 			if (!decision.visible) {
-				if (nativeLabels.length === 0) {
+				if (nativeLabels.length === 0 && readRuntime(node, "isContentMounted") === true) {
 					this.addDiagnostic(`Attachment name for ${id} could not be hidden because this Canvas runtime exposes no safe native label target.`);
 				} else {
 					for (const nativeLabel of nativeLabels) {
