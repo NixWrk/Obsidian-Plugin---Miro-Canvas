@@ -1814,6 +1814,20 @@ describe("source renderer document ownership", () => {
 
 
 describe("rectangular corner appearance", () => {
+  it("projects an attachment's explicit radius to its outer face and restores the inherited setting", () => {
+    const f = fixture();
+    delete f.data.miroSource;
+    f.data.nodes[0] = { ...f.data.nodes[0], type: "file", file: "Assets/object.svg" };
+    f.data.miroCanvas.localOverrides.a = { cornerRadius: 0, borderStyle: "none", showAttachmentName: false };
+    f.nodeEl.style.setProperty("--miro-canvas-card-radius", "24px");
+    const before = JSON.stringify(f.data);
+    f.renderer.refresh();
+    expect(f.nodeEl.getAttribute("data-miro-source-kind")).toBe("text");
+    expect(f.nodeEl.style.getPropertyValue("--miro-canvas-card-radius")).toBe("0px");
+    expect(JSON.stringify(f.data)).toBe(before);
+    f.renderer.dispose();
+    expect(f.nodeEl.style.getPropertyValue("--miro-canvas-card-radius")).toBe("24px");
+  });
   it("uses a sharp border join with zero corner radius, including thick borders", () => {
     const f = fixture("round_rectangle");
     f.data.miroCanvas.localOverrides.a = { cornerRadius: 0, borderWidth: 20 };

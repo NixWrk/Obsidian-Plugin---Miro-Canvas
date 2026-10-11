@@ -19,6 +19,7 @@ import { words } from "./i18n";
 import { publishImportAssets, type PublishedImportAssets } from "./import-assets";
 import { readOpenMindmapLayout } from "./import-source-layout";
 import { readOpenTldrawAppearance } from "./import-tldraw-appearance";
+import { readOpenExcalidrawAppearance } from "./import-excalidraw-appearance";
 import {
 	addReportCard,
 	idFactory,
@@ -156,6 +157,7 @@ export async function importIntoBoard(host: ImportHost, file: TFile): Promise<TF
 		...(host.theme === undefined ? {} : { theme: host.theme() }),
 		...(adapter.id === "mindmap-outline" || adapter.id === "markmind-rich" ? { mindmapLayout: readOpenMindmapLayout(host.app, file, source.text) } : {}),
 		...(adapter.id === "tldraw" ? { tldrawAppearance: readOpenTldrawAppearance(host.app, file, source.text) } : {}),
+		...(adapter.id === "excalidraw" ? { excalidrawAppearance: await readOpenExcalidrawAppearance(host.app, file, source.text) } : {}),
 	};
 	let result: ImportResult;
 	try {

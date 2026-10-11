@@ -1,6 +1,8 @@
 /** Read-only appearance facts from an already-open, audited tldraw 1.32.0 view. */
 import type { App, TFile } from "obsidian";
 import { MAX_TLDRAW_SOURCE_LENGTH } from "./importers/tldraw";
+import { capturePassiveSvg } from "./import-svg-snapshot";
+import { MAX_IMPORT_ASSET_TOTAL_BYTES, MAX_IMPORT_ASSETS, readEmbeddedAsset } from "./importers/assets";
 
 const MAX_SHAPES = 2_000;
 const MAX_COORDINATE = 100_000;
@@ -90,6 +92,91 @@ function bounds(value: unknown): { x: number; y: number; w: number; h: number } 
 	return finite(x) && finite(y) && finite(w) && finite(h) && w >= 0 && h >= 0 ? { x, y, w, h } : undefined;
 }
 
+interface VisualSnapshot {
+	readonly dataURL: string;
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+/** Source SVG user coordinates -> shape coordinates -> world coordinates, without screen/camera rounding. */
+function visualSnapshot(shell: HTMLElement, source: JsonRecord, transform: NonNullable<ReturnType<typeof matrix>>): VisualSnapshot | undefined {
+	try {
+		const props = source.props;
+		if (!object(props) || source.type !== "draw" || props.isComplete !== true
+			|| !finite(source.opacity) || source.opacity < 0 || source.opacity > 1) return undefined;
+		const roots = Array.from(shell.querySelectorAll("svg"));
+		const root = roots[0];
+		const owner = shell.ownerDocument.defaultView;
+		if (roots.length !== 1 || owner === null || !root.instanceOf(owner.SVGSVGElement) || root.hasAttribute("transform")
+			|| root.querySelector("text,tspan,image,foreignObject") !== null) return undefined;
+		const viewport = matrix(root.getCTM());
+		const ink = root.getBBox();
+		if (viewport === undefined || !finite(ink.x) || !finite(ink.y) || !finite(ink.width) || !finite(ink.height)) return undefined;
+		let padding = 0;
+		for (const element of Array.from(root.querySelectorAll("*"))) {
+			const style = owner.getComputedStyle(element);
+			const cssTransform = style.getPropertyValue("transform");
+			if (cssTransform && cssTransform !== "none") {
+				const attribute = element.getAttribute("transform");
+				if (attribute === null || style.getPropertyValue("transform-origin") !== "0px 0px") return undefined;
+				const clone = element.cloneNode(false) as SVGGraphicsElement;
+				const expected = matrix(clone.transform.baseVal.consolidate()?.matrix);
+				const actual = matrix(new owner.DOMMatrix(cssTransform));
+				if (expected === undefined || actual === undefined || Object.keys(expected).some(key => Math.abs(expected[key as keyof typeof expected] - actual[key as keyof typeof actual]) > 0.000001)) return undefined;
+			}
+			if (style.stroke !== "none" && style.display !== "none" && style.visibility !== "hidden") {
+				const width = Number.parseFloat(style.strokeWidth);
+				const local = matrix((element as SVGGraphicsElement).getCTM());
+				if (!finite(width) || width < 0 || width > 100 || local === undefined) return undefined;
+				// The passive grammar retains round/bevel joins; miter joins use the SVG default limit.
+				const join = style.getPropertyValue("stroke-linejoin");
+				if (join === "miter" && Number(style.getPropertyValue("stroke-miterlimit")) !== 4) return undefined;
+				const scale = Math.max(Math.hypot(local.a, local.b), Math.hypot(local.c, local.d));
+				padding = Math.max(padding, width * scale * (join === "miter" ? 2 : 0.5));
+			}
+		}
+		let opacity = 1;
+		for (let ancestor = root.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+			const style = owner.getComputedStyle(ancestor);
+			for (const name of ["filter", "clip-path", "mask", "mix-blend-mode"]) {
+				const value = style.getPropertyValue(name);
+				if (value && value !== "none" && value !== "normal") return undefined;
+			}
+			const alpha = Number(style.opacity);
+			if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) return undefined;
+			opacity *= alpha;
+			if (ancestor === shell) break;
+		}
+		const localBox = { x: ink.x - padding, y: ink.y - padding, width: Math.max(1, ink.width + padding * 2), height: Math.max(1, ink.height + padding * 2) };
+		const captured = capturePassiveSvg(root, localBox);
+		const asset = readEmbeddedAsset(captured);
+		if (!asset.ok || asset.extension !== "svg") return undefined;
+		const a = transform.a * viewport.a + transform.c * viewport.b;
+		const b = transform.b * viewport.a + transform.d * viewport.b;
+		const c = transform.a * viewport.c + transform.c * viewport.d;
+		const d = transform.b * viewport.c + transform.d * viewport.d;
+		const e = transform.a * viewport.e + transform.c * viewport.f + transform.e;
+		const f = transform.b * viewport.e + transform.d * viewport.f + transform.f;
+		const points = [[localBox.x, localBox.y], [localBox.x + localBox.width, localBox.y],
+			[localBox.x, localBox.y + localBox.height], [localBox.x + localBox.width, localBox.y + localBox.height]]
+			.map(([x, y]) => ({ x: a * x + c * y + e, y: b * x + d * y + f }));
+		if (points.some(point => !finite(point.x) || !finite(point.y))) return undefined;
+		const x = Math.min(...points.map(point => point.x));
+		const y = Math.min(...points.map(point => point.y));
+		const width = Math.max(1, Math.max(...points.map(point => point.x)) - x);
+		const height = Math.max(1, Math.max(...points.map(point => point.y)) - y);
+		const safe = new TextDecoder().decode(asset.bytes);
+		const body = safe.slice(safe.indexOf(">") + 1, safe.lastIndexOf("</svg>"));
+		const markup = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${x} ${y} ${width} ${height}"><g transform="matrix(${[a,b,c,d,e,f].join(" ")})" opacity="${opacity}">${body}</g></svg>`;
+		const dataURL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+		return readEmbeddedAsset(dataURL).ok ? { dataURL, x, y, width, height } : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /** Missing, stale, virtualized or unfamiliar source views use the offline approximation. */
 export function readOpenTldrawAppearance(app: App, file: TFile, sourceText: string): unknown {
 	try {
@@ -121,6 +208,10 @@ export function readOpenTldrawAppearance(app: App, file: TFile, sourceText: stri
 			if (!object(value) || typeof value.id !== "string" || byId.has(value.id)) return undefined;
 			byId.set(value.id, value);
 		}
+		for (const source of records) {
+			if (typeof source.id !== "string" || source.id.length > 512 || source.parentId !== pages[0].id
+				|| !sameJSON(source, byId.get(source.id))) return undefined;
+		}
 		const shells = new Map<string, HTMLElement>();
 		for (const element of Array.from(container.querySelectorAll<HTMLElement>("[data-shape-id]"))) {
 			const id = element.dataset.shapeId;
@@ -132,6 +223,8 @@ export function readOpenTldrawAppearance(app: App, file: TFile, sourceText: stri
 		const shapes: unknown[] = [];
 		const connectors: unknown[] = [];
 		let pointCount = 0;
+		let snapshotBytes = 0;
+		let snapshotCount = 0;
 		for (const source of records) {
 			if (typeof source.id !== "string" || source.id.length > 512 || source.parentId !== pages[0].id
 				|| !sameJSON(source, byId.get(source.id))) return undefined;
@@ -139,6 +232,15 @@ export function readOpenTldrawAppearance(app: App, file: TFile, sourceText: stri
 			const transform = matrix(invoke(editor, "getShapePageTransform", source.id));
 			const box = bounds(read(invoke(editor, "getShapeGeometry", source.id), "bounds"));
 			if (shell === undefined || transform === undefined || box === undefined) return undefined;
+			let snapshot = snapshotCount < MAX_IMPORT_ASSETS ? visualSnapshot(shell, source, transform) : undefined;
+			if (snapshot !== undefined) {
+				const asset = readEmbeddedAsset(snapshot.dataURL);
+				if (!asset.ok || snapshotBytes + asset.bytes.length > MAX_IMPORT_ASSET_TOTAL_BYTES) snapshot = undefined;
+				else {
+					snapshotBytes += asset.bytes.length;
+					snapshotCount += 1;
+				}
+			}
 			const paths = Array.from(shell.querySelectorAll("path")).filter(path => {
 				const paint = owner.getComputedStyle(path);
 				return paint.stroke !== "none" && Number.parseFloat(paint.strokeWidth) > 0;
@@ -172,6 +274,15 @@ export function readOpenTldrawAppearance(app: App, file: TFile, sourceText: stri
 			const border = paint === undefined ? null : color(paint.stroke);
 			const fill = paint === undefined ? null : color(paint.fill);
 			const text = textStyle === undefined ? dark ? "#f2f2f2" : "#1d1d1d" : color(textStyle.color);
+			const localX = box.x + box.w / 2;
+			const localY = box.y + box.h / 2;
+			const x = transform.a * localX + transform.c * localY + transform.e - box.w / 2;
+			const y = transform.b * localX + transform.d * localY + transform.f - box.h / 2;
+			if (!finite(x) || !finite(y)) return undefined;
+			if (snapshot !== undefined) {
+				shapes.push({ sourceId: source.id, x, y, width: Math.max(1, box.w), height: Math.max(1, box.h), visualSnapshot: snapshot });
+				continue;
+			}
 			if (border === undefined || fill === undefined || text === undefined || text === null) return undefined;
 			let ink = border;
 			let width = paint === undefined ? 0 : Number.parseFloat(paint.strokeWidth);
@@ -194,12 +305,8 @@ export function readOpenTldrawAppearance(app: App, file: TFile, sourceText: stri
 				alignment: textStyle.textAlign === "center" ? "center" : textStyle.textAlign === "end" || textStyle.textAlign === "right" ? "right" : "left",
 				verticalAlign: source.type === "text" || props.verticalAlign === "start" ? "top" : props.verticalAlign === "end" ? "bottom" : "center",
 			};
-			const localX = box.x + box.w / 2;
-			const localY = box.y + box.h / 2;
-			const x = transform.a * localX + transform.c * localY + transform.e - box.w / 2;
-			const y = transform.b * localX + transform.d * localY + transform.f - box.h / 2;
-			if (!finite(x) || !finite(y)) return undefined;
 			shapes.push({ sourceId: source.id, x, y, width: Math.max(1, box.w), height: Math.max(1, box.h),
+				...(snapshot === undefined ? {} : { visualSnapshot: snapshot }),
 				style: { colors: { fill, border: ink, text }, borderWidth: width,
 					borderStyle: ink === null ? "none" : props.dash === "dashed" ? "dashed" : props.dash === "dotted" ? "dotted" : "solid",
 					...(typography === undefined ? {} : { typography }) } });

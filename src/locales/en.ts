@@ -1262,6 +1262,7 @@ export const EN = {
 		reasons: {
 			tldrawStroke: "stroke width, smoothing and ink approximated",
 			tldrawAppearance: "shape contours, fonts and stroke rendering may differ",
+			visualFallback: "appearance preserved as an SVG attachment; move and resize here, edit its contents in the source editor",
 			appearance: "appearance approximated; geometry and available styles retained",
 			tldrawVariant: "tldraw record or drawing variant not supported",
 			pressure: "pressure widths transferred; freehand smoothing and simulated pressure differ",

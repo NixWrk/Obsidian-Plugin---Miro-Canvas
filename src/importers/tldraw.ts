@@ -8,7 +8,7 @@ import { validateMiroCanvasMetadata } from "../metadata";
 import type { CanvasAnchor } from "../anchors";
 import { MAX_STROKE_POINTS, readLocalStroke } from "../local-items";
 import { BoardBuilder, type BoardRect, type ImportedCardStyle } from "./board-builder";
-import { ImportAssets } from "./assets";
+import { ImportAssets, MAX_IMPORT_ASSET_TOTAL_BYTES, MAX_IMPORT_ASSETS, readEmbeddedAsset } from "./assets";
 import { ImportError, type FormatAdapter, type ImportContext, type ImportResult, type ImportSource } from "./types";
 
 export const MAX_TLDRAW_SOURCE_LENGTH = 16 * 1_024 * 1_024;
@@ -312,8 +312,13 @@ function appearance(builder: BoardBuilder, shape: JsonRecord, nodeId?: string): 
 	builder.note({ sourceId: shape.id as string, sourceType: shape.type as string, status: "approximated", reason: "tldrawAppearance", ...(nodeId === undefined ? {} : { nodeId }) });
 }
 
+interface VisualSnapshot extends BoardRect {
+	readonly dataURL: string;
+	readonly byteLength: number;
+}
 interface ObservedShape extends BoardRect {
 	readonly style?: ImportedCardStyle;
+	readonly visualSnapshot?: VisualSnapshot;
 }
 interface ObservedConnector {
 	readonly color: string;
@@ -326,12 +331,40 @@ interface ObservedAppearance {
 	readonly connectors: ReadonlyMap<string, ObservedConnector>;
 }
 
+/** The host bakes rotation into passive ink and supplies its world-space painted bounds. */
+function readVisualSnapshot(value: unknown, box: BoardRect, source: JsonRecord): VisualSnapshot | undefined {
+	if (!record(value) || Object.keys(value).some(key => !["dataURL", "x", "y", "width", "height"].includes(key))
+		|| typeof value.dataURL !== "string" || !/^data:image\/svg\+xml(?:;|,)/iu.test(value.dataURL)
+		|| !coordinate(value.x) || !coordinate(value.y) || !coordinate(value.width) || !coordinate(value.height)
+		|| value.width < 1 || value.height < 1 || !coordinate(value.x + value.width) || !coordinate(value.y + value.height)) return undefined;
+	const asset = readEmbeddedAsset(value.dataURL);
+	if (!asset.ok || asset.extension !== "svg" || Math.abs(asset.width - value.width) > 0.001
+		|| Math.abs(asset.height - value.height) > 0.001) return undefined;
+	// Labels and embedded images are handled separately; no snapshot depends on a font or linked asset.
+	const svg = new TextDecoder().decode(asset.bytes);
+	if (/<(?:text|tspan|image)(?:[\s/>])/u.test(svg)) return undefined;
+	const viewBox = /^<svg\b[^>]*\bviewBox="([^"]+)"/u.exec(svg)?.[1].trim().split(/[ ,]+/u).map(Number);
+	const expectedViewBox = [value.x, value.y, value.width, value.height];
+	if (viewBox === undefined || viewBox.length !== 4
+		|| viewBox.some((number, index) => !coordinate(number) || Math.abs(number - expectedViewBox[index]) > 0.001)) return undefined;
+	const angle = source.rotation as number;
+	const width = Math.abs(Math.cos(angle)) * box.width + Math.abs(Math.sin(angle)) * box.height;
+	const height = Math.abs(Math.sin(angle)) * box.width + Math.abs(Math.cos(angle)) * box.height;
+	const left = box.x + box.width / 2 - width / 2;
+	const top = box.y + box.height / 2 - height / 2;
+	const margins = [left - value.x, top - value.y, value.x + value.width - left - width, value.y + value.height - top - height];
+	if (margins.some(margin => margin < -1 || margin > 100)) return undefined;
+	return { dataURL: value.dataURL, byteLength: asset.bytes.length, x: value.x, y: value.y, width: value.width, height: value.height };
+}
+
 function readObservedAppearance(source: ImportSource, file: DrawingFile, value: unknown): ObservedAppearance | undefined {
 	if (!record(value) || value.sourceText !== source.text || (value.theme !== "light" && value.theme !== "dark")
 		|| !Array.isArray(value.shapes) || !Array.isArray(value.connectors)
 		|| value.shapes.length > 5_000 || value.connectors.length > 5_000) return undefined;
 	const sourceShapes = new Map(file.records.filter(item => item.typeName === "shape").map(item => [item.id as string, item]));
 	const shapes = new Map<string, ObservedShape>();
+	let snapshotBytes = 0;
+	let snapshotCount = 0;
 	for (const item of value.shapes as unknown[]) {
 		if (!record(item) || typeof item.sourceId !== "string" || !sourceShapes.has(item.sourceId) || shapes.has(item.sourceId)
 			|| !coordinate(item.x) || !coordinate(item.y) || !coordinate(item.width) || !coordinate(item.height)
@@ -343,7 +376,18 @@ function readObservedAppearance(source: ImportSource, file: DrawingFile, value: 
 			if (!validated.valid || validated.diagnostics.length !== 0) return undefined;
 			style = item.style;
 		}
-		shapes.set(item.sourceId, { x: item.x, y: item.y, width: item.width, height: item.height, ...(style === undefined ? {} : { style }) });
+		const box = { x: item.x, y: item.y, width: item.width, height: item.height };
+		let visualSnapshot = snapshotCount < MAX_IMPORT_ASSETS && snapshotBytes < MAX_IMPORT_ASSET_TOTAL_BYTES
+			? readVisualSnapshot(item.visualSnapshot, box, sourceShapes.get(item.sourceId)!) : undefined;
+		if (visualSnapshot !== undefined) {
+			if (snapshotBytes + visualSnapshot.byteLength > MAX_IMPORT_ASSET_TOTAL_BYTES) visualSnapshot = undefined;
+			else {
+				snapshotBytes += visualSnapshot.byteLength;
+				snapshotCount += 1;
+			}
+		}
+		shapes.set(item.sourceId, { ...box, ...(style === undefined ? {} : { style }),
+			...(visualSnapshot === undefined ? {} : { visualSnapshot }) });
 	}
 	const connectors = new Map<string, ObservedConnector>();
 	let totalPoints = 0;
@@ -368,6 +412,7 @@ function readObservedAppearance(source: ImportSource, file: DrawingFile, value: 
 interface NativeImportState {
 	readonly appearance?: ObservedAppearance;
 	readonly nodes: Map<string, string>;
+	readonly snapshotBoxes: Map<string, BoardRect>;
 	readonly consumed: Set<string>;
 	readonly assets: ImportAssets;
 	readonly context: ImportContext;
@@ -376,6 +421,30 @@ interface NativeImportState {
 	readonly sequences: JsonRecord;
 	readonly byId: ReadonlyMap<string, JsonRecord>;
 	readonly arrowBindings: ReadonlyMap<string, readonly JsonRecord[]>;
+}
+
+function importVisualSnapshot(shape: JsonRecord, builder: BoardBuilder, state: NativeImportState): boolean {
+	const id = shape.id as string;
+	const type = shape.type as string;
+	const props = shape.props as JsonRecord;
+	const version = state.sequences["com.tldraw.shape." + type];
+	const snapshot = state.appearance?.shapes.get(id)?.visualSnapshot;
+	const wantsSnapshot = type === "draw" && version === 5 && props.isComplete === true;
+	if (!wantsSnapshot || snapshot === undefined || !coordinate(shape.opacity) || shape.opacity < 0 || shape.opacity > 1) return false;
+	const asset = state.assets.add("visual:" + id, snapshot.dataURL);
+	if (!asset.ok) {
+		builder.note({ sourceId: id, sourceType: type, status: "approximated", reason: asset.reason });
+		return false;
+	}
+	const nodeId = builder.file(snapshot, asset.path, { source: { id, type }, style: {
+		rotation: 0, borderWidth: 0, borderStyle: "none", colors: { fill: null, border: null },
+		showAttachmentName: false, cornerRadius: 0, ...(shape.isLocked === true ? { locked: true as const } : {}),
+	} });
+	state.nodes.set(id, nodeId);
+	state.snapshotBoxes.set(id, snapshot);
+	// The picture retains source ink, while native editing and integer-box placement remain approximations.
+	builder.note({ sourceId: id, sourceType: type, status: "approximated", reason: "visualFallback", nodeId });
+	return true;
 }
 
 function importCard(shape: JsonRecord, builder: BoardBuilder, state: NativeImportState): boolean {
@@ -491,7 +560,7 @@ function importLine(shape: JsonRecord, builder: BoardBuilder, state: NativeImpor
 			|| !coordinate(normalized.x) || normalized.x < 0 || normalized.x > 1
 			|| !coordinate(normalized.y) || normalized.y < 0 || normalized.y > 1) return undefined;
 		usedBindings.push(binding.id as string);
-				const targetBox = state.appearance?.shapes.get(binding.toId as string);
+				const targetBox = state.snapshotBoxes.get(binding.toId as string) ?? state.appearance?.shapes.get(binding.toId as string);
 		let u = normalized.x;
 		let v = normalized.y;
 		if (observed !== undefined && targetBox !== undefined) {
@@ -501,7 +570,7 @@ function importLine(shape: JsonRecord, builder: BoardBuilder, state: NativeImpor
 			const height = Math.max(1, Math.round(targetBox.height));
 			const cx = x + width / 2;
 			const cy = y + height / 2;
-			const angle = state.byId.get(binding.toId as string)?.rotation as number;
+			const angle = state.snapshotBoxes.has(binding.toId as string) ? 0 : state.byId.get(binding.toId as string)?.rotation as number;
 			const dx = point.x - cx;
 			const dy = point.y - cy;
 			u = (cx + Math.cos(angle) * dx + Math.sin(angle) * dy - x) / width;
@@ -548,9 +617,9 @@ function convert(source: ImportSource, context: ImportContext): ImportResult {
 		arrowBindings.set(value.fromId, list);
 	}
 	const capturedAppearance = readObservedAppearance(source, file, context.tldrawAppearance);
-	const state: NativeImportState = { appearance: capturedAppearance, byId, arrowBindings, nodes: new Map(), consumed: new Set(), assets: new ImportAssets(source.path, context.newId), context, sourcePath: source.path, records: file.records, sequences: file.sequences };
+	const state: NativeImportState = { appearance: capturedAppearance, byId, arrowBindings, nodes: new Map(), snapshotBoxes: new Map(), consumed: new Set(), assets: new ImportAssets(source.path, context.newId), context, sourcePath: source.path, records: file.records, sequences: file.sequences };
 	for (const shape of shapes) {
-		if (importCard(shape, builder, state)) state.consumed.add(shape.id as string);
+		if (importVisualSnapshot(shape, builder, state) || importCard(shape, builder, state)) state.consumed.add(shape.id as string);
 	}
 	for (const shape of shapes) {
 		if (importLine(shape, builder, state)) state.consumed.add(shape.id as string);

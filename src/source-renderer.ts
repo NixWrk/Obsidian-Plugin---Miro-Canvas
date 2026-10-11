@@ -946,6 +946,9 @@ function applyNodeCss(
   // Native cards paint their rounded face and border on the inner container.
   // Painting the shell too leaves square corners around that face.
   const container = layer === undefined ? safeCall(shell, "querySelector", [":scope > .canvas-node-container"]) : undefined;
+  if (layer === undefined && descriptor.cornerRadius !== undefined) {
+    patchStyle(shell, "--miro-canvas-card-radius", `${descriptor.cornerRadius}px`, patches);
+  }
   for (const [property, value] of Object.entries(descriptor.css)) {
     if (TYPOGRAPHY_CSS.has(property)) {
       // A family the machine lacks falls back to a face of its own kind.

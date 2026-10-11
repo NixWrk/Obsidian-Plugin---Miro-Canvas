@@ -7,6 +7,8 @@ const CARD_SOURCE_KINDS = new Set(["card", "app-card", "preview", "document", "e
 /** Diagram geometry belongs to the figure; only card faces get a default radius. */
 export function hasCardCorners(kind: string | undefined, sourceKind: string | null, appCard: boolean): boolean {
   if (kind !== "text" && kind !== "file" && kind !== "link") return false;
+	// Persisted attachment appearance uses the renderer's generic text descriptor.
+	if (kind === "file" && sourceKind === "text") return true;
   return appCard || sourceKind === null || CARD_SOURCE_KINDS.has(sourceKind);
 }
 

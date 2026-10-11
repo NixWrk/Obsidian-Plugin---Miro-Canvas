@@ -1,5 +1,11 @@
 # miro-canvas
 
+User-approved temporary SVG import fallback preserves observed Excalidraw
+sketch effects and tldraw draw outlines as native file cards. Native support
+for roughness, hatching, shape opacity and smoothed pressure outlines remains
+on the feature roadmap. No new format fields or source-editor runtime are
+bundled. [Scope and current acceptance](import-visual-fallback-checks.md).
+
 [English] | [Full Russian specification](miro-canvas.ru.md)
 
 `miro-canvas` is an offline Obsidian plugin under active development that

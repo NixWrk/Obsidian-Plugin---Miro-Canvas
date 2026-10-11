@@ -93,20 +93,32 @@ function rasterDimensions(bytes: Uint8Array, extension: string): { readonly widt
 
 /** SVG is a restricted attachment format, not a general XML/HTML sanitizer. */
 export const MAX_IMPORT_SVG_BYTES = 1024 * 1024;
-export const MAX_IMPORT_SVG_ELEMENTS = 512;
+// Dense per-object hachures need more elements; geometry has a separate shared budget.
+export const MAX_IMPORT_SVG_ELEMENTS = 4_096;
+export const MAX_IMPORT_SVG_SEGMENTS = 32_768;
+export const MAX_IMPORT_SVG_PATH_SEGMENTS = 8_192;
+export const MAX_IMPORT_SVG_TRANSFORMS = 8_192;
+export const MAX_IMPORT_SVG_DASHES = 100_000;
+export const MAX_IMPORT_SVG_RASTER_PIXELS = 32_000_000;
 export const MAX_IMPORT_SVG_DEPTH = 16;
 const MAX_SVG_TEXT = 65_536;
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const SVG_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/iu;
 const SVG_SPACE = /^[ \t\r\n]*$/u;
-const SVG_COMMON = new Set(["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity"]);
+const SVG_COMMON = new Set(["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "stroke-dashoffset", "fill-rule", "opacity", "fill-opacity", "stroke-opacity"]);
 const SVG_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
 	svg: new Set(["xmlns", "width", "height", "viewBox", "preserveAspectRatio"]),
 	g: new Set(["transform"]),
-	rect: new Set(["x", "y", "width", "height", "rx", "ry"]),
-	text: new Set(["x", "y", "dx", "dy", "font-family", "font-size", "font-weight", "font-style", "text-anchor", "dominant-baseline", "xml:space"]),
+	rect: new Set(["x", "y", "width", "height", "rx", "ry", "transform"]),
+	path: new Set(["d", "transform"]),
+	ellipse: new Set(["cx", "cy", "rx", "ry", "transform"]),
+	circle: new Set(["cx", "cy", "r", "transform"]),
+	line: new Set(["x1", "y1", "x2", "y2", "transform"]),
+	polyline: new Set(["points", "transform"]),
+	polygon: new Set(["points", "transform"]),
+	text: new Set(["transform", "x", "y", "dx", "dy", "font-family", "font-size", "font-weight", "font-style", "text-anchor", "dominant-baseline", "xml:space"]),
 	tspan: new Set(["x", "y", "dx", "dy", "font-family", "font-size", "font-weight", "font-style", "text-anchor", "dominant-baseline", "xml:space"]),
-	image: new Set(["x", "y", "width", "height", "href", "preserveAspectRatio"]),
+	image: new Set(["x", "y", "width", "height", "href", "preserveAspectRatio", "transform"]),
 };
 const SVG_COLORS = new Set(["none", "transparent", "black", "white", "red", "green", "blue", "yellow", "gray", "grey", "silver", "maroon", "purple", "fuchsia", "lime", "olive", "navy", "teal", "aqua"]);
 
@@ -167,14 +179,294 @@ function svgNumber(value: string, maximum = 1_000_000): number {
 	return number;
 }
 
-function svgNumbers(value: string, count: number): number[] {
+function svgNumberList(value: string, maximumCount: number): number[] {
 	if (!/^[+\-0-9.eE, \t\r\n]+$/u.test(value) || /,\s*,|^\s*,|,\s*$/u.test(value)) return refuseSvg();
 	const pieces = value.trim().split(/[, \t\r\n]+/u);
-	if (pieces.length !== count) return refuseSvg();
+	if (pieces.length > maximumCount) return refuseSvg("assetTooLarge");
 	return pieces.map((piece) => svgNumber(piece));
 }
 
-function svgAttribute(name: string, value: string): string {
+function svgNumbers(value: string, count: number): number[] {
+	const numbers = svgNumberList(value, count);
+	if (numbers.length !== count) return refuseSvg();
+	return numbers;
+}
+
+type SvgMatrix = readonly [number, number, number, number, number, number];
+type SvgPoint = readonly [number, number];
+const SVG_IDENTITY: SvgMatrix = [1, 0, 0, 1, 0, 0];
+const MAX_SVG_COORDINATE = 1_000_000;
+const MAX_SVG_MATRIX_SCALE = 1_024;
+
+interface SvgBudget {
+	segments: number;
+	transforms: number;
+	dashes: number;
+	rasterPixels: number;
+}
+
+interface SvgFrame {
+	readonly tag: string;
+	readonly matrix: SvgMatrix;
+	readonly stroke: string;
+	readonly dasharray: readonly number[];
+}
+
+function svgSegments(budget: SvgBudget, count: number): void {
+	budget.segments += count;
+	if (budget.segments > MAX_IMPORT_SVG_SEGMENTS) return refuseSvg("assetTooLarge");
+}
+
+function svgMatrix(matrix: SvgMatrix): SvgMatrix {
+	if (matrix.some((number, index) => !Number.isFinite(number) || Math.abs(number) > (index < 4 ? MAX_SVG_MATRIX_SCALE : MAX_SVG_COORDINATE))) return refuseSvg("assetTooLarge");
+	return matrix;
+}
+
+function multiplySvgMatrix(left: SvgMatrix, right: SvgMatrix): SvgMatrix {
+	const [a, b, c, d, e, f] = left;
+	const [g, h, i, j, k, l] = right;
+	return svgMatrix([a * g + c * h, b * g + d * h, a * i + c * j, b * i + d * j, a * k + c * l + e, b * k + d * l + f]);
+}
+
+/** SVG attribute transforms only; CSS functions, units and 3D transforms are absent. */
+function svgTransform(value: string, budget: SvgBudget): { value: string; matrix: SvgMatrix } {
+	const transform = /(matrix|translate|scale|rotate|skewX|skewY)[ \t\r\n]*\(([^()]*)\)/uy;
+	let offset = 0;
+	let count = 0;
+	let matrix = SVG_IDENTITY;
+	const saved: string[] = [];
+	while (offset < value.length) {
+		const separatorStart = offset;
+		while (/[ \t\r\n]/u.test(value[offset] ?? "")) offset += 1;
+		if (offset === value.length) break;
+		if (count > 0 && value[offset] === ",") {
+			offset += 1;
+			while (/[ \t\r\n]/u.test(value[offset] ?? "")) offset += 1;
+		}
+		if (count > 0 && offset === separatorStart) return refuseSvg();
+		transform.lastIndex = offset;
+		const match = transform.exec(value);
+		if (match === null) return refuseSvg("unsupportedAsset");
+		const name = match[1];
+		const numbers = svgNumberList(match[2], 6);
+		const sizes: Readonly<Record<string, readonly number[]>> = { matrix: [6], translate: [1, 2], scale: [1, 2], rotate: [1, 3], skewX: [1], skewY: [1] };
+		if (!sizes[name].includes(numbers.length)) return refuseSvg();
+		count += 1;
+		budget.transforms += 1;
+		if (count > 16 || budget.transforms > MAX_IMPORT_SVG_TRANSFORMS) return refuseSvg("assetTooLarge");
+		let next: SvgMatrix;
+		if (name === "matrix") next = numbers as unknown as SvgMatrix;
+		else if (name === "translate") next = [1, 0, 0, 1, numbers[0], numbers[1] ?? 0];
+		else if (name === "scale") next = [numbers[0], 0, 0, numbers[1] ?? numbers[0], 0, 0];
+		else if (name === "rotate") {
+			const radians = numbers[0] * Math.PI / 180;
+			const sine = Math.sin(radians);
+			const cosine = Math.cos(radians);
+			const x = numbers[1] ?? 0;
+			const y = numbers[2] ?? 0;
+			next = [cosine, sine, -sine, cosine, x - cosine * x + sine * y, y - sine * x - cosine * y];
+		} else {
+			const tangent = Math.tan(numbers[0] * Math.PI / 180);
+			next = name === "skewX" ? [1, 0, tangent, 1, 0, 0] : [1, tangent, 0, 1, 0, 0];
+		}
+		matrix = multiplySvgMatrix(matrix, svgMatrix(next));
+		saved.push(`${name}(${numbers.join(" ")})`);
+		offset = transform.lastIndex;
+	}
+	if (count === 0) return refuseSvg();
+	return { value: saved.join(" "), matrix };
+}
+
+function svgPoint(point: SvgPoint, matrix: SvgMatrix): void {
+	const [x, y] = point;
+	const [a, b, c, d, e, f] = matrix;
+	if ([x, y, a * x + c * y + e, b * x + d * y + f].some((number) => !Number.isFinite(number) || Math.abs(number) > MAX_SVG_COORDINATE)) return refuseSvg("assetTooLarge");
+}
+
+/** Full numeric consumption, including compact signed coordinates and arc flags. */
+class SvgPathNumbers {
+	offset = 0;
+	private readonly number = /[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/iuy;
+
+	constructor(readonly value: string) {}
+
+	space(): void {
+		while (/[ \t\r\n]/u.test(this.value[this.offset] ?? "")) this.offset += 1;
+	}
+
+	read(commaAllowed: boolean, flag = false, separatorRequired = false): number {
+		const start = this.offset;
+		this.space();
+		if (this.value[this.offset] === ",") {
+			if (!commaAllowed) return refuseSvg();
+			this.offset += 1;
+			this.space();
+		}
+		if (separatorRequired && this.offset === start) return refuseSvg();
+		if (flag) {
+			const character = this.value[this.offset++];
+			if (character !== "0" && character !== "1") return refuseSvg();
+			return Number(character);
+		}
+		this.number.lastIndex = this.offset;
+		const match = this.number.exec(this.value);
+		if (match === null) return refuseSvg();
+		this.offset = this.number.lastIndex;
+		return svgNumber(match[0]);
+	}
+}
+
+interface SvgMeasure {
+	readonly length: number;
+	readonly subpaths: number;
+}
+
+/** Check endpoints/control hulls and bound the decoder's segments, not just command letters. */
+function svgPath(value: string, matrix: SvgMatrix, budget: SvgBudget): { value: string; measure: SvgMeasure } {
+	const input = new SvgPathNumbers(value);
+	const arity: Readonly<Record<string, number>> = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7 };
+	const saved: string[] = [];
+	let command: string | undefined;
+	let previous = "";
+	let current: SvgPoint = [0, 0];
+	let start = current;
+	let control = current;
+	let segments = 0;
+	let subpaths = 0;
+	let length = 0;
+	input.space();
+	if (input.value[input.offset] !== "M" && input.value[input.offset] !== "m") return refuseSvg();
+	while (input.offset < value.length) {
+		input.space();
+		if (input.offset === value.length) break;
+		const explicit = /^[MmLlHhVvCcSsQqTtAaZz]$/u.test(value[input.offset]);
+		if (explicit) command = value[input.offset++];
+		if (command === undefined) return refuseSvg();
+		const kind = command.toUpperCase();
+		const relative = command === command.toLowerCase();
+		segments += 1;
+		if (segments > MAX_IMPORT_SVG_PATH_SEGMENTS) return refuseSvg("assetTooLarge");
+		svgSegments(budget, 1);
+		if (kind === "Z") {
+			length += Math.hypot(current[0] - start[0], current[1] - start[1]);
+			current = start;
+			previous = kind;
+			saved.push(command);
+			command = undefined;
+			continue;
+		}
+		const numbers = Array.from({ length: arity[kind] }, (_, index) => input.read(index > 0 || !explicit, kind === "A" && (index === 3 || index === 4), kind === "A" && index === 3));
+		const point = (index: number): SvgPoint => [numbers[index] + (relative ? current[0] : 0), numbers[index + 1] + (relative ? current[1] : 0)];
+		let points: SvgPoint[];
+		if (kind === "H") points = [[numbers[0] + (relative ? current[0] : 0), current[1]]];
+		else if (kind === "V") points = [[current[0], numbers[0] + (relative ? current[1] : 0)]];
+		else if (kind === "C") points = [point(0), point(2), point(4)];
+		else if (kind === "Q") points = [point(0), point(2)];
+		else if (kind === "S" || kind === "T") {
+			const smooth = kind === "S" ? previous === "C" || previous === "S" : previous === "Q" || previous === "T";
+			const reflected: SvgPoint = smooth ? [current[0] * 2 - control[0], current[1] * 2 - control[1]] : current;
+			points = kind === "S" ? [reflected, point(0), point(2)] : [reflected, point(0)];
+		} else if (kind === "A") {
+			if (numbers[0] < 0 || numbers[1] < 0) return refuseSvg();
+			points = [point(5)];
+			if (numbers[0] > 0 && numbers[1] > 0 && (current[0] !== points[0][0] || current[1] !== points[0][1])) {
+				const angle = numbers[2] * Math.PI / 180;
+				const dx = (current[0] - points[0][0]) / 2;
+				const dy = (current[1] - points[0][1]) / 2;
+				const scale = Math.max(1, Math.hypot((Math.cos(angle) * dx + Math.sin(angle) * dy) / numbers[0], (-Math.sin(angle) * dx + Math.cos(angle) * dy) / numbers[1]));
+				const radius = Math.hypot(numbers[0], numbers[1]) * scale;
+				const x = (current[0] + points[0][0]) / 2;
+				const y = (current[1] + points[0][1]) / 2;
+				// Conservative arc envelope includes SVG's automatic radius enlargement.
+				for (const sideX of [-1, 1]) for (const sideY of [-1, 1]) svgPoint([x + sideX * radius * 2, y + sideY * radius * 2], matrix);
+				length += 2 * Math.PI * radius;
+			}
+		} else points = [point(0)];
+		let from = current;
+		for (const next of points) {
+			svgPoint(next, matrix);
+			if (kind !== "M") length += Math.hypot(next[0] - from[0], next[1] - from[1]);
+			from = next;
+		}
+		current = points[points.length - 1];
+		control = points.length > 1 ? points[points.length - 2] : current;
+		if (kind === "M") {
+			start = current;
+			subpaths += 1;
+		}
+		if (previous === "Z" && kind !== "M") subpaths += 1;
+		previous = kind;
+		saved.push(`${command} ${numbers.join(" ")}`);
+		if (kind === "M") command = relative ? "l" : "L";
+	}
+	return { value: saved.join(" "), measure: { length, subpaths } };
+}
+
+function svgGeometry(tag: string, fields: Map<string, string>, matrix: SvgMatrix, budget: SvgBudget): SvgMeasure | undefined {
+	if (tag === "path") {
+		const path = svgPath(fields.get("d") ?? "", matrix, budget);
+		fields.set("d", path.value);
+		return path.measure;
+	}
+	const number = (name: string): number => Number(fields.get(name) ?? 0);
+	if (tag === "polyline" || tag === "polygon") {
+		const points = svgNumberList(fields.get("points") ?? "", MAX_IMPORT_SVG_PATH_SEGMENTS * 2);
+		if (points.length % 2 !== 0 || points.length < (tag === "polygon" ? 6 : 4)) return refuseSvg();
+		svgSegments(budget, points.length / 2);
+		fields.set("points", points.join(" "));
+		let length = 0;
+		for (let index = 0; index < points.length; index += 2) {
+			svgPoint([points[index], points[index + 1]], matrix);
+			if (index > 0) length += Math.hypot(points[index] - points[index - 2], points[index + 1] - points[index - 1]);
+		}
+		if (tag === "polygon") length += Math.hypot(points[0] - points[points.length - 2], points[1] - points[points.length - 1]);
+		return { length, subpaths: 1 };
+	}
+	if (tag === "line") {
+		svgSegments(budget, 1);
+		svgPoint([number("x1"), number("y1")], matrix);
+		svgPoint([number("x2"), number("y2")], matrix);
+		return { length: Math.hypot(number("x2") - number("x1"), number("y2") - number("y1")), subpaths: 1 };
+	}
+	if (tag === "circle" || tag === "ellipse") {
+		const rx = number(tag === "circle" ? "r" : "rx");
+		const ry = number(tag === "circle" ? "r" : "ry");
+		for (const x of [-rx, rx]) for (const y of [-ry, ry]) svgPoint([number("cx") + x, number("cy") + y], matrix);
+		svgSegments(budget, 4);
+		return { length: 2 * Math.PI * Math.max(rx, ry), subpaths: 1 };
+	}
+	if (tag === "rect" || tag === "image") {
+		for (const x of [0, number("width")]) for (const y of [0, number("height")]) svgPoint([number("x") + x, number("y") + y], matrix);
+		if (tag === "image") return undefined;
+		svgSegments(budget, 4);
+		return { length: 2 * (number("width") + number("height")), subpaths: 1 };
+	}
+	if (tag === "text" || tag === "tspan") svgPoint([number("x") + number("dx"), number("y") + number("dy")], matrix);
+	return undefined;
+}
+
+function svgFrame(tag: string, fields: Map<string, string>, parent: SvgFrame | undefined, budget: SvgBudget): SvgFrame {
+	let matrix = parent?.matrix ?? SVG_IDENTITY;
+	if (fields.has("transform")) {
+		const transform = svgTransform(fields.get("transform")!, budget);
+		fields.set("transform", transform.value);
+		matrix = multiplySvgMatrix(matrix, transform.matrix);
+	}
+	const stroke = fields.get("stroke") ?? parent?.stroke ?? "none";
+	const dasharray = fields.has("stroke-dasharray") ? fields.get("stroke-dasharray") === "none" ? [] : svgNumberList(fields.get("stroke-dasharray")!, 64) : parent?.dasharray ?? [];
+	const measure = svgGeometry(tag, fields, matrix, budget);
+	const period = dasharray.reduce((sum, number) => sum + number, 0);
+	if (stroke !== "none" && period > 0) {
+		if (tag === "text" || tag === "tspan") return refuseSvg("unsupportedAsset");
+		if (measure !== undefined) {
+			budget.dashes += (Math.ceil(measure.length / period) + measure.subpaths) * dasharray.length;
+			if (!Number.isFinite(budget.dashes) || budget.dashes > MAX_IMPORT_SVG_DASHES) return refuseSvg("assetTooLarge");
+		}
+	}
+	return { tag, matrix, stroke, dasharray };
+}
+
+function svgAttribute(name: string, value: string, budget: SvgBudget): string {
 	if (name === "xmlns") {
 		if (value !== SVG_NAMESPACE) return refuseSvg("unsupportedAsset");
 		return value;
@@ -182,6 +474,8 @@ function svgAttribute(name: string, value: string): string {
 	if (name === "href") {
 		const raster = readEmbeddedRaster(value);
 		if (!raster.ok) return refuseSvg(raster.reason);
+		budget.rasterPixels += raster.width * raster.height;
+		if (budget.rasterPixels > MAX_IMPORT_SVG_RASTER_PIXELS) return refuseSvg("assetTooLarge");
 		const staticReason = staticRasterReason(raster.bytes, raster.extension);
 		if (staticReason !== undefined) return refuseSvg(staticReason);
 		return rasterDataURL(raster.bytes, raster.extension);
@@ -200,12 +494,13 @@ function svgAttribute(name: string, value: string): string {
 		if (box[2] <= 0 || box[3] <= 0) return refuseSvg();
 		return box.join(" ");
 	}
-	if (name === "transform") {
-		const matrix = /^matrix\(([^()]*)\)$/u.exec(value);
-		if (matrix === null) return refuseSvg("unsupportedAsset");
-		const values = svgNumbers(matrix[1], 6);
-		if (![1, -1].includes(values[0]) || values[1] !== 0 || values[2] !== 0 || ![1, -1].includes(values[3])) return refuseSvg("unsupportedAsset");
-		return `matrix(${values.join(" ")})`;
+	// Geometry needs the complete primitive's transform and the document-wide budget.
+	if (name === "transform" || name === "d" || name === "points") return value;
+	if (name === "stroke-dasharray") {
+		if (value === "none") return value;
+		const numbers = svgNumberList(value, 64);
+		if (numbers.some((number) => number < 0)) return refuseSvg();
+		return numbers.join(" ");
 	}
 	if (name === "preserveAspectRatio") {
 		if (!/^(?:none|x(?:Min|Mid|Max)Y(?:Min|Mid|Max)(?: (?:meet|slice))?)$/u.test(value)) return refuseSvg();
@@ -223,6 +518,7 @@ function svgAttribute(name: string, value: string): string {
 	}
 	const choices: Readonly<Record<string, readonly string[]>> = {
 		"stroke-linecap": ["butt", "round", "square"],
+		"fill-rule": ["nonzero", "evenodd"],
 		"stroke-linejoin": ["miter", "round", "bevel"],
 		"font-style": ["normal", "italic", "oblique"],
 		"text-anchor": ["start", "middle", "end"],
@@ -234,7 +530,7 @@ function svgAttribute(name: string, value: string): string {
 		return value;
 	}
 	const number = svgNumber(value.endsWith("px") ? value.slice(0, -2) : value, name === "font-size" ? 512 : 1_000_000);
-	if (["width", "height", "rx", "ry", "stroke-width", "font-size"].includes(name) && number < 0) return refuseSvg();
+	if (["width", "height", "r", "rx", "ry", "stroke-width", "font-size"].includes(name) && number < 0) return refuseSvg();
 	return String(number);
 }
 
@@ -265,7 +561,8 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 	const tagStart = /<([a-z]+)(?=[ \t\r\n/>])/uy;
 	const attribute = /[ \t\r\n]+([A-Za-z_:][A-Za-z0-9_:.-]*)[ \t\r\n]*=[ \t\r\n]*(?:"([^"<]*)"|'([^'<]*)')/uy;
 	const close = /<\/([a-z]+)[ \t\r\n]*>/uy;
-	const stack: string[] = [];
+	const stack: SvgFrame[] = [];
+	const budget: SvgBudget = { segments: 0, transforms: 0, dashes: 0, rasterPixels: 0 };
 	const body: string[] = [];
 	let attributes: Map<string, string> | undefined;
 	let offset = 0;
@@ -277,7 +574,7 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 			const next = source.indexOf("<", offset);
 			const raw = source.slice(offset, next < 0 ? source.length : next);
 			const text = xmlReferences(raw);
-			const parent = stack[stack.length - 1];
+			const parent = stack[stack.length - 1]?.tag;
 			if (parent !== "text" && parent !== "tspan" && !SVG_SPACE.test(text)) return refuseSvg();
 			textSize += text.length;
 			if (textSize > MAX_SVG_TEXT) return refuseSvg("assetTooLarge");
@@ -288,7 +585,7 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 		if (source.startsWith("</", offset)) {
 			close.lastIndex = offset;
 			const closing = close.exec(source);
-			if (closing === null || stack.pop() !== closing[1]) return refuseSvg();
+			if (closing === null || stack.pop()?.tag !== closing[1]) return refuseSvg();
 			offset = close.lastIndex;
 			if (closing[1] === "svg") ended = true;
 			else body.push(`</${closing[1]}>`);
@@ -300,7 +597,8 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 		if (opening === null) return refuseSvg("unsupportedAsset");
 		const tag = opening[1];
 		if (!Object.prototype.hasOwnProperty.call(SVG_FIELDS, tag)) return refuseSvg("unsupportedAsset");
-		const parent = stack[stack.length - 1];
+		const parentFrame = stack[stack.length - 1];
+		const parent = parentFrame?.tag;
 		if (attributes === undefined ? tag !== "svg" : parent === undefined || tag === "svg") return refuseSvg();
 		if (parent === "text" || parent === "tspan") {
 			if (tag !== "tspan") return refuseSvg("unsupportedAsset");
@@ -313,6 +611,7 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 			const end = /^[ \t\r\n]*(\/?)>/u.exec(source.slice(offset));
 			if (end !== null) {
 				offset += end[0].length;
+				const frame = svgFrame(tag, fields, parentFrame, budget);
 				if (tag === "svg") {
 					if (fields.get("xmlns") !== SVG_NAMESPACE) return refuseSvg("unsupportedAsset");
 					attributes = fields;
@@ -321,7 +620,7 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 					if (tag === "image" && (!fields.has("href") || !fields.has("width") || !fields.has("height"))) return refuseSvg();
 					body.push(`<${tag}${svgAttributes(fields)}${end[1] === "/" ? "/" : ""}>`);
 				}
-				if (end[1] !== "/") stack.push(tag);
+				if (end[1] !== "/") stack.push(frame);
 				break;
 			}
 			attribute.lastIndex = offset;
@@ -329,7 +628,7 @@ function parsePassiveSvg(bytes: Uint8Array): PassiveSvg {
 			if (field === null || fields.has(field[1])) return refuseSvg();
 			if (!SVG_FIELDS[tag].has(field[1]) && !SVG_COMMON.has(field[1])) return refuseSvg("unsupportedAsset");
 			if (fields.size >= 24) return refuseSvg("assetTooLarge");
-			fields.set(field[1], svgAttribute(field[1], xmlReferences((field[2] ?? field[3]).replace(/[\t\r\n]/gu, " "))));
+			fields.set(field[1], svgAttribute(field[1], xmlReferences((field[2] ?? field[3]).replace(/[\t\r\n]/gu, " ")), budget));
 			offset = attribute.lastIndex;
 		}
 	}

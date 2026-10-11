@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve observed Excalidraw sketch contours, hatching, shape transparency and freehand outlines, and tldraw freehand outlines, as bounded passive SVG attachments when a saved audited source view is already open. Report the change in editing mode; keep ordinary supported cards editable and source files unchanged. Retain sharp attachment faces and hide source picture filenames after native mounts.
+
 - Preserve source theme, supported static image reflection and restricted passive SVG attachments on Excalidraw import; retain native palette tint, invisible containers and direct routes on Advanced imports.
 - Add bounded tldraw native shape/text/line/image and authored Markmind rich tree import. Read complete geometry/styles from already-open audited source editors without changing them; reject stale/incomplete captures.
 - Remove native card padding and scrollbar reservation from imported local text/shape labels, retaining ordinary native card layout. Report remaining font, sketch, curve and editor feature differences explicitly.

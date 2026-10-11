@@ -47,9 +47,10 @@ import { isValidFontSize, isValidLineHeight } from "../appearance";
 import { MAX_WAYPOINTS } from "../connector-route";
 import { defaultPenInk, simplifyPoints, strokeBounds, type StrokePoint } from "../drawing";
 import { MAX_STROKE_POINTS, readLocalStroke, type LocalStroke } from "../local-items";
-import { ImportAssets } from "./assets";
+import { ImportAssets, readEmbeddedAsset } from "./assets";
 import { BoardBuilder, type BoardRect, type ImportedCardStyle, type SourceElement } from "./board-builder";
 import { readExcalidrawFile, type ExcalidrawFile, type ExcalidrawReadErrorCode } from "./excalidraw-file";
+import { needsExcalidrawVisual } from "./excalidraw-visual";
 import {
 	ImportError,
 	MAX_IMPORT_ELEMENTS,
@@ -229,7 +230,7 @@ export function convertExcalidraw(source: ImportSource, context: ImportContext):
 	const read = readExcalidrawFile(source.text);
 	if (!read.ok) throw new ImportError(READ_ERROR_REASONS[read.error.code], read.error.detail);
 	if (read.file.scene.elements.length > MAX_IMPORT_ELEMENTS) throw new ImportError("tooLarge", "Excalidraw scene exceeds the element limit");
-	const drawing = new DrawingImport(read.file, source.path, context, source.frontmatter);
+	const drawing = new DrawingImport(read.file, source.path, context, source.frontmatter, source.text);
 	return drawing.build();
 }
 
@@ -254,8 +255,11 @@ class DrawingImport {
 	private readonly placed = new Map<string, PlacedCard>();
 	private readonly lostStyles = new Set<ImportReason>();
 	private readonly reflectedImages = new Set<string>();
+	private readonly visualSources = new Set<string>();
+	private readonly snapshots = new Map<string, Record<string, unknown>>();
+	private readonly loadedRasters = new Map<string, Record<string, unknown>>();
 
-	constructor(file: ExcalidrawFile, sourcePath: string, context: ImportContext, private readonly frontmatter?: Readonly<Record<string, unknown>>) {
+	constructor(file: ExcalidrawFile, sourcePath: string, context: ImportContext, private readonly frontmatter?: Readonly<Record<string, unknown>>, sourceText?: string) {
 		this.builder = new BoardBuilder("excalidraw", context);
 		this.assets = new ImportAssets(sourcePath, context.newId);
 		this.file = file;
@@ -263,6 +267,25 @@ class DrawingImport {
 		const sourceTheme = isRecord(file.scene.appState) ? file.scene.appState.theme : undefined;
 		this.displayTheme = sourceTheme === "light" || sourceTheme === "dark" ? sourceTheme : undefined;
 		this.context = this.displayTheme === undefined ? context : { ...context, theme: this.displayTheme };
+		const capture = context.excalidrawAppearance;
+		if (isRecord(capture) && capture.sourceText === sourceText && Array.isArray(capture.snapshots) && capture.snapshots.length <= 512) {
+			for (const snapshot of capture.snapshots as unknown[]) {
+				if (!isRecord(snapshot) || typeof snapshot.sourceId !== "string" || this.snapshots.has(snapshot.sourceId)) {
+					this.snapshots.clear();
+					break;
+				}
+				this.snapshots.set(snapshot.sourceId, snapshot);
+			}
+			if (Array.isArray(capture.rasters) && capture.rasters.length <= 512) {
+				for (const raster of capture.rasters as unknown[]) {
+					if (!isRecord(raster) || typeof raster.sourceId !== "string" || this.loadedRasters.has(raster.sourceId)) {
+						this.loadedRasters.clear();
+						break;
+					}
+					this.loadedRasters.set(raster.sourceId, raster);
+				}
+			}
+		}
 	}
 
 	build(): ImportResult {
@@ -340,6 +363,7 @@ class DrawingImport {
 	}
 
 	private placeElement(element: DrawingElement): void {
+		if (this.placeVisual(element)) return;
 		if (SHAPE_TYPES.has(element.type)) this.placeShape(element);
 		else if (element.type === "text") this.placeText(element);
 		else if (element.type === "freedraw") this.placeStroke(element);
@@ -348,6 +372,36 @@ class DrawingImport {
 		else if (element.type === "embeddable") this.placeEmbeddable(element);
 		else if (element.type === "iframe") this.placeholder(element, "unsupported", "iframe");
 		else this.placeholder(element, "unsupported", "unknownElement");
+	}
+
+	/** The complete observed object becomes one ordinary, movable SVG file card. */
+	private placeVisual(element: DrawingElement): boolean {
+		if (!needsExcalidrawVisual(element.data)) return false;
+		const snapshot = this.snapshots.get(element.id);
+		if (snapshot === undefined || typeof snapshot.dataURL !== "string") return false;
+		const values = [snapshot.x, snapshot.y, snapshot.width, snapshot.height];
+		if (values.some(value => typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > 100_000)
+			|| Number(snapshot.width) < 1 || Number(snapshot.height) < 1) return false;
+		const label = this.labels.get(element.id);
+		if (snapshot.labelId !== label?.id || element.data.frameId != null || linkOf(element.data) !== undefined || label !== undefined && linkOf(label.data) !== undefined) return false;
+		const rect = { x: Number(snapshot.x), y: Number(snapshot.y), width: Number(snapshot.width), height: Number(snapshot.height) };
+		const original = cardBounds({ nodeId: "", rect: boxOf(element.data), angle: finiteNumber(element.data.angle) ?? 0 });
+		if (rect.x > original.x + 1 || rect.y > original.y + 1 || rect.x + rect.width < original.x + original.width - 1
+			|| rect.y + rect.height < original.y + original.height - 1 || rect.width > original.width + 2_000 || rect.height > original.height + 2_000) return false;
+		const image = readEmbeddedAsset(snapshot.dataURL);
+		if (!image.ok || image.extension !== "svg" || Math.abs(image.width - rect.width) > 0.01 || Math.abs(image.height - rect.height) > 0.01) return false;
+		const asset = this.assets.add(`visual:${element.id}`, snapshot.dataURL);
+		if (!asset.ok) return false;
+		const nodeId = this.builder.file(rect, asset.path, { source: sourceOf(element), style: { ...lockedStyle(element.data), showAttachmentName: false, cornerRadius: 0, borderStyle: "none", colors: { fill: null, border: null } } });
+		this.placed.set(element.id, { nodeId, rect, angle: 0 });
+		this.visualSources.add(element.id);
+		this.note({ sourceId: element.id, sourceType: element.type, status: "approximated", reason: "visualFallback", nodeId });
+		if (label !== undefined) {
+			this.placed.set(label.id, { nodeId, rect, angle: 0 });
+			this.visualSources.add(label.id);
+			this.note({ sourceId: label.id, sourceType: label.type, status: "approximated", reason: "visualFallback", nodeId });
+		}
+		return true;
 	}
 
 	/** A rectangle, an ellipse or a diamond: a shape card with the text inside it. */
@@ -401,7 +455,24 @@ class DrawingImport {
 				this.placeholder(element, "missing-asset", isNoteLink(target) ? "fileNotFound" : "imageNotFound");
 				return;
 			}
-			const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...fileSubpath(embed.link), ...styleOption(turnedStyle(element.data)) });
+			const loaded = this.loadedRasters.get(element.id);
+			const scale = element.data.scale;
+			if (loaded?.fileId === fileId && typeof loaded?.dataURL === "string" && Array.isArray(scale)
+				&& scale.length === 2 && scale.every(value => value === 1 || value === -1) && scale.includes(-1)
+				&& element.data.crop == null) {
+				const reflected = this.assets.add(`reflected:${element.id}`, loaded.dataURL, { flipX: scale[0] === -1, flipY: scale[1] === -1 });
+				if (reflected.ok) {
+					const nodeId = this.builder.file(rect, reflected.path, { source: sourceOf(element), style: { ...turnedStyle(element.data), showAttachmentName: false, cornerRadius: 0, borderStyle: "none", colors: { fill: null, border: null } } });
+					this.reflectedImages.add(element.id);
+					this.remember(element, nodeId, rect);
+					if (Math.abs(rect.width / rect.height - reflected.width / reflected.height) > 0.001) {
+						this.note({ sourceId: element.id, sourceType: "image", status: "approximated", reason: "imageAspect", nodeId });
+					}
+					this.noteLostLink(element);
+					return;
+				}
+			}
+			const nodeId = this.builder.file(rect, path, { source: sourceOf(element), ...fileSubpath(embed.link), style: { ...turnedStyle(element.data), showAttachmentName: false, cornerRadius: 0, borderStyle: "none", colors: { fill: null, border: null } } });
 			this.remember(element, nodeId, rect);
 			this.noteLostLink(element);
 			return;
@@ -425,7 +496,7 @@ class DrawingImport {
 					this.placeholder(element, asset.reason === "unsupportedAsset" ? "plugin-unsupported" : "invalid-source", asset.reason);
 					return;
 				}
-				const nodeId = this.builder.file(rect, asset.path, { source: sourceOf(element), style: { ...turnedStyle(element.data), showAttachmentName: false } });
+				const nodeId = this.builder.file(rect, asset.path, { source: sourceOf(element), style: { ...turnedStyle(element.data), showAttachmentName: false, cornerRadius: 0, borderStyle: "none", colors: { fill: null, border: null } } });
 				if (reflection.flipX || reflection.flipY) this.reflectedImages.add(element.id);
 				this.remember(element, nodeId, rect);
 				if (Math.abs(rect.width / rect.height - asset.width / asset.height) > 0.001) {
@@ -675,17 +746,17 @@ class DrawingImport {
 			this.note({ sourceId: element.id, sourceType: "fontFamily", status: "plugin-unsupported", reason: "customStyle" });
 		}
 		const roughness = finiteNumber(data.roughness);
-		if (ROUGH_TYPES.has(element.type) && roughness !== undefined && roughness > 0) this.lostStyles.add("roughness");
+		if (!this.visualSources.has(element.id) && ROUGH_TYPES.has(element.type) && roughness !== undefined && roughness > 0) this.lostStyles.add("roughness");
 		const fill = readColor(data.backgroundColor);
 		const filled = fill !== undefined && fill.kind === "hex";
-		if (FILLED_TYPES.has(element.type) && filled && typeof data.fillStyle === "string" && data.fillStyle !== "solid") {
+		if (!this.visualSources.has(element.id) && FILLED_TYPES.has(element.type) && filled && typeof data.fillStyle === "string" && data.fillStyle !== "solid") {
 			this.lostStyles.add("hatch");
 		}
 		const opacity = finiteNumber(data.opacity);
 		// A pen stroke keeps its transparency; nothing else on a board has one.
-		if (element.type !== "freedraw" && opacity !== undefined && opacity < 100) this.lostStyles.add("opacity");
+		if (!this.visualSources.has(element.id) && element.type !== "freedraw" && opacity !== undefined && opacity < 100) this.lostStyles.add("opacity");
 		if (element.type === "image" && isRecord(data.crop)) this.lostStyles.add("imageCrop");
-		if (element.type === "image" && data.scale !== undefined) {
+		if (!this.visualSources.has(element.id) && element.type === "image" && data.scale !== undefined) {
 			const scale = data.scale;
 			const valid = Array.isArray(scale) && scale.length === 2 && scale.every((value) => value === 1 || value === -1);
 			if (!valid || (scale[0] !== 1 || scale[1] !== 1) && !this.reflectedImages.has(element.id)) {

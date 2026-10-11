@@ -1060,9 +1060,11 @@ export function buildSourceScene(document: unknown): SourceScene {
       // Without an entry here it would reach neither the renderer nor the
       // anchor geometry, so it would stay upright and its connectors would end
       // on the border it no longer has.
-      if (shape === undefined && rotation === 0 && Object.keys(css).length === 0) continue;
+      const attachmentRadius = valueOf(node, "type") === "file" ? localCornerRadius(document, canvasId) : undefined;
+      if (shape === undefined && rotation === 0 && Object.keys(css).length === 0 && attachmentRadius === undefined) continue;
       items.set(canvasId, Object.freeze(shape === undefined
         ? { kind: "text", rotation, css: Object.freeze(css),
+          ...(attachmentRadius === undefined ? {} : { cornerRadius: attachmentRadius }),
           ...(css["border-style"] === "none" && valueOf(valueOf(node, "styleAttributes"), "border") === "invisible"
             && css["background-color"] === undefined ? { invisibleNativeContainer: true } : {}) }
         : { kind: "shape", shape, cornerRadius: localCornerRadius(document, canvasId), rotation, css: Object.freeze(css),

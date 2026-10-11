@@ -47,6 +47,7 @@ export interface ImportContext {
 	/** Read-only facts captured from an audited already-open source view; pure adapters validate them. */
 	readonly mindmapLayout?: unknown;
 	readonly tldrawAppearance?: unknown;
+	readonly excalidrawAppearance?: unknown;
 }
 
 /**
@@ -80,6 +81,7 @@ export const IMPORT_REASONS = [
 	// Excalidraw
 	"tldrawStroke",
 	"tldrawAppearance",
+	"visualFallback",
 	"appearance",
 	"tldrawVariant",
 	"pressure",

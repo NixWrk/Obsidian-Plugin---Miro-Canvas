@@ -59,6 +59,17 @@ entire source text, IDs/text/tree and geometry agree. Stale, dirty, unsupported
 or incomplete views use the offline adapter with explicit approximation.
 The imported board has no source-editor runtime dependency.
 
+Saved, audited Excalidraw 2.28.1 light views can supply separate passive SVG
+objects for sketch roughness, hatching, transparency and freehand outlines.
+tldraw 1.32.0 can supply the actual freehand outline. These are ordinary Canvas
+file cards: move/resize here, edit the sealed contour and text in the source
+editor, then import a new board. The report marks `visualFallback`. Already
+loaded, validated static rasters can also retain linked-picture reflection.
+Stale, dirty, missing or unsupported observations retain native approximations.
+SVG text references installed fonts. CSS contours in Advanced Canvas, portals,
+collapse semantics and unsupported HTML effects remain explicit differences.
+[Scope, source guards and checks](import-visual-fallback-checks.md).
+
 Source text is bounded to 64 Mi UTF-16 units, Excalidraw compressed input to
 16 Mi units/output to 64 Mi units, and Canvas/Excalidraw to 50,000 elements.
 tldraw has stricter [bounds](import-tldraw-audit.md). No editor runtime, active

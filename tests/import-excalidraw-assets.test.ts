@@ -11,6 +11,19 @@ const element = (id: string, type: string, more: Record<string, unknown> = {}) =
 const source = (scene: Record<string, unknown>): ImportSource => ({ path: "Drawings/Assets.excalidraw", extension: "excalidraw", text: JSON.stringify({ type: "excalidraw", version: 2, ...scene }) });
 
 describe("Excalidraw assets and native note links", () => {
+	it("reflects an observed linked raster without reading files from the pure adapter", () => {
+		const scene = source({ elements: [element("image", "image", { fileId: "picture", scale: [-1, 1] })] });
+		const input: ImportSource = { ...scene, extension: "md", text: `---\nexcalidraw-plugin: parsed\n---\n# Excalidraw Data\n## Embedded Files\npicture: [[Picture.png]]\n## Drawing\n\`\`\`json\n${scene.text}\n\`\`\`\n` };
+		const capture = { sourceText: input.text, snapshots: [], rasters: [{ sourceId: "image", fileId: "picture", dataURL: PNG }] };
+		const result = convertExcalidraw(input, { ...context(), resolveLink: () => "Picture.png", excalidrawAppearance: capture });
+		expect(result.assets).toHaveLength(1);
+		expect(new TextDecoder().decode(result.assets![0]!.bytes)).toContain("matrix(-1 0 0 1 1 0)");
+		expect(result.document.nodes).toMatchObject([{ type: "file", file: result.assets![0]!.path }]);
+		expect(result.report.entries.some(entry => entry.reason === "imageScale")).toBe(false);
+		const stale = convertExcalidraw(input, { ...context(), resolveLink: () => "Picture.png", excalidrawAppearance: { ...capture, sourceText: "old" } });
+		expect(stale.assets).toBeUndefined();
+		expect(stale.report.entries.some(entry => entry.reason === "imageScale")).toBe(true);
+	});
 	it("shares decoded native image cards and retains rotation and bound arrows", () => {
 		const input = source({ elements: [element("one", "image", { fileId: "../../id" }), element("two", "image", { fileId: "../../id", x: 400 }), element("arrow", "arrow", { angle: 0, x: 0, y: 40, width: 420, height: 0, points: [[0, 0], [420, 0]], startBinding: { elementId: "one" }, endBinding: { elementId: "two" } })], files: { "../../id": { dataURL: PNG } } });
 		const before = input.text;
