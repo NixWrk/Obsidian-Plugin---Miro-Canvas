@@ -894,7 +894,7 @@ function decorateTags(
   return appendOwnedChild(shell, list, patches) ? list : undefined;
 }
 
-function decorateShape(document: Document | undefined, layer: DomElementLike, descriptor: SourceItemDescriptor, size?: { readonly width: number; readonly height: number }): boolean {
+function decorateShape(document: Document | undefined, layer: DomElementLike, descriptor: SourceItemDescriptor, size?: { readonly width: number; readonly height: number }, shell?: DomElementLike): boolean {
   const d = shapePath(descriptor.shape, size === undefined ? undefined : { ...size, cornerRadius: descriptor.cornerRadius });
   if (d === undefined) return false;
   const svg = createSvg(document, "svg"), path = createSvg(document, "path");
@@ -906,10 +906,23 @@ function decorateShape(document: Document | undefined, layer: DomElementLike, de
   setOwnedElementStyle(svg, "position", "absolute");
   setOwnedElementStyle(svg, "inset", "0");
   const css = descriptor.css;
+  const palette = descriptor.nativePalette && shell !== undefined ? nativeConnectorColor(document, shell) : undefined;
+  const nativeFill = palette === undefined ? undefined : `color-mix(in oklch, ${palette} 7%, transparent)`;
+  const nativeBorder = palette === undefined ? undefined : `color-mix(in oklch, ${palette} 70%, transparent)`;
   const open = /brace|note_curly|note_square/.test(descriptor.shape ?? "");
+  if (!open && nativeFill !== undefined && css["background-color"] === undefined) {
+    const underlay = createSvg(document, "path");
+    if (underlay !== undefined) {
+      setOwnedElementAttribute(underlay, "d", d);
+      setOwnedElementAttribute(underlay, "data-miro-native-underlay", "true");
+      setOwnedElementAttribute(underlay, "fill", "var(--canvas-background, var(--background-primary))");
+      setOwnedElementAttribute(underlay, "stroke", "none");
+      safeCall(svg, "appendChild", [underlay]);
+    }
+  }
   for (const [name, value] of Object.entries({
-    d, fill: open ? "none" : css["background-color"] ?? "var(--canvas-background, var(--background-primary))",
-    stroke: css["border-color"] ?? "var(--canvas-border, var(--text-normal))",
+    d, fill: open ? "none" : css["background-color"] ?? nativeFill ?? "var(--canvas-background, var(--background-primary))",
+    stroke: css["border-color"] ?? nativeBorder ?? (shell === undefined ? "var(--canvas-border, var(--text-normal))" : nativeConnectorColor(document, shell)),
     "stroke-width": css["border-width"]?.replace(/px$/, "") ?? "1",
     "fill-opacity": css["--miro-fill-opacity"] ?? "1", "stroke-opacity": css["--miro-border-opacity"] ?? "1",
     "stroke-dasharray": css["border-style"] === "dashed" ? "8 6" : css["border-style"] === "dotted" ? "2 5" : "none",
@@ -1787,6 +1800,13 @@ function applyNode(
   patchClass(shell, OWNED_CLASS, patches);
   patchClass(shell, `miro-source-${descriptor.kind}`, patches);
   patchAttribute(shell, "data-miro-source-kind", descriptor.kind, patches);
+  if (descriptor.css["border-style"] !== undefined) patchAttribute(shell, "data-miro-source-border", descriptor.css["border-style"], patches);
+  else if (descriptor.kind === "text" && (descriptor.localItem === "text" || descriptor.sourceId !== undefined)
+    && descriptor.structured?.card === undefined && descriptor.structured?.appCard === undefined
+    && descriptor.css["border-color"] === undefined && descriptor.css["border-width"] === undefined) {
+    patchAttribute(shell, "data-miro-source-border", "none", patches);
+  }
+  if (descriptor.invisibleNativeContainer) patchAttribute(shell, "data-miro-source-container", "invisible", patches);
   if (descriptor.sourceId !== undefined) patchAttribute(shell, "data-miro-source-id", descriptor.sourceId, patches);
   else patchAttribute(shell, "data-miro-local-source", "true", patches);
   if (descriptor.localItem !== undefined) patchAttribute(shell, "data-miro-local-item", descriptor.localItem, patches);
@@ -1900,6 +1920,10 @@ function applyNode(
     if (descriptor.css["text-align"] === undefined) patchStyle(content, "text-align", "center", patches);
   }
 
+  if (descriptor.kind === "text" && descriptor.css["vertical-align"] !== undefined) {
+    patchAttribute(shell, "data-miro-source-valign", descriptor.css["vertical-align"], patches);
+  }
+
   if (descriptor.kind === "sticky") {
     // Miro inks a note for contrast with its fill, centres its text and, until
     // a size is chosen, fits the text to the note.
@@ -1936,7 +1960,7 @@ function applyNode(
       setOwnedElementStyle(created, "z-index", covers ? "2" : "0");
       if (sourceMindmap?.branchColor !== undefined) setOwnedElementStyle(created, "--miro-mindmap-color", sourceMindmap.branchColor);
       const drawable = descriptor.kind === "shape"
-        ? decorateShape(document, created, descriptor, shapeBox())
+        ? decorateShape(document, created, descriptor, shapeBox(), shell)
         : descriptor.kind === "code"
           ? decorateCode(document, created, descriptor)
           : sourceStroke !== undefined
@@ -2059,6 +2083,7 @@ function applyNode(
     const d = shapePath(descriptor.shape, { ...box, cornerRadius: radius });
     if (d === undefined) return;
     setOwnedElementAttribute(path, "d", d);
+    for (const contour of queryAll(layer, "svg path")) setOwnedElementAttribute(contour, "d", d);
     setOwnedElementAttribute(path, "stroke-linejoin", shapeCornerRadius(descriptor.shape, { ...box, cornerRadius: radius }) === 0 ? "miter" : "round");
     const inset = inscribedInsets(shapeOutline(descriptor.shape, { ...box, cornerRadius: radius }));
     if (inset !== undefined) styleOwnership.write(content as unknown as HTMLElement, "padding",

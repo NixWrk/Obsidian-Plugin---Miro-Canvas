@@ -71,6 +71,19 @@ function host(fake: ReturnType<typeof fakeVault>, confirm: ImportHost["confirm"]
 }
 
 describe("bounded embedded raster assets", () => {
+	it("publishes checked passive SVG and refuses active SVG before any write", async () => {
+		const svgPath = `${folder}/0000000000000002.svg`;
+		const bytes = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#abcdef"/></svg>');
+		const fake = fakeVault();
+		await publishImportAssets(fake.vault, [{ path: svgPath, bytes }], fake.source.path, file => fake.vault.delete(file, true));
+		expect(fake.files.has(svgPath)).toBe(true);
+		const rejected = fakeVault();
+		const active = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script></svg>');
+		await expect(publishImportAssets(rejected.vault, [{ path: svgPath, bytes: active }], rejected.source.path, file => rejected.vault.delete(file, true))).rejects.toThrow();
+		expect(rejected.mocks.createFolder).not.toHaveBeenCalled();
+		expect(rejected.mocks.createBinary).not.toHaveBeenCalled();
+	});
+
 	it("reads dimensions of generated actual PNG, JPEG, GIF and WebP files", () => {
 		const fixtures = JSON.parse(readFileSync(new URL("./fixtures/import/embedded-rasters.json", import.meta.url), "utf8")) as Record<string, string>;
 		for (const dataURL of Object.values(fixtures)) expect(readEmbeddedRaster(dataURL)).toMatchObject({ ok: true, width: 7, height: 3 });

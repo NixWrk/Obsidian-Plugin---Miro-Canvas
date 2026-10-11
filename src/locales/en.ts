@@ -1224,7 +1224,7 @@ export const EN = {
 		placeholder: (what: string) => `Not imported: ${what}`,
 		formats: {
 			advancedCanvas: "Advanced Canvas board",
-			tldraw: "tldraw (packed strokes)",
+			tldraw: "tldraw (supported native elements)",
 			jsonCanvas: "JSON Canvas board",
 			excalidraw: "Excalidraw drawing",
 			mindmapOutline: "Mind map (outline)",
@@ -1261,6 +1261,8 @@ export const EN = {
 		},
 		reasons: {
 			tldrawStroke: "stroke width, smoothing and ink approximated",
+			tldrawAppearance: "shape contours, fonts and stroke rendering may differ",
+			appearance: "appearance approximated; geometry and available styles retained",
 			tldrawVariant: "tldraw record or drawing variant not supported",
 			pressure: "pressure widths transferred; freehand smoothing and simulated pressure differ",
 			binding: "arrow binding missing, invalid or clamped to the card",
@@ -1280,7 +1282,7 @@ export const EN = {
 			formula: "formula kept as LaTeX text",
 			embeddedImage: "picture stored inside the drawing",
 			invalidAsset: "invalid embedded picture data",
-			unsupportedAsset: "embedded picture format not supported (PNG, JPEG, GIF and WebP only)",
+			unsupportedAsset: "embedded picture format not supported (PNG, JPEG, GIF, WebP or restricted passive SVG required)",
 			assetTooLarge: "embedded pictures exceed the import size limit",
 			imageNotFound: "picture not found in the vault",
 			fileNotFound: "note not found",

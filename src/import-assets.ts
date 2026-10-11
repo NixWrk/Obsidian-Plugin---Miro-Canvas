@@ -1,6 +1,6 @@
 /** The only attachment writer for imports: publish new owned files, then the board. */
 import type { TFile, Vault } from "obsidian";
-import { MAX_IMPORT_ASSET_BYTES, MAX_IMPORT_ASSET_TOTAL_BYTES, MAX_IMPORT_ASSETS } from "./importers/assets";
+import { MAX_IMPORT_ASSET_BYTES, MAX_IMPORT_ASSET_TOTAL_BYTES, MAX_IMPORT_ASSETS, readPassiveSvg } from "./importers/assets";
 import type { ImportAsset } from "./importers/types";
 
 interface OwnedAsset {
@@ -30,7 +30,7 @@ function assetFolder(assets: readonly ImportAsset[], sourcePath: string): string
 		}
 		if (!path.startsWith(parent)) throw new Error("import: attachment outside source folder");
 		const local = path.slice(parent.length);
-		if (!/^[^/]+ [0-9a-f]{16}\/[0-9a-f]{16}\.(png|jpg|gif|webp)$/u.test(local) || paths.has(path)) {
+		if (!/^[^/]+ [0-9a-f]{16}\/[0-9a-f]{16}\.(png|jpg|gif|webp|svg)$/u.test(local) || paths.has(path)) {
 			throw new Error("import: invalid attachment name");
 		}
 		paths.add(path);
@@ -40,6 +40,7 @@ function assetFolder(assets: readonly ImportAsset[], sourcePath: string): string
 		if (!(asset.bytes instanceof Uint8Array) || asset.bytes.length === 0 || asset.bytes.length > MAX_IMPORT_ASSET_BYTES) {
 			throw new Error("import: invalid attachment bytes");
 		}
+		if (path.endsWith(".svg") && !readPassiveSvg(asset.bytes).ok) throw new Error("import: unsafe SVG attachment");
 		bytes += asset.bytes.length;
 		if (bytes > MAX_IMPORT_ASSET_TOTAL_BYTES) throw new Error("import: attachments too large");
 	}

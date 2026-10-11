@@ -1173,7 +1173,7 @@ export const RU: Messages = {
 		placeholder: (what: string) => `Не перенесено: ${what}`,
 		formats: {
 			advancedCanvas: "Доска Advanced Canvas",
-			tldraw: "tldraw (упакованные штрихи)",
+			tldraw: "tldraw (поддерживаемые элементы)",
 			jsonCanvas: "Доска JSON Canvas",
 			excalidraw: "Рисунок Excalidraw",
 			mindmapOutline: "Интеллект-карта (список)",
@@ -1209,6 +1209,8 @@ export const RU: Messages = {
 		},
 		reasons: {
 			tldrawStroke: "толщина, сглаживание и цвет штриха приближены",
+			tldrawAppearance: "контуры фигур, шрифты и отображение штрихов могут отличаться",
+			appearance: "вид приближён; геометрия и доступное оформление сохранены",
 			tldrawVariant: "запись или вариант рисунка tldraw не поддерживается",
 			pressure: "толщина по нажиму перенесена; сглаживание и имитация нажима отличаются",
 			binding: "привязка стрелки отсутствует, повреждена или ограничена границами карточки",
@@ -1228,7 +1230,7 @@ export const RU: Messages = {
 			formula: "формула оставлена текстом LaTeX",
 			embeddedImage: "изображение, сохранённое внутри рисунка",
 			invalidAsset: "повреждённые данные встроенного изображения",
-			unsupportedAsset: "формат встроенного изображения не поддерживается (только PNG, JPEG, GIF и WebP)",
+			unsupportedAsset: "формат встроенного изображения не поддерживается (нужен PNG, JPEG, GIF, WebP или ограниченный пассивный SVG)",
 			assetTooLarge: "встроенные изображения превышают предел размера для импорта",
 			imageNotFound: "изображение не найдено в хранилище",
 			fileNotFound: "заметка не найдена",

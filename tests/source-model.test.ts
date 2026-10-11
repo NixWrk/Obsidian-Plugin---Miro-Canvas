@@ -197,6 +197,21 @@ describe("source projection model", () => {
     expect(scene.diagnostics).toContain("binding-dangling: lost -> gone.");
   });
 
+  it("keeps foreign import provenance apart from Miro source bindings", () => {
+    const scene = buildSourceScene({ nodes: [{ id: "card", type: "text" }], edges: [],
+      miroCanvas: { schemaVersion: 1, localOverrides: { card: { item: { type: "text" } } }, bindings: {
+        card: { sourceId: "mindmap-outline:line:4", role: "import:mindmap-outline:heading" },
+        report: { sourceId: "import:Source.md", role: "import-report" },
+        mismatch: { sourceId: "miro-object", role: "import:tldraw:geo" },
+        unknown: { sourceId: "future:id", role: "import:future:geo" },
+        miro: { sourceId: "lost", role: "copy" },
+      } } });
+    expect(scene.items.get("card")).toMatchObject({ localItem: "text" });
+    expect(scene.diagnostics).toEqual([
+      "binding-dangling: mismatch -> miro-object.", "binding-dangling: unknown -> future:id.", "binding-dangling: miro -> lost.",
+    ]);
+  });
+
   it("projects every M3 renderer family without reading active source content", () => {
     const scene = buildSourceScene({ miroSource: { items: [
       { id: "shape", type: "shape", data: { shape: "star", content: "<script>bad()</script>" } },

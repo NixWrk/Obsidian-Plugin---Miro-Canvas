@@ -44,6 +44,9 @@ export interface ImportContext {
 	 * vanish on a dark board.
 	 */
 	readonly theme?: "light" | "dark";
+	/** Read-only facts captured from an audited already-open source view; pure adapters validate them. */
+	readonly mindmapLayout?: unknown;
+	readonly tldrawAppearance?: unknown;
 }
 
 /**
@@ -76,6 +79,8 @@ export type ImportEntryStatus = (typeof IMPORT_ENTRY_STATUSES)[number];
 export const IMPORT_REASONS = [
 	// Excalidraw
 	"tldrawStroke",
+	"tldrawAppearance",
+	"appearance",
 	"tldrawVariant",
 	"pressure",
 	"binding",

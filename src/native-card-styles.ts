@@ -41,6 +41,13 @@ export function projectNativeCardStyles(shell: HTMLElement, write: StyleWriter):
   clear([shape, ...faces.split(", ").map(face => `${shape} ${face}`)].join(", "), ["background-color", "border-color"]);
   const text = '.miro-source-text:is([data-miro-source-id], [data-miro-local-item="text"]):not([data-miro-source-card-kind], .miro-source-mindmap-node)';
   clear(faces.split(", ").map(face => `${text} ${face}`).join(", "), ["background-color", "border-color"]);
+  project('.miro-source-rendered[data-miro-source-border="none"] > .canvas-node-container', { "border-style": "none", "box-shadow": "none" });
+  project('.miro-source-rendered[data-miro-source-container="invisible"] > .canvas-node-container', { "background-color": "transparent" });
+  project('[data-miro-canvas-native-label-hidden="true"]', { display: "none" });
+  const compactText = [shape, text];
+  project(compactText.map(root => `${root} .markdown-preview-view`).join(", "), { padding: "0", "scrollbar-gutter": "auto" });
+  project(compactText.map(root => `${root} ${sizer}`).join(", "), { "padding-top": "0", "padding-right": "0", "padding-bottom": "0", "padding-left": "0" });
+  project(compactText.map(root => `${root} .markdown-preview-view p`).join(", "), { margin: "0" });
   clear('.miro-source-preview > .canvas-node-container, .miro-source-document > .canvas-node-container, .miro-source-embed > .canvas-node-container', ["border-color"]);
   clear('.miro-source-embed > .canvas-node-container', ["background-color", "background-image", "background-position", "background-size", "background-repeat", "background-origin", "background-clip", "background-attachment"]);
   clear('.miro-source-deck > .canvas-node-container', ["background-color", "border-color"]);

@@ -669,6 +669,20 @@ describe("presentations, groups and ink", () => {
     expect(deck.children).toHaveLength(1);
   });
 
+  it("applies explicit vertical alignment on plain text and restores it on replacement and disposal", () => {
+    const f = fixture();
+    f.data = { ...f.data, miroSource: { items: [{ id: "a", type: "text" }] }, miroCanvas: { schemaVersion: 1, localOverrides: {} } };
+    f.renderer.refresh();
+    expect(f.nodeEl.getAttribute("data-miro-source-valign")).toBeNull();
+    for (const [verticalAlign, expected] of [["top", "top"], ["center", "middle"], ["bottom", "bottom"]]) {
+      f.data = { ...f.data, miroCanvas: { schemaVersion: 1, localOverrides: { a: { typography: { verticalAlign } } } } };
+      f.renderer.refresh();
+      expect(f.nodeEl.getAttribute("data-miro-source-valign")).toBe(expected);
+    }
+    f.renderer.dispose();
+    expect(f.nodeEl.getAttribute("data-miro-source-valign")).toBeNull();
+  });
+
   it("hides a group, inks text against its frame and centres a shape's text", () => {
     const f = scene([
       { id: "g", type: "group" },
@@ -1529,6 +1543,46 @@ describe("sticky notes", () => {
 });
 
 describe("a card's border", () => {
+  it("lets plain imported ink use its full text box while retaining explicit borders", () => {
+    const f = fixture();
+    f.data = { nodes: [{ id: "a", type: "text", x: 0, y: 0, width: 100, height: 25 }], edges: [],
+      miroCanvas: { schemaVersion: 1, localOverrides: { a: { item: { type: "text" } } } } };
+    f.renderer.refresh();
+    expect(f.nodeEl.getAttribute("data-miro-source-border")).toBe("none");
+    f.data = { ...f.data, miroCanvas: { schemaVersion: 1, localOverrides: { a: { item: { type: "text" }, borderStyle: "dotted", borderWidth: 2 } } } };
+    f.renderer.refresh();
+    expect(f.nodeEl.getAttribute("data-miro-source-border")).toBe("dotted");
+  });
+
+  it("uses a native colored shape's dynamic palette and keeps explicit paints", () => {
+    const f = fixture();
+    f.data = { nodes: [{ id: "a", type: "text", color: "1", x: 0, y: 0, width: 100, height: 80 }], edges: [],
+      miroCanvas: { schemaVersion: 1, localOverrides: { a: { shape: { kind: "ellipse", fallback: "text" } } } } };
+    f.renderer.refresh();
+    const layer = f.nodeEl.children.find(child => child.getAttribute("data-miro-source-decoration") === "shape")!;
+    const path = layer.children[0].children[1];
+    expect(layer.children[0].children[0].getAttribute("fill")).toBe("var(--canvas-background, var(--background-primary))");
+    expect(path.getAttribute("fill")).toBe("color-mix(in oklch, var(--canvas-color, currentColor) 7%, transparent)");
+    expect(path.getAttribute("stroke")).toBe("color-mix(in oklch, var(--canvas-color, currentColor) 70%, transparent)");
+    f.data = { ...f.data, miroCanvas: { schemaVersion: 1, localOverrides: { a: { shape: { kind: "ellipse", fallback: "text" }, colors: { fill: "#123456", border: "#abcdef" } } } } };
+    f.renderer.refresh();
+    const newPath = f.nodeEl.children.find(child => child.getAttribute("data-miro-source-decoration") === "shape")!.children[0].children[0];
+    expect(newPath.getAttribute("fill")).toBe("#123456");
+    expect(newPath.getAttribute("stroke")).toBe("#abcdef");
+  });
+
+  it("marks an absent native border and invisible container reversibly", () => {
+    const f = fixture();
+    f.data = { nodes: [{ id: "a", type: "text", color: "4", styleAttributes: { border: "invisible" }, x: 0, y: 0, width: 100, height: 80 }], edges: [],
+      miroCanvas: { schemaVersion: 1, localOverrides: { a: { borderStyle: "none" } } } };
+    f.renderer.refresh();
+    expect(f.nodeEl.getAttribute("data-miro-source-border")).toBe("none");
+    expect(f.nodeEl.getAttribute("data-miro-source-container")).toBe("invisible");
+    f.renderer.dispose();
+    expect(f.nodeEl.getAttribute("data-miro-source-border")).toBeNull();
+    expect(f.nodeEl.getAttribute("data-miro-source-container")).toBeNull();
+  });
+
   it("goes on the native container, where Canvas draws the border, not around it", () => {
     const shell = new Element("div");
     const container = shell.appendChild(new Element("div"));

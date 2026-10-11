@@ -43,7 +43,7 @@
  */
 
 import type { CanvasAnchor } from "../anchors";
-import { isValidFontSize } from "../appearance";
+import { isValidFontSize, isValidLineHeight } from "../appearance";
 import { MAX_WAYPOINTS } from "../connector-route";
 import { defaultPenInk, simplifyPoints, strokeBounds, type StrokePoint } from "../drawing";
 import { MAX_STROKE_POINTS, readLocalStroke, type LocalStroke } from "../local-items";
@@ -240,6 +240,7 @@ class DrawingImport {
 	private readonly file: ExcalidrawFile;
 	private readonly sourcePath: string;
 	private readonly context: ImportContext;
+	private readonly displayTheme: "light" | "dark" | undefined;
 	/** Live elements in the drawing's own order, back to front. */
 	private readonly elements: DrawingElement[] = [];
 	private readonly byId = new Map<string, DrawingElement>();
@@ -252,13 +253,16 @@ class DrawingImport {
 	/** Cards arrows may hold on to, by the id of the element they stand for. */
 	private readonly placed = new Map<string, PlacedCard>();
 	private readonly lostStyles = new Set<ImportReason>();
+	private readonly reflectedImages = new Set<string>();
 
 	constructor(file: ExcalidrawFile, sourcePath: string, context: ImportContext, private readonly frontmatter?: Readonly<Record<string, unknown>>) {
 		this.builder = new BoardBuilder("excalidraw", context);
 		this.assets = new ImportAssets(sourcePath, context.newId);
 		this.file = file;
 		this.sourcePath = sourcePath;
-		this.context = context;
+		const sourceTheme = isRecord(file.scene.appState) ? file.scene.appState.theme : undefined;
+		this.displayTheme = sourceTheme === "light" || sourceTheme === "dark" ? sourceTheme : undefined;
+		this.context = this.displayTheme === undefined ? context : { ...context, theme: this.displayTheme };
 	}
 
 	build(): ImportResult {
@@ -291,7 +295,7 @@ class DrawingImport {
 		const result = this.builder.finish({
 			sourcePath: this.sourcePath,
 			...(formatVersion === undefined ? {} : { formatVersion }),
-		});
+		}, this.displayTheme);
 		const assets = this.assets.list();
 		return assets.length === 0 ? result : { ...result, assets };
 	}
@@ -413,12 +417,16 @@ class DrawingImport {
 		if (embed === undefined && fileId !== undefined && isRecord(this.file.scene.files)) {
 			const entry = Object.prototype.hasOwnProperty.call(this.file.scene.files, fileId) ? this.file.scene.files[fileId] : undefined;
 			if (isRecord(entry)) {
-				const asset = this.assets.add(fileId, entry.dataURL);
+				const scale = element.data.scale;
+				const validScale = Array.isArray(scale) && scale.length === 2 && scale.every(value => value === 1 || value === -1);
+				const reflection = validScale ? { flipX: scale[0] === -1, flipY: scale[1] === -1 } : {};
+				const asset = this.assets.add(fileId, entry.dataURL, reflection);
 				if (!asset.ok) {
 					this.placeholder(element, asset.reason === "unsupportedAsset" ? "plugin-unsupported" : "invalid-source", asset.reason);
 					return;
 				}
-				const nodeId = this.builder.file(rect, asset.path, { source: sourceOf(element), ...styleOption(turnedStyle(element.data)) });
+				const nodeId = this.builder.file(rect, asset.path, { source: sourceOf(element), style: { ...turnedStyle(element.data), showAttachmentName: false } });
+				if (reflection.flipX || reflection.flipY) this.reflectedImages.add(element.id);
 				this.remember(element, nodeId, rect);
 				if (Math.abs(rect.width / rect.height - asset.width / asset.height) > 0.001) {
 					this.note({ sourceId: element.id, sourceType: "image", status: "approximated", reason: "imageAspect", nodeId });
@@ -680,7 +688,7 @@ class DrawingImport {
 		if (element.type === "image" && data.scale !== undefined) {
 			const scale = data.scale;
 			const valid = Array.isArray(scale) && scale.length === 2 && scale.every((value) => value === 1 || value === -1);
-			if (!valid || scale[0] !== 1 || scale[1] !== 1) {
+			if (!valid || (scale[0] !== 1 || scale[1] !== 1) && !this.reflectedImages.has(element.id)) {
 				this.note({ sourceId: element.id, sourceType: "scale", status: valid ? "plugin-unsupported" : "invalid-source", reason: "imageScale" });
 			}
 		}
@@ -846,6 +854,7 @@ function cardStyle(shape: ElementRecord | undefined, text: ElementRecord | undef
 function typographyOf(text: ElementRecord): Record<string, unknown> | undefined {
 	const typography: Record<string, unknown> = {};
 	if (isValidFontSize(text.fontSize)) typography.fontSize = roundTo(text.fontSize, 2);
+	if (isValidLineHeight(text.lineHeight)) typography.lineHeight = roundTo(text.lineHeight, 4);
 	const family = typeof text.fontFamily === "number" ? FONT_FAMILIES[text.fontFamily] : undefined;
 	if (family !== undefined) typography.fontFamily = family;
 	if (text.textAlign === "left" || text.textAlign === "center" || text.textAlign === "right") typography.alignment = text.textAlign;

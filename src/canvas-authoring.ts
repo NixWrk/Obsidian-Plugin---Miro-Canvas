@@ -874,8 +874,8 @@ function nativeDefaultAllowed(kind: "nodes" | "edges", key: string, value: unkno
  * field carrying the host's own default comes back missing, and node
  * geometry comes back rounded - that is the host keeping it, not losing it.
  */
-function nativeKeepsRequested(kind: "nodes" | "edges", key: string, observed: ReadResult, requested: unknown): boolean {
-	if (!observed.ok) return nativeOmits(kind, key, requested);
+function nativeKeepsRequested(kind: "nodes" | "edges", key: string, observed: ReadResult, requested: unknown, nodeType?: unknown): boolean {
+	if (!observed.ok) return nativeOmits(kind, key, requested, nodeType);
 	if (structurallyEqual(observed.value, requested)) return true;
 	return nativeRounds(kind, key, requested, observed.value);
 }
@@ -907,6 +907,7 @@ function graphItemsNativeMismatch(
 		const wantedId = safeRead(wanted, "id");
 		const id = wantedId.ok && typeof wantedId.value === "string" ? wantedId.value : `[${index}]`;
 		const actualId = safeRead(actual, "id");
+		const wantedType = safeRead(wanted, "type");
 		if (!actualId.ok || !wantedId.ok || !structurallyEqual(actualId.value, wantedId.value)) {
 			return `${kind} ${id} not at its requested position`;
 		}
@@ -915,7 +916,7 @@ function graphItemsNativeMismatch(
 			if (!wantedValue.ok) return `${kind} ${id} unreadable`;
 			const actualValue: ReadResult = hasOwn(actual, key) ? safeRead(actual, key) : { ok: false };
 			if (hasOwn(actual, key) && !actualValue.ok) return `${kind} ${id} unreadable`;
-			if (!nativeKeepsRequested(kind, key, actualValue, wantedValue.value)) {
+			if (!nativeKeepsRequested(kind, key, actualValue, wantedValue.value, wantedType.ok ? wantedType.value : undefined)) {
 				return `${kind} ${id} ${actualValue.ok ? "changed" : "lost"} ${key}`;
 			}
 		}

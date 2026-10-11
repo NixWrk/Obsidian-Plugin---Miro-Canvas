@@ -62,6 +62,8 @@ export interface BoardRect {
 
 /** What a card's look sets, in the shape the selection toolbar writes it. */
 export interface ImportedCardStyle {
+	readonly cornerRadius?: number;
+	readonly showAttachmentName?: boolean;
 	readonly typography?: Readonly<Record<string, unknown>>;
 	readonly colors?: Readonly<Record<string, string | null>>;
 	readonly borderStyle?: "solid" | "dashed" | "dotted" | "none";
@@ -319,8 +321,9 @@ export class BoardBuilder {
 	}
 
 	/** The finished board and its report; throws when the board would not pass the plugin's own checks. */
-	finish(details: ImportDetails): ImportResult {
+	finish(details: ImportDetails, displayTheme?: "light" | "dark"): ImportResult {
 		const miroCanvas: Record<string, unknown> = { schemaVersion: MIRO_CANVAS_SCHEMA_VERSION };
+		if (displayTheme !== undefined) miroCanvas.settings = { displayTheme };
 		if (Object.keys(this.bindings).length > 0) miroCanvas.bindings = this.bindings;
 		if (Object.keys(this.overrides).length > 0) miroCanvas.localOverrides = this.overrides;
 		if (Object.keys(this.connectors).length > 0) miroCanvas.connectors = this.connectors;
