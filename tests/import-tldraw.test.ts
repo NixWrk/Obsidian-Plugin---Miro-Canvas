@@ -7,6 +7,7 @@ import { assertImportedBoard, idFactory } from "../src/importers/board-builder";
 import { MAX_TLDRAW_RECORDS, MAX_TLDRAW_SOURCE_LENGTH, MAX_TLDRAW_TOTAL_POINTS, tldrawAdapter } from "../src/importers/tldraw";
 import { ImportError, MAX_IMPORT_ENTRIES, type ImportContext, type ImportResult, type ImportSource } from "../src/importers/types";
 import { MAX_STROKE_POINTS, type LocalStroke } from "../src/local-items";
+import { resolveAnchor } from "../src/anchors";
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "fixtures/import/tldraw-current-schema.tldr");
 const REAL_TEXT = readFileSync(FIXTURE, "utf8");
@@ -126,16 +127,16 @@ describe("bounded tldraw import", () => {
 		const result = convert();
 		const first = stroke(result, "shape:B8g2DGB0V1tqtCGkUopau");
 		expect(first.points).toHaveLength(142);
-		expect(first.box.width).toBeCloseTo(87.98681640625, 10);
-		expect(first.box.height).toBeCloseTo(144.29351806640625, 10);
-		expect(first.points[0]).toBeCloseTo(77.62942504882812, 10);
-		expect(first.points[1]).toBeCloseTo(47.0277099609375, 10);
-		expect(first.points[first.points.length - 2]).toBeCloseTo(87.98681640625, 10);
-		expect(first.points[first.points.length - 1]).toBeCloseTo(144.29351806640625, 10);
+		expect(first.box.width).toBeCloseTo(89, 10);
+		expect(first.box.height).toBeCloseTo(146, 10);
+		expect(first.points[0]).toBeCloseTo(77.71612548828125, 10);
+		expect(first.points[1]).toBeCloseTo(47.82942199707031, 10);
+		expect(first.points[first.points.length - 2]).toBeCloseTo(88.07351684570312, 10);
+		expect(first.points[first.points.length - 1]).toBeCloseTo(145.09523010253906, 10);
 		const second = stroke(result, "shape:lYFTlcgUfO12Ftet14pMy");
 		expect(second.points).toHaveLength(178);
-		expect(second.box.width).toBeCloseTo(72.39312744140625, 10);
-		expect(second.box.height).toBeCloseTo(127.8155517578125, 10);
+		expect(second.box.width).toBeCloseTo(74, 10);
+		expect(second.box.height).toBeCloseTo(129, 10);
 	});
 
 	it("keeps theme-readable ink, locks and source stacking order", () => {
@@ -144,7 +145,7 @@ describe("bounded tldraw import", () => {
 		first.isLocked = true;
 		data.records.reverse();
 		const result = convert(data, "dark");
-		expect(stroke(result, first.id).color).toBe("#ffffff");
+		expect(stroke(result, first.id).color).toBe("#f2f2f2");
 		const nodes = result.document.nodes as { id: string }[];
 		const metadata = result.document.miroCanvas as {
 			bindings: Record<string, { sourceId: string }>;
@@ -209,10 +210,12 @@ describe("bounded tldraw import", () => {
 		const shape = shapes(data)[0]!;
 		shape.props.segments[0]!.path = packedVector();
 		const imported = stroke(convert(data), shape.id);
-		expect(imported.points).toEqual([0, 0.5, 1.5, 0]);
-		expect(imported.box).toEqual({ width: 1.5, height: 1 });
+		expect(imported.points).toEqual([0.71612548828125, 0.8294219970703125, 2.21612548828125, 0.3294219970703125]);
+		expect(imported.box).toEqual({ width: 3, height: 1 });
 		shape.props.segments[0]!.path = packedVector(0, 0, 1, 0x8001);
-		expect(stroke(convert(data), shape.id).points).toEqual([0, 2 ** -24, 2 ** -24, 0]);
+				const subnormal = stroke(convert(data), shape.id);
+		expect(subnormal.points[2] - subnormal.points[0]).toBe(2 ** -24);
+		expect(subnormal.points[3] - subnormal.points[1]).toBe(-(2 ** -24));
 	});
 
 	it("rejects nonfinite packed values, malformed bytes, noncanonical base64 and huge paths", () => {
@@ -311,5 +314,211 @@ describe("bounded tldraw import", () => {
 		const data = sample();
 		data.records = Array.from({ length: MAX_TLDRAW_RECORDS + 1 }, (_, index) => ({ id: "page:" + index, typeName: "page" }));
 		expectFailure(data, "tooLarge");
+	});
+});
+function nativeSample(): Sample {
+	return JSON.parse(readFileSync(join(dirname(FIXTURE), "tldraw-authored-native.tldr"), "utf8")) as Sample;
+}
+
+function importedNode(result: ImportResult, sourceId: string): Record<string, unknown> {
+	const metadata = result.document.miroCanvas as { bindings: Record<string, { sourceId: string }> };
+	return (result.document.nodes as Record<string, unknown>[]).find(node => metadata.bindings[node.id as string]?.sourceId === "tldraw:" + sourceId)!;
+}
+
+describe("tldraw authored native shape evidence", () => {
+	it("imports sized geo/plain text/straight lines/arrows/images without a foreign runtime", () => {
+		const result = convert(nativeSample());
+		assertImportedBoard(result.document);
+		expect(result.assets).toHaveLength(1);
+		expect(result.assets![0]!.bytes.slice(0, 8)).toEqual(Uint8Array.from([137,80,78,71,13,10,26,10]));
+		expect(result.document.nodes).toHaveLength(6);
+		expect(result.document.edges).toHaveLength(1);
+		expect(result.report.entries.filter(entry => entry.reason === "tldrawVariant")).toHaveLength(0);
+		expect(importedNode(result,"shape:text").text).toContain("\\*stars\\*");
+		expect(importedNode(result,"shape:text").text).toContain("Кириллица");
+		expect(importedNode(result,"shape:image").type).toBe("file");
+	});
+
+	it("maps source-origin rotation to a card-center rotation and preserves default style tokens", () => {
+		const result = convert(nativeSample());
+		const card = importedNode(result, "shape:rectangle");
+		const cx = -300 + Math.cos(0.2)*110 - Math.sin(0.2)*70;
+		const cy = Math.sin(0.2)*110 + Math.cos(0.2)*70;
+		expect(card.x).toBe(Math.round(cx - 110));
+		expect(card.y).toBe(Math.round(cy - 70));
+		const metadata = result.document.miroCanvas as { localOverrides: Record<string, { rotation: number; borderWidth: number; colors: Record<string,string> }> };
+		const style = metadata.localOverrides[card.id as string]!;
+		expect(style.rotation).toBeCloseTo(0.2 * 180 / Math.PI);
+		expect(style.colors.border).toBe("#4465e9");
+		expect(style.borderWidth).toBe(3.5);
+	});
+
+	it("preserves fractional stroke coordinates after the actual Canvas integer-box projection", () => {
+		const result = convert(nativeSample());
+		const node = importedNode(result, "shape:authored-stroke");
+		const pen = stroke(result, "shape:authored-stroke");
+		expect(node.width).toBe(pen.box.width);
+		expect(node.height).toBe(pen.box.height);
+		expect((node.x as number) + pen.points[0]!).toBe(0.375);
+		expect((node.y as number) + pen.points[1]!).toBe(440.625);
+		expect((node.x as number) + pen.points[pen.points.length-2]!).toBe(120.375);
+		expect(pen.width).toBe(4.5);
+		expect(pen.color).toBe("#1d1d1d");
+	});
+
+	it("refuses unevidenced curves/clipping/crops/rich marks without silently flattening them", () => {
+		for (const variant of ["curve","binding","crop","marks","future"]) {
+			const data = nativeSample();
+			if (variant === "curve") shapes(data).find(shape=>shape.id==="shape:free-arrow")!.props.bend = 50;
+			if (variant === "binding") (data.records.find(record=>record.id==="binding:end")!.props as Record<string,unknown>).isExact = false;
+			if (variant === "crop") shapes(data).find(shape=>shape.id==="shape:image")!.props.crop = { topLeft:{x:0.1,y:0.1},bottomRight:{x:1,y:1} };
+			if (variant === "marks") shapes(data).find(shape=>shape.id==="shape:text")!.props.richText = { type:"doc",content:[{type:"paragraph",content:[{type:"text",text:"bold",marks:[{type:"bold"}]}]}] };
+			if (variant === "future") data.schema.sequences["com.tldraw.shape.geo"] = 99;
+			expect(convert(data).report.entries.some(entry => entry.reason === "tldrawVariant")).toBe(true);
+		}
+	});
+});
+describe("optional measured tldraw appearance", () => {
+	function observedCase() {
+		const data = nativeSample();
+		shapes(data).find(shape=>shape.id==="shape:text")!.props.autoSize = true;
+		shapes(data).find(shape=>shape.id==="shape:free-arrow")!.props.bend = 40;
+		const text = JSON.stringify(data);
+		const appearance = {
+			sourceText: text, theme: "light",
+			shapes: [{ sourceId: "shape:text", x:-300,y:240,width:340,height:130,
+				style:{ typography:{fontSize:26,fontFamily:"tldraw_mono, monospace",lineHeight:1.35},colors:{text:"#135790",fill:null,border:null},borderStyle:"none",borderWidth:0 } }],
+			connectors: [{sourceId:"shape:free-arrow",points:[{x:300,y:260},{x:350,y:285},{x:470,y:285},{x:520,y:260}],color:"#864200",width:5}],
+		};
+		return { data, text, appearance };
+	}
+	it("uses measured text boxes/styles and actual shaft samples for automatic text and curved source arrows", () => {
+		const {text,appearance} = observedCase();
+		const result = tldrawAdapter.convert(source(text),{...context(),tldrawAppearance:appearance});
+		const textNode = importedNode(result,"shape:text");
+		expect([textNode.x,textNode.y,textNode.width,textNode.height]).toEqual([-300,240,340,130]);
+		const metadata = result.document.miroCanvas as { localOverrides:Record<string,Record<string,unknown>>;connectors:Record<string,{route:string;color:string;waypoints:{x:number;y:number}[]}>;bindings:Record<string,{sourceId:string}> };
+		expect((metadata.localOverrides[textNode.id as string]!.colors as Record<string,unknown>).text).toBe("#135790");
+		const arrowId = Object.keys(metadata.bindings).find(id=>metadata.bindings[id]!.sourceId==="tldraw:shape:free-arrow")!;
+		expect(metadata.connectors[arrowId]!.route).toBe("straight");
+		expect(metadata.connectors[arrowId]!.waypoints).toEqual([{x:350,y:285},{x:470,y:285}]);
+		expect(metadata.connectors[arrowId]!.color).toBe("#864200");
+		expect(result.report.entries.some(entry=>entry.sourceId==="shape:free-arrow" && entry.status==="approximated")).toBe(true);
+	});
+	it("rejects stale/unknown/duplicate/nonfinite/unsafe captures atomically and preserves default fallback", () => {
+		const {text,appearance} = observedCase();
+		const fallback = tldrawAdapter.convert(source(text),context());
+		const stale = structuredClone(appearance); stale.sourceText+="stale";
+		const unknown = structuredClone(appearance); unknown.shapes[0]!.sourceId="shape:absent";
+		const duplicate = structuredClone(appearance); duplicate.shapes.push(duplicate.shapes[0]!);
+		const invalid = structuredClone(appearance); invalid.connectors[0]!.points[1]!.x=NaN;
+		const unsafe = structuredClone(appearance); Object.assign(unsafe.shapes[0]!.style,{html:"active"});
+		const huge = structuredClone(appearance); huge.connectors[0]!.points=Array.from({length:500},()=>({x:0,y:0}));
+		for(const value of [stale,unknown,duplicate,invalid,unsafe,huge]) {
+			expect(tldrawAdapter.convert(source(text),{...context(),tldrawAppearance:value})).toEqual(fallback);
+		}
+	});
+	it("keeps source rotation when measured styles override the defaults", () => {
+		const data=nativeSample(); const text=JSON.stringify(data);
+		const observed={sourceText:text,theme:"light",shapes:[{sourceId:"shape:rectangle",x:-300,y:0,width:220,height:140,style:{colors:{text:"#123456",border:"#123456",fill:null}}}],connectors:[]};
+		const result=tldrawAdapter.convert(source(text),{...context(),tldrawAppearance:observed});
+		const node=importedNode(result,"shape:rectangle");
+		const overrides=(result.document.miroCanvas as {localOverrides:Record<string,{rotation:number}>}).localOverrides;
+		expect(overrides[node.id as string]!.rotation).toBeCloseTo(0.2*180/Math.PI);
+		expect(JSON.stringify(observed)).not.toContain("miroCanvas");
+	});
+});
+const EDITOR_FIXTURE = join(dirname(FIXTURE), "tldraw-editor-authored-1.32.0.md");
+const EDITOR_TEXT = readFileSync(EDITOR_FIXTURE, "utf8");
+const EDITOR_APPEARANCE = JSON.parse(readFileSync(join(dirname(FIXTURE), "tldraw-editor-appearance-1.32.0.json"), "utf8")) as unknown;
+
+function editorSource(): ImportSource {
+	return { path: "Tldraw QA/Editor authored all.md", extension: "md", text: EDITOR_TEXT, frontmatter: { "tldraw-file": true, tags: ["tldraw"] } };
+}
+
+describe("actual tldraw 1.32.0 editor save", () => {
+	it("pins the original editor's real Markdown wrapper and normalized record versions", () => {
+		expect(createHash("sha256").update(readFileSync(EDITOR_FIXTURE)).digest("hex"))
+			.toBe("a574acb8bc541acaa41317b301153d524b0495f0ce7efe81ab3deef959ad28af");
+		const envelope = JSON.parse(EDITOR_TEXT.slice(EDITOR_TEXT.indexOf(START) + START.length, EDITOR_TEXT.indexOf(END))) as { meta: Record<string, unknown>; raw: Sample };
+		expect(envelope.meta["plugin-version"]).toBe("1.32.0");
+		expect(envelope.meta["tldraw-version"]).toBe("5.4.0");
+		expect(envelope.raw.tldrawFileFormatVersion).toBe(1);
+		expect(envelope.raw.schema.schemaVersion).toBe(2);
+		expect(envelope.raw.schema.sequences["com.tldraw.shape.geo"]).toBe(12);
+		expect(envelope.raw.records).toHaveLength(19);
+		expect(shapes(envelope.raw)).toHaveLength(9);
+		const input = editorSource();
+		const result = tldrawAdapter.convert(input, context("dark"));
+		assertImportedBoard(result.document);
+		expect(result.report.entries.filter(entry => entry.reason === "tldrawVariant")).toEqual([]);
+		expect(input.text).toBe(EDITOR_TEXT);
+		expect(result.assets).toHaveLength(1);
+	});
+
+	it("uses actual measured text geometry and SVG shaft samples while retaining explicit stroke loss", () => {
+		const result = tldrawAdapter.convert(editorSource(), { ...context("dark"), tldrawAppearance: EDITOR_APPEARANCE });
+		assertImportedBoard(result.document);
+		const node = importedNode(result, "shape:text");
+		expect([node.x, node.y, node.width, node.height]).toEqual([-300, 240, 260, 128]);
+		const metadata = result.document.miroCanvas as {
+			localOverrides: Record<string, { typography?: Record<string, unknown>; connectorAnchors?: { from: unknown; to: unknown }; connector?: { route: string; waypoints: unknown[] } }>;
+			bindings: Record<string, { sourceId: string }>;
+		};
+		expect(metadata.localOverrides[node.id as string]!.typography!.lineHeight).toBe(32 / 24);
+		const edgeId = Object.keys(metadata.bindings).find(id => metadata.bindings[id]!.sourceId === "tldraw:shape:bound-arrow")!;
+		const edge = metadata.localOverrides[edgeId]!;
+		expect(edge.connector!.route).toBe("straight");
+		expect(edge.connector!.waypoints).toHaveLength(31);
+		expect(edge.connectorAnchors!.from).toMatchObject({ type: "node", u: 219.77999877929688 / 220, v: 0.5 });
+		expect(result.report.entries.some(entry => entry.sourceId === "shape:authored-stroke" && entry.reason === "tldrawStroke")).toBe(true);
+		expect(result.report.counts).toEqual({ converted: 0, approximated: 10, notImported: 1, skipped: 0 });
+		expect(result.document.miroCanvas).toMatchObject({ settings: { displayTheme: "dark" } });
+	});
+	it("retains the accepted source theme independently of the importing host", () => {
+		const result = tldrawAdapter.convert(editorSource(), { ...context("light"), tldrawAppearance: EDITOR_APPEARANCE });
+		expect(result.document.miroCanvas).toMatchObject({ settings: { displayTheme: "dark" } });
+	});
+
+	it("does not add a filename caption or rounded mask to the source image", () => {
+		const result = tldrawAdapter.convert(editorSource(), context());
+		const image = importedNode(result, "shape:image");
+		const overrides = (result.document.miroCanvas as { localOverrides: Record<string, Record<string, unknown>> }).localOverrides;
+		expect(overrides[image.id as string]).toMatchObject({ showAttachmentName: false, cornerRadius: 0 });
+	});
+
+	it("fails closed on an unknown capture theme", () => {
+		const capture = structuredClone(EDITOR_APPEARANCE) as Record<string, unknown>;
+		capture.theme = "future";
+		expect(tldrawAdapter.convert(editorSource(), { ...context(), tldrawAppearance: capture }))
+			.toEqual(tldrawAdapter.convert(editorSource(), context()));
+	});
+
+	it("inverse-rotates captured attachment points around the rounded native card center", () => {
+		// Synthetic rotated-binding derivative of authored geometry, not a new editor export.
+		const data = nativeSample();
+		const binding = data.records.find(record => record.id === "binding:start")!;
+		(binding as Record<string, unknown>).toId = "shape:rectangle";
+		const cx = -300 + Math.cos(0.2) * 110 - Math.sin(0.2) * 70;
+		const cy = Math.sin(0.2) * 110 + Math.cos(0.2) * 70;
+		const rect = { x: cx - 110, y: cy - 70, width: 220, height: 140 };
+		const nativeCx = Math.round(rect.x) + 110;
+		const nativeCy = Math.round(rect.y) + 70;
+		const first = { x: nativeCx + Math.cos(0.2) * 66, y: nativeCy + Math.sin(0.2) * 66 };
+		const text = JSON.stringify(data);
+		const capture = { sourceText: text, theme: "light", shapes: [
+			{ sourceId: "shape:rectangle", ...rect },
+			{ sourceId: "shape:diamond", x: 300, y: 0, width: 220, height: 140 },
+		], connectors: [{ sourceId: "shape:bound-arrow", color: "#1d1d1d", width: 3.5, points: [first, { x: 250, y: 70 }, { x: 300.22, y: 70 }] }] };
+		const result = tldrawAdapter.convert(source(text), { ...context(), tldrawAppearance: capture });
+		const node = importedNode(result, "shape:rectangle");
+		const metadata = result.document.miroCanvas as { bindings: Record<string, { sourceId: string }>; localOverrides: Record<string, { rotation?: number; connectorAnchors?: { from: unknown } }> };
+		const edgeId = Object.keys(metadata.bindings).find(id => metadata.bindings[id]!.sourceId === "tldraw:shape:bound-arrow")!;
+		const anchor = metadata.localOverrides[edgeId]!.connectorAnchors!.from;
+		expect(anchor).toMatchObject({ type: "node", nodeId: node.id, u: 0.8 });
+		const resolved = resolveAnchor(anchor, { nodes: { [node.id as string]: { ...node, rotation: metadata.localOverrides[node.id as string]!.rotation } } });
+		expect(resolved.valid).toBe(true);
+		expect(resolved.point!.x).toBeCloseTo(first.x, 9);
+		expect(resolved.point!.y).toBeCloseTo(first.y, 9);
 	});
 });

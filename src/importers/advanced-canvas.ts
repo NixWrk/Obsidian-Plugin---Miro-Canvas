@@ -57,21 +57,24 @@ const NODE_SHAPES: ReadonlyMap<string, Mapped<CanvasShapeKind>> = new Map([
 	["database", { value: "can" }],
 ]);
 
-/** Card borders; an invisible border is a card with no border. */
+/** Card borders; native content tint is separate from an invisible container. */
 const NODE_BORDERS: ReadonlyMap<string, Mapped<string>> = new Map([
+	["solid", { value: "solid" }],
 	["dashed", { value: "dashed" }],
 	["dotted", { value: "dotted" }],
 	["invisible", { value: "none" }],
 ]);
 
-/** Text alignment; left is Advanced Canvas's default and never written. */
+/** Source text is left/top by default; center also centers it vertically. */
 const TEXT_ALIGNMENTS: ReadonlyMap<string, Mapped<string>> = new Map([
+	["left", { value: "left" }],
 	["center", { value: "center" }],
 	["right", { value: "right" }],
 ]);
 
 /** Line dashes; the plugin has one dash length. */
 const EDGE_PATHS: ReadonlyMap<string, Mapped<string>> = new Map<string, Mapped<string>>([
+	["solid", { value: "solid" }],
 	["dotted", { value: "dotted" }],
 	["short-dashed", { value: "dashed" }],
 	["long-dashed", { value: "dashed", approximation: "longDash" }],
@@ -80,9 +83,10 @@ const EDGE_PATHS: ReadonlyMap<string, Mapped<string>> = new Map<string, Mapped<s
 /**
  * Arrowheads, on every end of a line that has one.  The plugin's round ends
  * on a native edge are `filled_oval` and `oval`; a halved triangle and a
- * blunt end have no equal and take the nearest.
+ * blunt bar use the nearest existing cap, retaining a visible endpoint.
  */
 const EDGE_ARROWS: ReadonlyMap<string, Mapped<string>> = new Map<string, Mapped<string>>([
+	["triangle", { value: "filled_triangle" }],
 	["triangle-outline", { value: "triangle" }],
 	["thin-triangle", { value: "arrow" }],
 	["halved-triangle", { value: "stealth", approximation: "arrowhead" }],
@@ -90,11 +94,12 @@ const EDGE_ARROWS: ReadonlyMap<string, Mapped<string>> = new Map<string, Mapped<
 	["diamond-outline", { value: "diamond" }],
 	["circle", { value: "filled_oval" }],
 	["circle-outline", { value: "oval" }],
-	["blunt", { value: "none", approximation: "arrowhead" }],
+	["blunt", { value: "erd_one", approximation: "arrowhead" }],
 ]);
 
 /** How a line finds its way; Advanced Canvas's A* search is drawn with elbows. */
 const EDGE_ROUTES: ReadonlyMap<string, Mapped<string>> = new Map<string, Mapped<string>>([
+	["bezier", { value: "curved" }],
 	["direct", { value: "straight" }],
 	["square", { value: "elbowed" }],
 	["a-star", { value: "elbowed", approximation: "pathfinding" }],
@@ -422,12 +427,20 @@ class AdvancedCanvasCopy {
 
 	/** Advanced Canvas draws a shape on text cards only. */
 	private nodeShape(node: UnknownRecord, value: unknown): void {
+		if (node.type === "text" && value === "rectangle") return;
 		const mapped = typeof value === "string" ? NODE_SHAPES.get(value) : undefined;
 		if (mapped === undefined || node.type !== "text") {
 			this.keptKind(`styleAttributes.shape: ${styleDescription(value)}`, `${String(node.type)} style`);
 			return;
 		}
 		this.addOverride(node, ["shape"], { kind: mapped.value, fallback: "text" }, mapped.approximation);
+		if (!this.plugin.writable) return;
+		const alignment = valueAt(node, ["styleAttributes", "textAlign"]);
+		if (typeof alignment !== "string" || !TEXT_ALIGNMENTS.has(alignment)) {
+			// Source masks retain native text placement; Miro shapes otherwise center it.
+			this.addOverride(node, ["typography", "alignment"], "left");
+			this.addOverride(node, ["typography", "verticalAlign"], "top");
+		}
 	}
 
 	private nodeBorder(node: UnknownRecord, value: unknown): void {
@@ -437,6 +450,9 @@ class AdvancedCanvasCopy {
 			return;
 		}
 		this.addOverride(node, ["borderStyle"], mapped.value, mapped.approximation);
+		if (!this.plugin.writable || value !== "invisible") return;
+		// Advanced clears the container, while native content keeps its themed tint.
+		if (node.type === "file") this.addOverride(node, ["showAttachmentName"], false);
 	}
 
 	/** Advanced Canvas aligns the text of text cards only. */
@@ -447,6 +463,7 @@ class AdvancedCanvasCopy {
 			return;
 		}
 		this.addOverride(node, ["typography", "alignment"], mapped.value, mapped.approximation);
+		if (this.plugin.writable) this.addOverride(node, ["typography", "verticalAlign"], value === "center" ? "middle" : "top");
 	}
 
 	/**
