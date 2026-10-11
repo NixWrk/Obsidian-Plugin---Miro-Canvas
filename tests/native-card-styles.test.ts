@@ -19,6 +19,19 @@ function fixture(accept: (selector: string) => boolean, target = element()) {
 }
 
 describe("native inline styles participating in scoped card CSS", () => {
+  it("retains absent borders and preserves content paint when hiding the container", () => {
+    const f = fixture(selector => selector.includes('[data-miro-source-border="none"]') || selector.includes('[data-miro-source-container="invisible"]'), element({ "border-style": "solid", "background-color": "grey", color: "green" }));
+    projectNativeCardStyles(f.root, f.write);
+    expect(f.target.values).toEqual({ "border-style": "none", "background-color": "transparent", "box-shadow": "none", color: "green" });
+  });
+
+  it("removes card padding and scrollbar reservation only on local text and shapes", () => {
+    const f = fixture(selector => selector.startsWith('[data-miro-source-kind="shape"] .markdown-preview-view'), element({ padding: "12px", "scrollbar-gutter": "stable", color: "red" }));
+    projectNativeCardStyles(f.root, f.write);
+    expect(f.target.values).toMatchObject({ padding: "0", "scrollbar-gutter": "auto", margin: "0", color: "red" });
+    expect(f.write.mock.calls.every(([, key]) => key !== "font-size")).toBe(true);
+  });
+
   it.each(["drawing", "sticky", "table", "code", "mindmap-node"])("clears only competing native paint for %s", kind => {
     const f = fixture(selector => selector.startsWith(`.miro-source-${kind},`), element({ "background-color": "red", "border-color": "blue", "background-image": "url(example)", "border-width": "3px" }, { "border-color": "important" }));
     projectNativeCardStyles(f.root,f.write);

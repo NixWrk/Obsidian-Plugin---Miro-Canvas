@@ -25,7 +25,8 @@ export const NATIVE_OMITTED_DEFAULTS: Readonly<Record<GraphKind, Readonly<Record
 const NATIVE_ROUNDED_GEOMETRY: ReadonlySet<string> = new Set(["x", "y", "width", "height"]);
 
 /** Whether native Canvas leaves this written field out because it holds the default. */
-export function nativeOmits(kind: GraphKind, field: string, written: unknown): boolean {
+export function nativeOmits(kind: GraphKind, field: string, written: unknown, nodeType?: unknown): boolean {
+	if (kind === "nodes" && nodeType === "group" && field === "label" && written === "") return true;
 	const omitted = NATIVE_OMITTED_DEFAULTS[kind];
 	return Object.prototype.hasOwnProperty.call(omitted, field) && omitted[field] === written;
 }
@@ -103,7 +104,7 @@ export function graphDrift(stored: Record<string, unknown>, written: Record<stri
 			for (const field of Object.keys(wantedItem)) {
 				if (!hasOwn(actualItem, field)) {
 					// Native Canvas leaves a default out: that is keeping it.
-					if (nativeOmits(kind, field, wantedItem[field])) continue;
+					if (nativeOmits(kind, field, wantedItem[field], wantedItem.type)) continue;
 					return `${kind} ${id} lost ${field}`;
 				}
 				if (equalJson(actualItem[field], wantedItem[field])) continue;

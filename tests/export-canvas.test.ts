@@ -180,20 +180,18 @@ describe("independent native Markdown readiness", () => {
     background.dispose();
   });
 
-  it("accepts a completed empty Markdown card without inventing visible text", async () => {
+  it("cancels empty-card queues without waiting for nonexistent Markdown or inventing text", async () => {
+    vi.useFakeTimers();
     const f = fixture();
     const child = markdownNode(f);
     child.node.text = child.renderer.text = "";
-    child.renderer.onRender.mockImplementation(() => {
-      child.renderer.queued = null;
-      child.renderer.lastText = "";
-      child.renderer.rendered = null;
-    });
+    child.renderer.onRender.mockImplementation(() => { throw new Error("Empty drawing cards never settle natively"); });
     const background = createExportCanvas(f.sourceView, { nodes: [], edges: [] }, f.document as unknown as Document);
     await settleExportMarkdown(f.canvas, new AbortController().signal);
+    expect(child.originalQueue.cancel).toHaveBeenCalledOnce();
+    expect(child.renderer.onRender).not.toHaveBeenCalled();
     expect(child.preview.textContent).toBe("");
-    expect(child.renderer.sections).toEqual([]);
-    expect(child.renderer.onRender).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
     background.dispose();
   });
 

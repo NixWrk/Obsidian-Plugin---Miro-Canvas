@@ -6,7 +6,7 @@
  */
 
 /** The endings a source's name loses before it names the board; the longest first. */
-const SOURCE_ENDINGS = [".excalidraw.md", ".excalidraw", ".md", ".canvas"] as const;
+const SOURCE_ENDINGS = [".tldr.md", ".tldr", ".excalidraw.md", ".excalidraw", ".md", ".canvas"] as const;
 
 /** More boards from one source than anyone makes; past it the import gives up rather than looping. */
 const MAX_ATTEMPTS = 10_000;

@@ -28,8 +28,10 @@
  * line of a card's text past the first belongs to that card.
  */
 
+import { MAX_WAYPOINTS } from "../connector-route";
+import { validateMiroCanvasMetadata } from "../metadata";
 import { readableInk } from "../miro-palette";
-import { BoardBuilder, type BoardRect } from "./board-builder";
+import { BoardBuilder, type BoardRect, type CardOptions, type ImportedCardStyle } from "./board-builder";
 import type { FormatAdapter, ImportContext, ImportResult, ImportSource } from "./types";
 
 /** The property the mind-map plugins mark their notes with. */
@@ -242,7 +244,7 @@ function classifyLines(lines: readonly string[], start: number): LineClass[] {
 		}
 		const item = LIST_ITEM.exec(line);
 		if (item !== null) {
-			classes.push({ kind: "item", indent: indentWidth(item[1]), text: (item[2] ?? "").trim() });
+			classes.push({ kind: "item", indent: indentWidth(item[1]), text: (item[2] ?? "").trimStart() });
 			continue;
 		}
 		classes.push({ kind: "text" });
@@ -362,7 +364,7 @@ export function parseMindmapOutline(text: string): ParsedOutline {
 			afterBlank = false;
 			continue;
 		}
-		const line = raw.trim();
+		const line = raw.trimStart();
 		// A table needs a blank line above it to be read as one on a card.
 		const opensTable = line.startsWith("|") && !owner.text.split("\n").pop()!.trimStart().startsWith("|");
 		appendLine(owner, line, lineNumber, afterBlank || (opensTable && owner.text !== ""));
@@ -502,15 +504,136 @@ function rootStyle(): { typography: Record<string, unknown>; colors: Record<stri
 	};
 }
 
+type CapturedCardStyle = ImportedCardStyle & { readonly cornerRadius?: number };
+
+interface CapturedNode extends BoardRect {
+	readonly sourceLine: number;
+	readonly text: string;
+	readonly parentLine: number | null;
+	readonly style?: CapturedCardStyle;
+}
+interface CapturedEdge {
+	readonly fromLine: number;
+	readonly toLine: number;
+	readonly color: string;
+	readonly width: number;
+	readonly points: readonly { readonly x: number; readonly y: number }[];
+}
+interface CapturedLayout {
+	readonly nodes: ReadonlyMap<number, CapturedNode>;
+	readonly edges: ReadonlyMap<string, CapturedEdge>;
+}
+
+function isLayoutRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function boundedLayoutNumber(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 100_000;
+}
+function treeNodes(outline: ParsedOutline): { node: OutlineNode; parentLine: number | null }[] {
+	const rows: { node: OutlineNode; parentLine: number | null }[] = [];
+	const pending = outline.roots.map(node => ({ node, parentLine: null as number | null }));
+	if (outline.preamble !== undefined) pending.push({ node: outline.preamble, parentLine: null });
+	while (pending.length > 0) {
+		const row = pending.pop()!;
+		rows.push(row);
+		for (const child of row.node.children) pending.push({ node: child, parentLine: row.node.line });
+	}
+	return rows;
+}
+function checkedCapturedStyle(value: unknown): CapturedCardStyle | undefined {
+	if (!isLayoutRecord(value)) return undefined;
+	const keys = new Set(["typography", "colors", "borderStyle", "borderWidth", "cornerRadius"]);
+	if (Object.keys(value).some(key => !keys.has(key))) return undefined;
+	if (value.typography !== undefined) {
+		if (!isLayoutRecord(value.typography)) return undefined;
+		const typographyKeys = new Set(["fontFamily", "fontSize", "lineHeight", "alignment", "verticalAlign", "format"]);
+		if (Object.keys(value.typography).some(key => !typographyKeys.has(key))) return undefined;
+	}
+	const checked = validateMiroCanvasMetadata({ schemaVersion: 1, localOverrides: { captured: value } });
+	return checked.valid && checked.diagnostics.length === 0 ? value : undefined;
+}
+
+/** All captured nodes and branches match, or the offline layout remains in use. */
+function readCapturedLayout(source: ImportSource, outline: ParsedOutline, value: unknown): CapturedLayout | undefined {
+	if (!isLayoutRecord(value) || value.sourceText !== source.text || !Array.isArray(value.nodes)
+		|| !Array.isArray(value.edges) || value.nodes.length > 5_000 || value.edges.length > 5_000) return undefined;
+	const rows = treeNodes(outline);
+	if (rows.length !== value.nodes.length) return undefined;
+	const expected = new Map(rows.map(row => [row.node.line, row]));
+	const nodes = new Map<number, CapturedNode>();
+	for (const capture of value.nodes as unknown[]) {
+		if (!isLayoutRecord(capture) || typeof capture.sourceLine !== "number" || nodes.has(capture.sourceLine)) return undefined;
+		const row = expected.get(capture.sourceLine);
+		if (row === undefined || capture.text !== row.node.text || (capture.parentLine !== undefined && capture.parentLine !== row.parentLine)
+			|| !boundedLayoutNumber(capture.x) || !boundedLayoutNumber(capture.y)
+			|| !boundedLayoutNumber(capture.width) || !boundedLayoutNumber(capture.height)
+			|| capture.width < 1 || capture.height < 1) return undefined;
+		const style = capture.style === undefined ? undefined : checkedCapturedStyle(capture.style);
+		if (capture.style !== undefined && style === undefined) return undefined;
+		nodes.set(capture.sourceLine, {
+			sourceLine: capture.sourceLine, text: row.node.text, parentLine: row.parentLine,
+			x: capture.x, y: capture.y, width: capture.width, height: capture.height,
+			...(style === undefined ? {} : { style }),
+		});
+	}
+	const expectedEdges = new Set(rows.filter(row => row.parentLine !== null).map(row => String(row.parentLine) + ":" + row.node.line));
+	if (value.edges.length !== expectedEdges.size) return undefined;
+	const edges = new Map<string, CapturedEdge>();
+	let pointCount = 0;
+	for (const capture of value.edges as unknown[]) {
+		if (!isLayoutRecord(capture) || typeof capture.parentLine !== "number" || typeof capture.childLine !== "number") return undefined;
+		const key = String(capture.parentLine) + ":" + capture.childLine;
+		if (!expectedEdges.has(key) || edges.has(key) || typeof capture.color !== "string"
+			|| !/^#[0-9a-f]{6}$/iu.test(capture.color) || !boundedLayoutNumber(capture.width) || capture.width <= 0 || capture.width > 100
+			|| !Array.isArray(capture.points) || capture.points.length < 2 || capture.points.length > MAX_WAYPOINTS + 2) return undefined;
+		const points: { x: number; y: number }[] = [];
+		for (const point of capture.points as unknown[]) {
+			if (!isLayoutRecord(point) || !boundedLayoutNumber(point.x) || !boundedLayoutNumber(point.y)) return undefined;
+			points.push({ x: point.x, y: point.y });
+		}
+		pointCount += points.length;
+		if (pointCount > 100_000) return undefined;
+		const from = nodes.get(capture.parentLine)!;
+		const to = nodes.get(capture.childLine)!;
+		const endpointFits = (point: { x: number; y: number }, rect: BoardRect): boolean => {
+			const u = (point.x - Math.round(rect.x)) / Math.max(1, Math.round(rect.width));
+			const v = (point.y - Math.round(rect.y)) / Math.max(1, Math.round(rect.height));
+			return u >= 0 && u <= 1 && v >= 0 && v <= 1;
+		};
+		if (!endpointFits(points[0], from) || !endpointFits(points[points.length - 1], to)) return undefined;
+		edges.set(key, { fromLine: capture.parentLine, toLine: capture.childLine, color: capture.color, width: capture.width, points });
+	}
+	return { nodes, edges };
+}
+
+function outlineCard(
+	builder: BoardBuilder,
+	rect: BoardRect,
+	text: string,
+	options: CardOptions,
+): string {
+	const style = options.style;
+	const visiblePaint = (paint: string | null | undefined): boolean => typeof paint === "string" && paint !== "transparent" && !/^#[0-9a-f]{6}00$/iu.test(paint);
+	const border = style?.colors?.border;
+	const painted = visiblePaint(style?.colors?.fill) || (style?.borderWidth ?? 0) > 0 && style?.borderStyle !== "none" && (border === undefined || visiblePaint(border));
+	return painted
+		? builder.shapeCard(rect, text, { kind: (style?.cornerRadius ?? 0) > 0 ? "round_rectangle" : "rectangle", fallback: "text" }, options)
+		: builder.item(rect, text, { type: "text" }, options);
+}
+
 function convertOutline(source: ImportSource, context: ImportContext): ImportResult {
 	const builder = new BoardBuilder("mindmap-outline", context);
 	const outline = parseMindmapOutline(source.text);
+	const captured = readCapturedLayout(source, outline, context.mindmapLayout);
 	let left = 0;
 
 	// The text before the map: on a card of its own, left of the maps.
 	if (outline.preamble !== undefined) {
 		const size = estimateCardSize(outline.preamble.text, false);
-		const preambleId = builder.card({ x: left, y: 0, ...size }, outline.preamble.text, {
+		const capture = captured?.nodes.get(outline.preamble.line);
+		const preambleId = outlineCard(builder, capture ?? { x: left, y: 0, ...size }, outline.preamble.text, {
+			...(capture?.style === undefined ? {} : { style: capture.style }),
 			source: { id: `line:${outline.preamble.line}`, type: outline.preamble.kind },
 		});
 		builder.note({ sourceId: `line:${outline.preamble.line}`, sourceType: outline.preamble.kind, status: "approximated", reason: "textBeforeRoot", nodeId: preambleId });
@@ -525,9 +648,10 @@ function convertOutline(source: ImportSource, context: ImportContext): ImportRes
 		for (const card of placed) {
 			const isRoot = card.node === root;
 			const sourceId = `line:${card.node.line}`;
-			const id = builder.card(rectOf(card), card.node.text, {
+			const capture = captured?.nodes.get(card.node.line);
+			const id = outlineCard(builder, capture ?? rectOf(card), card.node.text, {
 				source: { id: sourceId, type: card.node.kind },
-				...(isRoot ? { style: rootStyle() } : {}),
+				...(capture?.style !== undefined ? { style: capture.style } : captured === undefined && isRoot ? { style: rootStyle() } : {}),
 			});
 			ids.set(card.node, id);
 			right = Math.max(right, card.x + card.width);
@@ -542,10 +666,18 @@ function convertOutline(source: ImportSource, context: ImportContext): ImportRes
 		for (const card of placed) {
 			const parentId = ids.get(card.node)!;
 			for (const child of card.node.children) {
+				const edge = captured?.edges.get(String(card.node.line) + ":" + child.line);
+				const fromRect = captured?.nodes.get(card.node.line);
+				const toRect = captured?.nodes.get(child.line);
+				const normalize = (point: { x: number; y: number }, rect: BoardRect): { u: number; v: number } => ({
+					u: (point.x - Math.round(rect.x)) / Math.max(1, Math.round(rect.width)),
+					v: (point.y - Math.round(rect.y)) / Math.max(1, Math.round(rect.height)),
+				});
 				builder.connect({
-					from: { type: "node", nodeId: parentId, u: 1, v: 0.5 },
-					to: { type: "node", nodeId: ids.get(child)!, u: 0, v: 0.5 },
-					route: "curved",
+					from: { type: "node", nodeId: parentId, ...(edge !== undefined && fromRect !== undefined ? normalize(edge.points[0], fromRect) : { u: 1, v: 0.5 }) },
+					to: { type: "node", nodeId: ids.get(child)!, ...(edge !== undefined && toRect !== undefined ? normalize(edge.points[edge.points.length - 1], toRect) : { u: 0, v: 0.5 }) },
+					route: edge === undefined ? "curved" : "straight",
+					...(edge === undefined ? {} : { color: edge.color, width: edge.width, waypoints: edge.points.slice(1, -1) }),
 					startCap: "none",
 					endCap: "none",
 				});
@@ -557,11 +689,10 @@ function convertOutline(source: ImportSource, context: ImportContext): ImportRes
 	for (const property of outline.properties) {
 		builder.note({ sourceId: `line:${property.line}`, sourceType: `property ${property.key}`, status: "plugin-unsupported", reason: "frontmatter" });
 	}
-	// The note keeps no places, so every card's place was worked out here.
-	// The whole map came over and only where its cards stand is new, so the
-	// map counts as approximated, not as something left out.
+	// Offline places are new; captured places retain the source geometry.
+	// Font fallback, card rendering and rounding remain approximations.
 	if (outline.roots.length > 0) {
-		builder.note({ sourceId: "layout", sourceType: "mind map", status: "approximated", reason: "layout" });
+		builder.note({ sourceId: "layout", sourceType: "mind map", status: "approximated", reason: captured === undefined ? "layout" : "appearance" });
 	}
 
 	return builder.finish({ sourcePath: source.path, formatVersion: OUTLINE_FORMAT });

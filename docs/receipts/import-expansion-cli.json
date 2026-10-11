@@ -1,0 +1,155 @@
+{
+  "verifiedOn": "2026-10-11",
+  "completed": 7,
+  "stopped": false,
+  "results": [
+    {
+      "name": "read_board",
+      "path": "CLI imported copy.canvas",
+      "revision": "83b6d8daf43e251cdbe23bd272319dfa4bdedcd10619f4132dca83b4eaf08bad",
+      "bytes": 3865,
+      "level": "summary",
+      "summary": {
+        "counts": {
+          "nodes": 7,
+          "edges": 1,
+          "connectors": 1,
+          "byKind": {
+            "frame": 1,
+            "shape": 2,
+            "image": 1,
+            "file": 1,
+            "drawing": 1,
+            "text": 1
+          }
+        },
+        "frames": [
+          {
+            "id": "8bad09a079ba816c",
+            "label": "Frame",
+            "rect": {
+              "x": -40,
+              "y": -40,
+              "width": 240,
+              "height": 180
+            }
+          }
+        ],
+        "framesOmitted": 0,
+        "bounds": {
+          "x": -40,
+          "y": -40,
+          "width": 1440,
+          "height": 608
+        },
+        "reviewMode": false,
+        "locked": 0,
+        "comments": {
+          "threads": 0,
+          "open": 0,
+          "resolved": 0,
+          "replies": 0
+        },
+        "exportPages": [],
+        "metadata": {
+          "status": "valid",
+          "errors": 0,
+          "warnings": 0
+        },
+        "hasMiroSource": false
+      },
+      "warnings": []
+    },
+    {
+      "name": "validate_board",
+      "path": "CLI imported copy.canvas",
+      "revision": "83b6d8daf43e251cdbe23bd272319dfa4bdedcd10619f4132dca83b4eaf08bad",
+      "valid": true,
+      "verdicts": {
+        "board": "valid",
+        "miroSource": "not_applicable",
+        "miroCanvas": "valid"
+      },
+      "schema": [],
+      "plugin": [],
+      "omitted": 0,
+      "warnings": []
+    },
+    {
+      "name": "move",
+      "path": "CLI imported copy.canvas",
+      "status": "applied",
+      "dryRun": true,
+      "written": false,
+      "revision": "3b430a9de2f9821b95073a9ef6b463d612d09a3eda6413f647466f92484025f4",
+      "previousRevision": "83b6d8daf43e251cdbe23bd272319dfa4bdedcd10619f4132dca83b4eaf08bad",
+      "changedIds": [
+        "1b75a14744ffcbc9"
+      ],
+      "diagnostics": [],
+      "warnings": []
+    },
+    {
+      "name": "move",
+      "path": "CLI imported copy.canvas",
+      "status": "applied",
+      "dryRun": false,
+      "written": true,
+      "revision": "3b430a9de2f9821b95073a9ef6b463d612d09a3eda6413f647466f92484025f4",
+      "previousRevision": "83b6d8daf43e251cdbe23bd272319dfa4bdedcd10619f4132dca83b4eaf08bad",
+      "changedIds": [
+        "1b75a14744ffcbc9"
+      ],
+      "diagnostics": [],
+      "warnings": []
+    },
+    {
+      "name": "validate_board",
+      "path": "CLI imported copy.canvas",
+      "revision": "3b430a9de2f9821b95073a9ef6b463d612d09a3eda6413f647466f92484025f4",
+      "valid": true,
+      "verdicts": {
+        "board": "valid",
+        "miroSource": "not_applicable",
+        "miroCanvas": "valid"
+      },
+      "schema": [],
+      "plugin": [],
+      "omitted": 0,
+      "warnings": []
+    },
+    {
+      "name": "undo_last",
+      "path": "CLI imported copy.canvas",
+      "status": "applied",
+      "dryRun": false,
+      "written": true,
+      "revision": "83b6d8daf43e251cdbe23bd272319dfa4bdedcd10619f4132dca83b4eaf08bad",
+      "previousRevision": "3b430a9de2f9821b95073a9ef6b463d612d09a3eda6413f647466f92484025f4",
+      "changedIds": [
+        "1b75a14744ffcbc9"
+      ],
+      "diagnostics": [],
+      "warnings": [],
+      "created": {
+        "undone": "move"
+      }
+    },
+    {
+      "name": "validate_board",
+      "path": "CLI imported copy.canvas",
+      "revision": "83b6d8daf43e251cdbe23bd272319dfa4bdedcd10619f4132dca83b4eaf08bad",
+      "valid": true,
+      "verdicts": {
+        "board": "valid",
+        "miroSource": "not_applicable",
+        "miroCanvas": "valid"
+      },
+      "schema": [],
+      "plugin": [],
+      "omitted": 0,
+      "warnings": []
+    }
+  ],
+  "revisionRestored": true
+}

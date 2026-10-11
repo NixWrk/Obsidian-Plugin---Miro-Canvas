@@ -7,6 +7,8 @@
  * import: a ".canvas" is offered whatever it holds, and its contents decide.
  */
 
+import { jsonCanvasAdapter } from "./json-canvas";
+import { tldrawAdapter } from "./tldraw";
 import { advancedCanvasAdapter } from "./advanced-canvas";
 import { excalidrawAdapter } from "./excalidraw";
 import { markmindRichAdapter } from "./markmind-rich";
@@ -16,13 +18,15 @@ import type { FormatAdapter, ImportSource } from "./types";
 /** In the order they are asked; the first whose `detect` says yes imports the file. */
 export const IMPORT_ADAPTERS: readonly FormatAdapter[] = Object.freeze([
 	advancedCanvasAdapter,
+	jsonCanvasAdapter,
+	tldrawAdapter,
 	excalidrawAdapter,
 	mindmapOutlineAdapter,
 	markmindRichAdapter,
 ]);
 
 /** The note properties the Excalidraw and mind-map plugins mark their notes with. */
-const IMPORTABLE_PROPERTIES = ["excalidraw-plugin", "mindmap-plugin"] as const;
+const IMPORTABLE_PROPERTIES = ["excalidraw-plugin", "mindmap-plugin", "tldraw-file"] as const;
 
 /**
  * Whether a file may be offered for import: a plain Excalidraw file, any
@@ -31,7 +35,7 @@ const IMPORTABLE_PROPERTIES = ["excalidraw-plugin", "mindmap-plugin"] as const;
  */
 export function mayImport(extension: string, frontmatter?: Readonly<Record<string, unknown>> | null): boolean {
 	const lower = extension.toLowerCase();
-	if (lower === "excalidraw" || lower === "canvas") return true;
+	if (lower === "excalidraw" || lower === "canvas" || lower === "tldr") return true;
 	if (lower !== "md" || frontmatter === undefined || frontmatter === null) return false;
 	return IMPORTABLE_PROPERTIES.some((key) => Object.prototype.hasOwnProperty.call(frontmatter, key));
 }

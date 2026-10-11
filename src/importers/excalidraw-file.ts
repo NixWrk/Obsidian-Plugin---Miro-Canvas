@@ -15,6 +15,7 @@
  */
 
 import { decompressFromBase64 } from "./lz-string";
+import { MAX_IMPORT_SOURCE_LENGTH } from "./types";
 
 /**
  * An Excalidraw scene as parsed.  Only the envelope is checked; every element
@@ -61,6 +62,10 @@ export interface ExcalidrawFile {
   readonly texts: ReadonlyMap<string, string>;
   /** File id -> where the embedded file comes from, from `## Embedded Files`. */
   readonly embeds: ReadonlyMap<string, ExcalidrawEmbed>;
+  /** Raw links in the plugin note override the scene's parsed link. */
+  readonly links: ReadonlyMap<string, string>;
+  /** User prose before the drawing data; remains in the source note. */
+  readonly noteBody?: string;
 }
 
 export type ExcalidrawReadErrorCode =
@@ -90,6 +95,7 @@ const DRAWING_FENCE = /^#{1,2} Drawing[ \t]*\n[^`]*```(compressed-json|json)[ \t
 const DATA_HEADING = /^# Excalidraw Data[ \t]*$/gm;
 
 const TEXT_ELEMENTS_HEADING = /^#{1,2} Text Elements[ \t]*$/gm;
+const ELEMENT_LINKS_HEADING = /^#{1,2} Element Links[ \t]*$/gm;
 const EMBEDDED_FILES_HEADING = /^#{1,2} Embedded Files[ \t]*$/gm;
 
 /** The headings that close the text section; a text element may hold headings of its own. */
@@ -110,6 +116,7 @@ const PLUGIN_RELEASE = /obsidian-excalidraw-plugin\/releases\/tag\/([^/?#\s]+)/;
  * plain scene; anything else for the plugin's Markdown note.
  */
 export function readExcalidrawFile(text: string): ExcalidrawReadResult {
+  if (text.length > MAX_IMPORT_SOURCE_LENGTH) return failure("not-a-scene", "drawing exceeds the size bound");
   const normalized = text.replace(/^\ufeff/, "").replace(/\r\n?/g, "\n");
   if (normalized.trimStart().startsWith("{")) {
     return readPlainScene(normalized);
@@ -153,8 +160,15 @@ function readPluginNote(text: string): ExcalidrawReadResult {
 
   return {
     ok: true,
-    file: describeFile("markdown", fence.encoding, pluginMode, scene.scene, texts, embeds),
+    file: describeFile("markdown", fence.encoding, pluginMode, scene.scene, texts, embeds, readElementLinks(data), readNoteBody(text.slice(0, dataStart))),
   };
+}
+
+/** Separate prose from YAML and the plugin's generated switch-view notice. */
+function readNoteBody(prefix: string): string | undefined {
+  const body = prefix.replace(/^---\n[\s\S]*?\n---(?:\n|$)/u, "")
+    .replace(/^==[^=\n]*EXCALIDRAW VIEW[^=\n]*==[ \t]*$/gimu, "").trim();
+  return body === "" ? undefined : body;
 }
 
 function describeFile(
@@ -164,6 +178,8 @@ function describeFile(
   scene: ExcalidrawScene,
   texts: ReadonlyMap<string, string>,
   embeds: ReadonlyMap<string, ExcalidrawEmbed>,
+  links: ReadonlyMap<string, string> = new Map(),
+  noteBody?: string,
 ): ExcalidrawFile {
   const pluginVersion = typeof scene.source === "string" ? PLUGIN_RELEASE.exec(scene.source)?.[1] : undefined;
   const hasVersion = typeof scene.version === "number" || typeof scene.version === "string";
@@ -177,6 +193,8 @@ function describeFile(
     scene,
     texts,
     embeds,
+    links,
+    ...(noteBody === undefined ? {} : { noteBody }),
   };
 }
 
@@ -280,6 +298,18 @@ function skipNewlines(text: string, from: number): number {
     position += 1;
   }
   return position;
+}
+
+/** A note's raw element links; never read entries from Embedded Files. */
+function readElementLinks(data: string): Map<string, string> {
+  const links = new Map<string, string>();
+  const body = sectionBody(data, ELEMENT_LINKS_HEADING, "last", (line) => /^#{1,6} /.test(line) || COMMENT_FENCE.test(line));
+  if (body === undefined) return links;
+  for (const line of body.split("\n")) {
+    const entry = EMBED_LINE.exec(line);
+    if (entry !== null) links.set(entry[1], entry[2].trim());
+  }
+  return links;
 }
 
 /** `## Embedded Files`: `fileId: [[link]]`, `fileId: https://...` or `fileId: $$tex$$`, one per entry. */

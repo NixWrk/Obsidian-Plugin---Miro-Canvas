@@ -127,6 +127,7 @@ export async function settleExportMarkdown(canvas: unknown, signal: AbortSignal)
   const nodes = own(canvas, "nodes");
   if (!(nodes instanceof Map)) throw new Error(words().export.unavailable);
   const targets = new Set<MarkdownTarget>();
+  const emptyRenderers = new Set<object>();
   const deadline = view.performance.now() + 5000;
   for (const node of nodes.values() as Iterable<unknown>) {
     if (view.performance.now() >= deadline) throw new Error(words().export.pageNotDrawn);
@@ -147,8 +148,12 @@ export async function settleExportMarkdown(canvas: unknown, signal: AbortSignal)
       || onRender === undefined || onResize === undefined
       || (typeof expectedText === "string" && expectedText !== own(renderer, "text"))) throw new Error(words().export.unavailable);
     markdownReading(renderer);
-    targets.add({ renderer, preview, onRender, onResize });
+    if (expectedText === "") emptyRenderers.add(renderer);
+    else targets.add({ renderer, preview, onRender, onResize });
   }
+  // Empty cards can host our drawings; native Markdown has no content to settle.
+  const emptyQueues = new Set<object>();
+  for (const renderer of emptyRenderers) cancelMarkdownQueue(renderer, emptyQueues);
   if (targets.size === 0) return;
   await new Promise<void>((resolve, reject) => {
     let poll: number | undefined;

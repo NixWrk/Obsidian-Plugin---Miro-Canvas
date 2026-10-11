@@ -282,9 +282,10 @@ describe("mind map outline: the board", () => {
 			expect(overrides[root.id]).toEqual({
 				typography: { fontSize: 24, alignment: "center", verticalAlign: "center", format: { bold: true } },
 				colors: { fill: "#4262ff", text: readableInk("#4262ff") },
+				shape: { kind: "rectangle", fallback: "text" },
 			});
 		}
-		expect(overrides[cardOfLine(result, 14).id]).toBeUndefined();
+		expect(overrides[cardOfLine(result, 14).id]).toEqual({ item: { type: "text" } });
 	});
 
 	it("lays the map out as a tree to the right, cards sized from their text, none overlapping", () => {
@@ -367,5 +368,71 @@ describe("mind map outline: the board", () => {
 		expect(nodesOf(result)).toEqual([]);
 		expect(edgesOf(result)).toEqual([]);
 		expect(result.report.entries).toEqual([]);
+	});
+});
+
+describe("outline Markdown appearance", () => {
+	it("keeps hard-break spaces in labels and continuations", () => {
+		const text = "---\nmindmap-plugin: basic\n---\n# Root\n- First  \n  Second  \n  Third\n";
+		const outline = parseMindmapOutline(text);
+		expect(outline.roots[0]!.children[0]!.text).toBe("First  \nSecond  \nThird");
+		const result = mindmapOutlineAdapter.convert(note(text, { "mindmap-plugin": "basic" }), context());
+		expect(nodesOf(result).some(node => node.text === "First  \nSecond  \nThird")).toBe(true);
+		expect(result.report.entries.some(entry => entry.reason === "layout")).toBe(true);
+	});
+});
+describe("optional captured source appearance", () => {
+	const sourceText = "---\nmindmap-plugin: basic\n---\n# Root\n- Child\n";
+	function capture() {
+		return {
+			sourceText,
+			theme: "light",
+			nodes: [
+				{ sourceLine: 4, text: "Root", x: -100, y: 20, width: 160, height: 40,
+					style: { typography: { fontSize: 18, lineHeight: 1.5, alignment: "left", verticalAlign: "center", format: { bold: true } },
+						colors: { fill: null, text: "#123456", border: null }, borderStyle: "none", borderWidth: 0 } },
+				{ sourceLine: 5, text: "Child", x: 200, y: 80, width: 120, height: 30 },
+			],
+			edges: [{ parentLine: 4, childLine: 5, points: [{x:60,y:40},{x:100,y:40},{x:140,y:95},{x:200,y:95}], color: "#445566", width: 2 }],
+		};
+	}
+	function importCaptured(value: unknown) {
+		return mindmapOutlineAdapter.convert(note(sourceText, { "mindmap-plugin": "basic" }), { ...context(), mindmapLayout: value });
+	}
+	it("preserves captured boxes/styles and sampled path geometry rather than inventing a new curve", () => {
+		const result = importCaptured(capture());
+		expect(nodesOf(result).map(node => [node.x,node.y,node.width,node.height])).toEqual([[-100,20,160,40],[200,80,120,30]]);
+		const metadata = metadataOf(result);
+		const root = nodesOf(result)[0]!;
+		expect(metadata.localOverrides[root.id]!.colors).toEqual({ fill:null,text:"#123456",border:null });
+		const edge = edgesOf(result)[0]!;
+		expect((metadata.localOverrides[edge.id]!.connector as Record<string, unknown>).route).toBe("straight");
+		expect((metadata.localOverrides[edge.id]!.connector as Record<string, unknown>).waypoints).toEqual([{x:100,y:40},{x:140,y:95}]);
+		expect(edge.fromNode).toBe(root.id);
+		expect(result.report.entries).toContainEqual({ sourceId: "layout", sourceType: "mind map", status: "approximated", reason: "appearance" });
+		expect(metadata.localOverrides[root.id]!.item).toEqual({ type: "text" });
+		expect(metadata.localOverrides[nodesOf(result)[1]!.id]!.item).toEqual({ type: "text" });
+	});
+	it("rejects stale, incomplete, duplicate, unsafe and different-tree captures atomically", () => {
+		const fallback = importCaptured(undefined);
+		const stale = capture(); stale.sourceText += "stale";
+		const missing = capture(); missing.nodes.pop();
+		const duplicate = capture(); duplicate.nodes[1]!.sourceLine = 4;
+		const wrongText = capture(); wrongText.nodes[1]!.text = "Different";
+		const wrongTree = capture(); wrongTree.edges[0]!.parentLine = 5;
+		const missingEdge = capture(); missingEdge.edges.length = 0;
+		const badPoint = capture(); badPoint.edges[0]!.points[1]!.x = NaN;
+		const outside = capture(); outside.edges[0]!.points[0]!.x = -200;
+		const badSize = capture(); badSize.nodes[1]!.width = 0;
+		const unsafeStyle = capture(); Object.assign(unsafeStyle.nodes[0]!.style!, { url: "https://example.invalid" });
+		for (const value of [stale,missing,duplicate,wrongText,wrongTree,missingEdge,badPoint,outside,badSize,unsafeStyle]) {
+			expect(importCaptured(value)).toEqual(fallback);
+		}
+	});
+	it("keeps source/capture immutable and repeats deterministically", () => {
+		const value = capture();
+		const before = JSON.stringify(value);
+		expect(importCaptured(value)).toEqual(importCaptured(value));
+		expect(JSON.stringify(value)).toBe(before);
 	});
 });

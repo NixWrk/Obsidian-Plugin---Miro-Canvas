@@ -221,8 +221,8 @@ function checkMetadataReferences(
 	}
 	if (isRecord(metadata.bindings)) {
 		for (const id of Object.keys(metadata.bindings)) {
-			if (!nodeIds.has(id)) {
-				add("binding-orphan", "warning", pointer("miroCanvas", "bindings", id), `There is a binding for '${id}', which is not a card on the board.`);
+			if (!nodeIds.has(id) && !edgeIds.has(id) && !connectorIds.has(id)) {
+				add("binding-orphan", "warning", pointer("miroCanvas", "bindings", id), `There is a binding for '${id}', which is not a card or line on the board.`);
 			}
 		}
 	}

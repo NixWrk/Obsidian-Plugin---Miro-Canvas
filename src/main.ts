@@ -1,7 +1,7 @@
 import { replaceInvalidFilenameCharacters } from "./control-characters";
 import { createHtmlElement } from "./dom-elements";
 import * as obsidian from "obsidian";
-import { Component, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, Setting, TFile, getLanguage, normalizePath, parseYaml, stringifyYaml, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { Component, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, FuzzySuggestModal, Notice, Platform, Plugin, Setting, TFile, getLanguage, normalizePath, parseYaml, stringifyYaml, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
 import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily, defaultPalette } from "./appearance";
 import {
@@ -20,6 +20,7 @@ import { M1CanvasSession } from "./m1-session";
 import { PaletteEditor } from "./palette-editor";
 import { CustomStyleEditor } from "./custom-style-editor";
 import { CanvasSnippetManager, readNativeSnippetEntries, readNativeSnippetNames } from "./canvas-snippets";
+import { resolveCanvasTheme } from "./canvas-theme";
 import { cloneCanvasJson } from "./canvas-json";
 import { newCanvasId } from "./canvas-ids";
 import { graphDrift } from "./native-graph";
@@ -75,7 +76,7 @@ import { localeFor, setLocale, words } from "./i18n";
 import { createWelcomeBoard } from "./welcome-board";
 import { PenTooltips } from "./pen-tooltips";
 import { bindingOf, stillTheBoard, type BoardBinding } from "./board-binding";
-import { canImportFile, importIntoBoard, showImportPreview } from "./import-command";
+import { availableImportFiles, canImportFile, importIntoBoard, showImportPreview } from "./import-command";
 import { automaticCheckDue, checkForUpdate, isNewerVersion, type ReleaseRequest, type UpdateCheck } from "./update-check";
 
 const NATIVE_CANVAS_VIEW_TYPE = "canvas";
@@ -508,18 +509,16 @@ export default class MiroCanvasPlugin extends Plugin {
     });
 
     // Import from another plugin's file into a new board: offered for the
-    // open file and in a file's own menu, and only for files an importer
-    // might read.  No default hotkey: an import is a deliberate step.
+    // open file, with a source picker otherwise, and in a file's own menu.
+    // No default hotkey: an import is a deliberate step.
     this.addCommand({
       id: "import-into-board",
       name: words().commands.importIntoBoard,
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
-        if (file === null || !canImportFile(this.app, file)) {
-          return false;
-        }
         if (!checking) {
-          this.importIntoBoard(file);
+          if (file !== null && canImportFile(this.app, file)) this.importIntoBoard(file);
+          else this.chooseImportSource();
         }
         return true;
       },
@@ -1020,6 +1019,21 @@ export default class MiroCanvasPlugin extends Plugin {
     );
   }
 
+  /** Raw drawings stay available without registering the source editor's file views. */
+  private chooseImportSource(): void {
+    const files = availableImportFiles(this.app);
+    const choose = (file: TFile): void => this.importIntoBoard(file);
+    class SourcePicker extends FuzzySuggestModal<TFile> {
+      getItems(): TFile[] { return files; }
+      getItemText(file: TFile): string { return file.path; }
+      onChooseItem(file: TFile): void { choose(file); }
+    }
+    const picker = new SourcePicker(this.app);
+    picker.modalEl.classList.add("miro-canvas-import-source-picker");
+    picker.setPlaceholder(words().importer.chooseSource);
+    picker.open();
+  }
+
   /** A new board from another plugin's file; the file itself is only read. */
   private importIntoBoard(file: TFile): void {
     void importIntoBoard({
@@ -1031,7 +1045,7 @@ export default class MiroCanvasPlugin extends Plugin {
       confirm: (preview) => showImportPreview(new Modal(this.app), preview),
       // A new board has no theme of its own: it follows the system's, as
       // the board itself works it out once it is open.
-      theme: () => (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
+      theme: () => resolveCanvasTheme("system", this.app.workspace.getMostRecentLeaf()?.view.containerEl.ownerDocument),
     }, file).catch((error: unknown) => {
       console.error("[miro-canvas] import failed", error);
       new Notice(words().importer.failed);

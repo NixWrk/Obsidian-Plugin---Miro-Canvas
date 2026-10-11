@@ -37,6 +37,8 @@ describe("card corner decoration", () => {
     }
     expect(hasCardCorners("group", null, false)).toBe(false);
     expect(hasCardCorners("text", "text", true)).toBe(true);
+    expect(hasCardCorners("file", "text", false)).toBe(true);
+    expect(hasCardCorners("file", "shape", false)).toBe(false);
     for (const kind of ["text", "file", "link"]) expect(hasCardCorners(kind, null, false)).toBe(true);
   });
 

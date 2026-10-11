@@ -82,3 +82,13 @@ SOFTWARE.
 Their copyright/license comments remain in the distributed bundle. Noto Sans
 copyright and full SIL Open Font License are retained in src/vector-pdf-fonts.ts
 and its distributed output; original font hashes are checked before repacking.
+
+
+## tldraw Obsidian test fixture (not editor runtime)
+
+`tests/fixtures/import/tldraw-current-schema.tldr` is an unmodified saved test
+file from tldraw/obsidian-plugin at 2a3b92638095128655ce786eeb717dc346a4d2d0,
+copyright 2023 Sam Alhaqab, Apache-2.0. The complete pinned license accompanies
+it in `tldraw-plugin-LICENSE.txt`; there was no separate upstream NOTICE.
+[Provenance and hashes](docs/import-tldraw-audit.md). No tldraw editor or SDK
+implementation is bundled.
