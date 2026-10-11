@@ -2592,3 +2592,22 @@ Before removing three unnecessary non-null assertions: rasterDimensions reads We
 
 
 Import expansion final verification: all local gates pass (3657 Vitest/77 Python, three smokes), no new lint advisory. Owned Windows SDK1.14.4 passes 20 renderer-input scenarios and independent raster PDF after the empty-card readiness repair. CLI validate/move/undo passes with zero schema/plugin diagnostics. Exact evidence and pending physical Android/OS/stylus/graph/property cases: docs/import-expansion-checks.md and docs/receipts/import-expansion-*.json.
+
+## Pure source appearance readers — 2026-10-11
+
+The open mindmap reader's Reflect.apply result is narrowed from unknown; SVG
+geometry/polyline checks use Obsidian's cross-window instanceOf helper. User
+action: import an already-open audited map. Required regression checks are
+complete node/path capture, source-owner window isolation, 50/100/200% capture,
+and fallback on unavailable source geometry. Actual isolated Windows capture
+is recorded separately from pure parser tests; Android input remains pending.
+
+Before the two redundant style assertions are removed: import command/source observer -> context mindmapLayout/tldrawAppearance -> pure source-text/geometry/style validation -> BoardBuilder metadata -> preview/publication. User actions are imports from already-open original editors, captured styles and paths, stale/unknown-capture fallback. Regression gates: valid captured metadata; exact source/AST/hierarchy/ID coverage; malformed/stale/unsafe/duplicate/over-budget snapshots rejected atomically; sampled straight paths/anchors retained; default offline imports unchanged; source immutability; focused mindmap/tldraw suites and TypeScript/targeted lint/diff check. Native observer/rendering, actual OS/stylus and physical Android acceptance remain pending separate parent receipts.
+
+## Markmind authored rich tree — 2026-10-12
+
+Before the control-character regex, redundant narrowed assertions and unsafe prototype assignment are replaced in src/importers/markmind-rich.ts: rich marker/fenced own data -> checked source IDs/text/positions and parent tree -> optional exact-source captured styles/paths -> BoardBuilder cards/native edges -> existing preview/publication. User actions: import the actual authored Markmind 3.7.4 tree, import offline with persisted x/y, import from an open matched source view, reject stale/unsafe/partial snapshots, expose component/fold/style losses. Mandatory regressions: authored 13 nodes/12 edges and source bytes; invalid/control IDs, parents/cycles/root/caps; safe style and component losses; complete snapshot ID/text/parent/position/style/path/theme coverage, endpoint compatibility, no accessor execution, detached output and atomic fallback; rich/basic/common tests, types/scoped lint/diff. Current pure/synthetic unit evidence is 117 tests; real Markmind rendering/input and physical Android acceptance remain pending with the parent. Exact own sample provenance and scope: docs/import-markmind-rich-checks.md. No proprietary implementation or schema change.
+
+## Tldraw source reader realm guard — 2026-10-11
+
+Trace: import-command tldraw context -> readOpenTldrawAppearance -> shape-owned SVG shaft sampling. User action: import an already-open original tldraw drawing, including a source view in another document realm. The lint warning concerns its SVGGeometryElement type guard; use Obsidian's instanceOf against the source owner's constructor, retaining the explicit missing-path guard. Required: TypeScript and target lint; actual owner-view capture succeeds; absent/foreign/stale view returns undefined; sampled board coordinates and source bytes unchanged. No Android/OS input claim.

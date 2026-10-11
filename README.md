@@ -201,7 +201,7 @@ text because the source export does not supply it.
 [Import instructions and limitations](docs/import.md).
 
 
-Embedded Excalidraw PNG/JPEG/GIF/WebP become new vault attachments after preview. Native Canvas copies preserve unknown fields; tldraw currently supports only a verified packed-stroke subset, and Markmind rich remains unsupported. [Formats and exact limits](docs/import.md).
+Embedded Excalidraw PNG/JPEG/GIF/WebP and restricted passive SVG become new vault attachments after preview; supported static pictures retain reflection and source theme. Native Canvas copies preserve unknown fields. Import also supports bounded tldraw shapes/text/lines/images and authored Markmind rich trees. Already-open audited source views can supply mindmap layout and tldraw appearance. Fonts, sketch contours and unsupported editor features can still differ. [Formats and exact limits](docs/import.md).
 
 ## Your files and privacy
 

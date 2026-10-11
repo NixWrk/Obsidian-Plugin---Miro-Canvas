@@ -42,7 +42,7 @@ async function importFile(path,{cancel=false,report=true}={}) {
  if(!report) await click('.miro-canvas-import-preview__report-card input');
  if(cancel) { await pressKey(client.send,'Escape'); await wait(150); assert.deepEqual(await checked('return app.vault.getFiles().map(f=>f.path).sort();'),before.files); receipt.checks.push({name:'cancel',path,preview,filesUnchanged:true}); return; }
  await click('.miro-canvas-import-preview .mod-cta');
- const board=await until("const f=app.workspace.getActiveFile();return f?.extension==='canvas'?f.path:false;");
+ const board=await until(`const f=app.workspace.getActiveFile();return f?.extension==='canvas'&&f.path!==${JSON.stringify(path)}?f.path:false;`);
  await until("return !!app.plugins.plugins['miro-canvas'].m1Session;");
  await wait(900);
  const state=await checked(`return {document:JSON.parse(await app.vault.read(app.vault.getAbstractFileByPath(${JSON.stringify(board)}))),source:await app.vault.read(app.vault.getAbstractFileByPath(${JSON.stringify(path)}))};`);
@@ -134,13 +134,17 @@ try {
  await create('Advanced native.canvas',JSON.stringify(ac));const advanced=await importFile('Advanced native.canvas',{report:false});assert(advanced.document.miroCanvas.localOverrides.g.groupCollapse);assert.equal(advanced.document.nodes[0].width,400);assert.deepEqual(advanced.document.miroCanvas.localOverrides.g.groupCollapse.children,['a']);
  receipt.checks.push({name:'Advanced Canvas compact snapshot without persisted preview',board:advanced.board});
  await checked("await app.workspace.revealLeaf(app.workspace.getLeavesOfType('file-explorer')[0]);app.workspace.leftSplit.expand();return true;");await wait(250);
- const menuPoint=await checked("const e=document.querySelector('.nav-file-title[data-path=\"Actual tldraw.tldr.md\"]');if(!e)throw Error('file menu target missing');e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.x+40,y:r.y+r.height/2};");
+ const menuPoint=await until("const e=document.querySelector('.nav-file-title[data-path=\"Actual tldraw.tldr.md\"]');if(!e)return false;e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();const p={x:r.x+Math.min(40,r.width/2),y:r.y+r.height/2};return r.width>0&&r.height>0&&e.contains(document.elementFromPoint(p.x,p.y))?p:false;");
  await mouse('mousePressed',menuPoint.x,menuPoint.y,'right',2);await mouse('mouseReleased',menuPoint.x,menuPoint.y,'right');await wait(150);
  await checked("const e=[...document.querySelectorAll('.menu-item')].find(e=>e.textContent.includes('Import into a board'));if(!e)throw Error('file import menu missing');e.id='import-file-menu-entry';return true;");await click('#import-file-menu-entry');
  await until("return !!document.querySelector('.miro-canvas-import-preview-modal');");
  await click('.miro-canvas-import-preview .mod-cta');const rawBoard=await until("const f=app.workspace.getActiveFile();return f?.extension==='canvas'&&f.basename.startsWith('Actual tldraw')?f.path:false;");
+ await until("return app.workspace.activeLeaf.view.getViewType()==='canvas' && !!app.plugins.plugins['miro-canvas'].m1Session;");
+ await wait(900);
  receipt.checks.push({name:'marked-note file-menu import',board:rawBoard});
  await checked("await app.workspace.getLeaf(false).openFile(app.vault.getAbstractFileByPath('Native note.md'),{active:true});return true;");
+ await until("return app.workspace.getActiveFile()?.path==='Native note.md' && app.workspace.activeLeaf.view.getViewType()==='markdown';");
+ await wait(250);
  await pressKey(client.send,'p',{modifiers:2});await until("return !!document.querySelector('.prompt-input');");await client.send('Input.insertText',{text:'Import into a board'});await wait(180);await pressKey(client.send,'Enter');
  await until("return !!document.querySelector('.miro-canvas-import-source-picker');");
  const sourceFilesBefore=await checked('return app.vault.getFiles().map(f=>f.path).sort();');await pressKey(client.send,'Escape');assert.deepEqual(await checked('return app.vault.getFiles().map(f=>f.path).sort();'),sourceFilesBefore);

@@ -79,3 +79,8 @@ Android: current ADB inventory empty. No physical tablet/phone, native OS mouse
 or stylus, graph UI or full properties UI acceptance is claimed. Markmind rich,
 general tldraw shapes/assets/multipage/legacy schemas and a real tldraw Markdown
 export remain pending with evidence requirements in the matrix/audit.
+
+The authored rich-tree/native tldraw expansion and appearance repairs supersede
+the earlier rich/current-wrapper pending entries above. See
+[all-import showcase acceptance](import-all-showcase-checks.md) for final scoped
+coverage, real editor/reopen checks, current local gates and remaining losses.
