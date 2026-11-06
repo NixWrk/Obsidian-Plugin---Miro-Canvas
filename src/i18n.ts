@@ -47,4 +47,9 @@ export function words(): Messages {
 	return TABLES[current];
 }
 
+/** Sentences side by side, as the language in use spaces them: Chinese leaves no gap. */
+export function sentences(...parts: readonly string[]): string {
+	return parts.join(words().settings.sentenceGap);
+}
+
 export type { Messages };

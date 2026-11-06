@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { currentLocale, localeFor, setLocale, words } from "../src/i18n";
+import { currentLocale, localeFor, sentences, setLocale, words } from "../src/i18n";
 import { EN } from "../src/locales/en";
 import { RU } from "../src/locales/ru";
 import { ZH } from "../src/locales/zh";
@@ -30,6 +30,8 @@ const SAME_IN_RUSSIAN = new Set<string>([
   "toolbar.linkPlaceholder",
   // The search counter, "3 / 12": numbers only.
   "search.count",
+  // The space between two sentences.
+  "settings.sentenceGap",
 ]);
 
 /** Product names and short labels Chinese keeps as they are, beside the Russian list. */
@@ -94,6 +96,24 @@ describe("the plugin's language", () => {
 			expect(typeof other, path).toBe(typeof value);
 			if (typeof value === "function") expect((other as (...args: unknown[]) => unknown).length, path).toBe(value.length);
 		}
+	});
+
+	it("spaces sentences as the language does", () => {
+		expect(sentences("One.", "Two.")).toBe("One. Two.");
+		setLocale("ru");
+		expect(sentences("Раз.", "Два.")).toBe("Раз. Два.");
+		setLocale("zh");
+		expect(sentences("一。", "二。")).toBe("一。二。");
+	});
+
+	it("ends every Chinese description a value follows with a full stop", () => {
+		const { settings, enhancements } = ZH;
+		const descriptions = [
+			settings.zoomStepDesc, settings.minZoomDesc, settings.maxZoomDesc, settings.panStepDesc, settings.fastPanDesc,
+			settings.magnetDesc, settings.snapDesc, settings.labelPositionDesc,
+			enhancements.shapeRadiusControlMinZoomHint, enhancements.cardCornerRadiusHint, enhancements.contentHint,
+		];
+		for (const description of descriptions) expect(description.endsWith("。"), description).toBe(true);
 	});
 
 	it("has every English string in Chinese, of the same kind", () => {
