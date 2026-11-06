@@ -454,6 +454,7 @@ export const RU: Messages = {
 		developerDiagnosticsName: "Диагностика для разработчиков",
 		developerDiagnosticsDesc: "Значок в панели доски показывает, что плагин не смог сделать так, как его просили.",
 		currently: (formattedValue: string) => `Сейчас: ${formattedValue}.`,
+		sentenceGap: " ",
 	},
 	toolbar: {
 		ariaLabel: "Форматирование выделенного",

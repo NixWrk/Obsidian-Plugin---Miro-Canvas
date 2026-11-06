@@ -476,7 +476,9 @@ export async function createWelcomeSamples(host: WelcomeBoardHost): Promise<Welc
 	await createSampleFile(host, paths.picture, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_PNG_BASE64)));
 	await createSampleFile(host, paths.pdf, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_PDF_BASE64)));
 	await createSampleFile(host, paths.docx, (path) => host.app.vault.createBinary(path, sampleBytes(WELCOME_SAMPLE_DOCX_BASE64)));
-	const exports = WELCOME_EXPORTS[currentLocale()];
+	const locale = currentLocale();
+	// The sample exports exist in English and Russian; Chinese shows the English ones.
+	const exports = WELCOME_EXPORTS[locale === "zh" ? "en" : locale];
 	await createSampleFile(host, paths.exportPdf, (path) => host.app.vault.createBinary(path, sampleBytes(exports.pdf)));
 	await createSampleFile(host, paths.exportPptx, (path) => host.app.vault.createBinary(path, sampleBytes(exports.pptx)));
 	return paths;

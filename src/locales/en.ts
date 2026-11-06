@@ -457,6 +457,7 @@ export const EN = {
 		developerDiagnosticsName: "Developer diagnostics",
 		developerDiagnosticsDesc: "For developers: a warning badge in the corner dock lists what the plugin could not do as asked.",
 		currently: (formattedValue: string) => `Currently ${formattedValue}.`,
+		sentenceGap: " ",
 	},
 	/** The floating formatting toolbar over a selection (selection-toolbar.ts). */
 	toolbar: {
