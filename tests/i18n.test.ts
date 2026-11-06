@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { currentLocale, localeFor, setLocale, words } from "../src/i18n";
 import { EN } from "../src/locales/en";
 import { RU } from "../src/locales/ru";
+import { ZH } from "../src/locales/zh";
 
 /**
  * Strings that stay the same in Russian: names of products and formats.
@@ -30,6 +31,9 @@ const SAME_IN_RUSSIAN = new Set<string>([
   // The search counter, "3 / 12": numbers only.
   "search.count",
 ]);
+
+/** Product names and short labels Chinese keeps as they are, beside the Russian list. */
+const SAME_IN_CHINESE = new Set<string>([...SAME_IN_RUSSIAN, "dock.themeSystem"]);
 
 type Table = { readonly [key: string]: unknown };
 
@@ -62,6 +66,13 @@ describe("the plugin's language", () => {
 		expect(localeFor("en-GB")).toBe("en");
 		expect(localeFor("de")).toBe("en");
 		expect(localeFor("rus")).toBe("en");
+		expect(localeFor("zh")).toBe("zh");
+		expect(localeFor("zh-CN")).toBe("zh");
+		expect(localeFor("zh-Hans-CN")).toBe("zh");
+		expect(localeFor("zh-TW")).toBe("en");
+		expect(localeFor("zh-HK")).toBe("en");
+		expect(localeFor("zh-Hant")).toBe("en");
+		expect(localeFor("zhx")).toBe("en");
 		expect(localeFor(null)).toBe("en");
 		expect(localeFor(undefined)).toBe("en");
 	});
@@ -83,6 +94,25 @@ describe("the plugin's language", () => {
 			expect(typeof other, path).toBe(typeof value);
 			if (typeof value === "function") expect((other as (...args: unknown[]) => unknown).length, path).toBe(value.length);
 		}
+	});
+
+	it("has every English string in Chinese, of the same kind", () => {
+		const english = leaves(EN);
+		const chinese = leaves(ZH as unknown as Table);
+		expect([...chinese.keys()].sort()).toEqual([...english.keys()].sort());
+		for (const [path, value] of english) {
+			const other = chinese.get(path);
+			expect(typeof other, path).toBe(typeof value);
+			if (typeof value === "function") expect((other as (...args: unknown[]) => unknown).length, path).toBe(value.length);
+		}
+	});
+
+	it("leaves no English string untranslated in Chinese", () => {
+		const english = leaves(EN);
+		const untranslated = [...leaves(ZH as unknown as Table)]
+			.filter(([path, value]) => !SAME_IN_CHINESE.has(path) && sample(value) === sample(english.get(path)))
+			.map(([path]) => path);
+		expect(untranslated).toEqual([]);
 	});
 
 	it("leaves no English string untranslated in Russian", () => {

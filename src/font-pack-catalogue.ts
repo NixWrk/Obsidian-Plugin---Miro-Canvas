@@ -12,8 +12,8 @@ export interface FontPackCatalogueEntry {
   readonly file: string;
   readonly bytes: number;
   readonly sha256: string;
-  readonly title: Readonly<Record<"en" | "ru", string>>;
-  readonly description: Readonly<Record<"en" | "ru", string>>;
+  readonly title: Readonly<Record<"en" | "ru" | "zh", string>>;
+  readonly description: Readonly<Record<"en" | "ru" | "zh", string>>;
 }
 
 export const FONT_PACK_CATALOGUE: readonly FontPackCatalogueEntry[] = Object.freeze([
@@ -22,31 +22,31 @@ export const FONT_PACK_CATALOGUE: readonly FontPackCatalogueEntry[] = Object.fre
     file: "fonts-miro.zip",
     bytes: 7770638,
     sha256: "1a5d605b54ec6e1e58130bc83a9da4d6fcfd60194f0ff440804c4fe50f6e4b89",
-    title: Object.freeze({ en: "Miro", ru: "Miro" }),
-    description: Object.freeze({ en: "The open fonts of Miro's list, Latin and Cyrillic.", ru: "Открытые шрифты из списка Miro, латиница и кириллица." }),
+    title: Object.freeze({ en: "Miro", ru: "Miro", zh: "Miro" }),
+    description: Object.freeze({ en: "The open fonts of Miro's list, Latin and Cyrillic.", ru: "Открытые шрифты из списка Miro, латиница и кириллица.", zh: "Miro 字体列表中的开源字体，包含拉丁字母和西里尔字母。" }),
   }),
   Object.freeze({
     id: "miro-cjk",
     file: "fonts-miro-cjk.zip",
     bytes: 62259152,
     sha256: "e74523bcf6af63eaa2aa0556c1f11192996f1d8d68add23bd2575a8b67487171",
-    title: Object.freeze({ en: "Miro: Japanese and Korean", ru: "Miro: японский и корейский" }),
-    description: Object.freeze({ en: "Miro's Japanese and Korean fonts. Large: add it only if your boards use them.", ru: "Японские и корейские шрифты Miro. Большой набор: добавляйте, только если они есть на ваших досках." }),
+    title: Object.freeze({ en: "Miro: Japanese and Korean", ru: "Miro: японский и корейский", zh: "Miro：日文和韩文" }),
+    description: Object.freeze({ en: "Miro's Japanese and Korean fonts. Large: add it only if your boards use them.", ru: "Японские и корейские шрифты Miro. Большой набор: добавляйте, только если они есть на ваших досках.", zh: "Miro 的日文和韩文字体。体积较大，白板用到时再添加。" }),
   }),
   Object.freeze({
     id: "word",
     file: "fonts-word.zip",
     bytes: 2888280,
     sha256: "7b782dc60c8e599842145eb76cf6a8715b79dce15909f8ce8fa77d78a0a4c8ef",
-    title: Object.freeze({ en: "Word", ru: "Word" }),
-    description: Object.freeze({ en: "Open fonts drawn to the metrics of Word's Calibri, Cambria, Arial, Times New Roman, Courier New and Georgia, found under those names wherever the originals are missing.", ru: "Открытые шрифты с метриками Calibri, Cambria, Arial, Times New Roman, Courier New и Georgia из Word; подставляются под этими именами там, где оригиналов нет." }),
+    title: Object.freeze({ en: "Word", ru: "Word", zh: "Word" }),
+    description: Object.freeze({ en: "Open fonts drawn to the metrics of Word's Calibri, Cambria, Arial, Times New Roman, Courier New and Georgia, found under those names wherever the originals are missing.", ru: "Открытые шрифты с метриками Calibri, Cambria, Arial, Times New Roman, Courier New и Georgia из Word; подставляются под этими именами там, где оригиналов нет.", zh: "按 Word 的 Calibri、Cambria、Arial、Times New Roman、Courier New 和 Georgia 字体度量绘制的开源字体，原字体缺失时以同名替代。" }),
   }),
   Object.freeze({
     id: "excalidraw",
     file: "fonts-excalidraw.zip",
     bytes: 863749,
     sha256: "cd7be6e39de8572e3c74c16ce6205051a4aea2404e115590b4faf010c864ea7c",
-    title: Object.freeze({ en: "Excalidraw", ru: "Excalidraw" }),
-    description: Object.freeze({ en: "The fonts Excalidraw draws with: Excalifont, Virgil, Nunito, Lilita One, Comic Shanns, Cascadia Code and Liberation Sans.", ru: "Шрифты, которыми рисует Excalidraw: Excalifont, Virgil, Nunito, Lilita One, Comic Shanns, Cascadia Code и Liberation Sans." }),
+    title: Object.freeze({ en: "Excalidraw", ru: "Excalidraw", zh: "Excalidraw" }),
+    description: Object.freeze({ en: "The fonts Excalidraw draws with: Excalifont, Virgil, Nunito, Lilita One, Comic Shanns, Cascadia Code and Liberation Sans.", ru: "Шрифты, которыми рисует Excalidraw: Excalifont, Virgil, Nunito, Lilita One, Comic Shanns, Cascadia Code и Liberation Sans.", zh: "Excalidraw 绘制时使用的字体：Excalifont、Virgil、Nunito、Lilita One、Comic Shanns、Cascadia Code 和 Liberation Sans。" }),
   })
 ]);
