@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the comment thread colour swatch round instead of an oval.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.

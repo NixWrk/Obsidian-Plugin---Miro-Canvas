@@ -3593,6 +3593,16 @@
   border-radius: 50%;
   cursor: pointer;
 }
+
+/* Obsidian pads the swatch wrapper but keeps the swatch's full height, which
+   squeezes the colour into an oval. Same doubled selector, for the same reason. */
+.miro-canvas-thread input.miro-canvas-thread__color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.miro-canvas-thread input.miro-canvas-thread__color::-webkit-color-swatch {
+  border-radius: 50%;
+}
 .miro-canvas-thread {
   border-left: 3px solid var(--miro-thread-color, var(--background-modifier-border));
 }
