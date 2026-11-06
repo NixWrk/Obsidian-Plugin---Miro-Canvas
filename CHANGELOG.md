@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Give the comment thread reply input horizontal padding so its text no longer touches the focus outline and lines up with the author name.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.
