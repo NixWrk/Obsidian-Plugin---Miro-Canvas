@@ -339,12 +339,13 @@ drag to move it; this works with an open panel too. Positions and folded
 states are remembered separately for computers, tablets and phones.
 On narrow screens, an open bar wraps towards the available space while its fold button stays in place.
 
-In plugin settings, you can hide each panel’s fold button; it remains
-available while arranging panels. In that mode, open “+” and drag a spare
+In plugin settings, you can hide each panel’s fold button; while arranging
+panels it stands beside the panel, with the drag grip and the turn button, so
+the panel keeps its size. In that mode, open “+” and drag a spare
 tool onto the main row: the insertion line shows where it will land.
 
 The button stays at the edge of its panel, clear of the tools. On a computer,
-an open panel shows it only in **Arrange panels** mode.
+an open panel offers it only in **Arrange panels** mode, beside the panel.
 
 <details>
 <summary>Fold repeatedly and move an open or folded panel</summary>

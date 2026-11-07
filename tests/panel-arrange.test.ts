@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 
-import { arrangeTrayPlacement, dropIndexFromPointer, PanelArrangeMode, pressIsOutside, rectContainsPoint, type PanelArrangeHost } from "../src/panel-arrange";
+import { arrangeHandlePlacement, arrangeTrayPlacement, dropIndexFromPointer, PanelArrangeMode, pressIsOutside, rectContainsPoint, type PanelArrangeHost } from "../src/panel-arrange";
 import type { PanelId, PanelPosition } from "../src/panel-layout";
 import type { ToolbarItem } from "../src/quick-tools";
 
@@ -443,6 +443,134 @@ describe("PanelArrangeMode: dragging a panel", () => {
     expect(saved.orientation).toBe("vertical");
     expect(saved.anchor).not.toBe("left-middle");
     expect(saved.anchor).not.toBe("right-middle");
+  });
+});
+
+describe("PanelArrangeMode: a drag keeps the bar's shape and the board's view", () => {
+  it("does not turn an unturned bar when it is dropped in a side's zone", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    rig.document.dispatch("pointerdown", pointerEvent(rig.dockBar, rig.dockBar.rect.left + 5, rig.dockBar.rect.top + 5));
+    rig.document.dispatch("pointerup", pointerEvent(rig.dockBar, 60, 400));
+    const saved = rig.savedPositions[0]!.position;
+    expect(saved.anchor).toBe("left-middle");
+    expect(saved.orientation).toBe("horizontal");
+  });
+
+  it("keeps a bar that stands in a column by the old side rule a column", () => {
+    const rig = buildRig();
+    rig.positions.dockBar = { anchor: "left-middle", dx: 12, dy: 0 };
+    rig.mode.enter();
+    rig.document.dispatch("pointerdown", pointerEvent(rig.dockBar, rig.dockBar.rect.left + 5, rig.dockBar.rect.top + 5));
+    rig.document.dispatch("pointerup", pointerEvent(rig.dockBar, 600, 790));
+    expect(rig.savedPositions[0]!.position.orientation).toBe("vertical");
+  });
+
+  it("gives the minimap no orientation of its own", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    rig.document.dispatch("pointerdown", pointerEvent(rig.minimap, rig.minimap.rect.left + 5, rig.minimap.rect.top + 5));
+    rig.document.dispatch("pointerup", pointerEvent(rig.minimap, 60, 400));
+    expect(rig.savedPositions[0]!.position.orientation).toBeUndefined();
+  });
+
+  it("saves nothing and reports no drag once the pointer is cancelled", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    rig.document.dispatch("pointerdown", pointerEvent(rig.dockBar, rig.dockBar.rect.left + 5, rig.dockBar.rect.top + 5));
+    expect(rig.mode.dragging).toBe(true);
+    rig.document.dispatch("pointercancel", pointerEvent(rig.dockBar, 60, 400));
+    expect(rig.mode.dragging).toBe(false);
+    rig.document.dispatch("pointerup", pointerEvent(rig.dockBar, 60, 400));
+    expect(rig.savedPositions).toHaveLength(0);
+  });
+
+  it("offers its own fold button only for a bar showing none, and folds on its click, not its press", () => {
+    const rig = buildRig();
+    const toggleFold = vi.fn();
+    const own = { hidden: true };
+    (rig.toolbar as unknown as { querySelector: () => unknown }).querySelector = () => own;
+    const mode = new PanelArrangeMode({ ...rig.host, toggleFold });
+    mode.enter();
+    const handle = rig.toolbar.children.find((child) => child.className === "miro-canvas-arrange-handle")!;
+    const fold = handle.children.find((child) => child.className.includes("miro-canvas-arrange-fold"))!;
+    expect((fold as unknown as { hidden: boolean }).hidden).toBe(false);
+    rig.document.dispatch("pointerdown", pointerEvent(fold, 5, 5));
+    expect(mode.dragging).toBe(false);
+    expect(toggleFold).not.toHaveBeenCalled();
+    fold.dispatch("click", {});
+    expect(toggleFold).toHaveBeenCalledWith("toolbar");
+    own.hidden = false;
+    mode.refresh();
+    expect((fold as unknown as { hidden: boolean }).hidden).toBe(true);
+    mode.exit();
+  });
+
+  it("tells the host when the mode's chrome comes and goes, so the bars can be placed again", () => {
+    const rig = buildRig();
+    const onEnter = vi.fn();
+    const mode = new PanelArrangeMode({ ...rig.host, onEnter });
+    mode.enter();
+    expect(onEnter).toHaveBeenCalledTimes(1);
+    expect(rig.onExit).not.toHaveBeenCalled();
+    mode.exit();
+    expect(rig.onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves no handle or mark on a panel when the board goes away, and does not call onExit", () => {
+    const rig = buildRig();
+    rig.mode.enter();
+    rig.mode.dispose();
+    expect(rig.toolbar.getAttribute("data-miro-canvas-arrange")).toBeNull();
+    expect(rig.onExit).not.toHaveBeenCalled();
+  });
+});
+
+describe("a panel's handle stays beside its own panel", () => {
+  const bounds = { left: 352, top: 140, width: 1040, height: 752 };
+  const handle = { width: 100, height: 44 };
+  const dock = { left: 1061, top: 826, width: 327, height: 52 };
+  const map = { left: 1160, top: 674, width: 228, height: 154 };
+
+  it("stands above the panel when nothing is in the way", () => {
+    expect(arrangeHandlePlacement(dock, handle, bounds, [], false)).toEqual({ left: 1061, top: 774 });
+  });
+
+  it("lines up with the panel's right end when asked", () => {
+    expect(arrangeHandlePlacement(dock, handle, bounds, [], true)).toEqual({ left: 1288, top: 774 });
+  });
+
+  it("slides along the panel past a neighbour instead of hopping over it", () => {
+    const placed = arrangeHandlePlacement(dock, handle, bounds, [map], false);
+    expect(placed).toEqual({ left: 1052, top: 774 });
+  });
+
+  it("goes below a panel at the top of the view", () => {
+    const top = { left: 600, top: 150, width: 300, height: 40 };
+    expect(arrangeHandlePlacement(top, handle, bounds, [], false)).toEqual({ left: 600, top: 198 });
+  });
+
+  it("keeps clear of a handle already placed", () => {
+    const first = { left: 1061, top: 774, width: 100, height: 44 };
+    const placed = arrangeHandlePlacement(dock, handle, bounds, [first], false);
+    expect(placed.left).toBeGreaterThanOrEqual(1169);
+    expect(placed.top).toBe(774);
+  });
+
+  it("squeezes in beside its panel before giving up on a tight corner", () => {
+    const wide = { width: 156, height: 44 };
+    const toolbar = { left: 643, top: 842, width: 459, height: 42 };
+    const narrowDock = { left: 1117, top: 848, width: 271, height: 30 };
+    const placed = arrangeHandlePlacement(narrowDock, wide, bounds, [map, toolbar], false);
+    expect(placed).toEqual({ left: 996, top: 796 });
+  });
+
+  it("stays inside the view when no spot is free", () => {
+    const tight = { left: 0, top: 0, width: 120, height: 60 };
+    const panel = { left: 0, top: 0, width: 120, height: 60 };
+    const placed = arrangeHandlePlacement(panel, handle, tight, [], false);
+    expect(placed.left).toBeGreaterThanOrEqual(0);
+    expect(placed.top + handle.height).toBeLessThanOrEqual(60);
   });
 });
 
