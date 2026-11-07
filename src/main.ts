@@ -1,7 +1,7 @@
 import { replaceInvalidFilenameCharacters } from "./control-characters";
 import { createHtmlElement } from "./dom-elements";
 import * as obsidian from "obsidian";
-import { Component, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, Setting, TFile, getLanguage, normalizePath, parseYaml, stringifyYaml, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
+import { Component, MarkdownRenderChild, MarkdownRenderer, Menu, Modal, Notice, Platform, Plugin, Scope, Setting, TFile, getLanguage, normalizePath, parseYaml, stringifyYaml, requestUrl, setIcon, type Events, type WorkspaceLeaf } from "obsidian";
 
 import { DEFAULT_FONT_FAMILY, OFFERED_FONT_FAMILIES, normalizeFontFamily, defaultPalette } from "./appearance";
 import {
@@ -154,6 +154,8 @@ export default class MiroCanvasPlugin extends Plugin {
   /** What the session now standing was built for, to tell a board still on screen from another; see `board-binding.ts`. */
   private currentCanvasBinding: BoardBinding | null = null;
   private m1Session: M1CanvasSession | null = null;
+  /** Stands above the Canvas view's keys, as a modal's does, and lets the app's hotkeys through. */
+  private textFieldScope: Scope | undefined;
   private boardIndex: ObsidianBoardIndex | undefined;
   private outgoingLinks: CanvasOutgoingLinks | undefined;
   private backlinks: CanvasBacklinks | undefined;
@@ -617,6 +619,7 @@ export default class MiroCanvasPlugin extends Plugin {
     const indexedFile = (view as { file?: unknown }).file;
     this.m1Session = new M1CanvasSession(view, this.metadataWriter, {
       onRegisterSnippetScope: (scope) => this.canvasSnippets?.register(scope) ?? (() => undefined),
+      onTextFieldFocus: (focused) => this.holdCanvasKeys(focused),
       onCommittedBoardDocument: (document, identity) => {
         if (this.currentCanvasView !== view || !(indexedFile instanceof TFile) || (view as { file?: unknown }).file !== indexedFile) return;
         this.boardIndex?.ingestLiveDocument(indexedFile, document, { owner: view, identity });
@@ -1775,6 +1778,13 @@ export default class MiroCanvasPlugin extends Plugin {
       await Promise.resolve();
       if (!this.shellDisposed) await this.boardIndex?.flush();
     }).catch(() => { receipt.error = "rename-work-failed"; });
+  }
+
+  /** Keep native Canvas's arrows, select-all and undo out of a field of the board's panels. */
+  private holdCanvasKeys(held: boolean): void {
+    this.textFieldScope ??= new Scope(this.app.scope);
+    if (held) this.app.keymap.pushScope(this.textFieldScope);
+    else this.app.keymap.popScope(this.textFieldScope);
   }
 
   private renameViewBusy(view: unknown): boolean {
