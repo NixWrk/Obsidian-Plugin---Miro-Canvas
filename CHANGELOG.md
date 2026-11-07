@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Make the comment card's reply field multi-line: long text wraps, the field grows to six lines and then scrolls, Enter sends, Shift+Enter breaks the line, and an Enter that confirms an input method's word never sends. It keeps a text field's hover and focus outline.
+- Let a comment's messages be selected and copied.
+- Answer one message of a comment thread: a reply button on each message, a "Replying to" line above the field, and the quoted message above the sent reply. The reply stores the message's ID in `replyTo` and the thread stays a flat list.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.
