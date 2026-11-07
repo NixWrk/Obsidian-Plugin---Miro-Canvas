@@ -4278,10 +4278,11 @@ export class M1CanvasSession {
 		if (this.commentCard === undefined) {
 			const card = new CommentThreadCard(document, {
 				// A locked thread takes no replies, renames, resolving or deleting.
-				onReply: (id, text, name) => {
+				onReply: (id, text, name, replyTo) => {
 					if (this.commentLocked(id, "local")) return;
 					const author = { name: name?.trim() || this.commentAuthor().name };
-					this.mutateComment("reply-comment", (draft) => addReply(draft, id, text, { author }));
+					const input = replyTo === undefined ? text : { text, replyTo };
+					this.mutateComment("reply-comment", (draft) => addReply(draft, id, input, { author }));
 				},
 				onRenameAuthor: (id, messageId, name, origin) => {
 					if (this.commentLocked(id, origin ?? "local")) return;

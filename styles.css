@@ -3686,10 +3686,75 @@
   font-size: var(--font-ui-smaller);
 }
 
+/* Obsidian's body turns selection off; a message is there to be read and copied. */
 .miro-canvas-thread__text {
   margin: 4px 0 0 28px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  cursor: text;
+  user-select: text;
+}
+
+/* The message a reply answers, and the same pair above the field while replying. */
+.miro-canvas-thread__quote {
+  margin: 4px 0 0 28px;
+  padding: 2px 0 2px 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  border-left: 2px solid var(--background-modifier-border);
+}
+
+.miro-canvas-thread__quote-author {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.miro-canvas-thread__quote-text {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.miro-canvas-thread__reply-target {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  border-left: 2px solid var(--miro-thread-color, var(--background-modifier-border));
+}
+
+/* Obsidian shows a control's name as a tooltip; a plain × explains itself. */
+.miro-canvas-thread__reply-target .miro-canvas-thread__icon {
+  --no-tooltip: true;
+}
+
+.miro-canvas-thread__reply-target-words {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Shown on the message under the pointer; a touch screen has no pointer to hover. */
+.miro-canvas-thread .miro-canvas-thread__reply-to {
+  opacity: 0;
+}
+
+.miro-canvas-thread__message:hover .miro-canvas-thread__reply-to,
+.miro-canvas-thread .miro-canvas-thread__reply-to:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .miro-canvas-thread .miro-canvas-thread__reply-to {
+    opacity: 1;
+  }
 }
 
 .miro-canvas-thread__note {
@@ -3701,6 +3766,7 @@
 }
 
 .miro-canvas-thread__note[hidden],
+.miro-canvas-thread__reply-target[hidden],
 .miro-canvas-thread__composer[hidden] {
   display: none;
 }
@@ -3708,7 +3774,7 @@
 .miro-canvas-thread__composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: end;
   gap: 4px;
   padding: 8px 8px 8px 14px;
   border-top: 1px solid var(--background-modifier-border);
@@ -3741,13 +3807,34 @@
   border-color: var(--background-modifier-border);
 }
 
+/* The field is as tall as its text, up to six lines, then scrolls. */
 .miro-canvas-thread .miro-canvas-thread__input {
   flex: 1;
   min-width: 0;
-  padding: 0;
+  width: 100%;
+  min-height: 0;
+  max-height: calc(6lh + 10px);
+  padding: 4px 8px;
+  overflow-y: auto;
+  font: inherit;
+  overflow-wrap: anywhere;
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   box-shadow: none;
+  resize: none;
+  field-sizing: content;
+}
+
+/* Obsidian's own hover and focus rules for a textarea weigh less than the rule
+   above, where a text input's weigh more, so the field takes them back here. */
+.miro-canvas-thread .miro-canvas-thread__input:where(:not(:disabled)):hover {
+  background-color: var(--background-modifier-form-field-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.miro-canvas-thread .miro-canvas-thread__input:is(:active, :focus) {
+  border-color: var(--background-modifier-border-focus);
+  box-shadow: 0 0 0 var(--input-border-width-focus) var(--background-modifier-border-focus);
 }
 
 /* A converted comment node shows the same thread, statically. */

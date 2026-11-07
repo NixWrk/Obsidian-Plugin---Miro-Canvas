@@ -130,6 +130,93 @@ describe("comment thread card", () => {
     expect(changes[1]).toEqual(["l1", "local", { color: "#123456" }]);
   });
 
+  it("sends on Enter, keeps Shift+Enter and an input method's Enter in the field", () => {
+    const { card, root, calls } = setup();
+    card.show(LOCAL, { editable: true, authorName: "Alice" });
+    const field = root.byLabel("Reply");
+    expect(field.tagName).toBe("textarea");
+    field.value = "first\nsecond";
+    expect(field.fire("keydown", { key: "Enter", shiftKey: true }).prevented).toBe(false);
+    expect(field.fire("keydown", { key: "Enter", isComposing: true }).prevented).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(field.fire("keydown", { key: "Enter" }).prevented).toBe(true);
+    expect(calls.at(-1)).toEqual(["reply", "l1", "first\nsecond", "Alice"]);
+    expect(field.value).toBe("");
+    expect(field.fire("keydown", { key: "Enter" }).prevented).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("answers one chosen message, quoting it, and lets go of it", () => {
+    const { card, root, calls } = setup();
+    const thread: CommentThread = { ...LOCAL, replies: [
+      { id: "r1", text: "first reply", origin: "local", createdAt: "", author: { name: "Bob" } },
+      { id: "r2", text: "second reply", origin: "local", createdAt: "", author: { name: "Eve" }, replyTo: "r1" },
+      { id: "r3", text: "orphan", origin: "local", createdAt: "", replyTo: "gone" },
+    ] };
+    card.show(thread, { editable: true, authorName: "Alice" });
+    const field = root.byLabel("Reply");
+    const target = root.byClass("miro-canvas-thread__reply-target")[0]!;
+    expect(target.hidden).toBe(true);
+    const quotes = root.byClass("miro-canvas-thread__quote");
+    expect(quotes.map((quote) => quote.text())).toEqual(["Bobfirst reply", "Message deleted"]);
+
+    const buttons = root.byClass("miro-canvas-thread__reply-to");
+    expect(buttons).toHaveLength(4);
+    buttons[1]!.fire("click");
+    expect(target.hidden).toBe(false);
+    expect(target.text()).toContain("Replying to Bob");
+    expect(target.byLabel("Reply to the whole thread").tagName).toBe("button");
+    field.value = "to Bob";
+    field.fire("keydown", { key: "Enter" });
+    expect(calls.at(-1)).toEqual(["reply", "l1", "to Bob", "Alice", "r1"]);
+    expect(target.hidden).toBe(true);
+
+    buttons[1]!.fire("click");
+    expect(field.fire("keydown", { key: "Escape" }).stopped).toBe(true);
+    expect(target.hidden).toBe(true);
+    expect(calls.some((call) => call[0] === "close")).toBe(false);
+    field.value = "to all";
+    field.fire("keydown", { key: "Enter" });
+    expect(calls.at(-1)).toEqual(["reply", "l1", "to all", "Alice"]);
+
+    buttons[2]!.fire("click");
+    card.show({ ...thread, replies: thread.replies.filter((reply) => reply.id !== "r2") }, { editable: true });
+    expect(target.hidden).toBe(true);
+  });
+
+  it("scrolls to a reply just sent, and only then", () => {
+    const { card, root } = setup();
+    card.show(LOCAL, { editable: true });
+    const list = root.byClass("miro-canvas-thread__messages")[0]! as FakeElement & { scrollTop?: number; scrollHeight?: number };
+    list.scrollHeight = 900;
+    const field = root.byLabel("Reply");
+    field.value = "sent";
+    field.fire("keydown", { key: "Enter" });
+    const sent = { id: "r9", text: "sent", origin: "local" as const, createdAt: "" };
+    card.show({ ...LOCAL, replies: [...LOCAL.replies, sent] }, { editable: true });
+    expect(list.scrollTop).toBe(900);
+    list.scrollTop = 0;
+    card.show({ ...LOCAL, replies: [...LOCAL.replies, sent, { ...sent, id: "r10" }] }, { editable: true });
+    expect(list.scrollTop).toBe(0);
+  });
+
+  it("offers no message reply when the thread cannot be edited", () => {
+    const { card, root } = setup();
+    card.show(LOCAL, { editable: false });
+    expect(root.byClass("miro-canvas-thread__reply-to")).toHaveLength(0);
+  });
+
+  it("keeps a growing card inside the board", () => {
+    const { card, root } = setup();
+    card.show(LOCAL, { editable: true });
+    root.offsetHeight = 100;
+    card.place({ x: 10, y: 500 }, { width: 800, height: 600 });
+    expect(root.style.top).toBe("476px");
+    root.offsetHeight = 300;
+    root.byLabel("Reply").fire("input");
+    expect(root.style.top).toBe("292px");
+  });
+
   it("passes edited author names for new comments and replies, preserving reply drafts on refresh", () => {
     const { card, root, calls } = setup();
     const form = root.byClass("miro-canvas-thread__composer")[0]!;

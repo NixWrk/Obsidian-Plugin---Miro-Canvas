@@ -16,6 +16,7 @@ export interface ThreadMessage {
   readonly author: string;
   readonly text: string;
   readonly createdAt?: string;
+  readonly replyTo?: string;
 }
 
 const AVATAR_COLORS = ["#7b2fbe", "#2f5fd0", "#138a5b", "#d9601a", "#c6334a", "#11808f", "#8c4bd6", "#5b6472"] as const;
@@ -43,6 +44,7 @@ export function threadMessages(thread: CommentThread): readonly ThreadMessage[] 
     ...thread.replies.map((reply) => ({
       id: reply.id, author: commentAuthorLabel(reply), text: reply.text,
       ...(reply.createdAt ? { createdAt: reply.createdAt } : {}),
+      ...(typeof reply.replyTo === "string" ? { replyTo: reply.replyTo } : {}),
     })),
   ];
 }
@@ -82,7 +84,7 @@ export function shortTime(value: string | undefined, locale?: string): string {
 
 export interface CommentThreadCardHost {
   readonly onHideImported?: (threadId: string) => void;
-  readonly onReply: (threadId: string, text: string, authorName?: string) => void;
+  readonly onReply: (threadId: string, text: string, authorName?: string, replyTo?: string) => void;
   /** Rename a display author; a listed imported opening uses its first reply ID. */
   readonly onRenameAuthor?: (threadId: string, messageId: string, name: string, origin?: CommentOrigin) => void;
   readonly onDeleteReply?: (threadId: string, replyId: string) => void;
@@ -107,6 +109,16 @@ export interface CommentThreadCardOptions {
   readonly authorName?: string;
 }
 
+interface CardPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+interface CardArea {
+  readonly width: number;
+  readonly height: number;
+}
+
 export class CommentThreadCard {
   public readonly element: HTMLElement;
   private thread: CommentThread | undefined;
@@ -115,7 +127,7 @@ export class CommentThreadCard {
   private readonly help: HTMLElement;
   private readonly list: HTMLElement;
   private readonly composer: HTMLElement;
-  private readonly input: HTMLInputElement;
+  private readonly input: HTMLTextAreaElement;
   private readonly authorInput: HTMLInputElement;
   private focusedAuthor: HTMLInputElement | undefined;
   private messageGeneration = 0;
@@ -128,6 +140,12 @@ export class CommentThreadCard {
   private readonly colorInput: HTMLInputElement;
   private readonly lockButton: HTMLButtonElement;
   private composing = false;
+  private placement: { readonly point: CardPoint; readonly area: CardArea } | undefined;
+  private readonly replyTarget: HTMLElement;
+  private readonly replyTargetLabel: HTMLElement;
+  private readonly replyTargetText: HTMLElement;
+  private replyTargetId: string | undefined;
+  private showNewestMessage = false;
   private composingLocked = false;
 
   public constructor(private readonly document: Document, private readonly host: CommentThreadCardHost) {
@@ -206,24 +224,41 @@ export class CommentThreadCard {
     this.authorInput.type = "text";
     this.authorInput.placeholder = words().comments.thread.authorName;
     this.authorInput.setAttribute("aria-label", words().comments.thread.authorName);
-    this.input = this.composer.appendChild<HTMLInputElement>(this.make("input", "miro-canvas-thread__input"));
-    this.input.type = "text";
+    this.replyTarget = this.composer.appendChild(this.make("div", "miro-canvas-thread__reply-target"));
+    const replyTargetWords = this.replyTarget.appendChild(this.make("div", "miro-canvas-thread__reply-target-words"));
+    this.replyTargetLabel = replyTargetWords.appendChild(this.make("div", "miro-canvas-thread__quote-author"));
+    this.replyTargetText = replyTargetWords.appendChild(this.make("div", "miro-canvas-thread__quote-text"));
+    this.replyTarget.appendChild(this.button(words().comments.thread.cancelReplyTo, "miro-canvas-thread__icon", "x", "×"))
+      .addEventListener("click", () => {
+        this.chooseReplyTarget(undefined);
+        this.input.focus?.();
+      });
+    this.replyTarget.hidden = true;
+    this.input = this.composer.appendChild(this.make("textarea", "miro-canvas-thread__input"));
+    this.input.rows = 1;
     this.input.placeholder = words().comments.thread.replyPlaceholder;
     this.input.setAttribute("aria-label", words().comments.thread.replyAriaLabel);
     this.send = this.composer.appendChild(this.button(words().comments.thread.sendReply, "miro-canvas-thread__icon miro-canvas-thread__send", "send", "➤"));
     this.send.type = "submit";
     this.composer.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (this.composer.hidden || this.element.hidden) return;
-      const text = this.input.value.trim();
-      if (text.length === 0) return;
-      const name = this.authorInput.value.trim();
-      const author: [string?] = name ? [name] : [];
-      if (this.composing) this.host.onCreate?.(text, ...author, {color: this.colorInput.value, locked: this.composingLocked});
-      else if (this.thread !== undefined) this.host.onReply(this.thread.id, text, ...author);
-      else return;
-      this.input.value = "";
+      this.sendDraft();
     });
+    // Enter sends and Shift+Enter breaks the line. An Enter that picks a word
+    // in an input method belongs to the input method.
+    this.input.addEventListener("keydown", (event) => {
+      // Escape first lets go of the chosen message; the next one closes the card.
+      if (event.key === "Escape" && this.replyTargetId !== undefined) {
+        event.stopPropagation();
+        this.chooseReplyTarget(undefined);
+        return;
+      }
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+      event.preventDefault();
+      this.sendDraft();
+    });
+    // The field grows with its text, so a card near the board's edge moves to stay inside.
+    this.input.addEventListener("input", () => this.replace());
     // The board must not start a drag, select or take the keys typed here.
     for (const type of ["pointerdown", "mousedown", "dblclick", "wheel", "keydown", "keyup"]) {
       card.addEventListener(type, (event) => {
@@ -265,6 +300,7 @@ export class CommentThreadCard {
     this.composer.hidden = false;
     this.input.placeholder = words().comments.thread.addCommentPlaceholder;
     this.input.value = "";
+    this.chooseReplyTarget(undefined);
     while (this.list.firstChild !== null) this.list.removeChild(this.list.firstChild);
     this.list.hidden = true;
     this.input.focus?.();
@@ -329,14 +365,19 @@ export class CommentThreadCard {
       this.messageGeneration += 1;
       this.messageSignature = messageSignature;
       while (this.list.firstChild !== null) this.list.removeChild(this.list.firstChild);
-      for (const message of threadMessages(thread)) {
+      const messages = threadMessages(thread);
+      for (const message of messages) {
         const mutable = !local || message.id === thread.id || thread.replies.some((reply) =>
           reply.id === message.id && reply.origin === "local" && !reply.immutable);
-        this.list.appendChild(this.message(message, options.locale, authorEditable && mutable, canEdit && mutable && message.id !== thread.id));
+        this.list.appendChild(this.message(message, messages, options.locale, authorEditable && mutable, canEdit && mutable && message.id !== thread.id, canEdit));
       }
+      if (!messages.some((message) => message.id === this.replyTargetId)) this.chooseReplyTarget(undefined);
+      if (this.showNewestMessage) this.list.scrollTop = this.list.scrollHeight;
+      this.showNewestMessage = false;
     }
     if (changed) {
       this.input.value = "";
+      this.chooseReplyTarget(undefined);
       this.authorInput.value = options.authorName ?? "";
     }
   }
@@ -353,7 +394,8 @@ export class CommentThreadCard {
   }
 
   /** Places the card beside a pin, kept inside the given area. */
-  public place(point: { readonly x: number; readonly y: number }, area: { readonly width: number; readonly height: number }): void {
+  public place(point: CardPoint, area: CardArea): void {
+    this.placement = { point, area };
     const width = this.element.offsetWidth || 320;
     const height = this.element.offsetHeight || 200;
     const right = point.x + 24 + width <= area.width;
@@ -374,7 +416,7 @@ export class CommentThreadCard {
     this.helpButton.setAttribute("aria-expanded", shown ? "true" : "false");
   }
 
-  private message(message: ThreadMessage, locale: string | undefined, editable: boolean, deletable: boolean): HTMLElement {
+  private message(message: ThreadMessage, messages: readonly ThreadMessage[], locale: string | undefined, editable: boolean, deletable: boolean, replyable: boolean): HTMLElement {
     const item = this.make("div", "miro-canvas-thread__message");
     const head = item.appendChild(this.make("div", "miro-canvas-thread__byline"));
     const avatar = head.appendChild(this.make("span", "miro-canvas-thread__avatar", authorInitial(message.author)));
@@ -410,14 +452,66 @@ export class CommentThreadCard {
     } else head.appendChild(this.make("span", "miro-canvas-thread__author", message.author));
     const time = head.appendChild(this.make("time", "miro-canvas-thread__time", shortTime(message.createdAt, locale)));
     if (message.createdAt !== undefined) time.setAttribute("datetime", message.createdAt);
+    if (replyable) {
+      const reply = head.appendChild(this.button(words().comments.thread.replyToMessage, "miro-canvas-thread__icon miro-canvas-thread__reply-to", "reply", "↩"));
+      reply.addEventListener("click", () => {
+        this.chooseReplyTarget(message);
+        this.input.focus?.();
+      });
+    }
     if (deletable && this.host.onDeleteReply) {
       const remove = head.appendChild(this.button(words().comments.thread.deleteReply, "miro-canvas-thread__icon", "trash-2", "×"));
       remove.addEventListener("click", () => {
         if (this.thread && !this.thread.immutable && this.thread.locked !== true && this.thread.origin === "local") this.host.onDeleteReply?.(this.thread.id, message.id);
       });
     }
+    if (message.replyTo !== undefined) item.appendChild(this.quote(messages.find((other) => other.id === message.replyTo)));
     item.appendChild(this.make("div", "miro-canvas-thread__text", message.text));
     return item;
+  }
+
+  /** The message a reply answers, or a plain note when it has been deleted. */
+  private quote(quoted: ThreadMessage | undefined): HTMLElement {
+    const quote = this.make("div", "miro-canvas-thread__quote");
+    if (quoted === undefined) {
+      quote.appendChild(this.make("div", "miro-canvas-thread__quote-text", words().comments.thread.quotedMessageGone));
+      return quote;
+    }
+    quote.appendChild(this.make("div", "miro-canvas-thread__quote-author", quoted.author));
+    quote.appendChild(this.make("div", "miro-canvas-thread__quote-text", quoted.text));
+    return quote;
+  }
+
+  /** Shows above the field which message the next reply answers; nothing for the whole thread. */
+  private chooseReplyTarget(message: ThreadMessage | undefined): void {
+    this.replyTargetId = message?.id;
+    this.replyTarget.hidden = message === undefined;
+    this.replyTargetLabel.textContent = message === undefined ? "" : words().comments.thread.replyingTo(message.author);
+    this.replyTargetText.textContent = message?.text ?? "";
+    this.replace();
+  }
+
+  /** The card changed height, so it finds its place again. */
+  private replace(): void {
+    if (this.placement !== undefined) this.place(this.placement.point, this.placement.area);
+  }
+
+  private sendDraft(): void {
+    if (this.composer.hidden || this.element.hidden) return;
+    const text = this.input.value.trim();
+    if (text.length === 0) return;
+    const name = this.authorInput.value.trim();
+    const author: [string?] = name ? [name] : [];
+    if (this.composing) this.host.onCreate?.(text, ...author, {color: this.colorInput.value, locked: this.composingLocked});
+    else if (this.thread === undefined) return;
+    else {
+      // Sending refreshes the card at once, so the flag is up before the host is told.
+      this.showNewestMessage = true;
+      if (this.replyTargetId === undefined) this.host.onReply(this.thread.id, text, ...author);
+      else this.host.onReply(this.thread.id, text, author[0], this.replyTargetId);
+    }
+    this.input.value = "";
+    this.chooseReplyTarget(undefined);
   }
 
   private make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
