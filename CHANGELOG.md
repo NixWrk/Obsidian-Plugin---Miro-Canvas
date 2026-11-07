@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep native Canvas's arrow keys, select-all and undo out of the text areas in the board's panels: the arrows move the cursor instead of nudging the selection, and Cmd/Ctrl+A and Cmd/Ctrl+Z act on the text instead of the board.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.
