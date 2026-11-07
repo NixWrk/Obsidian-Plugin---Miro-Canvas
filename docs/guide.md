@@ -294,7 +294,9 @@ Set your name and author colours in settings. Imported Miro comments can
 be read and hidden. Comments are stored in the board file. The plugin itself
 does not send them to other people or provide a shared editing server.
 
-The **lock** protects an item from moves, resizing, edits and deletion.
+The **lock** protects an item from moves, resizing, edits and deletion. A
+locked video or audio card keeps its player's controls once selected; a click
+on the picture does nothing, as in review mode.
 **Review mode** in the board menu protects the whole board, while allowing
 navigation, links, copying and comments.
 
