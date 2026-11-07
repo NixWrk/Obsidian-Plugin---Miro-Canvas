@@ -154,6 +154,14 @@ describe("corner dock", () => {
     for (const name of ["view", "board", "diagnostics"]) expect(menu(root, name).hidden).toBe(true);
   });
 
+  it("opens the row's tooltips upwards, away from the window's edge", () => {
+    const { root } = build();
+    const bar = root.children[root.children.length - 1]!;
+    const buttons = descendants(bar).filter((item) => item.attributes.has("aria-label") && item !== bar);
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) expect(button.getAttribute("data-tooltip-position")).toBe("top");
+  });
+
   it("draws Obsidian icons through the host and falls back to glyphs", () => {
     const drawn: string[] = [];
     const { root } = build({ setIcon: (element, icon) => { drawn.push(icon); (element as unknown as FakeElement).textContent = ""; } });

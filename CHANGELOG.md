@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Open the dock's tooltips upwards so the window's edge cannot push them over the bar.
+- Stop panels showing their accessibility name as a tooltip, and theme segments repeating the words on them; the controls inside keep theirs.
+- Line settings section headings up with their rows instead of pressing them against the group's edge.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.

@@ -5141,6 +5141,13 @@
   display: none;
 }
 
+/* A section's heading is the first row of its group, while Obsidian spaces a
+   group's heading for a place above the group: here it lines up with the rows. */
+.miro-canvas-settings .setting-items > .setting-item-heading {
+  margin-bottom: 0;
+  padding: var(--size-4-4) var(--size-4-5) var(--size-4-3);
+}
+
 .miro-canvas-settings .miro-canvas-settings-jump select {
   max-width: 100%;
 }
@@ -5639,4 +5646,45 @@
 }
 .miro-canvas-root .miro-canvas-laser-pointer [hidden] {
   display: none;
+}
+
+/* A panel's aria-label names it for a screen reader; shown as Obsidian's
+   tooltip it only pops up and away as the pointer crosses the panel.  The
+   variable inherits, so everything inside takes it back: the controls keep
+   their tooltips.  :where() keeps that reset below the rules that silence
+   something on purpose, a nested panel among them.  A segment's label repeats
+   the words on it. */
+:where(
+  .miro-canvas-dock,
+  .miro-canvas-dock__bar,
+  .miro-canvas-dock__menu,
+  .miro-canvas-toolbar,
+  .miro-canvas-comment-markers,
+  .miro-canvas-thread,
+  .miro-canvas-search,
+  .miro-canvas-slideshow,
+  .miro-canvas-export,
+  .miro-canvas-arrange-tray,
+  .miro-canvas-property-results,
+  .miro-canvas-custom-style-editor,
+  .miro-canvas-palette-editor
+) * {
+  --no-tooltip: false;
+}
+
+.miro-canvas-dock,
+.miro-canvas-dock__bar,
+.miro-canvas-dock__menu,
+.miro-canvas-dock__segment,
+.miro-canvas-toolbar,
+.miro-canvas-comment-markers,
+.miro-canvas-thread,
+.miro-canvas-search,
+.miro-canvas-slideshow,
+.miro-canvas-export,
+.miro-canvas-arrange-tray,
+.miro-canvas-property-results,
+.miro-canvas-custom-style-editor,
+.miro-canvas-palette-editor {
+  --no-tooltip: true;
 }

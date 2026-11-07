@@ -234,6 +234,8 @@ function makeButton(document: Document, label: string, title: string, className 
 	button.type = "button";
 	// Obsidian renders a tooltip from aria-label; a title would duplicate it.
 	button.setAttribute("aria-label", title);
+	// The dock stands at the board's foot: below it, the window's edge pushes the tooltip back over the bar.
+	button.setAttribute("data-tooltip-position", "top");
 	button.setAttribute("data-tooltip-delay", BAR_TOOLTIP_DELAY);
 	return button;
 }
