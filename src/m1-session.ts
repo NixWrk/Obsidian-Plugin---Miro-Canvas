@@ -350,6 +350,9 @@ const RECTANGLE_EXEMPT_SELECTOR = ".canvas-node,.canvas-edge,.canvas-selection,.
 const SELECTION_FRAME_SELECTOR = ".miro-canvas-mixed-selection-frame, .canvas-selection, .canvas-node-resizer";
 /** A card, a native line or one of the board's own, which is selected when it carries one of the two classes below. */
 const SELECTABLE_SELECTOR = ".canvas-node, .canvas-edge, .miro-board-connector";
+const MEDIA_SELECTOR = "video, audio";
+/** What a player offers beyond its picture, by the roles any accessible player gives its controls. */
+const PLAYER_CONTROL_SELECTOR = "button, a, input, select, [role=slider], [role=button], [role=menu], [role=menuitem], [role=menuitemradio], [role=menuitemcheckbox]";
 const PANEL_SELECTOR = ".miro-canvas-shape-radius-handle, .miro-canvas-panel, .miro-canvas-dock, .miro-canvas-dock__map, .miro-canvas-thread, .miro-canvas-slideshow, .miro-canvas-toolbar,"
 	+ " .miro-canvas-comment-markers, .miro-canvas-handles, .miro-canvas-minimap, .miro-canvas-m2-tools, .miro-canvas-arrange-banner, .miro-canvas-arrange-tray,"
 	+ " .miro-canvas-export, .miro-canvas-export-page__tab, .miro-canvas-export-page__corner";
@@ -1706,6 +1709,10 @@ export class M1CanvasSession {
 	private refreshTimer: ReturnType<typeof setInterval> | undefined;
 	private spacePanHeld = false;
 	private pointerEditIds: readonly string[] | undefined;
+	/** A press went to a card's player, which keeps the moves until the release, wherever they land. */
+	private playerGesture = false;
+	/** The guards kept the last press from the board: nothing waits for its release, which a player's picture must not see either. */
+	private pressKept = false;
 	private nativeHistoryDepth = 0;
 	private boardCommitQueued = false;
 	/**
@@ -9980,6 +9987,46 @@ export class M1CanvasSession {
 	}
 
 	/**
+	 * The player under the event in a focused card that must not change: while
+	 * viewing, or locked.  A player of a card's own draws its controls in a
+	 * shadow root beside the media, which the board sees only as the root's
+	 * host: the event's path shows what is inside.  A bare media element keeps
+	 * its controls where no path reaches, so all of it counts as controls.
+	 */
+	private guardedPlayer(event: Event): { readonly element: HTMLElement; readonly control: boolean } | undefined {
+		const card = this.closestElementOf(event, ".canvas-node.is-focused");
+		if (card === undefined) return undefined;
+		const path = event.composedPath();
+		const inside = path.slice(0, path.indexOf(card));
+		const matching = (selector: string): boolean => inside.some((item) => isElement(item) && typeof item.matches === "function" && item.matches(selector));
+		const shadowed = inside.some((item) => readRuntime(item, "nodeType") === 11 && (item as ShadowRoot).querySelector(MEDIA_SELECTOR) !== null);
+		const bare = !shadowed && matching(MEDIA_SELECTOR);
+		const element = inside.filter(isElement).at(-1);
+		if ((!shadowed && !bare) || element === undefined) return undefined;
+		if (!this.isViewing()) {
+			const id = this.eventElementId(eventTarget(event));
+			if (id === undefined || decideInteraction(this.policy, { operation: "move", elementIds: [id] }).reason !== "element-locked") return undefined;
+		}
+		return { element, control: bare || matching(PLAYER_CONTROL_SELECTOR) };
+	}
+
+	/**
+	 * Whether a press belongs to the controls of a player on a card that must
+	 * not change.  On a locked card it stops inside the card, so that native
+	 * Canvas starts no drag; native readonly sees to that while viewing.  A
+	 * card free to move stays native Canvas's to drag.
+	 */
+	private takePlayerPress(event: Event): boolean {
+		const player = this.guardedPlayer(event);
+		if (player === undefined || !player.control) return false;
+		if (this.isViewing()) return true;
+		player.element.addEventListener(event.type, (bubbled) => {
+			if (bubbled === event) bubbled.stopPropagation();
+		}, { once: true });
+		return true;
+	}
+
+	/**
 	 * Whether a press lands on what is selected: the shared frame, native
 	 * Canvas's selection box, or a selected card or line of either kind.  (A
 	 * selected comment pin and the grips are under `PANEL_SELECTOR`.)
@@ -10141,13 +10188,17 @@ export class M1CanvasSession {
 		for (const type of ["pointerdown", "mousedown"]) {
 			listen(type, (event) => {
 				this.pointerEditIds = undefined;
+				this.pressKept = false;
+				this.playerGesture = this.takePlayerPress(event);
+				if (this.playerGesture) return;
 				// Native touch pans from cards; readonly and method guards still protect edits.
 				if (this.isViewing() && readRuntime(event, "pointerType") === "touch") return;
 				if (readRuntime(event, "button") === 1 || readRuntime(event, "button") === 2 || this.isSpacePanHeld()) return;
 				const id = this.eventElementId(eventTarget(event));
 				if (id === undefined && !this.closestTarget(event, ".canvas-node, .canvas-edge, .canvas-selection, .canvas-node-resizer")) return;
 				this.pointerEditIds = this.eventIds(event);
-				if (this.blockIfNeeded(event, "move", this.pointerEditIds) && id !== undefined) {
+				this.pressKept = this.blockIfNeeded(event, "move", this.pointerEditIds);
+				if (this.pressKept && id !== undefined) {
 					// Selection must remain possible for the explicit Unlock action,
 					// without handing the press to native drag/resize initialization.
 					const element = [...(this.adapter.getNodes() ?? []), ...(this.adapter.getEdges() ?? [])].find((item) => readCanvasElementId(item) === id);
@@ -10156,6 +10207,13 @@ export class M1CanvasSession {
 						this.readInteractionState();
 					}
 				}
+			});
+		}
+		// A player's picture plays and pauses on the release, not the press.  A
+		// press that was let through is someone's gesture, which needs its release.
+		for (const type of ["pointerup", "click"]) {
+			listen(type, (event) => {
+				if (this.pressKept && this.guardedPlayer(event) !== undefined) event.stopPropagation();
 			});
 		}
 		listen("pointerdown", (event) => this.grabConnectorLine(event));
@@ -10179,6 +10237,9 @@ export class M1CanvasSession {
 		this.listen(host, "pointercancel", () => this.handles.cancelGesture(), true);
 		for (const type of ["pointerup", "pointercancel", "mouseup"]) {
 			this.listen(host, type, clearGesture, true);
+			// Not on blur: a press on a player takes the focus from a card's
+			// editor, and that blur reaches the window.  The next press sets it anew.
+			this.listen(host, type, () => { this.playerGesture = false; }, true);
 		}
 		const window = readRuntime(ownerDocument(this.root), "defaultView");
 		if (isObject(window)) this.listen(window as unknown as EventTarget, "blur", () => {
@@ -10194,6 +10255,7 @@ export class M1CanvasSession {
 		listen("pointermove", (event) => {
 			// Do not block the native pan when its finger crosses another card.
 			if (this.isViewing() && readRuntime(event, "pointerType") === "touch") return;
+			if (this.playerGesture) return;
 			// A selection move was checked against the locks as it began.
 			if (this.selectionMoveEnd !== undefined) return;
 			const buttons = readRuntime(event, "buttons");
