@@ -36,6 +36,14 @@ describe("which board a session was built for", () => {
     expect(stillTheBoard(bindingOf(unfinished), unfinished, true)).toBe(false);
   });
 
+  it("does not, for a view moved to another window, which keeps the view and its runtime", () => {
+    const view = { ...board("Boards/Plan.canvas"), containerEl: { ownerDocument: {} } };
+    const bound = bindingOf(view);
+    expect(stillTheBoard(bound, view, true)).toBe(true);
+    view.containerEl = { ownerDocument: {} };
+    expect(stillTheBoard(bound, view, true)).toBe(false);
+  });
+
   it("does not, for another view, a session that is not ready, or none", () => {
     const view = board("Boards/Plan.canvas");
     expect(stillTheBoard(bindingOf(view), { ...view }, true)).toBe(false);

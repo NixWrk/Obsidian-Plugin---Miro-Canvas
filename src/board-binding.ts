@@ -11,29 +11,39 @@
  * on screen is left as it is.
  */
 
-/** What a session was built for: the Canvas view, the file it showed, and the runtime it reads and writes. */
+/** What a session was built for: the Canvas view, the file it showed, the runtime it reads and writes, and the window's document it lives in. */
 export interface BoardBinding {
   readonly view: unknown;
   readonly file: string | undefined;
   readonly runtime: unknown;
+  readonly document: unknown;
 }
 
 /** What a Canvas view stands for now. */
 export function bindingOf(view: unknown): BoardBinding {
-  const shown = view as { readonly file?: { readonly path?: unknown } | null; readonly canvas?: unknown } | null | undefined;
+  const shown = view as {
+    readonly file?: { readonly path?: unknown } | null;
+    readonly canvas?: unknown;
+    readonly containerEl?: { readonly ownerDocument?: unknown } | null;
+  } | null | undefined;
   const path = shown?.file?.path;
-  return { view, file: typeof path === "string" ? path : undefined, runtime: shown?.canvas };
+  return { view, file: typeof path === "string" ? path : undefined, runtime: shown?.canvas, document: shown?.containerEl?.ownerDocument };
 }
 
 /**
  * Whether a session built for `bound` still stands for `view`: it was built
  * for this very view, showing this very file, on this very runtime, and has
  * finished building.  Anything less - another file in the same view, a
- * runtime made anew, a view whose runtime is not there yet - is a board that
- * needs a session of its own.
+ * runtime made anew, a view whose runtime is not there yet, a view moved to
+ * another window, which keeps the view and leaves the session's listeners on
+ * the old document - is a board that needs a session of its own.
  */
 export function stillTheBoard(bound: BoardBinding | null, view: unknown, ready: boolean): boolean {
   if (bound === null || !ready) return false;
   const now = bindingOf(view);
-  return now.view === bound.view && now.runtime !== undefined && now.runtime === bound.runtime && now.file === bound.file;
+  return now.view === bound.view
+    && now.runtime !== undefined
+    && now.runtime === bound.runtime
+    && now.file === bound.file
+    && now.document === bound.document;
 }
