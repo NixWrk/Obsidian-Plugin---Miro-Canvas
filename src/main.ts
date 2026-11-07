@@ -535,7 +535,7 @@ export default class MiroCanvasPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on(
         "active-leaf-change",
-        this.handleActiveLeafChange
+        this.handleLeafActivated
       )
     );
     // A Canvas view can be reused for another file, or finish constructing its
@@ -573,6 +573,20 @@ export default class MiroCanvasPlugin extends Plugin {
     this.fontFaces.dispose();
     this.penTooltips.dispose();
   }
+
+  /**
+   * A press on a board's dock while another leaf has the focus activates the
+   * board's leaf too, on the way to the button.  Its session already stands:
+   * rebuilding it would take away the menu or the search bar that press opens.
+   */
+  private readonly handleLeafActivated = (leaf: WorkspaceLeaf | null): void => {
+    if (stillTheBoard(this.currentCanvasBinding, leaf?.view, this.m1Session?.status === "ready")) {
+      this.syncCanvasSnippetScopes();
+      this.settingsOfThisDevice();
+      return;
+    }
+    this.handleActiveLeafChange(leaf);
+  };
 
   private readonly handleActiveLeafChange = (
     leaf: WorkspaceLeaf | null,
