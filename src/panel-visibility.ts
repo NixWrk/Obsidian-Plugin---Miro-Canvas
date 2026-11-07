@@ -3,7 +3,17 @@ import { setElementStyles } from "./dom-styles";
 import { words } from "./i18n";
 import { applyPanelPositionSettled, effectivePanelOrientation, positionFromPoint, type PanelId, type PanelPosition } from "./panel-layout";
 
-type CollapsiblePanel = "toolbar" | "dockBar";
+export type CollapsiblePanel = "toolbar" | "dockBar";
+
+/** The size of a folded bar, and of its button. */
+const FOLDED_SIZE = 44;
+
+/** The square a bar folds into, in the corner its folded button keeps. */
+function foldedCorner(box: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }, right: boolean, bottom: boolean): { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number } {
+  const left = right ? box.right - FOLDED_SIZE : box.left;
+  const top = bottom ? box.bottom - FOLDED_SIZE : box.top;
+  return { left, top, right: left + FOLDED_SIZE, bottom: top + FOLDED_SIZE };
+}
 
 interface VisibilityHost {
   readonly document: Document;
@@ -44,48 +54,7 @@ export class PanelVisibility {
           suppressClick = false;
           return;
         }
-        const current = this.currentPosition(id, panel);
-        const board = this.host.boardRoot.getBoundingClientRect();
-        const pivot = button.getBoundingClientRect();
-        const style = this.host.document.defaultView?.getComputedStyle(this.host.boardRoot);
-        const foot = Math.max(0, Number.parseFloat(style?.getPropertyValue("--miro-canvas-host-foot") ?? "0") || 0);
-        const view = { width: board.width, height: Math.max(1, board.height - foot) };
-        const collapsed = current.collapsed !== true;
-        const right = panel.getAttribute("data-panel-button-right") === "true";
-        const bottom = panel.getAttribute("data-panel-button-bottom") === "true";
-        const bar = this.bar(id, panel);
-        bar?.style.removeProperty("max-height");
-        bar?.style.removeProperty("max-width");
-        bar?.style.removeProperty("overflow-y");
-        applyPanelPositionSettled(panel, { ...current, collapsed }, view);
-        this.placeButton(id, button, collapsed, { ...current, buttonRight: right, buttonBottom: bottom });
-        const size = panel.getBoundingClientRect();
-        const before = pivot.right - board.left;
-        const after = view.width - (pivot.left - board.left);
-        const buttonRight = collapsed ? right : size.width > after && before > after;
-        const above = pivot.bottom - board.top;
-        const below = view.height - (pivot.top - board.top);
-        const buttonBottom = collapsed ? bottom : size.height > below && above > below;
-        if (!collapsed && effectivePanelOrientation(current) === "vertical" && bar !== null) {
-          // A long column scrolls away from its pivot instead of moving the button.
-          bar.style.setProperty("max-height", `${Math.max(44, (buttonBottom ? above : below) - 2)}px`);
-          setElementStyles(bar, { "overflow-y": "auto" });
-        } else if (!collapsed && bar !== null) {
-          // Wrap towards the roomier side instead of moving the button on a phone.
-          bar.style.setProperty("max-width", `${Math.max(44, (buttonRight ? before : after) - 2)}px`);
-        }
-        this.placeButton(id, button, collapsed, { ...current, buttonRight, buttonBottom });
-        const panelBox = panel.getBoundingClientRect();
-        const placed = button.getBoundingClientRect();
-        const left = pivot.left - board.left - (placed.left - panelBox.left);
-        const top = pivot.top - board.top - (placed.top - panelBox.top);
-        const next: PanelPosition = {
-          ...positionFromPoint({ left, top }, view, panelBox, 0),
-          orientation: effectivePanelOrientation(current), collapsed, buttonRight, buttonBottom,
-        };
-        applyPanelPositionSettled(panel, next, view);
-        this.host.savePosition(id, next);
-        this.refresh();
+        this.toggle(id);
       };
       const down = (event: PointerEvent): void => {
         event.stopPropagation();
@@ -200,6 +169,65 @@ export class PanelVisibility {
     }
   }
 
+  /**
+   * Folds a bar, or opens it.  The point that stays put is the fold button,
+   * or, for a bar that shows no button while open (on a computer, or with
+   * the button turned off), the corner of the bar the folded button sits in.
+   */
+  public toggle(id: CollapsiblePanel): void {
+    const panel = this.host.panels()[id];
+    const button = this.buttons.get(id);
+    if (panel === undefined || button === undefined) return;
+    const current = this.currentPosition(id, panel);
+    const board = this.host.boardRoot.getBoundingClientRect();
+    const shownBefore = !button.hidden;
+    const right = shownBefore ? panel.getAttribute("data-panel-button-right") === "true" : current.buttonRight ?? current.anchor.includes("right");
+    const bottom = shownBefore ? panel.getAttribute("data-panel-button-bottom") === "true" : current.buttonBottom ?? current.anchor.includes("bottom");
+    const pivot = shownBefore ? button.getBoundingClientRect() : foldedCorner(panel.getBoundingClientRect(), right, bottom);
+    const style = this.host.document.defaultView?.getComputedStyle(this.host.boardRoot);
+    const foot = Math.max(0, Number.parseFloat(style?.getPropertyValue("--miro-canvas-host-foot") ?? "0") || 0);
+    const view = { width: board.width, height: Math.max(1, board.height - foot) };
+    const collapsed = current.collapsed !== true;
+    const bar = this.bar(id, panel);
+    bar?.style.removeProperty("max-height");
+    bar?.style.removeProperty("max-width");
+    bar?.style.removeProperty("overflow-y");
+    applyPanelPositionSettled(panel, { ...current, collapsed }, view);
+    this.placeButton(id, button, collapsed, { ...current, buttonRight: right, buttonBottom: bottom });
+    const shownAfter = !button.hidden;
+    const size = panel.getBoundingClientRect();
+    const before = pivot.right - board.left;
+    const after = view.width - (pivot.left - board.left);
+    const buttonRight = collapsed || !shownAfter ? right : size.width > after && before > after;
+    const above = pivot.bottom - board.top;
+    const below = view.height - (pivot.top - board.top);
+    const buttonBottom = collapsed || !shownAfter ? bottom : size.height > below && above > below;
+    if (!collapsed && shownAfter && effectivePanelOrientation(current) === "vertical" && bar !== null) {
+      // A long column scrolls away from its pivot instead of moving the button.
+      bar.style.setProperty("max-height", `${Math.max(44, (buttonBottom ? above : below) - 2)}px`);
+      setElementStyles(bar, { "overflow-y": "auto" });
+    } else if (!collapsed && shownAfter && bar !== null) {
+      // Wrap towards the roomier side instead of moving the button on a phone.
+      bar.style.setProperty("max-width", `${Math.max(44, (buttonRight ? before : after) - 2)}px`);
+    }
+    this.placeButton(id, button, collapsed, { ...current, buttonRight, buttonBottom });
+    const panelBox = panel.getBoundingClientRect();
+    const placed = button.getBoundingClientRect();
+    const left = shownAfter
+      ? pivot.left - board.left - (placed.left - panelBox.left)
+      : (right ? pivot.right - panelBox.width : pivot.left) - board.left;
+    const top = shownAfter
+      ? pivot.top - board.top - (placed.top - panelBox.top)
+      : (bottom ? pivot.bottom - panelBox.height : pivot.top) - board.top;
+    const next: PanelPosition = {
+      ...positionFromPoint({ left, top }, view, panelBox, 0),
+      orientation: effectivePanelOrientation(current), collapsed, buttonRight, buttonBottom,
+    };
+    applyPanelPositionSettled(panel, next, view);
+    this.host.savePosition(id, next);
+    this.refresh();
+  }
+
   public refresh(): void {
     const labels = words().arrange;
     for (const [id, button] of this.buttons) {
@@ -226,8 +254,10 @@ export class PanelVisibility {
     const panel = this.host.panels()[id];
     if (panel === undefined) return;
     const mobile = this.host.document.body?.classList?.contains("is-mobile") === true;
-    const arranging = this.host.boardRoot.querySelector?.(".miro-canvas-arrange-banner") != null;
-    button.hidden = !collapsed && !arranging && (!mobile || this.host.buttonHidden?.(id) === true);
+    // Arranging must not change this: a button that appeared in the bar would
+    // widen it, and the bar would be placed at a size it does not keep.  The
+    // mode offers its own fold button beside the panel instead.
+    button.hidden = !collapsed && (!mobile || this.host.buttonHidden?.(id) === true);
     const grouped = id === "toolbar" && !button.hidden;
     const reserve = button.hidden ? "0px" : grouped ? "100px" : "56px";
     const position = override ?? this.host.position(id);
@@ -249,10 +279,11 @@ export class PanelVisibility {
         setElementStyles(more, { "margin": "0" });
         setElementStyles(more, { "padding": "0" });
         setElementStyles(more, { "border": "0" });
-        more.style.setProperty("left", vertical ? "calc(50% - 20px)" : right ? "auto" : "52px");
+        // Centred on the fold button's own line, whatever size this device gives a tool.
+        more.style.setProperty("left", vertical ? "calc(50% - var(--miro-canvas-toolbar-size, 32px) / 2)" : right ? "auto" : "52px");
         more.style.setProperty("right", !vertical && right ? "52px" : "auto");
-        more.style.setProperty("top", bottom ? "auto" : vertical ? "52px" : "6px");
-        more.style.setProperty("bottom", bottom ? vertical ? "52px" : "6px" : "auto");
+        more.style.setProperty("top", bottom ? "auto" : vertical ? "52px" : "calc(26px - var(--miro-canvas-toolbar-size, 32px) / 2)");
+        more.style.setProperty("bottom", bottom ? vertical ? "52px" : "calc(26px - var(--miro-canvas-toolbar-size, 32px) / 2)" : "auto");
       }
     }
     if (bar !== null) {

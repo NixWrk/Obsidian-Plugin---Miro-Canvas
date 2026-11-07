@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PanelVisibility } from "../src/panel-visibility";
-import { normalizePanelPosition, type PanelPosition } from "../src/panel-layout";
+import { normalizePanelPosition, resolvePanelRect, type PanelPosition } from "../src/panel-layout";
 
 class ElementStub {
   children: ElementStub[] = [];
@@ -113,6 +113,42 @@ describe("panel buttons", () => {
     const rig = setup(false, true, true);
     expect((rig.button as any).hidden).toBe(true);
     expect(rig.bar.style.setProperty).toHaveBeenCalledWith("padding-top", "0px");
+    rig.visibility.dispose();
+  });
+
+  it("does not show a removed button while arranging either, so the bar keeps its size", () => {
+    const rig = setup(false, true, true);
+    rig.document.querySelector = () => ({}) as never;
+    rig.visibility.refresh();
+    expect((rig.button as any).hidden).toBe(true);
+    rig.visibility.dispose();
+  });
+
+  it("folds a bar showing no button from its own corner, not from the hidden button", () => {
+    const rig = setup(false, true, true);
+    const hiddenButton = rig.button as any;
+    hiddenButton.getBoundingClientRect = () => hiddenButton.hidden
+      ? { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }
+      : { left: 20, top: 100, right: 64, bottom: 144, width: 44, height: 44 };
+    rig.visibility.toggle("toolbar");
+    expect(rig.save).toHaveBeenCalledTimes(1);
+    const saved = rig.save.mock.calls[0]![1] as PanelPosition;
+    expect(saved.collapsed).toBe(true);
+    // The stub's panel starts at 20, 100; a hidden button's zero rect would give 0, 0.
+    expect(resolvePanelRect(saved, { width: 1000, height: 800 }, { width: 300, height: 500 })).toEqual({ left: 20, top: 100 });
+    rig.visibility.dispose();
+  });
+
+  it("opens a folded bar on a computer without measuring the button it hides", () => {
+    const rig = setup(true, true, true);
+    const button = rig.button as any;
+    button.getBoundingClientRect = () => button.hidden
+      ? { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }
+      : { left: 20, top: 100, right: 64, bottom: 144, width: 44, height: 44 };
+    rig.visibility.toggle("toolbar");
+    const saved = rig.save.mock.calls[0]![1] as PanelPosition;
+    expect(saved.collapsed).toBe(false);
+    expect(resolvePanelRect(saved, { width: 1000, height: 800 }, { width: 300, height: 500 })).toEqual({ left: 20, top: 100 });
     rig.visibility.dispose();
   });
 

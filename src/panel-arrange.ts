@@ -17,7 +17,7 @@ import { setElementStyles } from "./dom-styles";
  */
 
 import { words } from "./i18n";
-import { applyPanelPosition, applyPanelPositionSettled, flipPanelOrientation, positionFromPoint, type PanelId, type PanelPosition, type ViewBox, type ViewSize } from "./panel-layout";
+import { applyPanelPosition, applyPanelPositionSettled, effectivePanelOrientation, flipPanelOrientation, positionFromPoint, type PanelId, type PanelPosition, type ViewBox, type ViewSize } from "./panel-layout";
 import {
   ALL_TOOLBAR_ITEMS, barItemElements, moveToolbarItem, paintToolbarIcon, removeToolbarItem, toolbarItemLabel, type ToolbarItem,
 } from "./quick-tools";
@@ -38,9 +38,14 @@ export interface PanelArrangeHost {
   readonly savePanelPosition: (id: PanelId, position: PanelPosition) => void;
   readonly saveToolbarItems: (items: readonly ToolbarItem[]) => void;
   readonly resetLayout: () => void;
+  /** The mode's chrome is up and the bars have made room for their fold buttons: the host places the panels again. */
+  readonly onEnter?: () => void;
+  /** The mode's chrome is gone: the host puts the bars back to their everyday size and place. */
   readonly onExit: () => void;
   readonly refreshPanelButtons?: () => void;
   readonly closeToolChoices?: () => void;
+  /** Folds a bar from the mode's own button, shown when the bar shows no fold button of its own. */
+  readonly toggleFold?: (id: "toolbar" | "dockBar") => void;
 }
 
 /** Where the pointer sits relative to each candidate slot's midpoint decides the drop index - the usual drag-reorder rule. */
@@ -111,6 +116,58 @@ export function arrangeTrayPlacement(view: ViewBox, bar: ViewBox, tray: ViewSize
   };
 }
 
+/** The room kept between a panel's handle and whatever stands next to it. */
+const HANDLE_GAP = 8;
+/** What a handle settles for in a tight corner, rather than stand on a neighbour. */
+const HANDLE_TIGHT_GAP = 2;
+/** The tightest corner first: the tool bar has the room to slide out of the way of what is already placed. */
+const HANDLE_ORDER: readonly PanelId[] = ["dockBar", "minimap", "toolbar"];
+
+/**
+ * Where a panel's handle floats: touching its own panel, clear of the other
+ * panels and of the handles already placed.  Above the panel comes first,
+ * then below, sliding along the panel's edge to get past a neighbour, then
+ * beside it; only when none of those fits does it fall back to the plain
+ * place above or below, kept inside `bounds`.
+ */
+export function arrangeHandlePlacement(panel: ViewBox, handle: ViewSize, bounds: ViewBox, obstacles: readonly ViewBox[], alignRight: boolean): { readonly left: number; readonly top: number } {
+  const panelRight = panel.left + panel.width;
+  const panelBottom = panel.top + panel.height;
+  const boundsRight = bounds.left + bounds.width;
+  const boundsBottom = bounds.top + bounds.height;
+  const fits = (left: number, top: number, gap: number): boolean => {
+    if (left < bounds.left || top < bounds.top || left + handle.width > boundsRight || top + handle.height > boundsBottom) return false;
+    return obstacles.every((obstacle) => left >= obstacle.left + obstacle.width + gap
+      || left + handle.width + gap <= obstacle.left
+      || top >= obstacle.top + obstacle.height + gap
+      || top + handle.height + gap <= obstacle.top);
+  };
+  const atStart = panel.left;
+  const atEnd = panelRight - handle.width;
+  const above = panel.top - handle.height - HANDLE_GAP;
+  const below = panelBottom + HANDLE_GAP;
+  const slides = [alignRight ? atEnd : atStart, alignRight ? atStart : atEnd];
+  for (const obstacle of obstacles) {
+    slides.push(obstacle.left - handle.width - HANDLE_GAP, obstacle.left + obstacle.width + HANDLE_GAP);
+  }
+  const alongPanel = slides.filter((left) => left + handle.width > panel.left && left < panelRight);
+  for (const gap of [HANDLE_GAP, HANDLE_TIGHT_GAP]) {
+    for (const top of [above, below]) {
+      for (const left of alongPanel) {
+        if (fits(left, top, gap)) return { left, top };
+      }
+    }
+    for (const left of [panelRight + HANDLE_GAP, panel.left - handle.width - HANDLE_GAP]) {
+      for (const top of [panel.top, panelBottom - handle.height]) {
+        if (fits(left, top, gap)) return { left, top };
+      }
+    }
+  }
+  const plainLeft = Math.min(Math.max(alignRight ? atEnd : atStart, bounds.left), boundsRight - handle.width);
+  const plainTop = above >= bounds.top ? above : below;
+  return { left: plainLeft, top: Math.max(bounds.top, Math.min(plainTop, boundsBottom - handle.height)) };
+}
+
 /** Builds and owns the "arrange panels" mode's own DOM: the banner, the tray, and the panels' drag affordance. */
 export class PanelArrangeMode {
   private activeState = false;
@@ -122,6 +179,8 @@ export class PanelArrangeMode {
   private readonly panelHandles = new Map<PanelId, HTMLElement>();
   /** The tool bar's and the dock row's own flip button, by panel id - the minimap keeps no orientation of its own. */
   private readonly flipButtons = new Map<PanelId, HTMLElement>();
+  /** The same bars' fold button, standing in for one the bar does not show while open. */
+  private readonly foldButtons = new Map<PanelId, HTMLButtonElement>();
   private readonly documentListeners: Array<() => void> = [];
   private dragCleanup: (() => void) | undefined;
   private sizeObserver: ResizeObserver | undefined;
@@ -130,6 +189,11 @@ export class PanelArrangeMode {
 
   public get active(): boolean {
     return this.activeState;
+  }
+
+  /** A panel is under the pointer right now; whoever else places panels waits for the drop. */
+  public get dragging(): boolean {
+    return this.dragCleanup !== undefined;
   }
 
   /** The host moved its panels after a resize or a layout update. */
@@ -203,15 +267,17 @@ export class PanelArrangeMode {
       flip.type = "button";
       flip.className = "miro-canvas-arrange-flip";
       flip.setAttribute("aria-label", labels.turnPanel);
-      let drawn = false;
-      try {
-        this.host.setIcon?.(flip, "rotate-cw");
-        drawn = this.host.setIcon !== undefined;
-      } catch {
-        drawn = false;
-      }
-      if (!drawn) flip.textContent = "⟳";
+      this.drawIcon(flip, "rotate-cw", "⟳");
       this.flipButtons.set(id, flip);
+      if (this.host.toggleFold === undefined) continue;
+      const fold = handle.appendChild(createHtmlElement(document, "button"));
+      fold.type = "button";
+      fold.className = "miro-canvas-arrange-flip miro-canvas-arrange-fold";
+      fold.setAttribute("aria-label", id === "toolbar" ? labels.collapseTools : labels.collapseNavigation);
+      fold.hidden = true;
+      this.drawIcon(fold, "panel-left-close", "−");
+      fold.addEventListener("click", () => this.host.toggleFold?.(id));
+      this.foldButtons.set(id, fold);
     }
 
     this.listenDocument("pointerdown", this.onBoardPointerDown as EventListener, true);
@@ -226,10 +292,22 @@ export class PanelArrangeMode {
       if (toolbar !== undefined) this.sizeObserver.observe(toolbar);
       this.sizeObserver.observe(this.banner);
     }
+    this.host.onEnter?.();
   }
 
   public exit(): void {
     if (!this.activeState) return;
+    this.teardown();
+    this.host.onExit();
+  }
+
+  /** Board teardown: leaves no trace, without running `onExit`'s own board-facing cleanup twice. */
+  public dispose(): void {
+    if (!this.activeState) return;
+    this.teardown();
+  }
+
+  private teardown(): void {
     this.activeState = false;
     this.sizeObserver?.disconnect();
     this.sizeObserver = undefined;
@@ -244,22 +322,19 @@ export class PanelArrangeMode {
     for (const handle of this.handles.splice(0)) handle.remove();
     this.panelHandles.clear();
     this.flipButtons.clear();
+    this.foldButtons.clear();
     for (const remove of this.documentListeners.splice(0)) remove();
-    this.host.onExit();
   }
 
-  /** Board teardown: leaves no trace, without running `onExit`'s own board-facing cleanup twice. */
-  public dispose(): void {
-    if (!this.activeState) return;
-    this.activeState = false;
-    this.sizeObserver?.disconnect();
-    this.sizeObserver = undefined;
-    this.dragCleanup?.();
-    this.dragCleanup = undefined;
-    this.banner?.remove();
-    this.tray?.remove();
-    this.panelHandles.clear();
-    for (const remove of this.documentListeners.splice(0)) remove();
+  private drawIcon(button: HTMLElement, icon: string, fallback: string): void {
+    let drawn = false;
+    try {
+      this.host.setIcon?.(button, icon);
+      drawn = this.host.setIcon !== undefined;
+    } catch {
+      drawn = false;
+    }
+    if (!drawn) button.textContent = fallback;
   }
 
   private renderTray(): void {
@@ -289,8 +364,8 @@ export class PanelArrangeMode {
   }
 
   private placeTray(): void {
-    this.placeHandles();
     this.host.refreshPanelButtons?.();
+    this.placeHandles();
     const tray = this.tray;
     const toolbar = this.host.panels().toolbar;
     if (tray === undefined || toolbar === undefined) return;
@@ -299,13 +374,13 @@ export class PanelArrangeMode {
     const board = this.host.boardRoot.getBoundingClientRect();
     const bar = toolbar.getBoundingClientRect();
     const banner = this.banner?.getBoundingClientRect();
-    const style = this.host.document.defaultView?.getComputedStyle(this.host.boardRoot);
-    const foot = Math.max(0, Number.parseFloat(style?.getPropertyValue("--miro-canvas-host-foot") ?? "0") || 0);
+    const foot = this.hostFoot();
     const top = Math.max(8, (banner?.bottom ?? board.top) - board.top + 8);
     const view = { left: 8, top, width: Math.max(0, board.width - 16), height: Math.max(0, board.height - foot - top - 8) };
     const obstacles: ViewBox[] = [];
     for (const button of Array.from(this.host.boardRoot.querySelectorAll?.(".miro-canvas-panel-toggle") ?? [])) {
       const rect = button.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
       obstacles.push({ left: rect.left - board.left, top: rect.top - board.top, width: rect.width, height: rect.height });
     }
     const toolbarHandle = this.panelHandles.get("toolbar")?.getBoundingClientRect();
@@ -346,34 +421,52 @@ export class PanelArrangeMode {
   private placeHandles(): void {
     const board = this.host.boardRoot.getBoundingClientRect();
     const banner = this.banner?.getBoundingClientRect();
-    const minTop = Math.max(board.top + 8, (banner?.bottom ?? board.top) + 8);
-    const style = this.host.document.defaultView?.getComputedStyle(this.host.boardRoot);
-    const foot = Math.max(0, Number.parseFloat(style?.getPropertyValue("--miro-canvas-host-foot") ?? "0") || 0);
-    for (const [id, handle] of this.panelHandles) {
-      const panel = this.host.panels()[id];
-      if (panel === undefined) continue;
+    const minTop = Math.max(board.top + HANDLE_GAP, (banner?.bottom ?? board.top) + HANDLE_GAP);
+    const foot = this.hostFoot();
+    const bounds: ViewBox = {
+      left: board.left + HANDLE_GAP,
+      top: minTop,
+      width: Math.max(0, board.width - 2 * HANDLE_GAP),
+      height: Math.max(0, board.bottom - foot - HANDLE_GAP - minTop),
+    };
+    const panels = this.host.panels();
+    for (const [id, fold] of this.foldButtons) {
+      const own = panels[id]?.querySelector?.<HTMLElement>(".miro-canvas-panel-toggle");
+      fold.hidden = own == null || !own.hidden;
+    }
+    const placed: ViewBox[] = [];
+    for (const id of HANDLE_ORDER) {
+      const handle = this.panelHandles.get(id);
+      const panel = panels[id];
+      if (handle === undefined || panel === undefined) continue;
       const bar = panel.getBoundingClientRect();
       const size = handle.getBoundingClientRect();
-      const horizontalToolbar = id === "toolbar" && panel.getAttribute("data-miro-canvas-panel-orientation") !== "vertical";
-      const desiredLeft = horizontalToolbar ? bar.right - size.width : bar.left;
-      const left = Math.min(Math.max(desiredLeft, board.left + 8), board.right - size.width - 8);
-      const above = bar.top - size.height - 8;
-      const desiredTop = above >= minTop ? above : bar.bottom + 8;
-      let top = Math.max(minTop, Math.min(desiredTop, board.bottom - foot - size.height - 8));
-      for (const [otherId, other] of Object.entries(this.host.panels())) {
+      const obstacles = [...placed];
+      for (const [otherId, other] of Object.entries(panels)) {
         if (otherId === id || other === undefined) continue;
         const obstacle = other.getBoundingClientRect();
-        if (obstacle.width <= 0 || obstacle.height <= 0) continue;
-        if (left >= obstacle.right + 8 || left + size.width + 8 <= obstacle.left) continue;
-        if (top >= obstacle.bottom + 8 || top + size.height + 8 <= obstacle.top) continue;
-        if (obstacle.top - size.height - 8 >= minTop) top = obstacle.top - size.height - 8;
-        else if (obstacle.bottom + 8 + size.height <= board.bottom - foot - 8) top = obstacle.bottom + 8;
+        if (obstacle.width > 0 && obstacle.height > 0) obstacles.push(obstacle);
       }
+      const horizontalToolbar = id === "toolbar" && panel.getAttribute("data-miro-canvas-panel-orientation") !== "vertical";
+      const { left, top } = arrangeHandlePlacement(bar, size, bounds, obstacles, horizontalToolbar);
+      placed.push({ left, top, width: size.width, height: size.height });
       handle.style.setProperty("left", `${left - bar.left}px`);
       handle.style.setProperty("top", `${top - bar.top}px`);
       setElementStyles(handle, { "right": "auto" });
       setElementStyles(handle, { "bottom": "auto" });
     }
+  }
+
+  /** How far up the phone's own bars reach into the board. */
+  private hostFoot(): number {
+    const style = this.host.document.defaultView?.getComputedStyle(this.host.boardRoot);
+    return Math.max(0, Number.parseFloat(style?.getPropertyValue("--miro-canvas-host-foot") ?? "0") || 0);
+  }
+
+  /** The part of the board the phone's own bars leave uncovered: the view every stored place is resolved in. */
+  private uncoveredView(): ViewSize {
+    const board = this.host.boardRoot.getBoundingClientRect();
+    return { width: board.width, height: Math.max(1, board.height - this.hostFoot()) };
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -411,6 +504,9 @@ export class PanelArrangeMode {
         }
         event.preventDefault();
         event.stopPropagation();
+        // Its click folds the bar; the press must only not start a drag.
+        const fold = this.foldButtons.get(id);
+        if (fold !== undefined && !pressIsOutside(target, [fold])) return;
         const flip = this.flipButtons.get(id);
         if (flip !== undefined && !pressIsOutside(target, [flip])) {
           this.flipPanel(id, element);
@@ -431,17 +527,18 @@ export class PanelArrangeMode {
     const document = this.host.document;
     const board = this.host.boardRoot.getBoundingClientRect();
     const rect = element.getBoundingClientRect();
+    const view = this.uncoveredView();
     const original = this.host.panelPosition("minimap");
     const canvas = element.querySelector("canvas")?.getBoundingClientRect();
     const insetWidth = rect.width - (canvas?.width ?? rect.width - 8);
     const insetHeight = rect.height - (canvas?.height ?? rect.height - 8);
-    let next: PanelPosition = { ...positionFromPoint({ left: rect.left - board.left, top: rect.top - board.top }, board, rect), ...original };
+    let next: PanelPosition = { ...positionFromPoint({ left: rect.left - board.left, top: rect.top - board.top }, view, rect), ...original };
     const move = (pointer: PointerEvent): void => {
       if (pointer.pointerId !== event.pointerId) return;
       const width = Math.max(100, Math.min(800, board.right - rect.left - insetWidth, rect.width - insetWidth + pointer.clientX - event.clientX));
-      const height = Math.max(80, Math.min(600, board.bottom - rect.top - insetHeight, rect.height - insetHeight + pointer.clientY - event.clientY));
-      next = { ...next, ...positionFromPoint({ left: rect.left - board.left, top: rect.top - board.top }, board, { width: width + insetWidth, height: height + insetHeight }), width, height };
-      applyPanelPositionSettled(element, next, board);
+      const height = Math.max(80, Math.min(600, board.top + view.height - rect.top - insetHeight, rect.height - insetHeight + pointer.clientY - event.clientY));
+      next = { ...next, ...positionFromPoint({ left: rect.left - board.left, top: rect.top - board.top }, view, { width: width + insetWidth, height: height + insetHeight }), width, height };
+      applyPanelPositionSettled(element, next, view);
     };
     const cleanup = (): void => {
       document.removeEventListener("pointermove", move);
@@ -458,7 +555,7 @@ export class PanelArrangeMode {
     const cancel = (pointer?: PointerEvent): void => {
       if (pointer !== undefined && pointer.pointerId !== event.pointerId) return;
       cleanup();
-      applyPanelPositionSettled(element, original, board);
+      applyPanelPositionSettled(element, original, view);
     };
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", finish);
@@ -469,27 +566,31 @@ export class PanelArrangeMode {
   private startPanelDrag(id: PanelId, element: HTMLElement, event: PointerEvent): void {
     const document = this.host.document;
     const boardRect = this.host.boardRoot.getBoundingClientRect();
+    const view = this.uncoveredView();
     const panelRect = element.getBoundingClientRect();
     const offsetX = event.clientX - panelRect.left;
     const offsetY = event.clientY - panelRect.top;
     const panelSize = { width: panelRect.width, height: panelRect.height };
-    // Moving the panel is a change of place only; a chosen orientation - not
-    // the anchor's own default - rides along untouched, so a vertical bar
-    // dragged to a new corner stays vertical there.
-    const orientation = this.host.panelPosition(id)?.orientation;
+    const original = this.host.panelPosition(id);
+    // Moving a bar is a change of place only: it keeps the shape it had when
+    // pressed, so the size measured above stays true to the drop.  Turning it
+    // is the flip button's job.  The minimap has no orientation of its own.
+    const orientation = id === "minimap" ? undefined : original === undefined ? "horizontal" : effectivePanelOrientation(original);
     const pointToPosition = (clientX: number, clientY: number): PanelPosition => {
       const at = positionFromPoint(
         { left: clientX - boardRect.left - offsetX, top: clientY - boardRect.top - offsetY },
-        { width: boardRect.width, height: boardRect.height },
+        view,
         panelSize,
       );
-      return { ...this.host.panelPosition(id), ...at, ...(orientation === undefined ? {} : { orientation }) };
+      return { ...original, ...at, ...(orientation === undefined ? {} : { orientation }) };
     };
     const move = (moveEvent: PointerEvent): void => {
-      applyPanelPosition(element, pointToPosition(moveEvent.clientX, moveEvent.clientY), { width: boardRect.width, height: boardRect.height }, panelSize);
+      if (moveEvent.pointerId !== event.pointerId) return;
+      applyPanelPosition(element, pointToPosition(moveEvent.clientX, moveEvent.clientY), view, panelSize);
       this.placeTray();
     };
     const finish = (upEvent: PointerEvent): void => {
+      if (upEvent.pointerId !== event.pointerId) return;
       cleanup();
       this.host.savePanelPosition(id, pointToPosition(upEvent.clientX, upEvent.clientY));
       this.placeTray();
@@ -497,11 +598,19 @@ export class PanelArrangeMode {
     const cleanup = (): void => {
       document.removeEventListener("pointermove", move as EventListener);
       document.removeEventListener("pointerup", finish as EventListener);
+      document.removeEventListener("pointercancel", cancel as EventListener);
       this.dragCleanup = undefined;
     };
+    const cancel = (cancelEvent?: PointerEvent): void => {
+      if (cancelEvent !== undefined && cancelEvent.pointerId !== event.pointerId) return;
+      cleanup();
+      applyPanelPositionSettled(element, original, view);
+      this.placeTray();
+    };
     document.addEventListener("pointermove", move as EventListener);
-    document.addEventListener("pointerup", finish as EventListener, { once: true });
-    this.dragCleanup = cleanup;
+    document.addEventListener("pointerup", finish as EventListener);
+    document.addEventListener("pointercancel", cancel as EventListener);
+    this.dragCleanup = () => cancel();
   }
 
   /**
@@ -512,7 +621,7 @@ export class PanelArrangeMode {
    */
   private flipPanel(id: PanelId, element: HTMLElement): void {
     const boardRect = this.host.boardRoot.getBoundingClientRect();
-    const view = { width: boardRect.width, height: boardRect.height };
+    const view = this.uncoveredView();
     const before = element.getBoundingClientRect();
     const stored = this.host.panelPosition(id);
     // A panel still at its CSS default has no stored place of its own yet;

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Keep the tool bar and the dock their everyday size and shape in "Arrange panels": a bar that shows no fold button of its own gets one beside it, next to the drag grip and the turn button, so nothing widens, overlaps or shifts when the mode starts or ends, and "+" stays in its place.
+- Keep the panels inside the view if the window changes size during "Arrange panels".
+- Open a folded bar on a computer where its button stood; it used to jump to another part of the board.
+- Dragging a bar in "Arrange panels" now only moves it: it no longer turns into a column in a side's zone and lands away from the drop. The flip button turns it.
+- Keep each panel's handle next to its own panel and clear of the other handles.
+- Restore a panel's place when its drag is cancelled, and resolve drags, turns and minimap resizes in the same uncovered view the saved place is shown in, so nothing jumps above a phone's bars.
+- Line the "+" button up with the tools beside the fold button on a phone or a tablet.
+- Give "Done", the turn button and the minimap's resize button their own colours; Obsidian's button style was overriding them.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.

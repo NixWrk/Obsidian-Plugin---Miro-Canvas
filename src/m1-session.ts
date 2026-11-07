@@ -1931,8 +1931,10 @@ export class M1CanvasSession {
 			savePanelPosition: (id, position) => this.commitPanelPosition(id, position),
 			saveToolbarItems: (items) => this.options.onToolbarItemsChanged?.(items),
 			resetLayout: () => this.options.onResetPanels?.(),
-			onExit: () => undefined,
+			onEnter: () => this.updatePanelPositions(),
+			onExit: () => this.updatePanelPositions(),
 			refreshPanelButtons: () => this.panelVisibility?.refresh(),
+			toggleFold: (id) => this.panelVisibility?.toggle(id),
 		});
 		this.panelVisibility = controlDocument === undefined || this.root === undefined ? undefined : new PanelVisibility({
 			document: controlDocument,
@@ -2124,15 +2126,15 @@ export class M1CanvasSession {
 	 * frame.  A place resolved before the stylesheet arrived - right after the
 	 * plugin is turned on or updated - was measured on an unstyled panel as
 	 * wide as the board, and a bar that grows, the pen's row opening, must
-	 * stay inside the view as well.  Not during the layout mode, whose own
-	 * drags place the panels, nor after the session is gone.
+	 * stay inside the view as well.  Not during a drag in the layout mode,
+	 * which places the panel itself, nor after the session is gone.
 	 */
 	private schedulePanelPositions(): void {
 		const view = ownerDocument(this.root)?.defaultView;
 		if (this.panelFrame !== undefined || typeof view?.requestAnimationFrame !== "function") return;
 		this.panelFrame = view.requestAnimationFrame(() => {
 			this.panelFrame = undefined;
-			if (this.root === undefined || this.panelSizeObserver === undefined || this.arrangeMode?.active === true) return;
+			if (this.root === undefined || this.panelSizeObserver === undefined || this.arrangeMode?.dragging === true) return;
 			this.updatePanelPositions();
 		});
 	}

@@ -4482,7 +4482,9 @@
   text-align: center;
 }
 
-.miro-canvas-arrange-banner__button {
+/* The root in the selector: Obsidian's own `button:not(.clickable-icon)`
+   outweighs one class, and took these buttons' colours and shadow. */
+.miro-canvas-root button.miro-canvas-arrange-banner__button {
   flex-shrink: 0;
   --miro-canvas-button-padding: 4px 10px;
   padding: var(--miro-canvas-button-padding);
@@ -4493,17 +4495,17 @@
   cursor: pointer;
 }
 
-.miro-canvas-arrange-banner__button--done {
+.miro-canvas-root button.miro-canvas-arrange-banner__button--done {
   color: var(--text-on-accent);
   background: var(--interactive-accent);
   border-color: transparent;
 }
 
-.miro-canvas-arrange-banner__button:hover {
+.miro-canvas-root button.miro-canvas-arrange-banner__button:hover {
   background: var(--background-modifier-hover);
 }
 
-.miro-canvas-arrange-banner__button--done:hover {
+.miro-canvas-root button.miro-canvas-arrange-banner__button--done:hover {
   background: var(--interactive-accent-hover);
 }
 
@@ -4603,7 +4605,8 @@
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  z-index: 1;
+  /* Over the neighbouring panels: a handle with nowhere clear to stand must still take its presses. */
+  z-index: 140;
 }
 
 .miro-canvas-arrange-grip {
@@ -4626,8 +4629,8 @@
   content: "⠿";
 }
 
-/* A panel dragged near a left or right edge turns vertical - this is the
-   place it was put in, so it holds whether the mode is on or not;
+/* A bar turned with the flip button, or stored at a side before that button
+   existed, stands in a column - it holds whether the mode is on or not;
    `applyPanelPosition` sets the orientation attribute for every panel it
    positions, mode or no mode. */
 [data-miro-canvas-panel-orientation="vertical"].miro-canvas-toolbar.miro-canvas-tools .miro-canvas-toolbar__bar,
@@ -4760,7 +4763,7 @@
   top: -49px;
 }
 
-.miro-canvas-arrange-resize {
+.miro-canvas-root button.miro-canvas-arrange-resize {
   position: absolute;
   right: -12px;
   bottom: -12px;
@@ -4832,7 +4835,7 @@
 
 /* The tool bar's and the dock row's own flip button, beside the grip in the
    same floating handle: turns the panel between a row and a column at once. */
-.miro-canvas-arrange-flip {
+.miro-canvas-root button.miro-canvas-arrange-flip {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -4848,7 +4851,7 @@
   cursor: pointer;
 }
 
-.miro-canvas-arrange-flip:hover {
+.miro-canvas-root button.miro-canvas-arrange-flip:hover {
   background: var(--background-modifier-hover);
 }
 
