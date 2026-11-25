@@ -254,7 +254,7 @@ npm run build
 Для чтения и изменения досок агентами есть отдельные [CLI и MCP-сервер](mcp/README.md)
 и [навык miro-canvas-format](.agents/skills/miro-canvas-format/SKILL.md).
 Готовые программы доступны в
-[отдельном выпуске tools-0.3.4](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.4); для них нужен **Node 20+**.
+[отдельном выпуске tools-0.3.5](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.5); для них нужен **Node 20+**.
 Запускайте их отдельно, вне папки плагина. Сам плагин их не запускает.
 
 [Примечания о совместимости](docs/contributing.ru.md#совместимость-исходного-кода)

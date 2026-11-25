@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.5 - 2026-11-25
 
 - Use `miro-canvas:open-controls` for the controls panel. Existing hotkeys and integrations using the original ID still open the panel.
 

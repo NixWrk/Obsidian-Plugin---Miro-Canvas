@@ -250,7 +250,7 @@ npm run build
 Agents can use the optional [CLI or MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md) to read and
 edit boards. Ready-to-run tools are in the matching
-[tools-0.3.4 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.4) and need **Node 20+**;
+[tools-0.3.5 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.5) and need **Node 20+**;
 run them separately, outside the plugin folder. The plugin starts neither.
 
 [Source compatibility notes](docs/contributing.md#source-compatibility)
