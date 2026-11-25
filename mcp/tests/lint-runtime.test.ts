@@ -9,14 +9,14 @@ const eslint = new ESLint({
 	overrideConfigFile: path.join(REPOSITORY_ROOT, "mcp/eslint.config.mjs"),
 	// Repeated lintText fixtures need the updated project, including under CI=true.
 	overrideConfig: {
-		files: ["mcp/src/**/*.ts"],
+		files: ["mcp/src/**/*.{ts,mts}"],
 		languageOptions: { parserOptions: { disallowAutomaticSingleRunInference: true } },
 	},
 	cache: false,
 });
 
 async function lint(source: string, module = "server"): Promise<string[]> {
-	const results = await eslint.lintText(source, { filePath: path.join(REPOSITORY_ROOT, `mcp/src/${module}.ts`) });
+	const results = await eslint.lintText(source, { filePath: path.join(REPOSITORY_ROOT, `mcp/src/${module}.mts`) });
 	return results.flatMap(result => result.messages.map(message => message.ruleId ?? "parser-error"));
 }
 

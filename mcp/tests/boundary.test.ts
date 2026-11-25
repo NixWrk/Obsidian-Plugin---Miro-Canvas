@@ -45,9 +45,9 @@ describe.each(["server", "cli"])("the %s bundle", frontend => {
 	it("carries nothing of Obsidian, the plugin's session, main.ts or the settings tab", async () => {
 		const metafile = await serverMetafile(frontend);
 		const inputs = Object.keys(metafile.inputs).map(normalise);
-		expect(inputs).toContain(`mcp/src/${frontend}.ts`);
-		expect(inputs).toContain("mcp/src/tool-runner.ts");
-		expect(inputs).toContain("mcp/src/tools-edit.ts");
+		expect(inputs).toContain(`mcp/src/${frontend}.mts`);
+		expect(inputs).toContain("mcp/src/tool-runner.mts");
+		expect(inputs).toContain("mcp/src/tools-edit.mts");
 		expect(inputs.some((input) => input.includes("node_modules/ajv/"))).toBe(true);
 		for (const forbidden of ["src/m1-session.ts", "src/main.ts", "src/settings-tab.ts", "src/obsidian-document-host.ts", "src/welcome-board.ts"]) {
 			expect(inputs).not.toContain(forbidden);

@@ -20,7 +20,7 @@ import { closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, re
 import path from "node:path";
 
 import type { MetadataDocumentStore } from "../../src/metadata-writer";
-import { ToolError, type Vault } from "./vault";
+import { ToolError, type Vault } from "./vault.mjs";
 
 /** Larger boards are refused: reading one whole would stall the agent and the server. */
 export const MAX_BOARD_BYTES = 64 * 1024 * 1024;

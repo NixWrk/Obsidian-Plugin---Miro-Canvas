@@ -3,8 +3,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { hasInvalidFilenameCharacter } from "../../src/control-characters";
-import { boardOpenInObsidian, createServerTools } from "../src/tools-edit";
-import { ToolError, Vault } from "../src/vault";
+import { boardOpenInObsidian, createServerTools } from "../src/tools-edit.mjs";
+import { ToolError, Vault } from "../src/vault.mjs";
 import { makeFixtureVault, makeVault, removeVaults } from "./helpers";
 
 afterEach(removeVaults);

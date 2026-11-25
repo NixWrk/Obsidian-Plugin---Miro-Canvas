@@ -2601,3 +2601,41 @@ fixture data on ARM64. The reporter's vault and Intel system were unavailable.
 The packaged 0.3.3 files passed the same toggle check with a 390 ms gap,
 1,000 boards indexed, and all 192 backlinks present.
 No physical Android device was connected.
+
+## Standalone source scope and PDF dependency (2026-11-25, before edits)
+
+The eight Node imports implement revision hashes, atomic saves, safe vault
+paths, CLI input and MCP stdin. Both entry points ship as Node ESM. Mark
+their sources as ESM and keep all of them in TypeScript and standalone ESLint.
+Verify both built programs over stdio, including custom configuration folders,
+read-only access, stale revisions and undo. Check bundle boundaries and compare
+the output with the published plugin and companion tools.
+
+The default configuration folder is part of standalone startup. Preserve the
+default and explicit `--config-dir` handling. The controls command ID is
+stored in user hotkeys and may be used by other plugins. Verify registration
+and a bound key in an isolated Canvas vault. The production PDF build excludes
+jsPDF's optional HTML sanitizer. Update its locked dependency, check the
+resolved version, export a PDF, and verify the production JavaScript.
+
+**Results.** DOMPurify 3.5.0 resolves through jsPDF. The production npm audit
+reported zero advisories. The rebuilt `main.js` matched the published 0.3.3
+asset byte for byte (SHA-256
+`5cb57688518217e603c58d7c4246bad2c70502cf646a1c2076780a987001f26e`).
+The companion bundles differ in source path comments and esbuild's ESM interop
+for CommonJS dependencies. Both started under Node 20.20.2. With read-only
+access the CLI exposed three tools and MCP listed 134 fixture boards.
+
+All ten companion sources had typed ESLint coverage with no diagnostics.
+TypeScript, schema, packaging, the offline PDF tests, all three browser smoke
+modes and 33 Python oracle tests passed. Vitest passed 3,535 tests with one
+skipped. The plugin lint reported only the existing controls command ID.
+In Windows Obsidian 1.15.1 a trusted Ctrl+Alt+F10 opened its panel under a
+temporary binding. The original binding, hotkeys file and board were restored.
+
+In two isolated Windows profiles the PDF button exported a 34,375-byte vector
+PDF on Obsidian 1.14.4. The same single-card board on 1.15.1 reported
+“Exporting is unavailable in this view.” Both tests preserved the board.
+The tested plugin JavaScript was identical to release 0.3.3. This records
+a separate compatibility issue on 1.15.1. No physical Android run or new
+Community Directory scorecard was obtained in this check.

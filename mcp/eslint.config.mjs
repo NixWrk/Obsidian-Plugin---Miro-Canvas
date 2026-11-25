@@ -23,10 +23,10 @@ const runtime = {
 						const property = node.computed ? node.property.value : node.property.name;
 						if (property !== "stdout") return;
 						const call = node.parent;
-						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/server.ts")
+						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/server.mts")
 							&& call.type === "CallExpression" && call.callee.type === "Identifier"
 							&& call.callee.name === "serveLines" && call.arguments[2] === node) return;
-						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/cli.ts")
+						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/cli.mts")
 							&& call.type === "MemberExpression" && !call.computed && call.property.name === "write"
 							&& call.parent.type === "CallExpression" && call.parent.callee === call
 							&& call.parent.parent.type === "ExpressionStatement" && call.parent.parent.parent.type === "Program") return;
@@ -69,7 +69,7 @@ const runtime = {
 					Literal(node) {
 						if (node.value !== ".obsidian") return;
 						const declaration = node.parent;
-						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/vault.ts")
+						if (context.filename.replaceAll("\\", "/").endsWith("/mcp/src/vault.mts")
 							&& declaration.type === "VariableDeclarator" && declaration.init === node
 							&& declaration.id.type === "Identifier" && declaration.id.name === "DEFAULT_CONFIG_DIR") return;
 						context.report({ node, messageId: "path" });
@@ -83,9 +83,9 @@ const runtime = {
 // This config describes the separately launched Node program, never src/ or the plugin.
 export default [
 	{ ignores: ["mcp/dist/**", "mcp/tests/**"] },
-	...[js.configs.recommended, ...tseslint.configs.recommendedTypeChecked].map(config => ({ ...config, files: ["mcp/src/**/*.ts"] })),
+	...[js.configs.recommended, ...tseslint.configs.recommendedTypeChecked].map(config => ({ ...config, files: ["mcp/src/**/*.{ts,mts}"] })),
 	{
-		files: ["mcp/src/**/*.ts"],
+		files: ["mcp/src/**/*.{ts,mts}"],
 		languageOptions: {
 			globals: globals.node,
 			parserOptions: { project: "./tsconfig.json", tsconfigRootDir: fileURLToPath(new URL("..", import.meta.url)) },

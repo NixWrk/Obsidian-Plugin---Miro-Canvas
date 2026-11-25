@@ -284,18 +284,13 @@ batches, revision handoff and undo limited to the current process.
 
 ## Remaining source warnings
 
-The recorded 0.2.9 scan of `src/` and `mcp/src/` with the official Obsidian rules reports
-**10 warnings and no errors**. The standalone Node lint reports no warnings or
-errors; the plugin-only lint retains the one command-ID warning below.
+The plugin lint reports one naming advisory for `miro-canvas:m1-commands`.
+Obsidian stores this exact ID in custom hotkeys. Keep it registered once so
+existing shortcuts and integrations continue to open the controls.
 
-| Warning | Sites | Reason |
-| --- | --- | --- |
-| Node builtin imports | 8 | The optional CLI/MCP programs use files, paths, hashes and stdin. They run under Node 20+, are excluded from `main.js`, and are never started by the plugin. |
-| Literal `.obsidian` | 1 | The ordinary configuration folder is an explicit default. Custom folders work through `--config-dir`; operations use the selected folder. |
-| `m1-commands` command ID | 1 | Existing users' saved hotkeys refer to this ID. Retaining it preserves them. |
-
-The two console warnings and the type-only `node:stream` import from the 0.2.8
-report are removed. CLI adds one necessary `node:fs` import, included in the
-eight sites above. Standalone code forbids console calls; Ajv logging is disabled
-while validation errors remain in JSON responses. These explanations do not
-certify Community Directory acceptance; its next scan may report differently.
+The standalone CLI and MCP sources use Node ESM (`.mts`). Run
+`npm run lint:mcp` for their type-aware rules and `npm test` for bundle
+isolation and real-process tests. Node provides their filesystem, hashes,
+paths and stdin. Their vault uses the folder selected with `--config-dir`,
+with `.obsidian` as the default. The community scanner documents its source
+scope in the [official configuration guide](https://github.com/obsidianmd/eslint-plugin/blob/master/docs/configuration.md#community-plugin-scanner-configuration).

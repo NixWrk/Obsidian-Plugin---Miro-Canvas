@@ -1,7 +1,7 @@
 /** Schema-checked board operations shared by the MCP and command-line frontends. */
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
-import type { ToolDefinition } from "./tools";
-import { ToolError } from "./vault";
+import type { ToolDefinition } from "./tools.mjs";
+import { ToolError } from "./vault.mjs";
 
 export class ToolArgumentsError extends Error {}
 

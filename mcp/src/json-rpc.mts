@@ -9,8 +9,8 @@
 
 import { createInterface, type ReadLineOptions } from "node:readline";
 
-import type { ToolDefinition } from "./tools";
-import { ToolArgumentsError, ToolRunner } from "./tool-runner";
+import type { ToolDefinition } from "./tools.mjs";
+import { ToolArgumentsError, ToolRunner } from "./tool-runner.mjs";
 
 /** Protocol versions this server speaks, newest first. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26"] as const;

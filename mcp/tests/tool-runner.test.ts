@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { ToolArgumentsError, ToolRunner } from "../src/tool-runner";
-import { ToolError } from "../src/vault";
-import { McpServer } from "../src/json-rpc";
-import type { ToolDefinition } from "../src/tools";
+import { ToolArgumentsError, ToolRunner } from "../src/tool-runner.mjs";
+import { ToolError } from "../src/vault.mjs";
+import { McpServer } from "../src/json-rpc.mjs";
+import type { ToolDefinition } from "../src/tools.mjs";
 
 const operation: ToolDefinition = {
 	name: "probe",

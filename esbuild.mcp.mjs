@@ -1,6 +1,6 @@
 // Builds the MCP server an agent runs next to a vault:
 //
-//   node esbuild.mcp.mjs     mcp/src/server.ts -> mcp/dist/miro-canvas-mcp.mjs
+//   node esbuild.mcp.mjs     mcp/src/server.mts -> mcp/dist/miro-canvas-mcp.mjs
 //
 // One file for Node 20 or later with everything inside it - ajv and the
 // pinned schema too - so running it needs no install.  The plugin's build
@@ -26,7 +26,7 @@ export const noObsidianPlugin = {
 export function mcpBuildOptions(root = rootDir, frontend = "server") {
 	if (!["server", "cli"].includes(frontend)) throw new Error(`Unknown board frontend: ${frontend}`);
 	return {
-		entryPoints: [path.join(root, "mcp", "src", `${frontend}.ts`)],
+		entryPoints: [path.join(root, "mcp", "src", `${frontend}.mts`)],
 		outfile: path.join(root, "mcp", "dist", frontend === "server" ? "miro-canvas-mcp.mjs" : "miro-canvas-cli.mjs"),
 		bundle: true,
 		platform: "node",

@@ -2,9 +2,9 @@ import { PassThrough } from "node:stream";
 import Ajv2020 from "ajv/dist/2020";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { LATEST_PROTOCOL_VERSION, McpServer, serveLines } from "../src/json-rpc";
-import { createReadTools } from "../src/tools";
-import { Vault } from "../src/vault";
+import { LATEST_PROTOCOL_VERSION, McpServer, serveLines } from "../src/json-rpc.mjs";
+import { createReadTools } from "../src/tools.mjs";
+import { Vault } from "../src/vault.mjs";
 import { makeFixtureVault, removeVaults } from "./helpers";
 
 afterEach(removeVaults);

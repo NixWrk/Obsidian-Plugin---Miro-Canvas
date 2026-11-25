@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createReadTools, type ToolDefinition } from "../src/tools";
-import { ToolError, Vault } from "../src/vault";
+import { createReadTools, type ToolDefinition } from "../src/tools.mjs";
+import { ToolError, Vault } from "../src/vault.mjs";
 import { makeFixtureVault, removeVaults } from "./helpers";
 
 afterEach(removeVaults);

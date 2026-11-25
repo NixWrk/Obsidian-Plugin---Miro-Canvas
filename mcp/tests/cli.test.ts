@@ -40,7 +40,7 @@ beforeAll(async () => {
 	const probe = await esbuild.build({
 		stdin: {
 			resolveDir: REPOSITORY_ROOT, loader: "ts",
-			contents: `import { ToolRunner } from "./mcp/src/tool-runner";
+			contents: `import { ToolRunner } from "./mcp/src/tool-runner.mjs";
 const runner = new ToolRunner([{
 	name: "probe", title: "Probe", description: "Unknown schema format",
 	inputSchema: { type: "object", properties: { value: { type: "string", format: "future-cli-format" } }, required: ["value"] },

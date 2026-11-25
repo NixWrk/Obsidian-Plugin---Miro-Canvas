@@ -8,10 +8,10 @@
  * sentence.
  */
 
-import { readBoardFile, type BoardFile } from "./board-file";
-import { boardStatus, fullBoard, listBoardItems, sourceSlice, summarizeBoard } from "./summary";
-import { validateBoard } from "./validate";
-import { ToolError, type Vault } from "./vault";
+import { readBoardFile, type BoardFile } from "./board-file.mjs";
+import { boardStatus, fullBoard, listBoardItems, sourceSlice, summarizeBoard } from "./summary.mjs";
+import { validateBoard } from "./validate.mjs";
+import { ToolError, type Vault } from "./vault.mjs";
 
 type JsonSchema = Record<string, unknown>;
 

@@ -3,8 +3,8 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { BoardEdit, FileCanvasRuntime, FileMetadataStore, hasUnsafeIntegers, readBoardFile, revisionOf } from "../src/board-file";
-import { ToolError, Vault } from "../src/vault";
+import { BoardEdit, FileCanvasRuntime, FileMetadataStore, hasUnsafeIntegers, readBoardFile, revisionOf } from "../src/board-file.mjs";
+import { ToolError, Vault } from "../src/vault.mjs";
 import { makeFixtureVault, makeVault, removeVaults } from "./helpers";
 
 afterEach(removeVaults);

@@ -2,7 +2,7 @@ import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ToolError, Vault } from "../src/vault";
+import { ToolError, Vault } from "../src/vault.mjs";
 import { makeVault, removeVaults } from "./helpers";
 
 afterEach(removeVaults);

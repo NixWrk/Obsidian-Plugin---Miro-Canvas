@@ -16,7 +16,7 @@ import { createInteractionPolicy, decideEditOperation } from "../../src/interact
 import { listCommentThreads } from "../../src/local-comments";
 import { parseMiroCanvasMetadata } from "../../src/metadata";
 import { buildSourceScene, type SourceItemDescriptor } from "../../src/source-model";
-import { ToolError } from "./vault";
+import { ToolError } from "./vault.mjs";
 
 type UnknownRecord = Record<string, unknown>;
 

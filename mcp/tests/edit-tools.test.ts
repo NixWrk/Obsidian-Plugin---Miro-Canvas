@@ -2,11 +2,11 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { revisionOf } from "../src/board-file";
-import { McpServer } from "../src/json-rpc";
-import { createReadTools, type ToolDefinition } from "../src/tools";
-import { createEditTools, createServerTools, type EditToolContext } from "../src/tools-edit";
-import { Vault } from "../src/vault";
+import { revisionOf } from "../src/board-file.mjs";
+import { McpServer } from "../src/json-rpc.mjs";
+import { createReadTools, type ToolDefinition } from "../src/tools.mjs";
+import { createEditTools, createServerTools, type EditToolContext } from "../src/tools-edit.mjs";
+import { Vault } from "../src/vault.mjs";
 import { makeFixtureVault, makeVault, removeVaults } from "./helpers";
 
 afterEach(removeVaults);

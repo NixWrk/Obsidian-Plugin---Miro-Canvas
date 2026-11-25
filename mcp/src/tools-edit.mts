@@ -35,9 +35,9 @@ import { miroStickyColors } from "../../src/miro-palette";
 import { CONNECTOR_CAPS, CONNECTOR_ROUTES, CONNECTOR_STROKES } from "../../src/source-model";
 import {
 	BoardEdit, FileCanvasRuntime, FileMetadataStore, readBoardFile, revisionOf, sameJson, STALE_BOARD, type BoardFile,
-} from "./board-file";
-import { boardPathSchema, createReadTools, readWarnings, type ToolDefinition } from "./tools";
-import { ToolError, type Vault } from "./vault";
+} from "./board-file.mjs";
+import { boardPathSchema, createReadTools, readWarnings, type ToolDefinition } from "./tools.mjs";
+import { ToolError, type Vault } from "./vault.mjs";
 
 type UnknownRecord = Record<string, unknown>;
 type JsonSchema = Record<string, unknown>;

@@ -11,9 +11,9 @@
  */
 
 import packageJson from "../../package.json";
-import { McpServer, serveLines } from "./json-rpc";
-import { createServerTools } from "./tools-edit";
-import { DEFAULT_CONFIG_DIR, ToolError, Vault } from "./vault";
+import { McpServer, serveLines } from "./json-rpc.mjs";
+import { createServerTools } from "./tools-edit.mjs";
+import { DEFAULT_CONFIG_DIR, ToolError, Vault } from "./vault.mjs";
 
 const USAGE = "usage: node miro-canvas-mcp.mjs --vault <absolute path to an Obsidian vault> [--config-dir <relative folder>] [--read-only]";
 

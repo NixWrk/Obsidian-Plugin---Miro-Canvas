@@ -1,9 +1,9 @@
 /** One-shot board operations; the plugin never imports or starts this program. */
 import { readFileSync, statSync } from "node:fs";
 import packageJson from "../../package.json";
-import { createServerTools } from "./tools-edit";
-import { ToolArgumentsError, ToolRunner, type ToolResult } from "./tool-runner";
-import { DEFAULT_CONFIG_DIR, ToolError, Vault } from "./vault";
+import { createServerTools } from "./tools-edit.mjs";
+import { ToolArgumentsError, ToolRunner, type ToolResult } from "./tool-runner.mjs";
+import { DEFAULT_CONFIG_DIR, ToolError, Vault } from "./vault.mjs";
 
 const MAX_INPUT_BYTES = 8 * 1024 * 1024;
 const MAX_BATCH_CALLS = 1000;

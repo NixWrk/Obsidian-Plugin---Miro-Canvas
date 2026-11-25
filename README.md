@@ -254,8 +254,8 @@ edit boards. Ready-to-run tools are in the matching
 run them separately, outside the plugin folder. The plugin starts neither.
 
 [Source compatibility notes](docs/contributing.md#remaining-source-warnings)
-explain retained Node imports for these tools, the `.obsidian` default for
-configuration and the command ID that preserves saved hotkeys.
+explain how the standalone Node modules are checked, how to select the vault
+configuration folder, and why the controls command keeps its saved hotkey ID.
 
 ## License
 

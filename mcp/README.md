@@ -317,7 +317,7 @@ For a non-default configuration directory, also add `"--config-dir", "Config"`
 The sources are `mcp/src`, the tests `mcp/tests` (run with `npm test`). `mcp/`
 may import the plugin's pure modules from `src/`, never the other way round;
 the build fails if anything it bundles imports `obsidian` or `electron`. The
-MCP protocol is written by hand in `json-rpc.ts` (JSON-RPC 2.0, one message
+MCP protocol is written by hand in `json-rpc.mts` (JSON-RPC 2.0, one message
 per line). See "Agents: the MCP server and CLI" in
 [docs/miro-canvas.md](../docs/miro-canvas.md) for the design.
 
@@ -342,8 +342,7 @@ does not redirect the global console. Stdout carries only MCP protocol messages
 or the CLI's one JSON result; CLI file input and stdin use Node APIs.
 Configuration paths use the active standalone `Vault.configDir`; only its
 explicit default initializer may name `.obsidian`. Focused lint fixtures and
-bounded stdio-process tests enforce these rules. Seven existing genuine Node
-builtin imports remain; the type-only `node:stream` import has been removed.
-The CLI adds one `node:fs` import for file/stdin input. Those imports, the explicit
-configuration default and legacy plugin command ID remain visible in the raw
-plugin context; the current local official-rules scan reports 10 warnings and no errors.
+bounded stdio-process tests enforce these rules.
+The CLI and MCP sources use the Node ESM extension `.mts`. Both entry points
+build to the same standalone `.mjs` filenames. The Node lint and TypeScript
+checks cover every companion module.
