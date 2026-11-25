@@ -2639,3 +2639,23 @@ PDF on Obsidian 1.14.4. The same single-card board on 1.15.1 reported
 The tested plugin JavaScript was identical to release 0.3.3. This records
 a separate compatibility issue on 1.15.1. No physical Android run or new
 Community Directory scorecard was obtained in this check.
+
+## PDF export on Obsidian 1.15.1 (before edits)
+
+Text cards in the export's independent Canvas use the native Markdown queue.
+Obsidian 1.14.4 stores a queue object with a cancel method. In 1.15.1
+`queueRender` assigns a cancellation callback to `cancelRender` and tracks
+priority with `queuedHigh`. Verify pending work, replacement callbacks,
+idle state and malformed queue descriptors. On each real app version use the
+same single-card board, save vector and raster PDFs through the export panel,
+inspect their content and compare the board bytes before and after.
+
+Windows Obsidian 1.14.4 and 1.15.1 each ran the production 0.3.4 build.
+Pointer input selected Vector and Raster and pressed Export PDF. The normal
+vault attachment writer saved all four files. Each contained one page. Text
+extraction returned `Export check` from each vector PDF (34,375 bytes each).
+OCR read the same words from all four rendered pages, including both raster
+PDFs (36,893 bytes each). Both source boards kept SHA-256
+`d72d15ba76972e858c2e98cb242b761934254d77f6fce461b84163485faabf25`.
+Each export released its background Canvas and job. No Android device was
+listed by ADB.

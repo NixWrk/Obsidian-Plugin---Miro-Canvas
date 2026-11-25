@@ -84,6 +84,22 @@ interface MarkdownReading {
   readonly queued: object | undefined;
 }
 
+/** Read the scheduled work without invoking accessors on native renderers. */
+function markdownQueue(renderer: object): object | undefined {
+  const legacy = Object.getOwnPropertyDescriptor(renderer, "queued");
+  if (legacy !== undefined && "value" in legacy) {
+    const job: unknown = legacy.value;
+    if (job == null) return undefined;
+    if (typeof job === "object" && typeof own(job, "high") === "boolean" && nativeMethod(job, "cancel") !== undefined) return job;
+  } else if (legacy === undefined && typeof own(renderer, "queuedHigh") === "boolean") {
+    // Obsidian 1.15 assigns a cancellation callback and clears it in onRender.
+    const callback = own(renderer, "cancelRender");
+    if (callback === null) return undefined;
+    if (typeof callback === "function") return callback;
+  }
+  throw new Error(words().export.unavailable);
+}
+
 function markdownReading(renderer: object): MarkdownReading {
   const sections = own(renderer, "sections");
   const asynchronous = own(renderer, "asyncSections");
@@ -91,27 +107,24 @@ function markdownReading(renderer: object): MarkdownReading {
   const parsing = own(renderer, "parsing");
   const text = own(renderer, "text");
   const lastText = own(renderer, "lastText");
-  const queued = own(renderer, "queued");
-  const queueDescriptor = Object.getOwnPropertyDescriptor(renderer, "queued");
+  const queued = markdownQueue(renderer);
   if (!Array.isArray(sections) || !Array.isArray(asynchronous) || (rendered !== null && !Array.isArray(rendered))
     || typeof parsing !== "boolean" || typeof text !== "string" || (lastText !== null && typeof lastText !== "string")
-    || sections.some(section => typeof own(section, "rendered") !== "boolean")
-    || queueDescriptor === undefined || !("value" in queueDescriptor)
-    || (queued !== null && queued !== undefined && (typeof queued !== "object"
-      || typeof own(queued, "high") !== "boolean" || nativeMethod(queued, "cancel") === undefined))) throw new Error(words().export.unavailable);
+    || sections.some(section => typeof own(section, "rendered") !== "boolean")) throw new Error(words().export.unavailable);
   const unrendered = sections.some(section => own(section, "rendered") !== true);
   return {
     ready: lastText === text && !parsing && asynchronous.length === 0 && !unrendered && rendered === null && queued == null,
     parsing,
     waitingAsync: asynchronous.length > 0 && !unrendered && lastText === text,
-    queued: queued == null ? undefined : queued,
+    queued,
   };
 }
 
 function cancelMarkdownQueue(renderer: object, cancelled: Set<object>): void {
   const queued = markdownReading(renderer).queued;
   if (queued === undefined || cancelled.has(queued)) return;
-  Reflect.apply(nativeMethod(queued, "cancel")!, queued, []);
+  if (typeof queued === "function") Reflect.apply(queued, renderer, []);
+  else Reflect.apply(nativeMethod(queued, "cancel")!, queued, []);
   cancelled.add(queued);
 }
 

@@ -65,8 +65,8 @@ Open the GIF at full size for small controls.
 Export renders an independent board snapshot without screen capture, so you can
 keep editing or open another board.
 Files are saved as new vault attachments. Raster PDF/PPTX store a picture per
-page. The development build adds a **Raster / Vector** choice for PDF and
-PowerPoint, while SVG remains a separate, always-vector format. Vector PDF
+page. Choose **Raster** or **Vector** for PDF and PowerPoint. Both PDF modes
+support text cards on Obsidian 1.14.4 and 1.15.1. SVG is always vector. Vector PDF
 embeds Noto Sans in four styles; source fonts are substituted. Vector PowerPoint
 stores one SVG per slide with a JPEG fallback for older readers; its text and
 shapes are not separate native PowerPoint objects. Live web embeds and video
@@ -250,7 +250,7 @@ npm run build
 Agents can use the optional [CLI or MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md) to read and
 edit boards. Ready-to-run tools are in the matching
-[tools-0.3.3 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.3) and need **Node 20+**;
+[tools-0.3.4 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.4) and need **Node 20+**;
 run them separately, outside the plugin folder. The plugin starts neither.
 
 [Source compatibility notes](docs/contributing.md#remaining-source-warnings)

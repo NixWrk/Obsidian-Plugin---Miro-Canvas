@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.4 - 2026-11-25
+
+- Fix PDF export of text cards on Obsidian 1.15.1 while preserving export on 1.14.4. Both raster and vector export wait for the card text to render.
+- Update jsPDF’s optional DOMPurify dependency to 3.5.0 and identify the standalone CLI and MCP sources as Node ES modules.
+
 ## 0.3.3 - 2026-11-25
 
 - Apply Text color to the selected text in a card editor. With no text selection, the palette sets the whole card's text color. ([#35](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/issues/35))

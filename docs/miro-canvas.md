@@ -2359,6 +2359,10 @@ PDF/PPTX use bundled html2canvas-pro on Windows and Android. Pages are tiled at 
 
 ## Independent export (0.2.10)
 
+Since 0.3.4 the background text renderer supports the Markdown queue object
+used by Obsidian 1.14.4 and the cancellation callback used by 1.15.1. Both
+PDF modes wait for the card text before reading the export surface.
+
 The historical live-camera capture above is superseded. Export freezes a board
 document, page geometry, resolved theme and source attachment path, creates an
 unregistered/inert native Canvas view outside the viewport, and renders only

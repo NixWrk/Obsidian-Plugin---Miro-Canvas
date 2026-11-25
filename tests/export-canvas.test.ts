@@ -126,6 +126,37 @@ function markdownNode(f: ReturnType<typeof fixture>, id = "text") {
 }
 
 describe("independent native Markdown readiness", () => {
+  it("drains each 1.15 cancellation callback once and waits for the final text", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const { renderer, preview } = markdownNode(f);
+    const first = vi.fn();
+    const next = vi.fn();
+    Reflect.deleteProperty(renderer, "queued");
+    const current = Object.assign(renderer, { queuedHigh: true, cancelRender: first as (() => void) | null });
+    current.onRender.mockImplementationOnce(() => {
+      current.cancelRender = next;
+      current.lastText = current.text;
+      current.sections = [{ rendered: false }];
+    }).mockImplementation(() => {
+      current.cancelRender = null;
+      current.rendered = null;
+      current.sections = [{ rendered: true }];
+      preview.textContent = "Launch card";
+    });
+    const background = createExportCanvas(f.sourceView, {}, f.document as unknown as Document);
+    const pending = settleExportMarkdown(f.canvas, new AbortController().signal);
+    expect(preview.textContent).toBe("");
+    await vi.advanceTimersByTimeAsync(16);
+    await pending;
+    expect(first.mock.instances).toEqual([renderer]);
+    expect(next.mock.instances).toEqual([renderer]);
+    expect(preview.textContent).toBe("Launch card");
+    await settleExportMarkdown(f.canvas, new AbortController().signal);
+    expect(current.onRender).toHaveBeenCalledTimes(2);
+    background.dispose();
+  });
+
   it("drains only the owned native queue and materializes text with global RAF suspended", async () => {
     const f = fixture();
     const child = markdownNode(f);
@@ -262,13 +293,19 @@ describe("independent native Markdown readiness", () => {
     background.dispose();
   });
 
-  it.each(["foreign preview", "accessor queue", "missing method", "missing child"])("fails closed on %s before cancelling even an earlier valid queue", async shape => {
+  it.each(["foreign preview", "accessor queue", "accessor callback", "missing priority", "invalid callback", "missing method", "missing child"])("fails closed on %s before cancelling even an earlier valid queue", async shape => {
     const f = fixture();
     const valid = markdownNode(f, "valid");
     const invalid = markdownNode(f, "invalid");
     const getter = vi.fn(() => invalid.originalQueue);
     if (shape === "foreign preview") Reflect.set(invalid.renderer, "previewEl", f.sourceCanvas.wrapperEl);
     if (shape === "accessor queue") Object.defineProperty(invalid.renderer, "queued", { get: getter, configurable: true });
+    if (["accessor callback", "missing priority", "invalid callback"].includes(shape)) {
+      Reflect.deleteProperty(invalid.renderer, "queued");
+      if (shape !== "missing priority") Reflect.set(invalid.renderer, "queuedHigh", true);
+      if (shape === "accessor callback") Object.defineProperty(invalid.renderer, "cancelRender", { get: getter });
+      else Reflect.set(invalid.renderer, "cancelRender", shape === "invalid callback" ? 42 : null);
+    }
     if (shape === "missing method") Reflect.set(invalid.renderer, "onRender", undefined);
     if (shape === "missing child") Reflect.deleteProperty(invalid.node, "child");
     const background = createExportCanvas(f.sourceView, { nodes: [], edges: [] }, f.document as unknown as Document);
