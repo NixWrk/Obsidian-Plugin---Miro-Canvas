@@ -240,11 +240,15 @@ describe("lines", () => {
 		let after = readJson(boardFile(root, "plugin-authored-board.canvas"));
 		expect(after.edges.find((edge: Answer) => edge.id === "edge-1").label).toBe("because");
 		expect(after.miroCanvas.localOverrides["edge-1"].connector.color).toBe("#ff0000");
+		const labelFrame = { borderWidth: 5, borderStyle: "dotted", colors: { text: "#f24726", fill: "#ffd02f" } };
+		after.miroCanvas.localOverrides["conn-1"] = labelFrame;
+		writeFileSync(boardFile(root, "plugin-authored-board.canvas"), JSON.stringify(after));
 		const joined = call("update_connector", { path: board, id: "conn-1", from: { nodeId: "card-1" } });
 		expect(joined.status).toBe("applied");
 		after = readJson(boardFile(root, "plugin-authored-board.canvas"));
 		expect(after.miroCanvas.connectors["conn-1"]).toBeUndefined();
 		expect(after.edges.find((edge: Answer) => edge.id === "conn-1")).toMatchObject({ fromNode: "card-1", toNode: "frame-1" });
+		expect(after.miroCanvas.localOverrides["conn-1"]).toMatchObject(labelFrame);
 		expect(call("validate_board", { path: board }).valid).toBe(true);
 	});
 });

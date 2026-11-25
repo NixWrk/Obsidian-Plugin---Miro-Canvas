@@ -24,13 +24,16 @@ describe("a connector label's font", () => {
   });
 
   it("writes an edited override in full, the way a card's own typography is, and it wins over an import", () => {
-    const override = { ...DEFAULT_TYPOGRAPHY, fontFamily: "serif", fontSize: 24, format: { ...DEFAULT_TYPOGRAPHY.format, bold: true } };
+    const override = { ...DEFAULT_TYPOGRAPHY, fontFamily: "serif", fontSize: 24, alignment: "right" as const, lineHeight: 1.6,
+      format: { ...DEFAULT_TYPOGRAPHY.format, bold: true } };
     expect(labelFont(override, { "font-family": "Georgia", "font-weight": "300" })).toEqual({
       "font-family": "serif",
       "font-size": "24px",
       "font-weight": "700",
       "font-style": "normal",
       "text-decoration": "none",
+      "text-align": "right",
+      "line-height": "1.6",
     });
   });
 });

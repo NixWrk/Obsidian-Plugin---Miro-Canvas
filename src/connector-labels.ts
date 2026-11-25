@@ -33,6 +33,7 @@ export interface ConnectorLabel {
    * properties keep whatever Canvas's own label rule paints.
    */
   readonly font?: Readonly<Record<string, string>>;
+  readonly appearance?: Readonly<Record<string, string>>;
   /** Native Canvas's own label for the edge, hidden while this one shows. */
   readonly native?: HTMLElement;
 }
@@ -52,15 +53,32 @@ interface Entry {
   readonly label: HTMLDivElement;
   readonly native?: HTMLElement;
   readonly nativeVisibility?: string;
+  highlight?: HTMLSpanElement;
   item: ConnectorLabel;
 }
 
 /** How far a label must be pulled, in window pixels, before a press becomes a drag. */
 const DRAG_THRESHOLD = 3;
 
-/** The font properties a label paints; alignment, line height and vertical
- * align stay a card's own, since a label never wraps or stacks like one. */
-const FONT_PROPERTIES = ["font-family", "font-size", "font-weight", "font-style", "text-decoration"] as const;
+export const LABEL_FONT_PROPERTIES = [
+  "font-family", "font-size", "font-weight", "font-style", "text-decoration", "text-align", "line-height",
+] as const;
+const FRAME_PROPERTIES = ["color", "background-color", "border-color", "border-style", "border-width"] as const;
+
+/** All absent fields follow the arrow or the board surface. Explicit transparent colors keep their meaning. */
+export function connectorLabelFrame(
+  stroke: { color: string; style: string; width: number },
+  overrides: Readonly<Record<string, string>> = {},
+): Readonly<Record<string, string>> {
+  return {
+    color: overrides.color ?? stroke.color,
+    "background-color": overrides["background-color"] ?? "var(--background-primary)",
+    "border-color": overrides["border-color"] ?? stroke.color,
+    "border-style": overrides["border-style"] ?? stroke.style,
+    "border-width": overrides["border-width"] ?? `${stroke.width}px`,
+    ...(overrides["--miro-highlight"] === undefined ? {} : { "--miro-highlight": overrides["--miro-highlight"] }),
+  };
+}
 
 export class ConnectorLabels {
   public readonly element: HTMLDivElement;
@@ -89,9 +107,10 @@ export class ConnectorLabels {
       entry.item = item;
       if (item.color === undefined) entry.wrapper.style.removeProperty("--canvas-color");
       else entry.wrapper.style.setProperty("--canvas-color", item.color);
-      this.applyFont(entry, item.font);
+      for (const property of LABEL_FONT_PROPERTIES) this.setStyle(entry.label, property, item.font?.[property]);
+      for (const property of FRAME_PROPERTIES) this.setStyle(entry.label, property, item.appearance?.[property]);
       if (item.id === this.editing) continue;
-      if (entry.label.textContent !== item.text) entry.label.textContent = item.text;
+      this.renderText(entry);
       entry.wrapper.hidden = item.text === "";
       if (this.dragging !== item.id) this.place(entry, this.previews.get(item.id) ?? item.points);
     }
@@ -145,6 +164,10 @@ export class ConnectorLabels {
     if (entry === undefined || this.editing !== undefined || !this.host.editable(id)) return false;
     const { wrapper, label } = entry;
     const before = entry.item.text;
+    if (entry.highlight !== undefined) {
+      entry.highlight = undefined;
+      label.textContent = before;
+    }
     this.editing = id;
     wrapper.hidden = false;
     label.contentEditable = "true";
@@ -164,7 +187,7 @@ export class ConnectorLabels {
         this.host.edit(id, text);
         return;
       }
-      label.textContent = before;
+      this.renderText(entry);
       wrapper.hidden = before === "";
     };
     // The board must not take the keys a label is written with; once it is
@@ -235,13 +258,25 @@ export class ConnectorLabels {
     this.entries.delete(id);
   }
 
-  /** Paint a label's own font, clearing any property the item no longer sets. */
-  private applyFont(entry: Entry, font: ConnectorLabel["font"]): void {
-    for (const property of FONT_PROPERTIES) {
-      const value = font?.[property];
-      if (value === undefined) entry.label.style.removeProperty(property);
-      else entry.label.style.setProperty(property, value);
+  private setStyle(label: HTMLElement, property: string, value: string | undefined): void {
+    if (value === undefined) label.style.removeProperty(property);
+    else label.style.setProperty(property, value);
+  }
+
+  private renderText(entry: Entry): void {
+    const color = entry.item.appearance?.["--miro-highlight"];
+    if (color === undefined || color === "transparent" || entry.item.text === "") {
+      entry.highlight?.remove();
+      if (entry.label.textContent !== entry.item.text) entry.label.textContent = entry.item.text;
+      entry.highlight = undefined;
+      return;
     }
+    if (entry.highlight === undefined) {
+      entry.label.textContent = "";
+      entry.highlight = entry.label.appendChild(createHtmlElement(this.document, "span"));
+    }
+    if (entry.highlight.textContent !== entry.item.text) entry.highlight.textContent = entry.item.text;
+    entry.highlight.style.setProperty("background-color", color);
   }
 
   /** Put a label at its share of a route, in board units. */

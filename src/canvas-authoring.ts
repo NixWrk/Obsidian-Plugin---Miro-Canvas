@@ -167,6 +167,8 @@ export interface RewriteGraphInput {
 	readonly removeEdges?: readonly string[];
 	readonly addNodes?: readonly Readonly<Record<string, unknown>>[];
 	readonly addEdges?: readonly Readonly<Record<string, unknown>>[];
+	/** Replace this independent connector with a native edge of the same id. */
+	readonly replaceConnectorId?: string;
 	/** Where the ends of added connectors are: on an outline, or free on the board. */
 	readonly edgeEnds?: readonly { readonly edgeId: string; readonly end: "from" | "to"; readonly anchor: CanvasAnchor }[];
 	/** Changes the plugin's record in place; it is validated afterwards like any other. */
@@ -2427,10 +2429,24 @@ export class CanvasAuthoring {
 			}
 		}
 		const taken = collectDocumentIds(before);
+		const independent = boardConnectors(before.document);
+		for (const connector of independent) taken.add(connector.id);
+		const replaced = input.replaceConnectorId;
+		if (replaced !== undefined) {
+			const decision = decideEditOperation(before.document, "reconnect", replaced);
+			if (!independent.some((connector) => connector.id === replaced)
+				|| before.nodes.some((node) => node.id === replaced) || before.edges.some((edge) => edge.id === replaced)
+				|| !addEdges.some((edge) => isPlainObject(edge) && readRequiredString(edge, "id") === replaced)
+				|| !decision.valid || !decision.allowed) {
+				addDiagnostic(diagnostics, "rewrite-connector-refused", "warning", "The independent connector cannot be replaced by a native edge.");
+				return reject();
+			}
+		}
 		const added = new Set<string>();
 		for (const item of [...addNodes, ...addEdges]) {
 			const id = isPlainObject(item) ? readRequiredString(item, "id") : undefined;
-			if (id === undefined || (taken.has(id) && !removeNodes.has(id) && !removeEdges.has(id)) || added.has(id)) {
+			const replacesConnector = id === replaced && addEdges.includes(item);
+			if (id === undefined || (taken.has(id) && !removeNodes.has(id) && !removeEdges.has(id) && !replacesConnector) || added.has(id)) {
 				addDiagnostic(diagnostics, "rewrite-id-invalid", "error", "Every added node and connector needs an id the board does not have.");
 				return reject();
 			}
@@ -2483,11 +2499,17 @@ export class CanvasAuthoring {
 			if (!update.ok || update.document === undefined) return reject();
 			document = update.document;
 		}
-		if (input.metadata !== undefined) {
+		if (input.metadata !== undefined || replaced !== undefined) {
 			const metadata = readMetadataForUpdate(document, diagnostics);
 			if (metadata === undefined) return reject();
 			try {
-				input.metadata(metadata);
+				if (replaced !== undefined) {
+					if (!isPlainObject(metadata.connectors) || !hasOwn(metadata.connectors, replaced)) {
+						throw new SnapshotError("the independent connector record is unavailable");
+					}
+					delete metadata.connectors[replaced];
+				}
+				input.metadata?.(metadata);
 			} catch (error) {
 				addDiagnostic(diagnostics, "metadata-change-failed", "error", `The record could not be changed: ${describeError(error)}.`);
 				return reject();

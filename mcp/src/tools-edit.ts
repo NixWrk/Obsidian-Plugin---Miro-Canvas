@@ -16,7 +16,7 @@ import { lstatSync, readFileSync } from "node:fs";
 import { normalizeAnchor, resolveAnchor, type AnchorPoint, type CanvasAnchor } from "../../src/anchors";
 import { planBoardConnectors } from "../../src/board-connector-writes";
 import {
-	boardConnectors, fitsNativeEdge, nativeEdgeOf, readBoardConnector, restyleBoardConnector, type BoardConnector,
+	boardConnectors, fitsNativeEdge, nativeEdgeOf, readBoardConnector, restyleBoardConnector, storeNativeConnectorOverride, type BoardConnector,
 } from "../../src/board-connectors";
 import {
 	CANVAS_SHAPE_KINDS, CanvasAuthoring, type CanvasAuthoringDiagnostic, type UpdateElementStyleInput, type UpdateNodeInput,
@@ -463,15 +463,8 @@ function connectorToNative(session: EditSession, connector: BoardConnector): Ste
 	const { edge, override } = nativeEdgeOf(connector);
 	return fromAuthoring(session.authoring().rewriteGraph({
 		addEdges: [edge],
-		metadata: (metadata) => {
-			const connectors = isRecord(metadata.connectors) ? { ...metadata.connectors } : {};
-			delete connectors[connector.id];
-			metadata.connectors = connectors;
-			const overrides = isRecord(metadata.localOverrides) ? { ...metadata.localOverrides } : {};
-			const kept = isRecord(overrides[connector.id]) ? overrides[connector.id] as UnknownRecord : {};
-			overrides[connector.id] = { ...kept, ...override };
-			metadata.localOverrides = overrides;
-		},
+		replaceConnectorId: connector.id,
+		metadata: (metadata) => storeNativeConnectorOverride(metadata, connector.id, override),
 	}));
 }
 

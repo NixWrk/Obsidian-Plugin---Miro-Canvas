@@ -91,6 +91,8 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
   readonly independentOnly?: boolean;
   /** Exactly one independently drawn line/arrow can receive a label here. */
   readonly canEditConnectorLabel?: boolean;
+  readonly labelFormatting?: boolean;
+  readonly labelBorderInherited?: boolean;
   readonly selectedIds: readonly string[];
   readonly kinds: readonly SelectionKind[];
   /** False in review mode or on a locked selection; unlocking remains available outside review. */
@@ -115,6 +117,7 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
 export type SelectionStylePatch = SelectionToolbarStyle;
 
 export interface SelectionToolbarActions {
+  readonly onResetLabelBorder?: () => void;
   readonly onFlipEdges?: () => void;
   readonly onMoreActions?: (button: HTMLElement) => void;
   readonly onTextSelectionWanted?: () => void;
@@ -559,6 +562,7 @@ interface ToolbarRefs {
   readonly formats: Readonly<Record<string, HTMLButtonElement>>;
   readonly align: Popover;
   readonly alignments: readonly HTMLButtonElement[];
+  readonly verticalRow: HTMLElement;
   readonly verticalAlignments: readonly HTMLButtonElement[];
   readonly lineHeight: HTMLInputElement;
   readonly list: HTMLButtonElement;
@@ -583,6 +587,8 @@ interface ToolbarRefs {
   readonly borderStyles: readonly HTMLButtonElement[];
   readonly borderWidth: HTMLInputElement;
   readonly borderWidthValue: HTMLElement;
+  readonly resetLabelBorder: HTMLButtonElement;
+  readonly resetLabelBorderRow: HTMLElement;
   readonly comment: HTMLButtonElement;
   readonly lock: HTMLButtonElement;
   /** Miro's "More": layer order, zoom to selection, edit, open link and delete. */
@@ -681,6 +687,7 @@ export class SelectionToolbar {
     this.closePopovers();
     if (!open) return;
     target.panel.hidden = false;
+    if (this.state?.labelFormatting) this.element.setAttribute("data-miro-label-popover-open", "true");
     keepPanelInView(target.panel);
     target.button.setAttribute("aria-expanded", "true");
   }
@@ -693,6 +700,7 @@ export class SelectionToolbar {
   }
 
   private closePopovers(): void {
+    this.element.removeAttribute?.("data-miro-label-popover-open");
     for (const popover of this.popovers) {
       popover.panel.hidden = true;
       popover.button.setAttribute("aria-expanded", "false");
@@ -766,8 +774,7 @@ export class SelectionToolbar {
     this.icon(fontSizeUp, "chevron-up", "⌃");
     this.icon(fontSizeDown, "chevron-down", "⌄");
 
-    // Miro's third group: how the text is set - style, alignment, list, link.
-    // A line shows only its style here; alignment, list and link are a card's own.
+    // Text cards and connector labels share the font and paragraph controls.
     const styleGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
     const format = this.makePopover(styleGroup, words().toolbar.textStyle);
     this.icon(format.button, "bold", "B");
@@ -886,6 +893,11 @@ export class SelectionToolbar {
     const borderWidthRow = this.block(borderPanel, words().toolbar.borderWidth, "miro-canvas-toolbar__row miro-canvas-toolbar__slider");
     const borderWidth = append(borderWidthRow, makeRange(document, words().toolbar.borderWidth, 0, BORDER_SLIDER_MAX));
     const borderWidthValue = append(borderWidthRow, make(document, "span", "miro-canvas-toolbar__value"));
+    const resetLabelBorderRow = this.block(borderPanel, undefined);
+    const resetLabelBorder = append(resetLabelBorderRow, makeButton(document,
+      words().toolbar.labelBorderFromArrow, "miro-canvas-toolbar__button--default"));
+    resetLabelBorder.textContent = words().toolbar.labelBorderFromArrow;
+    resetLabelBorderRow.hidden = true;
 
     // Miro's last group: comment, lock and everything under "More".
     const lastGroup = append(bar, make(document, "span", "miro-canvas-toolbar__group"));
@@ -950,10 +962,10 @@ export class SelectionToolbar {
     const refs: ToolbarRefs = {
       bar, shape, shapeOptions,
       sizeGroup, font, fontOptions, fontSize, fontSizeDown, fontSizeUp,
-      styleGroup, format, formats, align, alignments, verticalAlignments, lineHeight,
+      styleGroup, format, formats, align, alignments, verticalRow, verticalAlignments, lineHeight,
       list, link: { popover: link, input: linkInput, apply: linkApply },
       edgeGroup, editConnectorLabel, startCap, endCap, startCaps, endCaps, swapEnds, line, routes, strokes, lineWidth, lineWidthValue, headSize,
-      colors, colorGroup, lastGroup, reviewLink, borderStyles, borderWidth, borderWidthValue,
+      colors, colorGroup, lastGroup, reviewLink, borderStyles, borderWidth, borderWidthValue, resetLabelBorder, resetLabelBorderRow,
       comment, lock, more, layerSection, layerOptions,
       deleteSelection, openLink, nativeSlot, status,
     };
@@ -1057,6 +1069,9 @@ export class SelectionToolbar {
     this.listen(refs.borderWidth, "change", () => {
       const width = finiteNumber(refs.borderWidth.value);
       if (width !== undefined && width >= 0 && width <= MAX_BORDER_WIDTH) this.style({ borderWidth: width });
+    });
+    this.listen(refs.resetLabelBorder, "click", () => {
+      if (this.state?.editable && !this.state.reviewMode && this.state.labelFormatting) this.actions.onResetLabelBorder?.();
     });
     // The lock toggle is the one control that stays live on a locked selection,
     // otherwise an accidental lock could never be undone from here.
@@ -1193,21 +1208,20 @@ export class SelectionToolbar {
     }
     refs.deleteSelection.disabled=!state.editable;
     const hasNode = state.kinds.some((kind) => kind !== "edge");
-    // A card's text row belongs to nodes that show text; a link, file or
-    // embed has none of its own.  A line's label takes the same font family,
-    // size and four marks, so the font row opens for a line too - but not
-    // alignment or line height, which only a card's own text wraps enough to need.
+    // A line label has horizontal alignment and spacing. Its box follows the
+    // text height, so vertical alignment has no effect.
     const hasTextNode = state.kinds.some((kind) => kind !== "edge" && kind !== "media");
     refs.shape.host.hidden = !state.kinds.includes("shape");
     refs.sizeGroup.hidden = !(hasTextNode || hasEdge);
     refs.styleGroup.hidden = !(hasTextNode || hasEdge);
-    refs.align.host.hidden = !hasTextNode;
+    refs.align.host.hidden = !hasTextNode && !state.labelFormatting;
+    refs.verticalRow.hidden = !hasTextNode;
     refs.list.hidden = this.actions.onToggleList === undefined || !hasTextNode;
     refs.link.popover.host.hidden = this.actions.onSetLink === undefined || !hasTextNode;
     refs.edgeGroup.hidden = !hasEdge;
     refs.editConnectorLabel.hidden = state.canEditConnectorLabel !== true;
     for (const slot of COLOR_SLOT_KEYS) {
-      refs.colors[slot].popover.host.hidden = EDGE_COLOR_SLOTS.has(slot) ? !hasEdge : !hasNode;
+      refs.colors[slot].popover.host.hidden = EDGE_COLOR_SLOTS.has(slot) ? !hasEdge : !hasNode && !state.labelFormatting;
     }
 
     const shape = shapeCatalogEntry(state.shape);
@@ -1253,6 +1267,12 @@ export class SelectionToolbar {
     for (const slot of COLOR_SLOT_KEYS) {
       const color = normalizedHex(state.colors[slot]);
       const slotRefs = refs.colors[slot];
+      const arrowColor = state.labelFormatting === true && (slot === "text" || slot === "border");
+      slotRefs.reset.setAttribute("aria-label", arrowColor ? words().toolbar.labelColorFromArrow : words().toolbar.obsidianColor);
+      const defaultLabel = slotRefs.reset.querySelector?.(".miro-canvas-toolbar__default-label");
+      if (defaultLabel !== null && defaultLabel !== undefined) {
+        defaultLabel.textContent = arrowColor ? words().toolbar.labelColorFromArrow : words().toolbar.defaultLabel;
+      }
       // Absent is Obsidian's own colour; null is a transparent choice.
       slotRefs.reset.setAttribute("aria-pressed", state.colors[slot] === undefined ? "true" : "false");
       slotRefs.clear.setAttribute("aria-pressed", state.colors[slot] === null ? "true" : "false");
@@ -1269,6 +1289,8 @@ export class SelectionToolbar {
     pressWhere(refs.borderStyles, state.borderStyle ?? "solid");
     refs.borderWidth.value = String(Math.min(BORDER_SLIDER_MAX, state.borderWidth ?? 1));
     refs.borderWidthValue.textContent = state.borderWidth === undefined ? "" : String(state.borderWidth);
+    refs.resetLabelBorderRow.hidden = !state.labelFormatting || this.actions.onResetLabelBorder === undefined;
+    refs.resetLabelBorder.setAttribute("aria-pressed", state.labelBorderInherited === true ? "true" : "false");
 
     this.icon(refs.lock, state.locked ? "lock" : "lock-open", state.locked ? "🔒" : "🔓");
     refs.lock.setAttribute("aria-pressed", state.locked ? "true" : "false");
@@ -1320,7 +1342,7 @@ export class SelectionToolbar {
       ...Object.values(refs.formats), ...refs.alignments, ...refs.verticalAlignments, refs.lineHeight, refs.list, refs.link.input, refs.link.apply,
       refs.editConnectorLabel, ...refs.startCaps, ...refs.endCaps, refs.swapEnds, ...refs.routes, ...refs.strokes, refs.lineWidth, refs.headSize,
       ...Object.values(refs.colors).flatMap((color) => [color.input, color.clear, color.reset]),
-      ...refs.borderStyles, refs.borderWidth, ...refs.layerOptions,
+      ...refs.borderStyles, refs.borderWidth, refs.resetLabelBorder, ...refs.layerOptions,
     ];
   }
 

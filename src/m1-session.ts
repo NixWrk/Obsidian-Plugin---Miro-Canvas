@@ -44,11 +44,11 @@ import { planBoardConnectors } from "./board-connector-writes";
 import type { LayerDirection } from "./layer-order";
 import {
 	boardConnectors, connectorEndCap, fitsNativeEdge, heldByNode, nativeEdgeOf, readBoardConnector,
-	restyleBoardConnector, translateConnector, type BoardConnector,
+	restyleBoardConnector, storeNativeConnectorOverride, translateConnector, type BoardConnector,
 } from "./board-connectors";
 import { commentSelectionId, previewBoardSelection, selectedComment, selectionMovesLineData, routeEndsInBox, pointInSelectionBox, rectIntersectsBox, type SelectedRouteEnds } from "./board-selection";
 import { ConnectorLayer } from "./connector-layer";
-import { ConnectorLabels, type ConnectorLabel } from "./connector-labels";
+import { ConnectorLabels, connectorLabelFrame, LABEL_FONT_PROPERTIES, type ConnectorLabel } from "./connector-labels";
 import {
 	MAX_WAYPOINTS, gripNear, moveElbowSegment, placeWaypoint, planRoute, removeWaypoint, routeBends, routeHandles, routePath, simplifyCorners,
 	type PlannedRoute, type RouteEnd,
@@ -528,9 +528,6 @@ export function resolveSelectionToolbarPresentation(
 	};
 }
 
-/** The CSS a label's own font paints; never alignment, line height or vertical align. */
-const LABEL_FONT_PROPERTIES = new Set(["font-family", "font-size", "font-weight", "font-style", "text-decoration"]);
-
 /**
  * A connector label's font: an edited override in full, painted the same
  * way a card's text is, since touching any one field snaps every field to
@@ -544,17 +541,14 @@ export function labelFont(
 	css: Readonly<Record<string, string>> | undefined,
 ): Readonly<Record<string, string>> | undefined {
 	if (override !== undefined) {
-		const style: Record<string, string> = {};
-		for (const [property, value] of typographyDeclarations(override)) {
-			if (LABEL_FONT_PROPERTIES.has(property)) style[property] = value;
-		}
-		return style;
+		return Object.fromEntries(typographyDeclarations(override));
 	}
 	if (css === undefined) return undefined;
 	const style: Record<string, string> = {};
 	const family = css["font-family"];
 	if (family !== undefined) style["font-family"] = fontStack(family);
-	for (const property of ["font-size", "font-weight", "font-style", "text-decoration"]) {
+	for (const property of LABEL_FONT_PROPERTIES) {
+		if (property === "font-family") continue;
 		const value = css[property];
 		if (value !== undefined) style[property] = value;
 	}
@@ -936,7 +930,7 @@ export class M1CanvasSession {
 	/** Labels on every connector, native edges and the board's own alike. */
 	private connectorLabels?: ConnectorLabels;
 	/** What the labels were last placed for; the same again places nothing. */
-	private labelsPlaced: { readonly document: unknown; readonly geometry: AnchorGeometry; readonly selected: string | undefined } | undefined;
+	private labelsPlaced: { readonly document: unknown; readonly geometry: AnchorGeometry; readonly selected: string | undefined; readonly theme: string | null } | undefined;
 	/** What the Lines and arrows tool draws with. */
 	private connectorColor?: string;
 	private connectorHeadSize?: number;
@@ -1203,15 +1197,8 @@ export class M1CanvasSession {
 		this.authoring ??= createCanvasAuthoring(this.view);
 		const result = this.authoring.rewriteGraph({
 			addEdges: [edge],
-			metadata: (metadata) => {
-				const connectors = isRecord(metadata.connectors) ? { ...metadata.connectors } : {};
-				delete connectors[connector.id];
-				metadata.connectors = connectors;
-				const overrides = isRecord(metadata.localOverrides) ? { ...metadata.localOverrides } : {};
-				const kept = isRecord(overrides[connector.id]) ? overrides[connector.id] as Record<string, unknown> : {};
-				overrides[connector.id] = { ...kept, ...override };
-				metadata.localOverrides = overrides;
-			},
+			replaceConnectorId: connector.id,
+			metadata: (metadata) => storeNativeConnectorOverride(metadata, connector.id, override),
 		});
 		if (!result.ok) {
 			this.options.onNotice?.(firstProblem(result.diagnostics) ?? words().session.edgeJoinRejected);
@@ -1275,7 +1262,11 @@ export class M1CanvasSession {
 				const overrides = isRecord(metadata.localOverrides) ? { ...metadata.localOverrides } : {};
 				if (isRecord(overrides[edgeId])) {
 					// What described the edge now lives in the connector.
-					const { connector: _style, connectorAnchors: _anchors, colors: _colors, ...rest } = overrides[edgeId] as Record<string, unknown>;
+					const { connector: _style, connectorAnchors: _anchors, colors, ...rest } = overrides[edgeId] as Record<string, unknown>;
+					if (isRecord(colors)) {
+						const { edge: _stroke, ...labelColors } = colors;
+						if (Object.keys(labelColors).length > 0) rest.colors = labelColors;
+					}
 					if (Object.keys(rest).length === 0) delete overrides[edgeId];
 					else overrides[edgeId] = rest;
 				}
@@ -1301,6 +1292,34 @@ export class M1CanvasSession {
 		const channels = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/u.exec(computed ?? "");
 		if (channels === null) return this.boardInk();
 		return `#${channels.slice(1, 4).map((value) => Number(value).toString(16).padStart(2, "0")).join("")}`;
+	}
+
+	private nativeLabelStroke(edge: unknown, descriptor: SourceItemDescriptor | undefined): { color: string; style: string; width: number } {
+		const group = readRuntime(edge, "lineGroupEl");
+		const path = isElement(group) ? group.querySelector?.("path.canvas-display-path") : undefined;
+		const paint = path?.ownerDocument?.defaultView?.getComputedStyle(path);
+		const color = descriptor?.css.stroke ?? paint?.stroke;
+		return {
+			color: color && color !== "none" ? color : "var(--text-normal)",
+			style: descriptor?.connector?.strokeStyle ?? "solid",
+			width: cssNumber(descriptor?.css["stroke-width"] ?? paint?.strokeWidth) ?? 2,
+		};
+	}
+
+	private labelOverrides(id: string, raw: unknown, projected: Readonly<Record<string, string>> = {}): Readonly<Record<string, string>> {
+		const css = { ...projected };
+		const colors = this.appearance.localOverrides[id]?.colors;
+		for (const [slot, property] of [
+			["text", "color"], ["fill", "background-color"], ["border", "border-color"], ["highlight", "--miro-highlight"],
+		] as const) {
+			const value = colors?.[slot];
+			if (value === null || typeof value === "string") css[property] = value ?? "transparent";
+		}
+		const style = readRuntime(raw, "borderStyle");
+		if (style === "solid" || style === "dashed" || style === "dotted" || style === "none") css["border-style"] = style;
+		const width = finite(readRuntime(raw, "borderWidth"));
+		if (width !== undefined && width >= 0 && width <= 100) css["border-width"] = `${width}px`;
+		return css;
 	}
 
 	/** Edit the label of the one selected connector, a native edge's or the board's own. */
@@ -1352,9 +1371,10 @@ export class M1CanvasSession {
 		const raw = this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument;
 		const { geometry, scene } = this.landingGeometry();
 		const selected = this.selectedIds.length === 1 ? this.selectedIds[0] : undefined;
+		const theme = this.root?.getAttribute("data-miro-canvas-resolved-theme") ?? null;
 		const placed = this.labelsPlaced;
-		if (placed !== undefined && placed.document === raw && placed.geometry === geometry && placed.selected === selected) return;
-		this.labelsPlaced = { document: raw, geometry, selected };
+		if (placed !== undefined && placed.document === raw && placed.geometry === geometry && placed.selected === selected && placed.theme === theme) return;
+		this.labelsPlaced = { document: raw, geometry, selected, theme };
 		const fallback = this.settings.connectorLabelPosition;
 		const along = (id: string): readonly { readonly x: number; readonly y: number }[] => {
 			const route = geometry.edges?.[id];
@@ -1381,11 +1401,16 @@ export class M1CanvasSession {
 			if (id === undefined || (text === "" && id !== selected)) continue;
 			const points = along(id);
 			if (points.length < 2) continue;
-			const labelT = readRuntime(readRuntime(readRuntime(overrides, id), "connector"), "labelT");
+			const local = readRuntime(overrides, id);
+			const labelT = readRuntime(readRuntime(local, "connector"), "labelT");
 			const native = readRuntime(readRuntime(edge, "labelElement"), "wrapperEl");
 			const labelFontStyle = font(id);
+			const descriptor = scene.items.get(id);
+			const stroke = this.nativeLabelStroke(edge, descriptor);
 			items.push({
 				id, text, points, t: typeof labelT === "number" && labelT >= 0 && labelT <= 1 ? labelT : fallback,
+				color: stroke.color,
+				appearance: connectorLabelFrame(stroke, this.labelOverrides(id, local, descriptor?.css)),
 				...(isElement(native) ? { native } : {}),
 				...(labelFontStyle === undefined ? {} : { font: labelFontStyle }),
 			});
@@ -1398,6 +1423,8 @@ export class M1CanvasSession {
 			const labelFontStyle = font(connector.id);
 			items.push({
 				id: connector.id, text, points, t: connector.labelT ?? fallback, color: connector.color,
+				appearance: connectorLabelFrame({ color: connector.color, width: connector.width, style: connector.strokeStyle ?? "solid" },
+					this.labelOverrides(connector.id, readRuntime(overrides, connector.id), scene.items.get(connector.id)?.css)),
 				...(labelFontStyle === undefined ? {} : { font: labelFontStyle }),
 			});
 		}
@@ -1844,6 +1871,7 @@ export class M1CanvasSession {
 			onTextSelectionWanted: () => this.captureTextFragment(),
 			onAppearance: (action) => this.applyAppearance(action),
 			onStyle: (patch) => this.applyElementStyle(patch),
+			onResetLabelBorder: () => this.setLabelBorder(undefined),
 			onFlipEdges: () => this.flipSelectionEdges(),
 			onMoreActions: (button) => this.options.onSelectionActions?.(button, this.enhancementActions()),
 			onEditConnectorLabel: () => {this.editSelectedConnectorLabel();},
@@ -3259,6 +3287,10 @@ export class M1CanvasSession {
 		if (!this.editAllowed("restyle", this.selectedIds)) {
 			return;
 		}
+		if ((patch.borderWidth !== undefined || patch.borderStyle !== undefined) && this.labelConnectorSelection()) {
+			this.setLabelBorder(patch);
+			return;
+		}
 		this.authoring ??= createCanvasAuthoring(this.view);
 		const lines = this.selectedIds.filter((id) => this.lineOf(id) !== undefined);
 		// The board's own connectors keep their style in their own record.
@@ -3291,6 +3323,37 @@ export class M1CanvasSession {
 			this.addDiagnostic(reason ?? "Canvas rejected the style change.");
 		}
 		this.refresh();
+	}
+
+	private labelConnectorSelection(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const ids = new Set(collectCanvasElementIds(this.adapter.getEdges() ?? []));
+		for (const connector of boardConnectors(this.currentRawDocument)) ids.add(connector.id);
+		return this.selectedIds.every((id) => ids.has(id));
+	}
+
+	private setLabelBorder(patch: Pick<SelectionStylePatch, "borderStyle" | "borderWidth"> | undefined): void {
+		this.readInteractionState();
+		if (!this.labelConnectorSelection() || !this.editAllowed("restyle", this.selectedIds)) return;
+		this.writeMetadata("connector-label-border", (draft) => {
+			const overrides = isRecord(draft.localOverrides) ? { ...draft.localOverrides } : {};
+			for (const id of this.selectedIds) {
+				const existing = overrides[id];
+				if (patch === undefined && !isRecord(existing)) continue;
+				const style = isRecord(existing) ? { ...existing } : {};
+				if (patch === undefined) {
+					delete style.borderWidth;
+					delete style.borderStyle;
+				} else {
+					if (patch.borderWidth !== undefined) style.borderWidth = patch.borderWidth;
+					if (patch.borderStyle !== undefined) style.borderStyle = patch.borderStyle;
+				}
+				if (Object.keys(style).length > 0) overrides[id] = style;
+				else delete overrides[id];
+			}
+			if (Object.keys(overrides).length > 0) draft.localOverrides = overrides;
+			else delete draft.localOverrides;
+		});
 	}
 
 	/**
@@ -6639,6 +6702,16 @@ export class M1CanvasSession {
 		const ownSelected = this.connectorLayer?.selection() ?? [];
 		const placement = this.selectionPlacement();
 		const kinds = this.selectionKinds();
+		const labelFormatting = kinds.length === 1 && kinds[0] === "edge" && this.labelConnectorSelection();
+		const rawLabel = id === undefined ? undefined
+			: readRuntime(readRuntime(readRuntime(this.currentRawDocument, "miroCanvas"), "localOverrides"), id);
+		const labelStyle = labelFormatting && id !== undefined ? this.labelOverrides(id, rawLabel) : {};
+		const colors = { ...presentation.colors };
+		if (labelFormatting && id !== undefined) {
+			Object.assign(colors, this.appearance.localOverrides[id]?.colors);
+		}
+		if (own !== undefined) colors.edge = own.color;
+		const labelTypography = id === undefined ? undefined : this.appearance.localOverrides[id]?.typography;
 		const link = this.selectedLink();
 		const textLink = this.selectedCardLink();
 		return {
@@ -6652,8 +6725,11 @@ export class M1CanvasSession {
 				: lockedSelection
 					? { blockedReason: "This selection is locked. Unlock it to change formatting." }
 					: {}),
-			typography: presentation.typography,
-			colors: presentation.colors,
+			typography: labelFormatting && id !== undefined
+				? labelTypography ?? (this.landingGeometry().scene.items.get(id)?.css["text-align"] === undefined
+					? { ...presentation.typography, alignment: "center" } : presentation.typography)
+				: presentation.typography,
+			colors,
 			palette: this.appearance.settings.palette,
 			// A note is filled from Miro's own sticky colours, as Miro offers them.
 			...(kinds.length > 0 && kinds.every((kind) => kind === "sticky") ? { fillPalette: stickyPalette() } : {}),
@@ -6661,6 +6737,13 @@ export class M1CanvasSession {
 			...(kinds.length > 0 && kinds.every((kind) => kind === "frame") ? { fillPalette: framePalette() } : {}),
 			recentColors: this.appearance.settings.recentColors,
 			...presentation.style,
+			...(labelFormatting ? {
+				labelFormatting,
+				labelBorderInherited: labelStyle["border-style"] === undefined && labelStyle["border-width"] === undefined,
+				borderStyle: presentation.style.borderStyle ?? (labelStyle["border-style"] as SelectionToolbarStyle["borderStyle"])
+					?? own?.strokeStyle ?? presentation.style.connector?.strokeStyle ?? "solid",
+				borderWidth: presentation.style.borderWidth ?? cssNumber(labelStyle["border-width"]) ?? own?.width ?? presentation.style.connector?.width ?? 2,
+			} : {}),
 			// One of the board's own connectors shows its own record's style.
 			...(own === undefined ? {} : {
 				connector: {
@@ -6672,11 +6755,10 @@ export class M1CanvasSession {
 					strokeStyle: own.strokeStyle ?? "solid",
 					waypoints: own.waypoints ?? [],
 				},
-				colors: { ...presentation.colors, edge: own.color },
 			}),
 			independentSelection: ownSelected.length > 0,
 			independentOnly: this.selectedIds.length > 0 && this.selectedIds.every((selected) => ownSelected.includes(selected)),
-			canEditConnectorLabel: this.selectedIds.length === 1 && kinds.includes("edge"),
+			canEditConnectorLabel: this.selectedIds.length === 1 && labelFormatting,
 			...(placement === undefined ? {} : { placement }),
 			...(link === undefined ? {} : { link }),
 			...(textLink === undefined ? {} : { textLink }),
@@ -7423,7 +7505,7 @@ export class M1CanvasSession {
 		// off after the metadata commit, which refuses a graph that changed
 		// under it, and saved the way Canvas saves its own colour menu.
 		if (type === APPEARANCE_ACTIONS.resetColor && (slot === "fill" || slot === "border" || slot === "edge")
-			&& this.clearNativeColors(this.selectedIds)) {
+			&& this.clearNativeColors(this.selectedIds, slot === "edge")) {
 			this.adapter.requestSave();
 			this.refresh();
 		}
@@ -7610,9 +7692,10 @@ export class M1CanvasSession {
 	}
 
 	/** Take native Canvas colour presets off elements, the way its own colour menu does. */
-	private clearNativeColors(ids: readonly string[]): boolean {
+	private clearNativeColors(ids: readonly string[], includeEdges: boolean): boolean {
 		let cleared = false;
-		for (const item of [...(this.adapter.getNodes() ?? []), ...(this.adapter.getEdges() ?? [])]) {
+		const edges = includeEdges ? this.adapter.getEdges() ?? [] : [];
+		for (const item of [...(this.adapter.getNodes() ?? []), ...edges]) {
 			const id = readCanvasElementId(item);
 			const color = readRuntime(item, "color");
 			const setColor = readRuntime(item, "setColor");

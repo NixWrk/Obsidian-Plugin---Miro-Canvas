@@ -272,7 +272,11 @@ Thickness stays steady while holding and lifting the pen; movement continues
 to change thickness with pressure. Pressing the active pen or line button again hides its settings
 while keeping the tool selected.
 
-Line labels use the same fonts and formatting as card text. Snapping helps
+Select a connector to format its label. The text and frame border follow the
+arrow color, and the border follows its width and stroke style. The text,
+highlight, fill and border palettes apply to the whole label. **Line color**
+applies to the arrow itself. Choose **Use arrow color** or **Use arrow width and
+style** to resume following the arrow. Snapping helps
 attach ends to card outlines and anchor points. Connections to other lines
 are experimental and disabled by default.
 

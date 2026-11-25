@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ConnectorLabels, type ConnectorLabel, type ConnectorLabelsHost } from "../src/connector-labels";
+import { ConnectorLabels, connectorLabelFrame, type ConnectorLabel, type ConnectorLabelsHost } from "../src/connector-labels";
 
 class FakeStyle {
   public transform = "";
@@ -118,6 +118,34 @@ function item(patch: Partial<ConnectorLabel> = {}): ConnectorLabel {
 }
 
 describe("connector labels", () => {
+  it("follows the arrow until each label field has its own override", () => {
+    const stroke = { color: "#ff8800", width: 5, style: "dashed" };
+    expect(connectorLabelFrame(stroke)).toEqual({
+      color: "#ff8800", "background-color": "var(--background-primary)",
+      "border-color": "#ff8800", "border-width": "5px", "border-style": "dashed",
+    });
+    const overrides = { color: "#0088ff", "border-color": "transparent", "border-width": "0px" };
+    expect(connectorLabelFrame({ color: "#5544dd", width: 7, style: "dotted" }, overrides)).toMatchObject({
+      color: "#0088ff", "border-color": "transparent", "border-width": "0px", "border-style": "dotted",
+    });
+  });
+
+  it("updates the frame and the text highlight without moving or replacing the label", () => {
+    const labels = new ConnectorLabels(new FakeDocument() as unknown as Document, host());
+    const root = labels.element as unknown as FakeElement;
+    labels.update([item({ appearance: { "border-width": "5px", "--miro-highlight": "#ffe86d" } })]);
+    const label = labelOf(root, "c1");
+    const position = label.parentNode?.style.transform;
+    expect(label.children[0].textContent).toBe("connects");
+    expect(label.children[0].style.getPropertyValue("background-color")).toBe("#ffe86d");
+    expect(label.style.getPropertyValue("border-width")).toBe("5px");
+    labels.update([item({ appearance: { "border-width": "2px", "--miro-highlight": "transparent" } })]);
+    expect(labelOf(root, "c1")).toBe(label);
+    expect(label.parentNode?.style.transform).toBe(position);
+    expect(label.textContent).toBe("connects");
+    expect(label.children).toHaveLength(0);
+    expect(label.style.getPropertyValue("border-width")).toBe("2px");
+  });
   it("paints a label's font from the item and clears a property the item stops setting", () => {
     const labels = new ConnectorLabels(new FakeDocument() as unknown as Document, host());
     const root = labels.element as unknown as FakeElement;

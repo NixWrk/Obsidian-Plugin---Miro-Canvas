@@ -58,6 +58,10 @@ class FakeElement {
     this.attributes.set(name, value);
   }
 
+  public removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+
   public getAttribute(name: string): string | null {
     return this.attributes.get(name) ?? null;
   }
@@ -177,6 +181,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   readonly lists: number[];
   readonly links: Array<string | undefined>;
   readonly comments: number[];
+  readonly labelBorderResets: number[];
   readonly update: (patch?: Partial<SelectionToolbarState>) => void;
 } {
   const appearance: AppearanceAction[] = [];
@@ -186,9 +191,11 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   const lists: number[] = [];
   const links: Array<string | undefined> = [];
   const comments: number[] = [];
+  const labelBorderResets: number[] = [];
   const toolbar = new SelectionToolbar({
     onAppearance: (action) => { appearance.push(action); },
     onStyle: (patch) => { styles.push(patch); },
+    onResetLabelBorder: () => { labelBorderResets.push(1); },
     onLock: (locked) => { locks.push(locked); },
     onLayer: (direction) => { layers.push(direction); },
     onToggleList: () => { lists.push(1); },
@@ -210,7 +217,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   };
   const update = (patch: Partial<SelectionToolbarState> = {}): void => toolbar.update({ ...base, ...patch });
   update();
-  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, locks, layers, lists, links, comments, update };
+  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, locks, layers, lists, links, comments, labelBorderResets, update };
 }
 
 describe("selection toolbar", () => {
@@ -405,6 +412,30 @@ describe("selection toolbar", () => {
     update({ ...EDGE, kinds: ["edge"] });
     expect(shown(byLabel(root, "Alignment"))).toBe(false);
     expect(shown(byLabel(root, "Font"))).toBe(true);
+  });
+
+  it("shares text and frame controls with a connector label while keeping its stroke separate", () => {
+    const { root, appearance, styles, labelBorderResets, update } = build({
+      ...EDGE, labelFormatting: true, labelBorderInherited: true, borderWidth: 4, borderStyle: "dashed",
+    });
+    expect(["Alignment", "Text color", "Fill color", "Border", "Line color"].every(label => shown(byLabel(root, label)))).toBe(true);
+    expect(shown(byLabel(root, "Align bottom"))).toBe(false);
+    byLabel(root, "Border").dispatch("click");
+    expect(root.getAttribute("data-miro-label-popover-open")).toBe("true");
+    byLabel(root, "Align right").dispatch("click");
+    byLabel(root, "Border width").value = "6";
+    byLabel(root, "Border width").dispatch("change");
+    expect(appearance).toEqual([{ type: APPEARANCE_ACTIONS.setAlignment, alignment: "right" }]);
+    expect(styles).toEqual([{ borderWidth: 6 }]);
+    const reset = byLabel(root, "Use arrow width and style");
+    expect(reset.getAttribute("aria-pressed")).toBe("true");
+    reset.dispatch("click");
+    update({ editable: false, labelBorderInherited: false });
+    expect(reset.getAttribute("aria-pressed")).toBe("false");
+    reset.dispatch("click");
+    expect(labelBorderResets).toEqual([1]);
+    update({ selectedIds: ["another-edge"] });
+    expect(root.getAttribute("data-miro-label-popover-open")).toBeNull();
   });
 
   it("sets text style, alignment and font from pictures and shows the current ones", () => {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Give arrow labels independent text and frame formatting. Text and border colors, border width and border style follow the arrow until overridden.
+
 ## 0.3.3 - 2026-11-25
 
 - Apply Text color to the selected text in a card editor. With no text selection, the palette sets the whole card's text color. ([#35](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/issues/35))

@@ -1901,6 +1901,11 @@
   cursor: default;
 }
 
+/* Label formatting can open over the board's dock on a low connector. */
+.miro-canvas-toolbar[data-miro-label-popover-open="true"] {
+  z-index: 131;
+}
+
 .miro-canvas-toolbar__heading {
   padding: 0 2px;
   color: var(--text-muted);
@@ -2309,8 +2314,10 @@
 }
 
 .miro-canvas-connector-label .canvas-path-label {
+  box-sizing: border-box;
   pointer-events: auto;
   cursor: grab;
+  text-align: center;
 }
 
 .miro-canvas-connector-label[hidden] {

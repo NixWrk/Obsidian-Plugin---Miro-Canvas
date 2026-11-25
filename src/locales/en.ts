@@ -518,6 +518,8 @@ export const EN = {
 		dottedBorder: "Dotted border",
 		noBorder: "No border",
 		borderWidth: "Border width",
+		labelBorderFromArrow: "Use arrow width and style",
+		labelColorFromArrow: "Use arrow color",
 		openLink: "Open link",
 		openLinkWithUrl: (url: string) => `Open link\n${url}`,
 		comment: "Comment",

@@ -1442,6 +1442,32 @@ describe("connector creation", () => {
 		edges: [],
 	});
 
+	it("replaces a styled independent connector with a native edge in one history step without permitting duplicate ids", () => {
+		const before = {
+			...board(),
+			miroSource: { evidence: ["preserved"] },
+			miroCanvas: {
+				schemaVersion: 1,
+				connectors: { labelled: {
+					id: "labelled", from: { type: "free", x: 100, y: 40 }, to: { type: "free", x: 300, y: 40 },
+					route: "straight", color: "#4262ff", width: 3, startCap: "none", endCap: "arrow", label: "Kept",
+				} },
+				localOverrides: { labelled: { borderWidth: 5, borderStyle: "dotted", colors: { text: "#f24726" } } },
+			},
+		};
+		const { graph, authoring } = host(before);
+		const edge = { id: "labelled", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left", label: "Kept" };
+		expect(authoring.rewriteGraph({ addEdges: [edge] }).ok).toBe(false);
+		expect(authoring.rewriteGraph({ addEdges: [edge], replaceConnectorId: "labelled" }).ok).toBe(true);
+		expect(graph.getData().edges).toEqual([edge]);
+		expect(graph.getData()).not.toHaveProperty("miroCanvas.connectors.labelled");
+		expect(graph.getData()).toHaveProperty("miroCanvas.localOverrides.labelled", before.miroCanvas.localOverrides.labelled);
+		expect(graph.getData().miroSource).toEqual(before.miroSource);
+		expect(graph.history).toHaveLength(2);
+		graph.undo();
+		expect(graph.getData()).toEqual(before);
+	});
+
 	it("adds one native edge between two nodes", () => {
 		const { graph, authoring } = host(board());
 		const result = authoring.createConnector({ fromNode: "a", toNode: "b" });

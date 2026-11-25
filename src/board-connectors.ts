@@ -243,6 +243,17 @@ export function nativeEdgeOf(connector: BoardConnector): { readonly edge: Record
   };
 }
 
+/** Keep a label's individual styling when a native edge takes over its stroke. */
+export function storeNativeConnectorOverride(metadata: Record<string, unknown>, id: string, override: Record<string, unknown>): void {
+  const overrides = isRecord(metadata.localOverrides) ? { ...metadata.localOverrides } : {};
+  const existing = overrides[id];
+  const kept = isRecord(existing) ? existing : {};
+  const labelColors = isRecord(kept.colors) ? kept.colors : {};
+  const strokeColors = isRecord(override.colors) ? override.colors : {};
+  overrides[id] = { ...kept, ...override, colors: { ...labelColors, ...strokeColors } };
+  metadata.localOverrides = overrides;
+}
+
 /** Pure, explicit migration of lines once drawn as nodes.  The exact old record is archived; source data is untouched. */
 export function migrateLineNodes(input: Record<string, unknown>): { document: Record<string, unknown>; migrated: string[]; skipped: string[] } {
   const document = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;

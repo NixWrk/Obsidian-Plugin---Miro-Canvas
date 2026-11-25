@@ -514,6 +514,8 @@ export const RU: Messages = {
 		dottedBorder: "Точечная рамка",
 		noBorder: "Без рамки",
 		borderWidth: "Толщина рамки",
+		labelBorderFromArrow: "Толщина и стиль по стрелке",
+		labelColorFromArrow: "Цвет по стрелке",
 		openLink: "Открыть ссылку",
 		openLinkWithUrl: (url: string) => `Открыть ссылку\n${url}`,
 		comment: "Комментарий",
