@@ -177,6 +177,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   readonly appearance: AppearanceAction[];
   readonly styles: SelectionStylePatch[];
   readonly widthPreviews: (number | undefined)[];
+  readonly borderPreviews: (number | undefined)[];
   readonly locks: boolean[];
   readonly layers: string[];
   readonly lists: number[];
@@ -188,6 +189,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   const appearance: AppearanceAction[] = [];
   const styles: SelectionStylePatch[] = [];
   const widthPreviews: (number | undefined)[] = [];
+  const borderPreviews: (number | undefined)[] = [];
   const locks: boolean[] = [];
   const layers: string[] = [];
   const lists: number[] = [];
@@ -197,7 +199,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   const toolbar = new SelectionToolbar({
     onAppearance: (action) => { appearance.push(action); },
     onStyle: (patch) => { styles.push(patch); },
-    onLineWidthPreview: (width) => { widthPreviews.push(width); },
+    onWidthPreview: (target, width) => { (target === "line" ? widthPreviews : borderPreviews).push(width); },
     onResetLabelBorder: () => { labelBorderResets.push(1); },
     onLock: (locked) => { locks.push(locked); },
     onLayer: (direction) => { layers.push(direction); },
@@ -220,7 +222,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   };
   const update = (patch: Partial<SelectionToolbarState> = {}): void => toolbar.update({ ...base, ...patch });
   update();
-  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, widthPreviews, locks, layers, lists, links, comments, labelBorderResets, update };
+  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, widthPreviews, borderPreviews, locks, layers, lists, links, comments, labelBorderResets, update };
 }
 
 describe("selection toolbar", () => {
@@ -640,6 +642,24 @@ describe("selection toolbar", () => {
     width.dispatch("input");
     width.dispatch("change");
     expect(styles).toEqual([{ connector: { width: 4 } }]);
+  });
+
+  it("previews border width for a frame, preserves zero across refreshes and commits once on release", () => {
+    const { root, styles, borderPreviews, widthPreviews, update } = build({ kinds: ["frame"], borderWidth: 3 });
+    const width = byLabel(root, "Border width");
+    width.dispatch("pointerdown");
+    width.value = "7";
+    width.dispatch("input");
+    width.value = "0";
+    width.dispatch("input");
+    update({ placement: { x: 140, y: 45 } });
+    expect(width.value).toBe("0");
+    expect(borderPreviews).toEqual([7, 0]);
+    expect(styles).toEqual([]);
+    width.dispatch("change");
+    expect(styles).toEqual([{ borderWidth: 0 }]);
+    expect(borderPreviews).toEqual([7, 0, undefined]);
+    expect(widthPreviews).toEqual([]);
   });
 
   it("marks no picture for an unsupported shape token and rejects an out-of-range width", () => {

@@ -2,14 +2,13 @@
 
 ## Unreleased
 
-- Give arrow labels independent text and frame formatting. Text and border colors, border width and border style follow the arrow until overridden.
-- Keep the selection handles aligned with a card from the start of a drag.
-- Preview line thickness and inherited label borders while dragging the slider. Releasing it saves one undoable change.
-
 ## 0.3.3 - 2026-11-25
 
 - Apply Text color to the selected text in a card editor. With no text selection, the palette sets the whole card's text color. ([#35](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/issues/35))
 - Batch backlink pane refreshes during board indexing to reduce repeated vault-cache scans after startup and plugin enable. ([#20](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/issues/20))
+- Format arrow labels and their borders independently. Text color, border color, border width and border style follow the arrow until overridden.
+- Keep the selection handles aligned with a card from the start of a drag.
+- Preview line and border thickness while dragging the slider. This covers arrow labels, text, cards, shapes, notes, attachments and frames. Releasing the slider saves one undoable action.
 
 ## 0.3.2 - 2026-10-10
 

@@ -18,9 +18,12 @@ export function projectNativeCardStyles(shell: HTMLElement, write: StyleWriter):
     ...(typeof shell.findAll === "function" ? shell.findAll(selector)
       : Array.from((shell as PlainCardElement).querySelectorAll(selector), element => element as HTMLElement)),
   ];
+  const keepsBorder = (element: HTMLElement): boolean => element.parentElement === shell
+    && shell.getAttribute?.("data-miro-native-border") === "true" && element.matches?.(".canvas-node-container") === true;
   const clear = (selector: string, properties: readonly string[]): void => {
     for (const element of selected(selector)) {
       for (const property of properties) {
+        if (property.startsWith("border-") && keepsBorder(element)) continue;
         write(element, property, "");
       }
     }
@@ -49,6 +52,7 @@ export function projectNativeCardStyles(shell: HTMLElement, write: StyleWriter):
   clear('.miro-source-group > .canvas-node-container, .miro-source-group .canvas-node-content', ["background-color"]);
   // Variables follow the native selection classes without observing every card.
   for (const element of selected('.miro-source-group > .canvas-node-container')) {
+    if (keepsBorder(element)) continue;
     for (const property of ["border-width", "border-style"] as const) {
       const before = element.style.getPropertyValue(property);
       write(element, property, before === "" ? "" : `var(--miro-source-group-${property}, ${before})`, `--miro-source-group-${property}`);

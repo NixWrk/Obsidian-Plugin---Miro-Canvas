@@ -318,9 +318,11 @@ and width, and the full connector settings (route, line style, both end caps,
 width). Controls that do not apply to the selection are removed from the row
 rather than shown disabled, and only one popover is open at a time.
 
-The line thickness slider previews the stroke and any inherited label border
-as it moves. Releasing it commits one change to Canvas history. Cancelling
-restores the saved thickness.
+The thickness sliders preview the line, its inherited label border, or the
+explicit border of a label or node as they move. Border controls work on text,
+shapes, notes, attachments and frames, including collapsed frames.
+Releasing a slider commits one change to Canvas history. Cancelling restores
+the saved thickness.
 
 Typography and colors continue through the appearance pipeline; shape, border
 and connector settings go through the guarded authoring transaction. Review mode

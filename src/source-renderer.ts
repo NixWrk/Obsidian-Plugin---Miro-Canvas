@@ -929,11 +929,13 @@ function applyNodeCss(
   layer: DomElementLike | undefined,
   patches: RestorePatch[],
   onFontUsed?: (family: string) => void,
+  border?: Readonly<Record<string, string>>,
 ): void {
   // Native cards paint their rounded face and border on the inner container.
   // Painting the shell too leaves square corners around that face.
   const container = layer === undefined ? safeCall(shell, "querySelector", [":scope > .canvas-node-container"]) : undefined;
-  for (const [property, value] of Object.entries(descriptor.css)) {
+  if (border !== undefined && isElement(container)) patchAttribute(shell, "data-miro-native-border", "true", patches);
+  for (const [property, value] of Object.entries(border === undefined ? descriptor.css : { ...descriptor.css, ...border })) {
     if (TYPOGRAPHY_CSS.has(property)) {
       // A family the machine lacks falls back to a face of its own kind.
       if (property === "font-family") onFontUsed?.(value);
@@ -953,6 +955,31 @@ function applyNodeCss(
       else patchStyle(shell, property, value, patches);
     }
   }
+}
+
+/** Parts of an explicitly edited border that the card's theme would otherwise hide. */
+function localCardBorder(descriptor: SourceItemDescriptor, override: unknown): Readonly<Record<string, string>> | undefined {
+  if (safeGet(override, "borderWidth") === undefined && safeGet(override, "borderStyle") === undefined
+    && safeGet(safeGet(override, "colors"), "border") === undefined) return undefined;
+  const css = descriptor.css;
+  return {
+    "border-width": css["border-width"] ?? "1px",
+    "border-style": css["border-style"] ?? "solid",
+    "border-color": css["border-color"] ?? "var(--canvas-border, var(--text-muted))",
+  };
+}
+
+function applyCollapsedFrameBorder(runtime: unknown, id: string, descriptor: SourceItemDescriptor,
+  border: Readonly<Record<string, string>>, patches: RestorePatch[]): RenderedItem | undefined {
+  const shell = elementFor(runtime, NODE_SHELL_KEYS);
+  const face = elementFor(runtime, ["containerEl"]);
+  if (shell === undefined || face === undefined) return undefined;
+  for (const [property, value] of Object.entries(border)) patchStyle(face, property, value, patches);
+  return {
+    id, kind: "node", element: face, marker: shell, descriptor,
+    anchor: { keys: ["containerEl"], element: face },
+    intact: () => true,
+  };
 }
 
 function isContained(outer: DomElementLike, inner: DomElementLike): boolean {
@@ -1773,6 +1800,7 @@ function applyNode(
   previewRotation?: number,
   onDeckAction?: (deckId: string, action: DeckAction) => void,
   onFontUsed?: (family: string) => void,
+  border?: Readonly<Record<string, string>>,
 ): RenderedItem | undefined {
   const nodeEl = elementFor(runtime, ["nodeEl"]);
   const containerEl = elementFor(runtime, ["containerEl"]);
@@ -1999,7 +2027,7 @@ function applyNode(
       patchStyle(content, "padding", reserve.map((value) => `${Math.round(value * 10) / 10}px`).join(" "), patches);
     }
   }
-  applyNodeCss(descriptor, shell, content, layer, patches, onFontUsed);
+  applyNodeCss(descriptor, shell, content, layer, patches, onFontUsed, border);
   if (layer !== undefined && descriptor.kind === "shape") {
     // Remove the native rectangular paint only after a real contour exists.
     // The node shell is not the only painted surface: native Canvas fills and
@@ -2340,9 +2368,16 @@ export class SourceRenderer {
       this.cornerPreviewItem ??= this.cardItems.find(item => item.id === radiusPreview.id);
       this.cornerPreviewItem?.radiusGeometry?.preview(radiusPreview.radius);
     }
+    const cardBorders = new Map<string, Readonly<Record<string, string>>>();
+    for (const [id, descriptor] of descriptors) {
+      if (descriptor.kind === "connector" || descriptor.kind === "shape" || descriptor.structured?.line !== undefined) continue;
+      const border = localCardBorder(descriptor, safeGet(overrides, id));
+      if (border !== undefined) cardBorders.set(id, border);
+    }
     const cardSignature = safeSignature({
       descriptors: [...descriptors].map(([id, descriptor]) => [id,
         id === radiusPreview?.id && this.cornerPreviewItem !== undefined ? this.cornerPreviewItem.descriptor : descriptor]), routes: [...nativeRoutes.keys()], collapsedGroups: [...collapsedGroups], ready, order: scene.order, preview, diagnostics, fittedTexts,
+      borders: [...cardBorders],
       sizes: [...descriptors.keys()].map((id) => [id, documentSizes.get(id) ?? null]),
     });
     const linesDrawnFor: LinesDrawnFor = {
@@ -2365,13 +2400,16 @@ export class SourceRenderer {
     const lineDiagnostics: string[] = [];
     try {
       for (const [id, descriptor] of descriptors) {
-        if (nativeRoutes.has(id) || descriptor.kind === "connector" || collapsedGroups.has(id)) continue;
+        if (nativeRoutes.has(id) || descriptor.kind === "connector") continue;
+        const border = cardBorders.get(id);
+        const collapsed = collapsedGroups.has(id);
+        if (collapsed && border === undefined) continue;
         const runtime = nodes.get(id);
         if (runtime === undefined) {
           cardDiagnostics.push(`node-runtime-missing: ${id}.`);
           continue;
         }
-        const item = applyNode(
+        const item = collapsed && border !== undefined ? applyCollapsedFrameBorder(runtime, id, descriptor, border, cardPatches) : applyNode(
           this.document,
           runtime,
           id,
@@ -2386,6 +2424,7 @@ export class SourceRenderer {
           this.host.onFontUsed === undefined
             ? undefined
             : (family) => this.host.onFontUsed?.(family),
+          border,
         );
         if (item !== undefined) cardItems.push(item);
       }

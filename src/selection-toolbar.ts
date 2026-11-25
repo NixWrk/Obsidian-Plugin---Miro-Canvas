@@ -115,6 +115,7 @@ export interface SelectionToolbarState extends SelectionToolbarStyle {
 
 /** A style patch never carries the target id: the host owns the selection. */
 export type SelectionStylePatch = SelectionToolbarStyle;
+export type WidthTarget = "line" | "border";
 
 export interface SelectionToolbarActions {
   readonly onResetLabelBorder?: () => void;
@@ -125,7 +126,7 @@ export interface SelectionToolbarActions {
   readonly onEditConnectorLabel?: () => void;
   readonly onAppearance: (action: AppearanceAction) => void;
   readonly onStyle: (patch: SelectionStylePatch) => void;
-  readonly onLineWidthPreview?: (width: number | undefined) => void;
+  readonly onWidthPreview?: (target: WidthTarget, width: number | undefined) => void;
   readonly onLock: (locked: boolean) => void;
   /** Opens the selected link outside the board. */
   readonly onOpenLink?: () => void;
@@ -605,8 +606,8 @@ interface ToolbarRefs {
 }
 
 export class SelectionToolbar {
-  private lineWidthDraft: number | undefined;
-  private lineWidthCancelled = false;
+  private widthDraft: { readonly target: WidthTarget; readonly width: number } | undefined;
+  private cancelledWidth: WidthTarget | undefined;
   public readonly element: HTMLElement;
   private readonly document: Document | undefined;
   private readonly actions: SelectionToolbarActions;
@@ -703,7 +704,7 @@ export class SelectionToolbar {
   }
 
   private closePopovers(): void {
-    this.cancelLineWidth();
+    this.cancelWidthPreview();
     this.element.removeAttribute?.("data-miro-label-popover-open");
     for (const popover of this.popovers) {
       popover.panel.hidden = true;
@@ -711,17 +712,59 @@ export class SelectionToolbar {
     }
   }
 
-  public cancelLineWidth(): void {
-    if (this.lineWidthDraft === undefined) return;
-    this.lineWidthDraft = undefined;
-    this.lineWidthCancelled = true;
-    if (this.refs !== undefined) this.showLineWidth(this.refs, this.state?.connector?.width ?? 2);
-    this.actions.onLineWidthPreview?.(undefined);
+  public cancelWidthPreview(): void {
+    const draft = this.widthDraft;
+    if (draft === undefined) return;
+    this.widthDraft = undefined;
+    this.cancelledWidth = draft.target;
+    if (this.refs !== undefined) this.showWidth(this.refs, draft.target);
+    this.actions.onWidthPreview?.(draft.target, undefined);
   }
 
-  private showLineWidth(refs: ToolbarRefs, width: number): void {
-    refs.lineWidth.value = String(Math.min(LINE_SLIDER_MAX, width));
-    refs.lineWidthValue.textContent = String(width);
+  private showWidth(refs: ToolbarRefs, target: WidthTarget): void {
+    const draft = this.widthDraft?.target === target ? this.widthDraft.width : undefined;
+    if (target === "line") {
+      const width = draft ?? this.state?.connector?.width ?? 2;
+      refs.lineWidth.value = String(Math.min(LINE_SLIDER_MAX, width));
+      refs.lineWidthValue.textContent = String(width);
+    } else {
+      const width = draft ?? this.state?.borderWidth;
+      refs.borderWidth.value = String(Math.min(BORDER_SLIDER_MAX, width ?? 1));
+      refs.borderWidthValue.textContent = width === undefined ? "" : String(width);
+    }
+  }
+
+  private listenWidth(refs: ToolbarRefs, target: WidthTarget): void {
+    const input = target === "line" ? refs.lineWidth : refs.borderWidth;
+    const usableWidth = (): number | undefined => {
+      const width = finiteNumber(input.value);
+      return this.cancelledWidth !== target && this.state?.editable === true && !this.state.reviewMode
+        && width !== undefined && (target === "line" ? width > 0 : width >= 0) && width <= MAX_BORDER_WIDTH ? width : undefined;
+    };
+    const cancel = (): void => {
+      if (this.widthDraft?.target === target) this.cancelWidthPreview();
+    };
+    // A range reports every step during the gesture and one change on release.
+    this.listen(input, "pointerdown", () => { this.cancelledWidth = undefined; });
+    this.listen(input, "keydown", (event) => {
+      if ((event as KeyboardEvent).key !== "Escape") this.cancelledWidth = undefined;
+    });
+    this.listen(input, "pointercancel", cancel);
+    this.listen(input, "blur", cancel);
+    this.listen(input, "input", () => {
+      const width = usableWidth();
+      if (width === undefined) return;
+      this.widthDraft = { target, width };
+      this.showWidth(refs, target);
+      this.actions.onWidthPreview?.(target, width);
+    });
+    this.listen(input, "change", () => {
+      const width = usableWidth();
+      if (width === undefined) return;
+      this.widthDraft = undefined;
+      this.style(target === "line" ? { connector: { width } } : { borderWidth: width });
+      this.actions.onWidthPreview?.(target, undefined);
+    });
   }
 
   /** A block inside a panel, under an optional small heading. */
@@ -1060,28 +1103,7 @@ export class SelectionToolbar {
     for (const option of refs.strokes) {
       this.listen(option, "click", () => this.style({ connector: { strokeStyle: valueOf(option) as ConnectorStroke } }));
     }
-    // The browser reports every step but commits the range once on release.
-    this.listen(refs.lineWidth, "pointerdown", () => { this.lineWidthCancelled = false; });
-    this.listen(refs.lineWidth, "keydown", (event) => {
-      if ((event as KeyboardEvent).key !== "Escape") this.lineWidthCancelled = false;
-    });
-    this.listen(refs.lineWidth, "pointercancel", () => this.cancelLineWidth());
-    this.listen(refs.lineWidth, "blur", () => this.cancelLineWidth());
-    this.listen(refs.lineWidth, "input", () => {
-      const width = finiteNumber(refs.lineWidth.value);
-      if (this.lineWidthCancelled || this.state?.editable !== true || this.state.reviewMode
-        || width === undefined || width <= 0 || width > MAX_BORDER_WIDTH) return;
-      this.lineWidthDraft = width;
-      this.showLineWidth(refs, width);
-      this.actions.onLineWidthPreview?.(width);
-    });
-    this.listen(refs.lineWidth, "change", () => {
-      const width = finiteNumber(refs.lineWidth.value);
-      if (this.lineWidthCancelled || width === undefined || width <= 0 || width > MAX_BORDER_WIDTH) return;
-      this.lineWidthDraft = undefined;
-      this.style({ connector: { width } });
-      this.actions.onLineWidthPreview?.(undefined);
-    });
+    this.listenWidth(refs, "line");
     this.listen(refs.headSize, "change", () => {
       const headSize = Number(refs.headSize.value);
       if (validHeadSize(headSize)) this.style({ connector: { headSize } });
@@ -1098,11 +1120,7 @@ export class SelectionToolbar {
     for (const option of refs.borderStyles) {
       this.listen(option, "click", () => this.style({ borderStyle: valueOf(option) as BorderStyle }));
     }
-    this.listen(refs.borderWidth, "input", () => { refs.borderWidthValue.textContent = refs.borderWidth.value; });
-    this.listen(refs.borderWidth, "change", () => {
-      const width = finiteNumber(refs.borderWidth.value);
-      if (width !== undefined && width >= 0 && width <= MAX_BORDER_WIDTH) this.style({ borderWidth: width });
-    });
+    this.listenWidth(refs, "border");
     this.listen(refs.resetLabelBorder, "click", () => {
       if (this.state?.editable && !this.state.reviewMode && this.state.labelFormatting) this.actions.onResetLabelBorder?.();
     });
@@ -1212,7 +1230,7 @@ export class SelectionToolbar {
       refs.status.hidden = true;
       this.closePopovers();
     }
-    if (!state.editable) this.cancelLineWidth();
+    if (!state.editable) this.cancelWidthPreview();
     root.hidden = !visible;
     // A popover must never outlive the selection it was opened for.
     const selectionKey = state.selectedIds.join("\u0000");
@@ -1293,7 +1311,7 @@ export class SelectionToolbar {
     showPicture(refs.startCap.button, `start:${start}`, () => capPicture(document, start, "start"), start === "none" ? "—" : "←");
     showPicture(refs.endCap.button, `end:${end}`, () => capPicture(document, end, "end"), end === "none" ? "—" : "→");
     showPicture(refs.line.button, `route:${route}`, () => routePicture(document, route), "╱");
-    this.showLineWidth(refs, this.lineWidthDraft ?? state.connector?.width ?? 2);
+    this.showWidth(refs, "line");
     if (this.document?.activeElement !== refs.headSize) refs.headSize.value = state.connector?.headSize === undefined ? "" : String(state.connector.headSize);
 
     for (const slot of COLOR_SLOT_KEYS) {
@@ -1319,8 +1337,7 @@ export class SelectionToolbar {
       slotRefs.recent.hidden = state.recentColors.length === 0;
     }
     pressWhere(refs.borderStyles, state.borderStyle ?? "solid");
-    refs.borderWidth.value = String(Math.min(BORDER_SLIDER_MAX, state.borderWidth ?? 1));
-    refs.borderWidthValue.textContent = state.borderWidth === undefined ? "" : String(state.borderWidth);
+    this.showWidth(refs, "border");
     refs.resetLabelBorderRow.hidden = !state.labelFormatting || this.actions.onResetLabelBorder === undefined;
     refs.resetLabelBorder.setAttribute("aria-pressed", state.labelBorderInherited === true ? "true" : "false");
 
@@ -1379,7 +1396,7 @@ export class SelectionToolbar {
   }
 
   public dispose(): void {
-    this.cancelLineWidth();
+    this.cancelWidthPreview();
     for (const remove of this.listeners.splice(0)) {
       try {
         remove();

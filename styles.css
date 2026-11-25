@@ -2116,7 +2116,8 @@
 }
 
 /* Native Canvas eases stroke widths. A held slider already supplies each step. */
-.miro-canvas-root[data-miro-line-width-preview] .canvas-display-path {
+.miro-canvas-root[data-miro-width-preview="line"] .canvas-display-path,
+.miro-canvas-root[data-miro-width-preview="border"] :is(.canvas-node-container, .miro-source-decoration, .canvas-path-label) {
   transition: none;
 }
 

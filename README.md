@@ -14,7 +14,7 @@ connect them with arrows. Your board stays a local `.canvas` file.
 
 | Task | Tools |
 | --- | --- |
-| **Plan and organize** | Sticky notes, text, shapes, flowcharts and frames that move with their contents. |
+| **Plan and organize** | Sticky notes, text, shapes, flowcharts and frames that move with their contents. Preview border thickness while you adjust it. |
 | **Use your notes** | Vault notes, `[[links]]`, embeds, images, PDFs, code blocks and Markdown tables. |
 | **Connect ideas** | Straight, elbowed and curved arrows with independently formatted labels and live thickness previews. Attached lines follow the cards. |
 | **Draw** | Pen, highlighter, smart shape recognition and whole-stroke or partial erasers. |

@@ -40,6 +40,16 @@ describe("native inline styles participating in scoped card CSS", () => {
     expect(f.target.values["border-color"]).toBe("var(--miro-source-group-border-color, transparent)");
   });
 
+  it("keeps an explicitly formatted native group border through style projection", () => {
+    const border = { "border-width": "9px", "border-style": "dotted", "border-color": "red" };
+    const f = fixture(selector => selector === ".miro-source-group > .canvas-node-container", element({ ...border }));
+    Object.assign(f.root, { getAttribute: (name: string) => name === "data-miro-native-border" ? "true" : null });
+    Object.assign(f.target, { parentElement: f.root, matches: (selector: string) => selector === ".canvas-node-container" });
+    projectNativeCardStyles(f.root, f.write);
+    expect(f.target.values).toEqual(border);
+    expect(f.write).not.toHaveBeenCalled();
+  });
+
   it("projects the table sizer without changing its text or unrelated native styles", () => {
     const f = fixture(selector => selector.startsWith(".miro-source-table .markdown-preview-view >"), element({ height:"180px", padding:"12px", "min-height":"100%", color:"red" }));
     projectNativeCardStyles(f.root,f.write);

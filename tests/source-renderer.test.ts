@@ -1564,6 +1564,30 @@ describe("a card's border", () => {
     expect(container.style.getPropertyValue("border-color")).toBe("");
     expect(shell.style.getPropertyValue("background-color")).toBe("");
   });
+
+  it("gives a sticky note a visible border when only a width was chosen", () => {
+    const shell = new Element("div");
+    const face = shell.appendChild(new Element("div"));
+    const data = {
+      nodes: [{ id: "note", type: "text", x: 0, y: 0, width: 140, height: 100, text: "Note" }],
+      edges: [],
+      miroCanvas: { schemaVersion: 1, localOverrides: { note: { item: { type: "sticky_note" }, borderWidth: 5 } } },
+    };
+    const renderer = new SourceRenderer({
+      getDocument: () => data,
+      getNodes: () => [{ id: "note", nodeEl: shell, containerEl: face }],
+      getEdges: () => [],
+    }, dom);
+    renderer.refresh();
+    const decoration = shell.children.find((child) => child.getAttribute("data-miro-source-decoration") === "sticky");
+    expect(decoration?.style.getPropertyValue("border-width")).toBe("5px");
+    expect(decoration?.style.getPropertyValue("border-style")).toBe("solid");
+    expect(decoration?.style.getPropertyValue("border-color")).toBe("var(--canvas-border, var(--text-muted))");
+    delete (data.miroCanvas.localOverrides.note as { borderWidth?: number }).borderWidth;
+    renderer.refresh();
+    expect(shell.children.find((child) => child.getAttribute("data-miro-source-decoration") === "sticky")?.style.getPropertyValue("border-width")).toBe("");
+    renderer.dispose();
+  });
 });
 
 describe("a card that native Canvas drags", () => {
