@@ -27,7 +27,28 @@ describe("formatting selected words", () => {
     expect(formatTextSelection("слово", { type: A.setFontFamily, fontFamily: 'bad; color:red' })).toBeUndefined();
     expect(formatTextSelection("слово", { type: A.setFontSize, fontSize: NaN })).toBeUndefined();
   });
-  it("leaves paragraph alignment and card colours to the card", () => {
+  it("colors selected text in place, keeping newlines, whitespace and other styles", () => {
+    expect(formatTextSelection(" **слово** \n\n ещё ", { type: A.setColor, slot: "text", color: "#F15" }))
+      .toBe(' <span style="color: #ff1155">**слово**</span> \n\n <span style="color: #ff1155">ещё</span> ');
+    expect(formatTextSelection("<em>слово</em>", { type: A.setColor, slot: "text", color: "#ff1155" }, true))
+      .toBe('<span style="color: #ff1155"><em>слово</em></span>');
+  });
+  it("replaces or removes selected inline colors without rewriting other styles", () => {
+    const text = '<span style="color: #112233">одно</span> <span style="color: #aabbccff">другое</span>';
+    expect(formatTextSelection(text, { type: A.setColor, slot: "text", color: "#ff1155" }))
+      .toBe('<span style="color: #ff1155">одно другое</span>');
+    expect(formatTextSelection(text, { type: A.setColor, slot: "text", color: null })).toBe("одно другое");
+    expect(formatTextSelection(text, { type: A.resetColor, slot: "text" })).toBe("одно другое");
+    expect(formatTextSelection("слово", { type: A.setColor, slot: "text", color: "red; display: none" })).toBeUndefined();
+  });
+  it("recolors an already colored range without losing its nested font size", () => {
+    const text = '<span style="color: #112233"><span style="font-size: 24px">слово</span></span>';
+    expect(formatTextSelection(text, { type: A.setColor, slot: "text", color: "#ff1155" }))
+      .toBe('<span style="color: #ff1155"><span style="font-size: 24px">слово</span></span>');
+    expect(formatTextSelection(text, { type: A.resetColor, slot: "text" })).toBe('<span style="font-size: 24px">слово</span>');
+  });
+  it("leaves paragraph alignment and other color slots to the card", () => {
     expect(formatTextSelection("слово", { type: A.setAlignment, alignment: "left" })).toBeUndefined();
+    expect(formatTextSelection("слово", { type: A.setColor, slot: "fill", color: "#ff1155" })).toBeUndefined();
   });
 });

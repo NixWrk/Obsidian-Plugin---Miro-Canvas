@@ -167,6 +167,10 @@ in community plugins. Replace these three files to update.
 4. Choose **Lines and arrows** (`L`) to connect the two cards.
 5. Select a card to change its color, font or shape.
 
+While editing a text card, select words before choosing **Text color** to
+color just those words. With the text selection cleared, the same control
+sets the card's text color.
+
 For a guided tour, accept the first-run **welcome board**, or create it from
 **Settings → Miro Canvas → Getting started → Create the welcome board**.
 It includes editable examples, real notes and sample PDF/PowerPoint files.
@@ -246,7 +250,7 @@ npm run build
 Agents can use the optional [CLI or MCP server](mcp/README.md) and
 [miro-canvas-format skill](.agents/skills/miro-canvas-format/SKILL.md) to read and
 edit boards. Ready-to-run tools are in the matching
-[tools-0.3.2 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.2) and need **Node 20+**;
+[tools-0.3.3 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.3) and need **Node 20+**;
 run them separately, outside the plugin folder. The plugin starts neither.
 
 [Source compatibility notes](docs/contributing.md#remaining-source-warnings)

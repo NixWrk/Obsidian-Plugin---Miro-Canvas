@@ -1687,7 +1687,12 @@ export default class MiroCanvasPlugin extends Plugin {
     this.backlinks = undefined;
     if (this.shellDisposed || !this.canvasSettings.boardKnowledge) return;
     this.boardIndex = createObsidianBoardIndex(this.app, {
-      onIndexed: () => { this.outgoingLinks?.refresh(); this.propertyResults?.refresh(); this.backlinks?.refresh(); if (this.canvasSettings.automaticPropertyEdges) this.queuePropertyEdges(); },
+      onIndexed: () => {
+        this.outgoingLinks?.refresh();
+        this.propertyResults?.refresh();
+        this.backlinks?.scheduleRefresh();
+        if (this.canvasSettings.automaticPropertyEdges) this.queuePropertyEdges();
+      },
       onNotePropertiesChanged: () => { if (this.canvasSettings.automaticPropertyEdges) this.queuePropertyEdges(); },
       onRename: (file, oldPath, boards) => {
         this.maintainRenamedBoards(file, oldPath, boards);

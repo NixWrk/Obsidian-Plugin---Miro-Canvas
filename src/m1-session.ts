@@ -7441,7 +7441,10 @@ export class M1CanvasSession {
 			const editor = readRuntime(child, "editor") ?? readRuntime(readRuntime(child, "editMode"), "editor");
 			if (!isObject(editor)) continue;
 			const text = callRuntime(editor, "getSelection");
-			if (typeof text !== "string" || text === "") continue;
+			if (typeof text !== "string" || text === "") {
+				if (callRuntime(editor, "hasFocus") === true) this.textFragment = undefined;
+				continue;
+			}
 			const nodeText = readRuntime(node, "text");
 			this.textFragment = {
 				id, editor, text, from: callRuntime(editor, "getCursor", "from"),
@@ -7460,6 +7463,7 @@ export class M1CanvasSession {
 		}
 		const next = formatTextSelection(fragment.text, action, fragment.html);
 		if (next === undefined) return false;
+		if (next === fragment.text) return true;
 		if (callRuntime(fragment.editor, "getRange", fragment.from, fragment.to) !== fragment.text) {
 			this.textFragment = undefined;
 			return true;

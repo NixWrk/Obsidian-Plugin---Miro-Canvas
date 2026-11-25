@@ -215,9 +215,9 @@ formatting, alignment, line spacing, fill and border. Highlight words,
 add a list or turn text into a link.
 
 To format part of a card, enter text editing, select the words and choose a
-font, size or style from the toolbar. The surrounding text stays unchanged.
-On a phone, hold a word to select it. With the keyboard open, font and style
-menus open above the toolbar.
+font, size, style or **Text color** from the toolbar. With the text selection
+cleared, **Text color** applies to the whole card. On a phone, hold a word to
+select it. With the keyboard open, font and style menus open above the toolbar.
 
 <details>
 <summary>Change font and colour</summary>

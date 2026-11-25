@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, TFile } from "obsidian";
 import { extractBoardKnowledge } from "../src/board-knowledge";
 import { CanvasBacklinks, canvasBacklinkResultCount, type CanvasBacklinksOptions } from "../src/canvas-backlinks";
@@ -160,6 +160,34 @@ function fixture(options: CanvasBacklinksOptions = {}, discovery = false) {
 }
 
 describe("Canvas native backlink supplement", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("coalesces resolve events across asynchronous board reads and cancels pending refresh on unload", async () => {
+    const h = fixture({}, true);
+    h.bridge.start();
+    h.index.getKnowledge.mockClear();
+    h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 };
+    for (let count = 0; count < 10; count += 1) {
+      h.app.metadataCache.trigger("resolve", h.board);
+      await Promise.resolve();
+    }
+    expect(h.index.getKnowledge).not.toHaveBeenCalled();
+    vi.runOnlyPendingTimers();
+    expect(h.index.getKnowledge).toHaveBeenCalledOnce();
+    expect(h.count.textContent).toBe("1");
+
+    h.app.metadataCache.trigger("resolve", h.board);
+    h.bridge.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("discovers a property-only source which native never adds, outside its virtual tree", () => {
     const h = fixture({}, true);
     h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 };
@@ -176,35 +204,35 @@ describe("Canvas native backlink supplement", () => {
     h.bridge.dispose(); expect(row.listenerCount).toBe(0); expect(supplement.parent).toBeUndefined(); expect(h.empty.hidden).toBe(false);
   });
 
-  it("batches native removals and resolves without needing a native source result", async () => {
+  it("batches native removals and resolves without needing a native source result", () => {
     const h = fixture({}, true); h.bridge.start(); h.index.getKnowledge.mockClear();
     h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 };
     h.dom.removeResult(h.board); h.app.metadataCache.trigger("resolve", h.board); h.app.metadataCache.trigger("resolve", h.board);
-    expect(h.index.getKnowledge).not.toHaveBeenCalled(); await Promise.resolve();
+    expect(h.index.getKnowledge).not.toHaveBeenCalled(); vi.runOnlyPendingTimers();
     expect(h.index.getKnowledge).toHaveBeenCalledOnce(); expect(h.count.textContent).toBe("1");
     expect(h.paneEl.text).toContain("Board.canvasrelated: [[Target]]"); h.bridge.dispose();
   });
 
-  it("counts property mentions once as a real native card result arrives and disappears", async () => {
+  it("counts property mentions once as a real native card result arrives and disappears", () => {
     const h = fixture({}, true); h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 2 }; h.bridge.start();
     expect(h.dom.getMatchCount()).toBe(1);
     const result = h.dom.addResult(h.board, { "canvas-a": [[0, 21]] }); result.onRender();
-    expect(h.dom.getMatchCount()).toBe(2); await Promise.resolve();
+    expect(h.dom.getMatchCount()).toBe(2); vi.runOnlyPendingTimers();
     expect(h.count.textContent).toBe("2");
     expect(h.paneEl.children.filter(el => el.attributes.has("data-miro-canvas-property-backlinks"))).toHaveLength(0);
     expect(result.result).toEqual({ "canvas-a": [[0, 21]] }); expect(result.content).toBe("native full source");
-    h.dom.removeResult(h.board); await Promise.resolve();
+    h.dom.removeResult(h.board); vi.runOnlyPendingTimers();
     expect(h.count.textContent).toBe("1"); expect(h.paneEl.text).toContain("related: [[Target]]"); h.bridge.dispose();
   });
 
-  it("fails closed on active, invalid or unsupported filters for missing-source rows", async () => {
+  it("fails closed on active, invalid or unsupported filters for missing-source rows", () => {
     const h = fixture({}, true); h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 }; h.bridge.start();
     h.component.searchComponent.value = "path:Board"; h.component.searchQuery = { match: vi.fn(() => true) };
-    h.component.updateSearch(); await Promise.resolve();
+    h.component.updateSearch(); vi.runOnlyPendingTimers();
     expect(h.paneEl.text).not.toContain("related"); expect(h.dom.getMatchCount()).toBe(0);
     expect(h.component.searchQuery.match).not.toHaveBeenCalled();
     h.component.searchQuery = null; h.bridge.refresh(); expect(h.paneEl.text).not.toContain("related");
-    h.component.searchComponent.value = ""; h.component.updateSearch(); await Promise.resolve(); expect(h.count.textContent).toBe("1");
+    h.component.searchComponent.value = ""; h.component.updateSearch(); vi.runOnlyPendingTimers(); expect(h.count.textContent).toBe("1");
     h.component.searchComponent.getValue = undefined as unknown as typeof h.component.searchComponent.getValue;
     h.bridge.refresh(); expect(h.paneEl.text).not.toContain("related"); expect(h.count.textContent).toBe("0"); h.bridge.dispose();
   });
@@ -217,42 +245,42 @@ describe("Canvas native backlink supplement", () => {
     h.component.searchQuery = { match: () => false }; h.bridge.refresh(); expect(result.childrenEl.text).not.toContain("related"); h.bridge.dispose();
   });
 
-  it("removes stale sources on delete/rename and binds recreated paths to the new genuine file", async () => {
+  it("removes stale sources on delete/rename and binds recreated paths to the new genuine file", () => {
     const h = fixture({}, true); h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 }; h.bridge.start();
     const supplement = h.paneEl.children[2]; const row = supplement.children[0].children[1].children[0];
-    h.files.delete(h.board.path); h.vault.trigger("delete", h.board); await Promise.resolve();
+    h.files.delete(h.board.path); h.vault.trigger("delete", h.board); vi.runOnlyPendingTimers();
     expect(row.listenerCount).toBe(0); expect(h.count.textContent).toBe("0");
     const recreated = { path: h.board.path, extension: "canvas" } as TFile; h.files.set(recreated.path, recreated);
-    h.vault.trigger("create", recreated); await Promise.resolve();
+    h.vault.trigger("create", recreated); vi.runOnlyPendingTimers();
     h.paneEl.children[2].children[0].children[1].children[0].emit("click"); expect(h.openFile).toHaveBeenLastCalledWith(recreated);
     h.files.delete(recreated.path); const moved = { path: "Moved.canvas", extension: "canvas" } as TFile; h.files.set(moved.path, moved);
     delete h.app.metadataCache.resolvedLinks[recreated.path]; h.app.metadataCache.resolvedLinks[moved.path] = { [h.target.path]: 1 };
-    h.vault.trigger("rename", moved, recreated.path); await Promise.resolve();
+    h.vault.trigger("rename", moved, recreated.path); vi.runOnlyPendingTimers();
     expect(h.paneEl.text).toContain("Moved.canvas"); expect(h.paneEl.text).not.toContain("Board.canvas"); h.bridge.dispose();
   });
 
-  it("clears changed/unresolved properties, target switches and disabled index rows", async () => {
+  it("clears changed/unresolved properties, target switches and disabled index rows", () => {
     const h = fixture({}, true); h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 }; h.bridge.start();
     const next = extractBoardKnowledge({ nodes: [], edges: [], miroCanvas: { properties: { relation: "[[Missing]]" } } })!;
-    h.index.getKnowledge.mockReturnValue(next); h.app.metadataCache.trigger("resolve", h.board); await Promise.resolve();
+    h.index.getKnowledge.mockReturnValue(next); h.app.metadataCache.trigger("resolve", h.board); vi.runOnlyPendingTimers();
     expect(h.count.textContent).toBe("0"); expect(h.paneEl.text).not.toContain("related");
     h.index.getKnowledge.mockReturnValue(h.knowledge); h.bridge.refresh(); expect(h.count.textContent).toBe("1");
-    h.component.file = { path: "Other.md", extension: "md" } as TFile; h.component.update(); await Promise.resolve();
+    h.component.file = { path: "Other.md", extension: "md" } as TFile; h.component.update(); vi.runOnlyPendingTimers();
     expect(h.count.textContent).toBe("0"); expect(h.paneEl.text).not.toContain("related");
     h.component.file = h.target; h.bridge.refresh(); const row = h.paneEl.children[2].children[0].children[1].children[0];
     h.index.status = "disposed"; h.bridge.refresh(); expect(row.listenerCount).toBe(0); expect(h.count.textContent).toBe("0");
     h.bridge.dispose(); expect(h.vault.listenerCount()).toBe(0); expect(h.app.metadataCache.listenerCount()).toBe(0);
   });
 
-  it("tracks section collapse and restores only its owned native empty-state flag", async () => {
+  it("tracks section collapse and restores only its owned native empty-state flag", () => {
     const h = fixture({}, true); h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 }; h.bridge.start();
-    h.component.setBacklinkCollapsed(true); await Promise.resolve(); expect(h.paneEl.children[2].hidden).toBe(true);
-    h.component.setBacklinkCollapsed(false); await Promise.resolve(); expect(h.paneEl.children[2].hidden).toBe(false);
-    h.component.setCollapseAll(true); await Promise.resolve(); expect(h.paneEl.children[2].children[0].children[1].hidden).toBe(true);
+    h.component.setBacklinkCollapsed(true); vi.runOnlyPendingTimers(); expect(h.paneEl.children[2].hidden).toBe(true);
+    h.component.setBacklinkCollapsed(false); vi.runOnlyPendingTimers(); expect(h.paneEl.children[2].hidden).toBe(false);
+    h.component.setCollapseAll(true); vi.runOnlyPendingTimers(); expect(h.paneEl.children[2].children[0].children[1].hidden).toBe(true);
     h.empty.hidden = false; h.bridge.dispose(); expect(h.empty.hidden).toBe(false);
   });
 
-  it("bounds candidate paths and property reference inspections and cancels queued unload work", async () => {
+  it("bounds candidate paths and property reference inspections and cancels queued unload work", () => {
     const diagnose = vi.fn(); const h = fixture({ maxCandidatePaths: 1, maxReferencesPerResult: 1, onDiagnostic: diagnose }, true);
     h.knowledge.frontmatterLinks.unshift({ key: "missing", link: "Missing", original: "[[Missing]]", displayText: "Missing" });
     h.app.metadataCache.resolvedLinks[h.board.path] = { [h.target.path]: 1 };
@@ -260,7 +288,7 @@ describe("Canvas native backlink supplement", () => {
     expect(diagnose).toHaveBeenCalledWith("canvas-backlinks-reference-limit", h.board.path);
     expect(diagnose).toHaveBeenCalledWith("canvas-backlinks-candidate-limit", undefined);
     expect(h.count.textContent).toBe("0"); h.index.getKnowledge.mockClear();
-    h.app.metadataCache.trigger("resolve", h.board); h.bridge.dispose(); await Promise.resolve(); expect(h.index.getKnowledge).not.toHaveBeenCalled();
+    h.app.metadataCache.trigger("resolve", h.board); h.bridge.dispose(); vi.runOnlyPendingTimers(); expect(h.index.getKnowledge).not.toHaveBeenCalled();
   });
 
   it("does not substitute a file-shaped cache record when vault lookup or mounting is unsupported", () => {

@@ -1,7 +1,20 @@
-import { APPEARANCE_ACTIONS, fontStack, isSafeFontFamily, type AppearanceAction } from "./appearance";
+import { APPEARANCE_ACTIONS, fontStack, isSafeFontFamily, isValidColor, normalizeColor, type AppearanceAction } from "./appearance";
+
+const INLINE_COLOR = /^<span style="color: #[0-9a-f]{6}(?:[0-9a-f]{2})?">$/u;
+const SPAN_TAG = /<\/span\s*>|<span(?=[\s>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/giu;
 
 /** Selected words keep their formatting in the card's own text. */
 export function formatTextSelection(text: string, action: AppearanceAction, html = false): string | undefined {
+  if (action.slot === "text" && (action.type === APPEARANCE_ACTIONS.setColor || action.type === APPEARANCE_ACTIONS.resetColor)) {
+    if (action.type === APPEARANCE_ACTIONS.setColor && !isValidColor(action.color)) return undefined;
+    const color = action.type === APPEARANCE_ACTIONS.resetColor ? null : normalizeColor(action.color);
+    return text.split("\n").map((line) => {
+      const plain = removeInlineColors(line);
+      const match = /^(\s*)(.*?)(\s*)$/u.exec(plain);
+      if (!color || !match?.[2]) return plain;
+      return `${match[1]}${span(match[2], "color", color)}${match[3]}`;
+    }).join("\n");
+  }
   if (action.type === APPEARANCE_ACTIONS.setFormat) {
     const outerSpan = /^(<span\s+style="[^"]*">)([\s\S]*)(<\/span>)$/u.exec(text);
     if (outerSpan !== null) {
@@ -35,6 +48,25 @@ export function formatTextSelection(text: string, action: AppearanceAction, html
     return span(text, "font-size", `${action.fontSize}px`);
   }
   return undefined;
+}
+
+/** Remove complete color spans while preserving nested fonts and sizes. */
+function removeInlineColors(line: string): string {
+  if (!line.includes('<span style="color: ')) return line;
+  const openings: RegExpExecArray[] = [];
+  const toRemove = new Set<number>();
+  for (const tag of line.matchAll(SPAN_TAG)) {
+    if (!tag[0].startsWith("</")) {
+      openings.push(tag);
+      continue;
+    }
+    const open = openings.pop();
+    if (open && INLINE_COLOR.test(open[0])) {
+      toRemove.add(open.index);
+      toRemove.add(tag.index);
+    }
+  }
+  return line.replace(SPAN_TAG, (tag: string, offset: number) => toRemove.has(offset) ? "" : tag);
 }
 
 function span(text: string, property: string, value: string): string {

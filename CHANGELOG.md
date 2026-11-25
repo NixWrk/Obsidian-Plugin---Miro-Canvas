@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.3 - 2026-11-25
+
+- Apply Text color to the selected text in a card editor. With no text selection, the palette sets the whole card's text color. ([#35](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/issues/35))
+- Batch backlink pane refreshes during board indexing to reduce repeated vault-cache scans after startup and plugin enable. ([#20](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/issues/20))
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.

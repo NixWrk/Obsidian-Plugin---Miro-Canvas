@@ -802,6 +802,13 @@ selected card, it also covers that card's outline and resize handles.
   the user selects an explicit board theme.
 - Include theme-aware defaults, recent colors, hex input, and an accessible
   palette for text, fill, borders, edges, and comments.
+- A text color chosen during native text editing is saved as inline color
+  markup for the selected range through the native editor. An empty text
+  selection uses the card's appearance override.
+  In Obsidian 1.14.4 on Ubuntu ARM64, selecting a word and choosing a swatch
+  reproduced the card-wide color in 0.3.2. The fix colored the word alone,
+  supported native Undo and Redo, saved the inline color to disk, and
+  applied a separate card-wide color after closing the text editor.
 
 ### Shapes, notes, and groups
 

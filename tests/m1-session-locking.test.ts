@@ -261,6 +261,7 @@ describe("formatting a fragment through the native editor", () => {
 		let to = { line: 0, ch: 15 };
 		const editor = {
 			getSelection: () => value.slice(from.ch, to.ch),
+			hasFocus: () => node.isEditing === true,
 			getCursor: (end: string) => end === "from" ? from : to,
 			getRange: (start: typeof from, end: typeof to) => value.slice(start.ch, end.ch),
 			replaceRange: vi.fn((text: string, start: typeof from, end: typeof to) => { value = value.slice(0, start.ch) + text + value.slice(end.ch); }),
@@ -277,6 +278,22 @@ describe("formatting a fragment through the native editor", () => {
 		expect(rig.value()).toBe("Начало **середина** конец");
 		expect(rig.editor.replaceRange).toHaveBeenCalledTimes(1);
 		expect(rig.canvas.data.miroCanvas.localOverrides.free).toBeUndefined();
+	});
+	it("applies text color to the captured fragment, then to the card after the selection is collapsed", () => {
+		const rig = editing();
+		rig.internal.captureTextFragment();
+		rig.node.isEditing = false;
+		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setColor, slot: "text", color: "#ff1155" });
+		expect(rig.value()).toBe('Начало <span style="color: #ff1155">середина</span> конец');
+		expect(rig.editor.replaceRange).toHaveBeenCalledOnce();
+		expect(rig.canvas.data.miroCanvas.localOverrides.free).toBeUndefined();
+
+		rig.node.isEditing = true;
+		const cursor = { line: 0, ch: 0 };
+		rig.editor.setSelection(cursor, cursor);
+		rig.internal.applyAppearance({ type: APPEARANCE_ACTIONS.setColor, slot: "text", color: "#224466" });
+		expect(rig.editor.replaceRange).toHaveBeenCalledOnce();
+		expect(rig.canvas.data.miroCanvas.localOverrides.free.colors.text).toBe("#224466");
 	});
 	it("retains a captured range while the toolbar's size input has focus", () => {
 		const rig = editing();

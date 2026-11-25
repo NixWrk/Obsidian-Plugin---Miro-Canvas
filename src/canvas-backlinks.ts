@@ -7,6 +7,7 @@ import { createHtmlElement } from "./dom-elements";
 type PrivateObject = Record<string, unknown>;
 type Method = (this: PrivateObject, ...args: unknown[]) => unknown;
 const STANDARD_MATCH_KEYS = ["filename", "filepath", "content", "propertyName", "tag"];
+const REFRESH_INTERVAL_MS = 50;
 
 export interface CanvasBacklinkProperty {
   readonly key: string;
@@ -121,7 +122,7 @@ export class CanvasBacklinks {
   private readonly maxProperties: number;
   private readonly maxCandidates: number;
   private readonly maxReferences: number;
-  private refreshQueued = false;
+  private refreshTimer: number | undefined;
 
   constructor(private readonly app: Pick<App, "workspace" | "metadataCache"> & Partial<Pick<App, "vault">>,
     private readonly index: Pick<ObsidianBoardIndex, "status" | "getKnowledge">,
@@ -191,6 +192,8 @@ export class CanvasBacklinks {
   dispose(): void {
     if (this.state === "disposed") return;
     this.state = "disposed";
+    window.clearTimeout(this.refreshTimer);
+    this.refreshTimer = undefined;
     for (const remove of this.removers.splice(0)) remove();
     for (const pane of [...this.panes.values()]) this.detach(pane);
   }
@@ -198,13 +201,13 @@ export class CanvasBacklinks {
   private diagnose(code: string, path?: string): void {
     try { this.options.onDiagnostic?.(code, path); } catch { /* Diagnostics do not own the view. */ }
   }
-  private scheduleRefresh(): void {
-    if (this.refreshQueued || this.state !== "ready") return;
-    this.refreshQueued = true;
-    queueMicrotask(() => {
-      this.refreshQueued = false;
+  /** Coalesce index and pane events across asynchronous reads before rescanning backlinks. */
+  scheduleRefresh(): void {
+    if (this.refreshTimer !== undefined || this.state !== "ready") return;
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = undefined;
       if (this.state === "ready") this.refresh();
-    });
+    }, REFRESH_INTERVAL_MS);
   }
   private probe(component: PrivateObject): Pane | undefined {
     const dom = component.backlinkDom;

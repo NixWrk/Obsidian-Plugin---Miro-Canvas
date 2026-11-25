@@ -2574,3 +2574,30 @@ PDF/PPTX/raster PDF/Stop with source/camera restored and jobs/surfaces zero.
 Independent exported-content parsing verifies glyphs and all four font styles.
 Android 0.3.2 is pending disconnected ADB devices; do not substitute the prior
 0.3.1 tablet pass. See release-0.3.2-checks.md for the current receipt.
+
+## Backlink refresh timers (2026-11-25)
+
+Board indexing, metadata resolution, vault changes and native backlink pane
+updates share the refresh timer. Use the plugin's main window for the timer
+so it can refresh all panes, including popouts, and cancel it on unload.
+Check that indexing coalesces repeated refreshes, and that pane filters,
+collapse, property mentions and source navigation still work. Measure the
+refresh count, input responsiveness and resolved backlinks in isolated
+Obsidian vaults.
+
+In Windows Obsidian 1.15.1, reindexing 120 fixture boards called the backlink
+refresh 308 times on the original build and once on the patched build. The
+pane reported 36 backlinks in both runs, and the patched plugin enabled
+successfully in the same vault.
+
+On a NanoPi NEO4 with Ubuntu 24.04.4 ARM64, Obsidian 1.14.4 ran under Xvfb.
+With 1,000 fixture boards and 3,500 notes, a CDP pointer click on the plugin
+toggle in Community plugins produced a 22,661 ms renderer timer gap on the
+original build and a 357 ms gap on the patched build. Natural indexing
+completed on both builds, and the pane reported 192 backlinks in each run.
+An instrumented replay of the same workload recorded 2,310 refresh calls
+before the change and two after it. The workload reproduces the stall with
+fixture data on ARM64. The reporter's vault and Intel system were unavailable.
+The packaged 0.3.3 files passed the same toggle check with a 390 ms gap,
+1,000 boards indexed, and all 192 backlinks present.
+No physical Android device was connected.
