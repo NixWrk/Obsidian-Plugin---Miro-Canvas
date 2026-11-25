@@ -200,6 +200,7 @@ export const RU: Messages = {
 		showStatus: "Показать состояние плагина",
 		initializeMetadata: "Создать метаданные доски",
 		openControls: "Открыть панель управления",
+		legacyControls: "Открыть панель управления (прежнее сочетание клавиш)",
 		localTools: "Дополнительные инструменты: фигуры, комментарии, привязки, документы",
 		sourceInspector: "Открыть сведения об источнике",
 		themeSystem: "Тема доски: как в Obsidian",

@@ -2659,3 +2659,19 @@ PDFs (36,893 bytes each). Both source boards kept SHA-256
 `d72d15ba76972e858c2e98cb242b761934254d77f6fce461b84163485faabf25`.
 Each export released its background Canvas and job. No Android device was
 listed by ADB.
+
+## Controls command ID (before edits)
+
+The palette, custom shortcuts and integrations open the controls for the active
+Canvas. Obsidian keys shortcuts by full command ID. Its command list calls
+`checkCallback(true)` and dispatch is separate. Verify one eligible palette
+entry, dispatch through both IDs, an actual legacy key press and inactivity
+outside Canvas. Check the saved hotkeys and board bytes, and run source lint.
+
+In an isolated Windows vault on Obsidian 1.15.1 the production build listed
+`open-controls` once in the native palette. Both full IDs opened the panel,
+as did Ctrl+Alt+F10 bound to the previous ID and sent through CDP keyboard
+input. Both callbacks declined execution in an empty tab. The board and
+hotkeys file kept their original bytes. Source ESLint passed with zero
+warnings. Vitest passed 3,539 tests with one skipped. ADB listed no connected
+device, so the Android interaction check remains pending.

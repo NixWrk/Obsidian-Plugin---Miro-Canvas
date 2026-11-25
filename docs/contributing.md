@@ -282,11 +282,10 @@ for bad usage or input. `--read-only` permits reading and checking only.
 See the [CLI reference](../mcp/README.md#cli) for `--args`, `--stdin`, sequential
 batches, revision handoff and undo limited to the current process.
 
-## Remaining source warnings
+## Source compatibility
 
-The plugin lint reports one naming advisory for `miro-canvas:m1-commands`.
-Obsidian stores this exact ID in custom hotkeys. Keep it registered once so
-existing shortcuts and integrations continue to open the controls.
+Use `miro-canvas:open-controls` for the controls panel. The palette lists it
+once. Saved shortcuts and integrations can still call `miro-canvas:m1-commands`.
 
 The standalone CLI and MCP sources use Node ESM (`.mts`). Run
 `npm run lint:mcp` for their type-aware rules and `npm test` for bundle

@@ -197,6 +197,7 @@ export const EN = {
 		showStatus: "Show plugin status",
 		initializeMetadata: "Initialize board metadata",
 		openControls: "Open Miro Canvas controls",
+		legacyControls: "Open Miro Canvas controls (legacy shortcut)",
 		localTools: "Local shapes, comments, anchors and documents",
 		sourceInspector: "Open source and provenance inspector",
 		themeSystem: "Use Obsidian board theme",

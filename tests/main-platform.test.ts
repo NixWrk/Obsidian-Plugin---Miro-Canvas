@@ -11,7 +11,7 @@ import { replaceInvalidFilenameCharacters } from "../src/control-characters";
 const source = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("main.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const plugin = ast.statements.find(ts.isClassDeclaration)!;
-const names = ["initializationTimerHost", "initializationRetry", "shellDisposed", "canvasSnippets", "canvasSnippetScopes", "syncCanvasSnippetScopes", "exportJobs", "enhancementModals", "focusedLeaf", "handleActiveLeafChange", "disposeShell", "activeM1Session", "updateStatus", "pickFontFile", "openFileSourceMenu"];
+const names = ["registerControls", "initializationTimerHost", "initializationRetry", "shellDisposed", "canvasSnippets", "canvasSnippetScopes", "syncCanvasSnippetScopes", "exportJobs", "enhancementModals", "focusedLeaf", "handleActiveLeafChange", "disposeShell", "activeM1Session", "updateStatus", "pickFontFile", "openFileSourceMenu"];
 const methods = names.map(name => plugin.members.find(member => member.name?.getText(ast) === name)!.getText(ast)).join("\n");
 const sanitizer = ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "sanitizeFontFileName")!;
 const code = transformSync(`class PlatformProbe { ${methods}\nsettingsOfThisDevice() {}\ncurrentCanvasStillOpen() { return false; } }\nthis.PlatformProbe = PlatformProbe;\nthis.sanitize = ${sanitizer.getText(ast)};`, { loader: "ts", target: "es2020" }).code;
@@ -246,40 +246,28 @@ describe("main platform methods (synthetic native contract)", () => {
     expect(input.remove).toHaveBeenCalledOnce();
   });
 
-  it("preserves the full legacy registration, visible command name and custom hotkey mapping", () => {
-    function registration(text: string) {
-      const tree = ts.createSourceFile("main.ts", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-      let found: ts.CallExpression | undefined;
-      function visit(node: ts.Node) {
-        if (ts.isCallExpression(node) && node.expression.getText(tree) === "this.addCommand"
-          && ts.isObjectLiteralExpression(node.arguments[0]!)) {
-          const id = node.arguments[0]!.properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === "id");
-          if (id && ts.isPropertyAssignment(id) && id.initializer.getText(tree) === '"m1-commands"') found = node;
-        }
-        ts.forEachChild(node, visit);
-      }
-      visit(tree);
-      return found!.getText(tree);
-    }
+  it("lists controls once and accepts both command IDs on Canvas", () => {
     const f = shell();
-    f.instance.manifest.name = "Miro Canvas";
-    const customHotkeys = { "miro-canvas:m1-commands": [{ modifiers: ["Mod"], key: "M" }] };
-    const saved = JSON.stringify(customHotkeys);
-    const commands = new Map<string, { id: string; name: string }>();
-    // Plugin.addCommand's verified native prefix/name behavior, no hotkey rewrite.
-    f.instance.addCommand = (command: { id: string; name: string }) => {
-      command.id = f.instance.manifest.id + ":" + command.id;
-      command.name = f.instance.manifest.name + ": " + command.name;
-      commands.set(command.id, command);
-      return command;
-    };
+    const openCommands = vi.fn();
+    const active = vi.fn((): { openCommands: typeof openCommands } | null => ({ openCommands }));
+    f.instance.activeM1Session = active;
     f.context.words = words;
-    f.context.plugin = f.instance;
-    const registrationCode = transformSync('(function () { ' + registration(source) + '; }).call(plugin);', { loader: "ts" }).code;
-    runInContext(registrationCode, f.context);
-    expect([...commands.keys()]).toEqual(["miro-canvas:m1-commands"]);
-    expect(commands.get("miro-canvas:m1-commands")!.name).toBe("Miro Canvas: " + words().commands.openControls);
-    expect(JSON.stringify(customHotkeys)).toBe(saved);
+    type Registered = { id: string; name: string; checkCallback(checking: boolean): boolean };
+    const commands = new Map<string, Registered>();
+    f.instance.addCommand = (cmd: Registered) => commands.set(cmd.id, cmd);
+    f.instance.registerControls();
+    expect([...commands.keys()]).toEqual(["open-controls", "m1-commands"]);
+    expect([...commands.values()].filter(c => c.checkCallback(true)).map(c => c.id)).toEqual(["open-controls"]);
+    expect(commands.get("open-controls")!.name).toBe(words().commands.openControls);
+    expect(openCommands).not.toHaveBeenCalled();
+    for (const cmd of commands.values()) expect(cmd.checkCallback(false)).toBe(true);
+    expect(openCommands).toHaveBeenCalledTimes(2);
+    active.mockReturnValue(null);
+    for (const cmd of commands.values()) {
+      expect(cmd.checkCallback(true)).toBe(false);
+      expect(cmd.checkCallback(false)).toBe(false);
+    }
+    expect(openCommands).toHaveBeenCalledTimes(2);
   });
 
   it("preserves every UTF-16 filename character, trim, fallback and code-unit boundary", () => {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use `miro-canvas:open-controls` for the controls panel. Existing hotkeys and integrations using the original ID still open the panel.
+
 ## 0.3.4 - 2026-11-25
 
 - Fix PDF export of text cards on Obsidian 1.15.1 while preserving export on 1.14.4. Both raster and vector export wait for the card text to render.

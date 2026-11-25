@@ -320,20 +320,7 @@ export default class MiroCanvasPlugin extends Plugin {
     // callbacks never touch the document directly; M1CanvasSession routes
     // explicit mutations through MetadataWriter and camera actions through
     // its safe viewport controller.
-    this.addCommand({
-      id: "m1-commands",
-      name: words().commands.openControls,
-      checkCallback: (checking) => {
-        const session = this.activeM1Session();
-        if (!session) {
-          return false;
-        }
-        if (!checking) {
-          session.openCommands();
-        }
-        return true;
-      },
-    });
+    this.registerControls();
     this.addCommand({
       id: "local-tools",
       name: words().commands.localTools,
@@ -966,6 +953,27 @@ export default class MiroCanvasPlugin extends Plugin {
         .onClick(() => session.changeLayer(action.direction, ids)));
     }
     placeBeforeDanger(menu, LAYER_MENU_SECTION);
+  }
+
+  private registerControls(): void {
+    const labels = words().commands;
+    // Both IDs dispatch the same action. Only the current ID belongs in the palette.
+    for (const entry of [
+      { id: "open-controls", name: labels.openControls, inPalette: true },
+      { id: "m1-commands", name: labels.legacyControls, inPalette: false },
+    ]) {
+      this.addCommand({
+        id: entry.id,
+        name: entry.name,
+        checkCallback: (checking) => {
+          if (checking && !entry.inPalette) return false;
+          const session = this.activeM1Session();
+          if (!session) return false;
+          if (!checking) session.openCommands();
+          return true;
+        },
+      });
+    }
   }
 
   private runM1Command(checking: boolean, callback: (session: M1CanvasSession) => void): boolean {

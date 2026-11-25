@@ -253,9 +253,9 @@ edit boards. Ready-to-run tools are in the matching
 [tools-0.3.4 companion release](https://github.com/NixWrk/Obsidian-Plugin---Miro-Canvas/releases/tag/tools-0.3.4) and need **Node 20+**;
 run them separately, outside the plugin folder. The plugin starts neither.
 
-[Source compatibility notes](docs/contributing.md#remaining-source-warnings)
+[Source compatibility notes](docs/contributing.md#source-compatibility)
 explain how the standalone Node modules are checked, how to select the vault
-configuration folder, and why the controls command keeps its saved hotkey ID.
+configuration folder, and how existing shortcuts work with `open-controls`.
 
 ## License
 
