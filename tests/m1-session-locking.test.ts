@@ -159,6 +159,22 @@ describe("committed knowledge publication", () => {
 });
 
 describe("selection frame follows the displayed card", () => {
+	it("watches a newly selected card before the next full refresh", () => {
+		vi.stubGlobal("HTMLElement", HostElement);
+		const { canvas, root, free, session, selection } = fixture();
+		const canvasEl = new HostElement("canvas");
+		const observed = new Set<HostElement>();
+		class Observer {
+			observe(target: HostElement) { observed.add(target); }
+			disconnect() { observed.clear(); }
+		}
+		Object.assign(canvas, { canvasEl });
+		Object.assign(root, { ownerDocument: { createElement: () => new HostElement(), defaultView: { MutationObserver: Observer } } });
+		selection.add(free);
+		(session as any).readInteractionState();
+		expect([...observed]).toEqual([canvasEl, free.nodeEl]);
+	});
+
 	it("uses live size and displayed zoom while native resize and camera animation have not committed", () => {
 		vi.stubGlobal("HTMLElement", HostElement);
 		const { root, free, session } = fixture();

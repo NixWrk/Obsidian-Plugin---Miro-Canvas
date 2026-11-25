@@ -113,6 +113,8 @@ export interface DeleteItemsInput {
 export interface ChangeItemsInput {
 	readonly updates?: readonly UpdateItemInput[];
 	readonly removals?: readonly string[];
+	/** Related metadata changes to apply in the same history entry as the items. */
+	readonly metadata?: (metadata: Record<string, unknown>) => void;
 }
 
 export interface UpdateItemInput {
@@ -2878,6 +2880,12 @@ export class CanvasAuthoring {
 				setOwn(overrides, change.id, { ...kept, item: { ...change.item } });
 			}
 			if (overridesValue.value !== undefined || changes.length > 0) setOwn(metadata, "localOverrides", overrides);
+			try {
+				input.metadata?.(metadata);
+			} catch {
+				addDiagnostic(diagnostics, "metadata-update-failed", "error", "The related item metadata could not be updated.");
+				return reject();
+			}
 			if (!validateMiroCanvasMetadata(metadata).valid) {
 				addDiagnostic(diagnostics, "metadata-validation-failed", "error", "The proposed item metadata failed validation; no graph import was attempted.");
 				return reject();

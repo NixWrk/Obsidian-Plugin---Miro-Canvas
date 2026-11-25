@@ -989,7 +989,7 @@ export class M1CanvasSession {
 		const document = ownerDocument(this.root);
 		if (!isElement(canvasEl) || document === undefined || typeof document.createElementNS !== "function") return;
 		this.connectorLayer ??= new ConnectorLayer(document, {
-			document: () => this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument,
+			document: () => this.lineWidthDocument(this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument),
 			geometry: () => this.landingGeometry().geometry,
 			press: (event, id) => this.pressConnector(event, id),
 			selected: () => {
@@ -1368,7 +1368,7 @@ export class M1CanvasSession {
 		// that label is hidden too, however little else changed.
 		const canvasEl = readRuntime(this.nativeCanvas(), "canvasEl");
 		if (isElement(canvasEl) && labels.mount(canvasEl)) this.labelsPlaced = undefined;
-		const raw = this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument;
+		const raw = this.lineWidthDocument(this.commentMovePreview ?? this.selectionMovePreview ?? this.currentRawDocument);
 		const { geometry, scene } = this.landingGeometry();
 		const selected = this.selectedIds.length === 1 ? this.selectedIds[0] : undefined;
 		const theme = this.root?.getAttribute("data-miro-canvas-resolved-theme") ?? null;
@@ -1407,6 +1407,8 @@ export class M1CanvasSession {
 			const labelFontStyle = font(id);
 			const descriptor = scene.items.get(id);
 			const stroke = this.nativeLabelStroke(edge, descriptor);
+			const preview = this.lineWidthPreview;
+			if (preview?.selection === this.selectedIds && this.selectedIdSet.has(id)) stroke.width = preview.width;
 			items.push({
 				id, text, points, t: typeof labelT === "number" && labelT >= 0 && labelT <= 1 ? labelT : fallback,
 				color: stroke.color,
@@ -1536,6 +1538,14 @@ export class M1CanvasSession {
 	private nativeReadonlyWarningShown = false;
 	private currentMetadata: MiroCanvasMetadata | undefined;
 	private currentRawDocument: unknown;
+	private lineWidthPreview: { readonly selection: readonly string[]; readonly width: number } | undefined;
+	private lineWidthProjection: {
+		readonly base: unknown;
+		readonly preview: M1CanvasSession["lineWidthPreview"];
+		readonly document: unknown;
+		readonly scene: SourceScene;
+	} | undefined;
+	private lineWidthFrame: number | undefined;
 	private commentMovePreview: Record<string, unknown> | undefined;
 	private appearance: AppearanceState = normalizeAppearanceState(undefined);
 	private textFragment: { id: string; editor: object; from: unknown; to: unknown; text: string; html: boolean } | undefined;
@@ -1778,7 +1788,8 @@ export class M1CanvasSession {
 				: undefined;
 		const renderDocument = options.document ?? ownerDocument(this.root);
 		this.sourceRenderer = renderDocument === undefined ? undefined : new SourceRenderer({
-			getDocument: () => this.commentMovePreview ?? this.selectionMovePreview ?? this.liveDocument ?? this.boardDocument(),
+			getDocument: () => this.lineWidthDocument(this.commentMovePreview ?? this.selectionMovePreview ?? this.liveDocument
+				?? (this.lineWidthPreview === undefined ? this.boardDocument() : this.currentRawDocument)),
 			getNodes: () => this.adapter.getNodes(),
 			getEdges: () => this.adapter.getEdges(),
 			getSelectionMovePreviewIds: () => this.selectionMovePreview === undefined ? undefined : this.selectionMoveIds,
@@ -1786,12 +1797,16 @@ export class M1CanvasSession {
 			getShapeRadiusPreview: () => this.radiusPreview,
 			getCollapsedNodeOwners: () => this.collapsedOwners(),
 			getSourceScene: (document) => {
+				const projection = this.lineWidthProjection;
+				if (projection !== undefined && projection.document === document) return projection.scene;
 				if (this.radiusPreview !== undefined && this.radiusPreview.document === document) return this.radiusPreview.scene;
 				const cache = this.landingCache;
 				return cache !== undefined && cache.document === document ? cache.scene : undefined;
 			},
 			getLiveGesture: () => this.liveDocument === undefined ? undefined : this.gestureSerial,
 			getAnchorGeometry: (document) => {
+				const projection = this.lineWidthProjection;
+				if (projection !== undefined && projection.document === document) document = projection.base;
 				const cache = this.landingCache;
 				return cache !== undefined && cache.document === document && this.rotationPreview === undefined ? cache.geometry : undefined;
 			},
@@ -1871,6 +1886,7 @@ export class M1CanvasSession {
 			onTextSelectionWanted: () => this.captureTextFragment(),
 			onAppearance: (action) => this.applyAppearance(action),
 			onStyle: (patch) => this.applyElementStyle(patch),
+			onLineWidthPreview: (width) => this.previewLineWidth(width),
 			onResetLabelBorder: () => this.setLabelBorder(undefined),
 			onFlipEdges: () => this.flipSelectionEdges(),
 			onMoreActions: (button) => this.options.onSelectionActions?.(button, this.enhancementActions()),
@@ -3278,7 +3294,109 @@ export class M1CanvasSession {
 		this.refresh();
 	}
 
+	private previewLineWidth(width: number | undefined): void {
+		const next = width === undefined ? undefined : { selection: this.selectedIds, width };
+		if (next?.selection === this.lineWidthPreview?.selection && next?.width === this.lineWidthPreview?.width) return;
+		this.lineWidthPreview = next;
+		this.lineWidthProjection = undefined;
+		if (next === undefined) this.root?.removeAttribute("data-miro-line-width-preview");
+		else this.root?.setAttribute("data-miro-line-width-preview", "");
+		if (this.disposed || this.lineWidthFrame !== undefined) return;
+		const render = (): void => {
+			this.lineWidthFrame = undefined;
+			if (this.disposed) return;
+			this.sourceRenderer?.refresh();
+			this.connectorLayer?.render();
+			this.updateConnectorLabels();
+		};
+		const view = ownerDocument(this.root)?.defaultView;
+		if (typeof view?.requestAnimationFrame === "function") this.lineWidthFrame = view.requestAnimationFrame(render);
+		else render();
+	}
+
+	/** Only the renderers see the draft. The graph and its history still see the saved board. */
+	private lineWidthDocument(document: unknown): unknown {
+		const preview = this.lineWidthPreview;
+		if (preview === undefined || preview.selection !== this.selectedIds || !isRecord(document)) return document;
+		if (this.lineWidthProjection?.base === document && this.lineWidthProjection.preview === preview) return this.lineWidthProjection.document;
+		const scene = this.landingGeometry().scene;
+		const local = preview.selection.filter((id) => {
+			const item = scene.items.get(id);
+			return item?.kind === "connector" || item?.structured?.line !== undefined;
+		});
+		const own = boardConnectors(document).filter((connector) => this.selectedIdSet.has(connector.id));
+		const metadata: UnknownRecord = { schemaVersion: 1, ...(isRecord(document.miroCanvas) ? document.miroCanvas : {}) };
+		this.writeLineWidths(metadata, local, own, preview.width);
+		const projected = { ...document, miroCanvas: metadata };
+		const items = new Map(scene.items);
+		for (const id of local) {
+			const item = items.get(id);
+			if (item !== undefined) items.set(id, { ...item, css: { ...item.css, "stroke-width": String(preview.width) } });
+		}
+		this.lineWidthProjection = { base: document, preview, document: projected, scene: { ...scene, items } };
+		return projected;
+	}
+
+	/** Patch only the width, keeping the rest of each connector's style and data. */
+	private writeLineWidths(metadata: UnknownRecord, ids: readonly string[], own: readonly BoardConnector[], width: number): void {
+		if (ids.length > 0) {
+			const overrides: UnknownRecord = isRecord(metadata.localOverrides) ? metadata.localOverrides : {};
+			metadata.localOverrides = { ...overrides, ...Object.fromEntries(ids.map((id) => {
+				const value = readOwn(overrides, id);
+				const current = isRecord(value) ? value : {};
+				const connector = isRecord(current.connector) ? current.connector : {};
+				return [id, { ...current, connector: { ...connector, width } }];
+			})) };
+		}
+		if (own.length > 0) {
+			const connectors = isRecord(metadata.connectors) ? metadata.connectors : {};
+			metadata.connectors = { ...connectors, ...Object.fromEntries(own.map((item) => {
+				const current = connectors[item.id];
+				return [item.id, { ...(isRecord(current) ? current : item), width }];
+			})) };
+		}
+	}
+
+	private commitLineWidth(width: number): void {
+		const preview = this.lineWidthPreview;
+		this.previewLineWidth(undefined);
+		this.readInteractionState();
+		if ((preview !== undefined && preview.selection !== this.selectedIds) || !this.editAllowed("restyle", this.selectedIds)) return;
+		const document = this.boardDocument();
+		if (!isRecord(document)) return;
+		const scene = buildSourceScene(document);
+		const overrides = readRuntime(readRuntime(document, "miroCanvas"), "localOverrides");
+		const ids = this.selectedIds.filter((id) => {
+			const item = scene.items.get(id);
+			const override = readOwn(overrides, id);
+			return item?.kind === "connector" || (item?.structured?.line !== undefined && finite(readRuntime(readRuntime(override, "connector"), "width")) !== undefined);
+		});
+		const own = boardConnectors(document).filter((item) => this.selectedIdSet.has(item.id));
+		const legacy = this.selectedIds.flatMap((id) => {
+			const drawn = this.lineOf(id);
+			if (drawn === undefined || drawn.line.width === width) return [];
+			const { box: _box, points: _points, ...style } = drawn.line;
+			const { rect, line } = lineFromBoard(drawn.points, { ...style, width });
+			const current = readRuntime(readOwn(overrides, id), "item");
+			const stored = readRuntime(current, "line");
+			return [{ id, rect, item: { ...(isRecord(current) ? current : {}), type: "line" as const, line: { ...(isRecord(stored) ? stored : {}), ...line } } }];
+		});
+		const metadata = (draft: UnknownRecord): void => this.writeLineWidths(draft, ids, own, width);
+		if (legacy.length > 0) {
+			this.authoring ??= createCanvasAuthoring(this.view);
+			const result = this.authoring.changeItems({ updates: legacy, metadata }, document);
+			if (!result.ok) this.addDiagnostic(firstProblem(result.diagnostics) ?? "Canvas rejected the line width.");
+			this.refresh();
+		} else if (ids.length > 0 || own.length > 0) {
+			this.writeMetadata("line-width", metadata);
+		}
+	}
+
 	private applyElementStyle(patch: SelectionStylePatch): void {
+		if (patch.connector?.width !== undefined && Object.keys(patch.connector).length === 1 && Object.keys(patch).length === 1) {
+			this.commitLineWidth(patch.connector.width);
+			return;
+		}
 		if (this.selectedIds.length === 0) {
 			this.addDiagnostic("Select a Canvas element before changing its shape, border or connector settings.");
 			return;
@@ -5042,6 +5160,7 @@ export class M1CanvasSession {
 		if (next.length === this.selectedIds.length && next.every((id, index) => id === this.selectedIds[index])) return;
 		this.selectedIds = next;
 		this.selectedIdSet = selectedIdSet;
+		this.toolbar?.cancelLineWidth();
 	}
 
 	/**
@@ -9784,7 +9903,11 @@ export class M1CanvasSession {
 		const document = this.savedDocument();
 		this.policy = this.policyFromDocument(document);
 		const selection = this.adapter.getSelection();
+		const previous = this.selectedIds;
 		this.setSelectedIds([...(selection === undefined ? [] : this.idsOfSelection(selection).ids), ...this.ownSelection(document)]);
+		// Native Canvas can pick and move a card before the next full refresh.
+		// Follow its shell before Canvas writes the upcoming frame's transform.
+		if (this.selectedIds !== previous && this.root !== undefined) this.retargetFollow();
 		if (selection === undefined) {
 			this.interactionBlock = "this Canvas runtime does not report its selection";
 			this.policy = createInteractionPolicy(undefined);

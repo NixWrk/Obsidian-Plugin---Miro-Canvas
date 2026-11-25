@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Give arrow labels independent text and frame formatting. Text and border colors, border width and border style follow the arrow until overridden.
+- Keep the selection handles aligned with a card from the start of a drag.
+- Preview line thickness and inherited label borders while dragging the slider. Releasing it saves one undoable change.
 
 ## 0.3.3 - 2026-11-25
 

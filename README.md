@@ -16,7 +16,7 @@ connect them with arrows. Your board stays a local `.canvas` file.
 | --- | --- |
 | **Plan and organize** | Sticky notes, text, shapes, flowcharts and frames that move with their contents. |
 | **Use your notes** | Vault notes, `[[links]]`, embeds, images, PDFs, code blocks and Markdown tables. |
-| **Connect ideas** | Straight, elbowed and curved arrows with independently formatted labels. Attached lines follow the cards. |
+| **Connect ideas** | Straight, elbowed and curved arrows with independently formatted labels and live thickness previews. Attached lines follow the cards. |
 | **Draw** | Pen, highlighter, smart shape recognition and whole-stroke or partial erasers. |
 | **Discuss and review** | Comment threads, replies, resolved comments, item locks and board review mode. |
 | **Make it yours** | Fonts, colors, light/dark board themes, movable panels, tool order, search and a minimap. |

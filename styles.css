@@ -2115,6 +2115,11 @@
   pointer-events: none;
 }
 
+/* Native Canvas eases stroke widths. A held slider already supplies each step. */
+.miro-canvas-root[data-miro-line-width-preview] .canvas-display-path {
+  transition: none;
+}
+
 
 /* The dashed box a node is drawn in turns with it and carries the resize
    grips: a corner scales evenly, a side stretches.  Native resizers step

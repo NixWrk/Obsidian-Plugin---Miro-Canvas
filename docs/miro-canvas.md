@@ -318,6 +318,10 @@ and width, and the full connector settings (route, line style, both end caps,
 width). Controls that do not apply to the selection are removed from the row
 rather than shown disabled, and only one popover is open at a time.
 
+The line thickness slider previews the stroke and any inherited label border
+as it moves. Releasing it commits one change to Canvas history. Cancelling
+restores the saved thickness.
+
 Typography and colors continue through the appearance pipeline; shape, border
 and connector settings go through the guarded authoring transaction. Review mode
 and locked elements leave the toolbar visible but inert with an explicit reason,

@@ -125,6 +125,7 @@ export interface SelectionToolbarActions {
   readonly onEditConnectorLabel?: () => void;
   readonly onAppearance: (action: AppearanceAction) => void;
   readonly onStyle: (patch: SelectionStylePatch) => void;
+  readonly onLineWidthPreview?: (width: number | undefined) => void;
   readonly onLock: (locked: boolean) => void;
   /** Opens the selected link outside the board. */
   readonly onOpenLink?: () => void;
@@ -604,6 +605,8 @@ interface ToolbarRefs {
 }
 
 export class SelectionToolbar {
+  private lineWidthDraft: number | undefined;
+  private lineWidthCancelled = false;
   public readonly element: HTMLElement;
   private readonly document: Document | undefined;
   private readonly actions: SelectionToolbarActions;
@@ -700,11 +703,25 @@ export class SelectionToolbar {
   }
 
   private closePopovers(): void {
+    this.cancelLineWidth();
     this.element.removeAttribute?.("data-miro-label-popover-open");
     for (const popover of this.popovers) {
       popover.panel.hidden = true;
       popover.button.setAttribute("aria-expanded", "false");
     }
+  }
+
+  public cancelLineWidth(): void {
+    if (this.lineWidthDraft === undefined) return;
+    this.lineWidthDraft = undefined;
+    this.lineWidthCancelled = true;
+    if (this.refs !== undefined) this.showLineWidth(this.refs, this.state?.connector?.width ?? 2);
+    this.actions.onLineWidthPreview?.(undefined);
+  }
+
+  private showLineWidth(refs: ToolbarRefs, width: number): void {
+    refs.lineWidth.value = String(Math.min(LINE_SLIDER_MAX, width));
+    refs.lineWidthValue.textContent = String(width);
   }
 
   /** A block inside a panel, under an optional small heading. */
@@ -1043,11 +1060,27 @@ export class SelectionToolbar {
     for (const option of refs.strokes) {
       this.listen(option, "click", () => this.style({ connector: { strokeStyle: valueOf(option) as ConnectorStroke } }));
     }
-    // A slider shows its value while it moves and writes once, when it is let go.
-    this.listen(refs.lineWidth, "input", () => { refs.lineWidthValue.textContent = refs.lineWidth.value; });
+    // The browser reports every step but commits the range once on release.
+    this.listen(refs.lineWidth, "pointerdown", () => { this.lineWidthCancelled = false; });
+    this.listen(refs.lineWidth, "keydown", (event) => {
+      if ((event as KeyboardEvent).key !== "Escape") this.lineWidthCancelled = false;
+    });
+    this.listen(refs.lineWidth, "pointercancel", () => this.cancelLineWidth());
+    this.listen(refs.lineWidth, "blur", () => this.cancelLineWidth());
+    this.listen(refs.lineWidth, "input", () => {
+      const width = finiteNumber(refs.lineWidth.value);
+      if (this.lineWidthCancelled || this.state?.editable !== true || this.state.reviewMode
+        || width === undefined || width <= 0 || width > MAX_BORDER_WIDTH) return;
+      this.lineWidthDraft = width;
+      this.showLineWidth(refs, width);
+      this.actions.onLineWidthPreview?.(width);
+    });
     this.listen(refs.lineWidth, "change", () => {
       const width = finiteNumber(refs.lineWidth.value);
-      if (width !== undefined && width > 0 && width <= MAX_BORDER_WIDTH) this.style({ connector: { width } });
+      if (this.lineWidthCancelled || width === undefined || width <= 0 || width > MAX_BORDER_WIDTH) return;
+      this.lineWidthDraft = undefined;
+      this.style({ connector: { width } });
+      this.actions.onLineWidthPreview?.(undefined);
     });
     this.listen(refs.headSize, "change", () => {
       const headSize = Number(refs.headSize.value);
@@ -1179,6 +1212,7 @@ export class SelectionToolbar {
       refs.status.hidden = true;
       this.closePopovers();
     }
+    if (!state.editable) this.cancelLineWidth();
     root.hidden = !visible;
     // A popover must never outlive the selection it was opened for.
     const selectionKey = state.selectedIds.join("\u0000");
@@ -1259,9 +1293,7 @@ export class SelectionToolbar {
     showPicture(refs.startCap.button, `start:${start}`, () => capPicture(document, start, "start"), start === "none" ? "—" : "←");
     showPicture(refs.endCap.button, `end:${end}`, () => capPicture(document, end, "end"), end === "none" ? "—" : "→");
     showPicture(refs.line.button, `route:${route}`, () => routePicture(document, route), "╱");
-    const lineWidth = state.connector?.width;
-    refs.lineWidth.value = String(Math.min(LINE_SLIDER_MAX, lineWidth ?? 2));
-    refs.lineWidthValue.textContent = String(lineWidth ?? 2);
+    this.showLineWidth(refs, this.lineWidthDraft ?? state.connector?.width ?? 2);
     if (this.document?.activeElement !== refs.headSize) refs.headSize.value = state.connector?.headSize === undefined ? "" : String(state.connector.headSize);
 
     for (const slot of COLOR_SLOT_KEYS) {
@@ -1347,6 +1379,7 @@ export class SelectionToolbar {
   }
 
   public dispose(): void {
+    this.cancelLineWidth();
     for (const remove of this.listeners.splice(0)) {
       try {
         remove();

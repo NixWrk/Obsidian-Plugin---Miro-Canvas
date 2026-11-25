@@ -176,6 +176,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   readonly root: FakeElement;
   readonly appearance: AppearanceAction[];
   readonly styles: SelectionStylePatch[];
+  readonly widthPreviews: (number | undefined)[];
   readonly locks: boolean[];
   readonly layers: string[];
   readonly lists: number[];
@@ -186,6 +187,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
 } {
   const appearance: AppearanceAction[] = [];
   const styles: SelectionStylePatch[] = [];
+  const widthPreviews: (number | undefined)[] = [];
   const locks: boolean[] = [];
   const layers: string[] = [];
   const lists: number[] = [];
@@ -195,6 +197,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   const toolbar = new SelectionToolbar({
     onAppearance: (action) => { appearance.push(action); },
     onStyle: (patch) => { styles.push(patch); },
+    onLineWidthPreview: (width) => { widthPreviews.push(width); },
     onResetLabelBorder: () => { labelBorderResets.push(1); },
     onLock: (locked) => { locks.push(locked); },
     onLayer: (direction) => { layers.push(direction); },
@@ -217,7 +220,7 @@ function build(overrides: Partial<SelectionToolbarState> = {}, options: Selectio
   };
   const update = (patch: Partial<SelectionToolbarState> = {}): void => toolbar.update({ ...base, ...patch });
   update();
-  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, locks, layers, lists, links, comments, labelBorderResets, update };
+  return { toolbar, root: toolbar.element as unknown as FakeElement, appearance, styles, widthPreviews, locks, layers, lists, links, comments, labelBorderResets, update };
 }
 
 describe("selection toolbar", () => {
@@ -600,6 +603,43 @@ describe("selection toolbar", () => {
     expect(pressed(root, "Line")).toEqual(["straight", "dotted"]);
     expect(byLabel(root, "Line").getAttribute("data-picture")).toBe("route:straight");
     expect(width.value).toBe("3");
+  });
+
+  it("previews the range as it moves and writes only the released width", () => {
+    const { root, styles, widthPreviews, update } = build({ ...EDGE, connector: { width: 3 } });
+    const width = byLabel(root, "Line thickness");
+    width.dispatch("pointerdown");
+    width.value = "7";
+    width.dispatch("input");
+    update({ placement: { x: 140, y: 45 } });
+    expect(width.value).toBe("7");
+    width.value = "12";
+    width.dispatch("input");
+    expect(widthPreviews).toEqual([7, 12]);
+    expect(styles).toEqual([]);
+    width.dispatch("change");
+    expect(styles).toEqual([{ connector: { width: 12 } }]);
+    expect(widthPreviews).toEqual([7, 12, undefined]);
+  });
+
+  it("discards a line width preview on pointer cancellation or selection change", () => {
+    const { root, styles, widthPreviews, update } = build({ ...EDGE, connector: { width: 3 } });
+    const width = byLabel(root, "Line thickness");
+    for (const cancel of [() => width.dispatch("pointercancel"), () => update({ selectedIds: ["other"] })]) {
+      width.dispatch("pointerdown");
+      width.value = "13";
+      width.dispatch("input");
+      cancel();
+      expect(width.value).toBe("3");
+      width.dispatch("change");
+    }
+    expect(styles).toEqual([]);
+    expect(widthPreviews).toEqual([13, undefined, 13, undefined]);
+    width.dispatch("keydown", { key: "ArrowRight" });
+    width.value = "4";
+    width.dispatch("input");
+    width.dispatch("change");
+    expect(styles).toEqual([{ connector: { width: 4 } }]);
   });
 
   it("marks no picture for an unsupported shape token and rejects an out-of-range width", () => {
