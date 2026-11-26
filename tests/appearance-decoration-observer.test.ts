@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { M1CanvasSession } from "../src/m1-session";
+import { M1CanvasSession, type M1SessionOptions } from "../src/m1-session";
 import { MetadataWriter } from "../src/metadata-writer";
 import { createObsidianMetadataStore } from "../src/obsidian-metadata-store";
 
@@ -217,7 +217,7 @@ afterEach(() => {
 });
 
 /** A board with one styled card and one plain card, wired the way real Canvas exposes canvasEl and a MutationObserver-capable document. */
-function fixture(override: Record<string, unknown> = {}) {
+function fixture(override: Record<string, unknown> = {}, options: M1SessionOptions = {}) {
 	const root = new HostElement("canvas-wrapper");
 	const nodeLayer = new HostElement("canvas-node-layer");
 	root.appendChild(nodeLayer);
@@ -253,7 +253,7 @@ function fixture(override: Record<string, unknown> = {}) {
 	const view = { canvas };
 	const store = createObsidianMetadataStore(view).store;
 	expect(store).toBeDefined();
-	const session = new M1CanvasSession(view, new MetadataWriter(store!));
+	const session = new M1CanvasSession(view, new MetadataWriter(store!), options);
 	sessions.push(session);
 	expect(session.mount()).toBe(true);
 	session.refresh();
@@ -364,5 +364,41 @@ describe("appearance decoration follows Obsidian's own DOM replacement", () => {
 		expect(observer.connected).toBe(true);
 		session.dispose();
 		expect(observer.connected).toBe(false);
+	});
+});
+
+describe("the focus of a field in the board's panels", () => {
+	const focusEvent = (type: string, matches: readonly string[]) => {
+		const event = new Event(type);
+		Object.defineProperty(event, "target", {
+			value: { closest: (selector: string) => (matches.some((name) => selector.includes(name)) ? {} : null) },
+		});
+		return event;
+	};
+
+	it("tells the plugin once when a panel's field takes the focus and when it loses it", () => {
+		const onTextFieldFocus = vi.fn();
+		const { root } = fixture({}, { onTextFieldFocus });
+		root.dispatchEvent(focusEvent("focusin", ["textarea"]));
+		root.dispatchEvent(focusEvent("focusin", ["textarea"]));
+		expect(onTextFieldFocus.mock.calls).toEqual([[true]]);
+		root.dispatchEvent(focusEvent("focusout", ["textarea"]));
+		expect(onTextFieldFocus.mock.calls).toEqual([[true], [false]]);
+	});
+
+	it("leaves a card's own fields and anything else that takes the focus to native Canvas", () => {
+		const onTextFieldFocus = vi.fn();
+		const { root } = fixture({}, { onTextFieldFocus });
+		root.dispatchEvent(focusEvent("focusin", ["textarea", ".canvas-node"]));
+		root.dispatchEvent(focusEvent("focusin", ["button"]));
+		expect(onTextFieldFocus).not.toHaveBeenCalled();
+	});
+
+	it("gives the keys back when the board closes with a field focused", () => {
+		const onTextFieldFocus = vi.fn();
+		const { root, session } = fixture({}, { onTextFieldFocus });
+		root.dispatchEvent(focusEvent("focusin", ["textarea"]));
+		session.dispose();
+		expect(onTextFieldFocus.mock.calls).toEqual([[true], [false]]);
 	});
 });

@@ -197,6 +197,8 @@ export interface M1SessionOptions {
   readonly onSelectionActions?: (button: HTMLElement, actions: readonly { readonly title: string; readonly run: () => void; readonly disabled?: boolean }[]) => void;
   readonly onCommittedBoardDocument?: (document: object, identity: object) => void;
   readonly onReleaseBoardDocument?: () => void;
+  /** A field of the board's own panels took or lost the focus: while it holds it, native Canvas's keys must leave it alone. */
+  readonly onTextFieldFocus?: (focused: boolean) => void;
   readonly onOpenPalette?: () => void;
   readonly onOpenBoardProperties?: () => void;
   readonly onEncapsulateSelection?: () => void;
@@ -1744,6 +1746,7 @@ export class M1CanvasSession {
 	private refreshTimer: ReturnType<typeof setInterval> | undefined;
 	private spacePanHeld = false;
 	private pointerEditIds: readonly string[] | undefined;
+	private textFieldFocused = false;
 	private nativeHistoryDepth = 0;
 	private boardCommitQueued = false;
 	/**
@@ -10231,6 +10234,12 @@ export class M1CanvasSession {
 		return this.closestTarget(event, PANEL_SELECTOR);
 	}
 
+	private setTextFieldFocused(focused: boolean): void {
+		if (focused === this.textFieldFocused) return;
+		this.textFieldFocused = focused;
+		this.options.onTextFieldFocus?.(focused);
+	}
+
 	/**
 	 * Whether a press lands on what is selected: the shared frame, native
 	 * Canvas's selection box, or a selected card or line of either kind.  (A
@@ -10322,6 +10331,12 @@ export class M1CanvasSession {
 				handler(event);
 			}, true);
 		};
+		// Native Canvas's arrows, select-all and undo run ahead of every listener
+		// here, and pass over a text input and its cards' editors, not a textarea.
+		this.listen(this.root, "focusin", (event) => {
+			this.setTextFieldFocused(this.closestTarget(event, "input, textarea, select") && !this.closestTarget(event, ".canvas-node"));
+		});
+		this.listen(this.root, "focusout", () => this.setTextFieldFocused(false));
 		listen("keydown", (event) => {
 			const keyboard = event as KeyboardEvent;
 			const key = keyboard.key;
@@ -10473,6 +10488,7 @@ export class M1CanvasSession {
 			return;
 		}
 		this.disposed = true;
+		this.setTextFieldFocused(false);
 		this.options.onReleaseBoardDocument?.();
 		this.nativeUiVisibility?.dispose();
 		this.nativeUiVisibility = undefined;
