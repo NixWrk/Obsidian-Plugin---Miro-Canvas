@@ -41,6 +41,8 @@ export interface CommentReply {
   readonly updatedAt?: string;
   readonly author?: CommentAuthor;
   readonly immutable?: boolean;
+  /** The message of the same thread this reply answers; a flat list keeps its order. */
+  readonly replyTo?: string;
   readonly [key: string]: unknown;
 }
 
