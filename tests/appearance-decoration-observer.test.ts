@@ -366,3 +366,126 @@ describe("appearance decoration follows Obsidian's own DOM replacement", () => {
 		expect(observer.connected).toBe(false);
 	});
 });
+
+describe("a card's player while the board is under review", () => {
+	/** What the board sees of a press inside a player: the shadow host, in a card that may be focused. */
+	const card = new HostElement();
+	const playerTarget = (focused: boolean, player = new HostElement()) => ({
+		closest(selector: string) {
+			if (selector.includes("data-node-id")) return { getAttribute: (name: string) => (name === "data-node-id" ? "styled" : null) };
+			if (selector.includes(".is-focused")) return focused ? card : null;
+			return selector.includes(".canvas-node") ? {} : null;
+		},
+		player,
+	});
+	/** A control of the player, inside its shadow root; the path is what the board can see of it. */
+	const control = { nodeType: 1, appendChild() {}, removeChild() {}, matches: (selector: string) => selector.includes("[role=slider]") };
+	const shadow = { nodeType: 11, querySelector: (selector: string) => (selector.includes("video") ? {} : null) };
+	const noMedia = { nodeType: 11, querySelector: () => null };
+	const fire = (root: HostElement, type: string, target: { closest(selector: string): unknown; player: HostElement }, init: Record<string, unknown> = {}) => {
+		const event = new Event(type, { cancelable: true });
+		Object.defineProperty(event, "target", { value: target });
+		const inside = [...(init.onPicture === true ? [] : [control]), init.path ?? shadow, target.player];
+		Object.defineProperty(event, "composedPath", { value: () => [...inside, card] });
+		for (const [key, value] of Object.entries({ button: 0, buttons: 1, pointerType: "mouse", ...init })) {
+			Object.defineProperty(event, key, { value });
+		}
+		const stopped = vi.spyOn(event, "stopPropagation");
+		root.dispatchEvent(event);
+		return Object.assign(event, { stopped });
+	};
+	const reviewing = () => {
+		const board = fixture();
+		board.session.toggleReviewMode();
+		expect(board.session.isViewing()).toBe(true);
+		return board;
+	};
+
+	it("leaves a press and the moves after it to a focused card's player, wherever they land", () => {
+		const { root } = reviewing();
+		for (const type of ["pointerdown", "mousedown"]) {
+			expect(fire(root, type, playerTarget(true)).defaultPrevented).toBe(false);
+		}
+		expect(fire(root, "pointermove", playerTarget(true)).defaultPrevented).toBe(false);
+		// Past the slider's end the pointer is over the card, not the player.
+		expect(fire(root, "pointermove", playerTarget(false)).defaultPrevented).toBe(false);
+	});
+
+	it("keeps the gesture when the press takes the focus from a card's editor", () => {
+		const { root } = reviewing();
+		fire(root, "pointerdown", playerTarget(true));
+		(root.ownerDocument as FakeDocument).defaultView.dispatchEvent(new Event("blur"));
+		expect(fire(root, "pointermove", playerTarget(true)).defaultPrevented).toBe(false);
+	});
+
+	it("still keeps a press on a card that is not focused, and the moves after a release", () => {
+		const { root } = reviewing();
+		fire(root, "pointerdown", playerTarget(true));
+		(root.ownerDocument as FakeDocument).defaultView.dispatchEvent(new Event("pointerup"));
+		expect(fire(root, "pointermove", playerTarget(false)).defaultPrevented).toBe(true);
+		expect(fire(root, "pointerdown", playerTarget(false)).defaultPrevented).toBe(true);
+	});
+
+	it("gives a locked card's player the press and keeps it from native Canvas's drag", () => {
+		const { root, canvas, session } = fixture({ locked: true });
+		session.refresh();
+		expect(canvas.readonly).toBe(false);
+		const player = new HostElement();
+		const event = fire(root, "pointerdown", playerTarget(true, player));
+		expect(event.defaultPrevented).toBe(false);
+		player.dispatchEvent(event);
+		expect(event.stopped).toHaveBeenCalledOnce();
+		expect(fire(root, "pointermove", playerTarget(false)).defaultPrevented).toBe(false);
+	});
+
+	it.each(["review", "lock"])("keeps the picture of a player from a press, its release and its click (%s)", (kind) => {
+		const { root, session } = kind === "review" ? reviewing() : fixture({ locked: true });
+		session.refresh();
+		const picture = { onPicture: true };
+		expect(fire(root, "pointerdown", playerTarget(true), picture).defaultPrevented).toBe(true);
+		expect(fire(root, "pointerup", playerTarget(true), picture).stopped).toHaveBeenCalled();
+		expect(fire(root, "click", playerTarget(true), picture).stopped).toHaveBeenCalled();
+	});
+
+	it("treats a bare media element as all controls, its own being out of reach", () => {
+		const { root } = reviewing();
+		const video = { nodeType: 1, appendChild() {}, removeChild() {}, matches: (selector: string) => selector.includes("video") };
+		const event = fire(root, "pointerdown", playerTarget(true), { onPicture: true, path: video });
+		expect(event.defaultPrevented).toBe(false);
+	});
+
+	it("leaves a shadow root without media to the guards, whatever it draws", () => {
+		const { root } = reviewing();
+		expect(fire(root, "pointerdown", playerTarget(true), { path: noMedia }).defaultPrevented).toBe(true);
+		expect(fire(root, "pointerup", playerTarget(true), { path: noMedia }).stopped).not.toHaveBeenCalled();
+	});
+
+	it("gives a release over the picture to a gesture that began on a control", () => {
+		const { root } = reviewing();
+		fire(root, "pointerdown", playerTarget(true));
+		expect(fire(root, "pointerup", playerTarget(true), { onPicture: true }).stopped).not.toHaveBeenCalled();
+	});
+
+	it("gives a release over the picture to a press the guards let through", () => {
+		const { root } = reviewing();
+		const pan = new Event("pointerdown");
+		Object.defineProperty(pan, "target", { value: { closest: () => null } });
+		root.dispatchEvent(pan);
+		expect(fire(root, "pointerup", playerTarget(true), { onPicture: true }).stopped).not.toHaveBeenCalled();
+	});
+
+	it("still keeps a press on a locked card that is not focused", () => {
+		const { root, session } = fixture({ locked: true });
+		session.refresh();
+		expect(fire(root, "pointerdown", playerTarget(false)).defaultPrevented).toBe(true);
+	});
+
+	it("leaves a focused player on a card free to move to native Canvas", () => {
+		const { root } = fixture();
+		const player = new HostElement();
+		const event = fire(root, "pointerdown", playerTarget(true, player));
+		expect(event.defaultPrevented).toBe(false);
+		player.dispatchEvent(event);
+		expect(event.stopped).not.toHaveBeenCalled();
+	});
+});

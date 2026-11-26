@@ -17,6 +17,8 @@
 - Keep the selection handles aligned with a card from the start of a drag.
 - Preview line and border thickness while dragging the slider. This covers arrow labels, text, cards, shapes, notes, attachments and frames. Releasing the slider saves one undoable action.
 
+- Let the controls of a focused card's video or audio player take presses and drags in review mode and on a locked card, so its time slider can seek; the picture no longer plays or pauses there, the card itself stays in place, and a card that is not focused is still protected.
+
 ## 0.3.2 - 2026-10-10
 
 - Remove the deprecated, no-op Range.detach call from vector text measurement. Preserve glyph positioning, text styles and export cancellation while supporting hosts without the legacy method.
