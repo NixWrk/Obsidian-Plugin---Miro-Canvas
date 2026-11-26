@@ -24,7 +24,7 @@ connect them with arrows. Your board stays a local `.canvas` file.
 
 Panels and tool choices are remembered separately for computers, tablets and
 phones. Android supports touch navigation, stylus drawing and optional finger
-drawing. The interface is available in English and Russian.
+drawing. The interface is available in English, Russian and Simplified Chinese.
 
 <details>
 <summary>See drawing and erasing</summary>

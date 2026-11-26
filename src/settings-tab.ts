@@ -12,7 +12,7 @@ import { fontStack } from "./appearance";
 import { authorColor } from "./comment-thread";
 import type { FontPackCatalogueEntry } from "./font-pack-catalogue";
 import type { FontPackProgress } from "./font-packs";
-import { currentLocale, words } from "./i18n";
+import { currentLocale, sentences, words } from "./i18n";
 import { POINTER_BINDINGS, type PointerBinding } from "./pointer-bindings";
 import { ALL_TOOLBAR_ITEMS, DEFAULT_TOOLBAR_ITEMS, paintToolbarIcon, toolbarItemLabel, type ToolbarItem } from "./quick-tools";
 import type { UpdateCheck } from "./update-check";
@@ -440,7 +440,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
       const megabytes = (pack.bytes / (1024 * 1024)).toFixed(1);
       const setting = new SettingsRow(rows)
         .setName(pack.title[locale] ?? pack.title.en)
-        .setDesc(`${pack.description[locale] ?? pack.description.en} ${labels.sizeMB(megabytes)}`);
+        .setDesc(sentences(pack.description[locale] ?? pack.description.en, labels.sizeMB(megabytes)));
       setting.configure((nativeSetting) => {
         const status = nativeSetting.descEl.createDiv({ cls: "miro-canvas-fontpack-status" });
         nativeSetting.addButton((button) => {
@@ -675,10 +675,10 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
     const bound = SETTING_BOUNDS[key];
     const initialValue = this.host.settings[key];
     const currently = words().settings.currently;
-    new SettingsRow(rows).setName(name).setDesc(`${description} ${currently(format(initialValue))}`)
+    new SettingsRow(rows).setName(name).setDesc(sentences(description, currently(format(initialValue))))
       .configure((setting) => {
         const value = this.host.settings[key];
-        setting.setDesc(`${description} ${currently(format(value))}`);
+        setting.setDesc(sentences(description, currently(format(value))));
         let valueInput: TextComponent | undefined;
         let valueSlider: SliderComponent | undefined;
         setting.addSlider((slider) => {
@@ -688,7 +688,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
           .setValue(value)
           .onChange((next) => {
             valueInput?.setValue(String(next));
-            setting.setDesc(`${description} ${currently(format(next))}`);
+            setting.setDesc(sentences(description, currently(format(next))));
             void this.host.saveSettings({ [key]: next });
           });
         });
@@ -705,7 +705,7 @@ export class MiroCanvasSettingTab extends PluginSettingTab {
               const next = Math.max(bound.min, Math.min(bound.max, number));
               valueSlider?.setValue(next);
               if (number !== next) text.setValue(String(next));
-              setting.setDesc(`${description} ${currently(format(next))}`);
+              setting.setDesc(sentences(description, currently(format(next))));
               void this.host.saveSettings({ [key]: next });
             });
           });
